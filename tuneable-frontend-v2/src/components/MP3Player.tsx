@@ -9,6 +9,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { computeChampionTipContext } from '../utils/tipStats';
 import { toast } from 'react-toastify';
 import {
   isNativeAudioPlatform,
@@ -437,14 +438,10 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
   };
 
-  const getTopTip = () => {
-    const bids = Array.isArray((media as any)?.bids) ? (media as any).bids : [];
-    const amounts = bids
-      .map((bid: any) => bid?.amount)
-      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
-    if (amounts.length === 0) return undefined;
-    return Math.max(...amounts) / 100;
-  };
+  const championTip = computeChampionTipContext((media as any)?.bids, user, {
+    fallbackChampionAggregatePence: (media as any)?.globalMediaAggregateTop,
+    fallbackChampionUser: (media as any)?.globalMediaAggregateTopUser,
+  });
 
   const handleOpenTipModal = () => {
     if (!media) {
@@ -662,7 +659,9 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         bidAmount={Math.max(media.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
         minTip={media.minimumBid || 0.01}
         avgTip={getAverageTip()}
-        topTip={getTopTip()}
+        championAggregate={championTip?.championAggregate}
+        viewerAggregate={championTip?.viewerAggregate}
+        viewerIsChampion={championTip?.viewerIsChampion}
         mediaTitle={media.title}
         mediaArtist={media.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

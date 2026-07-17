@@ -41,6 +41,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { computeChampionTipContext } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
@@ -977,14 +978,14 @@ const UserProfile: React.FC = () => {
     return media.globalMediaAggregateAvg / 100; // Convert from pence to pounds
   };
 
-  const getTopTip = (media: any): number | undefined => {
-    if (!media?.bids?.length) return undefined;
-    const amounts = media.bids
-      .map((bid: any) => bid.amount)
-      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
-    if (amounts.length === 0) return undefined;
-    return Math.max(...amounts) / 100;
-  };
+  const libraryChampionTip = useMemo(
+    () =>
+      computeChampionTipContext(libraryItemToTip?.bids, currentUser, {
+        fallbackChampionAggregatePence: libraryItemToTip?.globalMediaAggregateTop,
+        fallbackChampionUser: (libraryItemToTip as any)?.globalMediaAggregateTopUser,
+      }),
+    [libraryItemToTip, currentUser]
+  );
 
   // Add tune search handler
   const handleAddTuneSearch = async () => {
@@ -4487,7 +4488,9 @@ const UserProfile: React.FC = () => {
         bidAmount={currentUser?.preferences?.defaultTip || 1.11}
         minTip={0.01}
         avgTip={libraryItemToTip ? calculateAverageBid(libraryItemToTip) : undefined}
-        topTip={getTopTip(libraryItemToTip)}
+        championAggregate={libraryChampionTip?.championAggregate}
+        viewerAggregate={libraryChampionTip?.viewerAggregate}
+        viewerIsChampion={libraryChampionTip?.viewerIsChampion}
         mediaTitle={libraryItemToTip?.title || 'Unknown'}
         mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((currentUser as any)?.balance)}

@@ -8,6 +8,7 @@ import { Play, Pause, Volume2, VolumeX, X, Heart } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { computeChampionTipContext } from '../utils/tipStats';
 import { toast } from 'react-toastify';
 
 /** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */
@@ -188,14 +189,10 @@ const PersistentPodcastPlayer: React.FC = () => {
     return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
   };
 
-  const getTopTip = () => {
-    const bids = Array.isArray((currentEpisode as any)?.bids) ? (currentEpisode as any).bids : [];
-    const amounts = bids
-      .map((bid: any) => bid?.amount)
-      .filter((amount: unknown): amount is number => typeof amount === 'number' && amount > 0);
-    if (amounts.length === 0) return undefined;
-    return Math.max(...amounts) / 100;
-  };
+  const championTip = computeChampionTipContext((currentEpisode as any)?.bids, user, {
+    fallbackChampionAggregatePence: (currentEpisode as any)?.globalMediaAggregateTop,
+    fallbackChampionUser: (currentEpisode as any)?.globalMediaAggregateTopUser,
+  });
 
   const handleOpenTipModal = () => {
     if (!currentEpisode) {
@@ -442,7 +439,9 @@ const PersistentPodcastPlayer: React.FC = () => {
         bidAmount={Math.max(currentEpisode?.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
         minTip={currentEpisode?.minimumBid || 0.01}
         avgTip={getAverageTip()}
-        topTip={getTopTip()}
+        championAggregate={championTip?.championAggregate}
+        viewerAggregate={championTip?.viewerAggregate}
+        viewerIsChampion={championTip?.viewerIsChampion}
         mediaTitle={currentEpisode?.title || 'Unknown'}
         mediaArtist={currentEpisode?.artist || currentEpisode?.podcastTitle || currentEpisode?.podcastSeries?.title || 'Unknown show'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

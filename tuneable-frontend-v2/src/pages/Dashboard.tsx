@@ -21,6 +21,7 @@ import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import { normalizeSources } from '../utils/mediaPlayability';
+import { computeChampionTipContext } from '../utils/tipStats';
 
 interface SearchResult {
   _id?: string;
@@ -70,14 +71,14 @@ const Dashboard: React.FC = () => {
     return user?.preferences?.defaultTip || 1.11;
   };
 
-  const getLibraryTopTip = (item: LibraryItem | null): number | undefined => {
-    if (!item?.bids?.length) return undefined;
-    const amounts = item.bids
-      .map((bid) => bid.amount)
-      .filter((amount): amount is number => typeof amount === 'number' && amount > 0);
-    if (amounts.length === 0) return undefined;
-    return Math.max(...amounts) / 100;
-  };
+  const libraryChampionTip = useMemo(
+    () =>
+      computeChampionTipContext(libraryItemToTip?.bids, user, {
+        fallbackChampionAggregatePence: (libraryItemToTip as any)?.globalMediaAggregateTop,
+        fallbackChampionUser: (libraryItemToTip as any)?.globalMediaAggregateTopUser,
+      }),
+    [libraryItemToTip, user]
+  );
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
@@ -2844,7 +2845,9 @@ Join here: ${inviteLink}`.trim();
         bidAmount={Math.max(minimumBid, getUserDefaultTip())}
         minTip={minimumBid}
         avgTip={libraryItemToTip ? libraryItemToTip.globalMediaAggregateAvg / 100 : undefined}
-        topTip={getLibraryTopTip(libraryItemToTip)}
+        championAggregate={libraryChampionTip?.championAggregate}
+        viewerAggregate={libraryChampionTip?.viewerAggregate}
+        viewerIsChampion={libraryChampionTip?.viewerIsChampion}
         mediaTitle={libraryItemToTip?.title || 'Unknown'}
         mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

@@ -56,6 +56,7 @@ import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly, normalizeSources } from '../utils/mediaPlayability';
+import { computeChampionTipContext } from '../utils/tipStats';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
 import AiToolsEditor from '../components/AiToolsEditor';
@@ -437,6 +438,15 @@ const TuneProfile: React.FC = () => {
     const avgPence = total / bids.length;
     return penceToPoundsNumber(avgPence); // Convert pence to pounds
   };
+
+  const mediaChampionTip = useMemo(
+    () =>
+      computeChampionTipContext(media?.bids, user, {
+        fallbackChampionAggregatePence: media?.globalMediaAggregateTop,
+        fallbackChampionUser: (media as any)?.globalMediaAggregateTopUser,
+      }),
+    [media, user]
+  );
 
   // Check if user can edit this tune
   const canEditTune = () => {
@@ -4211,6 +4221,9 @@ const TuneProfile: React.FC = () => {
         bidAmount={defaultTipAmount}
         minTip={minimumBid}
         avgTip={media ? calculateGlobalMediaBidAvg(media) || undefined : undefined}
+        championAggregate={mediaChampionTip?.championAggregate}
+        viewerAggregate={mediaChampionTip?.viewerAggregate}
+        viewerIsChampion={mediaChampionTip?.viewerIsChampion}
         mediaTitle={media?.title || 'Unknown'}
         mediaArtist={media?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

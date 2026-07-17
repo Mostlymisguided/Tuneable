@@ -23,6 +23,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
+import { computeChampionTipContext } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import {
   isLocationMatch,
@@ -1678,29 +1679,37 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   }, [pendingMedia, isInlineBid, party, queueBidAmounts, newMediaBidAmounts, calculateAverageBid, showBidConfirmationModal]);
 
   // Tip stats shown as shortcuts in the confirmation modal.
-  // avg/top only make sense for media already in the queue (inline tips).
+  // avg/champion only make sense for media already in the queue (inline tips).
   const confirmationTipStats = useMemo(() => {
     const minTip = getEffectiveMinimumBid(pendingMedia);
     if (!isInlineBid || !pendingMedia) {
-      return { minTip, avgTip: undefined as number | undefined, topTip: undefined as number | undefined };
+      return {
+        minTip,
+        avgTip: undefined as number | undefined,
+        championAggregate: undefined as number | undefined,
+        viewerAggregate: undefined as number | undefined,
+        viewerIsChampion: false,
+      };
     }
     let avgTip: number | undefined;
-    let topTip: number | undefined;
     try {
       const avg = calculateAverageBid(pendingMedia);
       avgTip = avg > 0 ? avg : undefined;
-      const bids = Array.isArray(pendingMedia?.bids) ? pendingMedia.bids : [];
-      const amounts = bids
-        .map((b: any) => (typeof b?.amount === 'number' ? b.amount : 0))
-        .filter((a: number) => a > 0);
-      if (amounts.length > 0) {
-        topTip = penceToPoundsNumber(Math.max(...amounts));
-      }
     } catch (e) {
       console.error('Error computing tip stats:', e);
     }
-    return { minTip, avgTip, topTip };
-  }, [pendingMedia, isInlineBid, calculateAverageBid]);
+    const champion = computeChampionTipContext(pendingMedia?.bids, user, {
+      fallbackChampionAggregatePence: pendingMedia?.globalMediaAggregateTop,
+      fallbackChampionUser: pendingMedia?.globalMediaAggregateTopUser,
+    });
+    return {
+      minTip,
+      avgTip,
+      championAggregate: champion?.championAggregate,
+      viewerAggregate: champion?.viewerAggregate,
+      viewerIsChampion: champion?.viewerIsChampion ?? false,
+    };
+  }, [pendingMedia, isInlineBid, calculateAverageBid, user]);
 
   // Calculate user balance safely
   const confirmationUserBalance = useMemo(() => {
@@ -3620,7 +3629,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           bidAmount={confirmationBidAmount}
           minTip={confirmationTipStats.minTip}
           avgTip={confirmationTipStats.avgTip}
-          topTip={confirmationTipStats.topTip}
+          championAggregate={confirmationTipStats.championAggregate}
+          viewerAggregate={confirmationTipStats.viewerAggregate}
+          viewerIsChampion={confirmationTipStats.viewerIsChampion}
           mediaTitle={pendingMedia?.title || 'Unknown'}
           mediaArtist={Array.isArray(pendingMedia?.artist) 
             ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'

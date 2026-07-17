@@ -6,6 +6,7 @@ import { partyAPI } from '../lib/api';
 import type { Party } from '../types';
 import type { User } from '../contexts/AuthContext';
 import { normalizeTagForStorage } from '../utils/tagNormalizer';
+import { amountToTakeChampion } from '../utils/tipStats';
 
 type ProgressStep = 'placing' | 'processing' | 'updating' | null;
 
@@ -25,8 +26,12 @@ interface BidConfirmationModalProps {
   minTip?: number;
   /** Average tip on this media (pounds). Shown as a shortcut chip when provided. */
   avgTip?: number;
-  /** Highest tip on this media across all parties (pounds). Shown as a shortcut chip when provided. */
-  topTip?: number;
+  /** #1 tipper aggregate on this media (pounds). Enables the Champion shortcut. */
+  championAggregate?: number;
+  /** Current user's aggregate on this media (pounds). Used to compute gap to #1. */
+  viewerAggregate?: number;
+  /** True when the current user already holds #1. */
+  viewerIsChampion?: boolean;
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -43,7 +48,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   isNonPlayable = false,
   minTip = 0.01,
   avgTip,
-  topTip,
+  championAggregate,
+  viewerAggregate = 0,
+  viewerIsChampion = false,
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -165,13 +172,51 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   if (!isOpen) return null;
 
   const hasInsufficientFunds = effectiveAmount > userBalance;
-  const statChips: { label: string; value: number }[] = [
-    { label: 'Min', value: minTip },
-    ...(typeof avgTip === 'number' && avgTip > 0 ? [{ label: 'Avg', value: avgTip }] : []),
-    ...(typeof topTip === 'number' && topTip > 0 ? [{ label: 'Top', value: topTip }] : []),
-  ];
+  const hasChampion =
+    typeof championAggregate === 'number' && Number.isFinite(championAggregate) && championAggregate > 0;
+  const takeChampionAmount = hasChampion
+    ? amountToTakeChampion(championAggregate, viewerAggregate, minTip)
+    : null;
   const actionLabel = 'Tip';
   const actionLabelLower = 'tip';
+
+  type StatChip =
+    | { kind: 'set'; label: string; value: number; title: string }
+    | {
+        kind: 'champion';
+        label: string;
+        value: number;
+        displayValue?: number;
+        title: string;
+        disabled?: boolean;
+      };
+
+  const statChips: StatChip[] = [
+    { kind: 'set', label: 'Min', value: minTip, title: `Set ${actionLabelLower} to £${minTip.toFixed(2)}` },
+    ...(typeof avgTip === 'number' && avgTip > 0
+      ? [{ kind: 'set' as const, label: 'Avg', value: avgTip, title: `Set ${actionLabelLower} to £${avgTip.toFixed(2)}` }]
+      : []),
+  ];
+
+  if (hasChampion && takeChampionAmount != null) {
+    if (viewerIsChampion) {
+      statChips.push({
+        kind: 'champion',
+        label: "You're #1",
+        value: championAggregate,
+        title: `You hold #1 with £${championAggregate.toFixed(2)} total tipped`,
+        disabled: true,
+      });
+    } else {
+      statChips.push({
+        kind: 'champion',
+        label: 'Champion',
+        value: takeChampionAmount,
+        displayValue: championAggregate,
+        title: `Tip £${takeChampionAmount.toFixed(2)} to take #1 (currently £${championAggregate.toFixed(2)})`,
+      });
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
@@ -201,7 +246,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           )}
           {isNonPlayable && (
             <p className="text-amber-300/90 text-xs mt-2">
-              This track is not playable yet. Your tip adds support now and playback can follow once audio is uploaded.
+              This track is not playable yet. Your tip adds support now — playback and download can follow once audio is uploaded.
             </p>
           )}
         </div>
@@ -248,18 +293,38 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           {/* Tip stat shortcuts */}
           {statChips.length > 0 && (
             <div className="mt-4 flex items-center justify-center flex-wrap gap-2">
-              {statChips.map(({ label, value }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setAmountTo(value)}
-                  disabled={isLoading}
-                  title={`Set ${actionLabelLower} to £${value.toFixed(2)}`}
-                  className="px-3 py-1 rounded-full bg-purple-800/50 border border-purple-500/40 text-xs text-purple-200 hover:bg-purple-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {label} £{value.toFixed(2)}
-                </button>
-              ))}
+              {statChips.map((chip) => {
+                const isChampion = chip.kind === 'champion';
+                const disabled = isLoading || Boolean(chip.kind === 'champion' && chip.disabled);
+                const buttonLabel =
+                  isChampion && chip.disabled
+                    ? chip.label
+                    : isChampion && chip.displayValue != null
+                      ? `${chip.label} £${chip.displayValue.toFixed(2)}`
+                      : `${chip.label} £${chip.value.toFixed(2)}`;
+
+                return (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => {
+                      if (disabled) return;
+                      setAmountTo(chip.value);
+                    }}
+                    disabled={disabled}
+                    title={chip.title}
+                    className={`px-3 py-1 rounded-full border text-xs transition-colors disabled:cursor-not-allowed ${
+                      isChampion
+                        ? disabled
+                          ? 'bg-amber-900/30 border-amber-500/30 text-amber-200/70'
+                          : 'bg-amber-900/40 border-amber-400/50 text-amber-100 hover:bg-amber-600 hover:text-white'
+                        : 'bg-purple-800/50 border-purple-500/40 text-purple-200 hover:bg-purple-600 hover:text-white disabled:opacity-50'
+                    }`}
+                  >
+                    {buttonLabel}
+                  </button>
+                );
+              })}
             </div>
           )}
 
