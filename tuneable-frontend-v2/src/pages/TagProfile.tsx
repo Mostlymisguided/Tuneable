@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Tag, Loader2, Music, Users, Crown, Minus, Plus, Coins } from 'lucide-react';
+import { Tag, Loader2, Music, Coins } from 'lucide-react';
 import { tagAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -19,14 +19,6 @@ interface TagStats {
   globalTagAggregate?: number;
 }
 
-interface RelatedParty {
-  _id: string;
-  name: string;
-  slug?: string;
-  description?: string;
-  tags?: string[];
-}
-
 interface RelatedTag {
   name: string;
   slug: string;
@@ -42,13 +34,11 @@ const TagProfile: React.FC = () => {
 
   const [tag, setTag] = useState<TagEntity | null>(null);
   const [stats, setStats] = useState<TagStats | null>(null);
-  const [relatedParty, setRelatedParty] = useState<RelatedParty | null>(null);
   const [relatedTags, setRelatedTags] = useState<RelatedTag[]>([]);
   const [media, setMedia] = useState<TagMediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showChampions, setShowChampions] = useState(false);
 
   const loadProfile = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -61,7 +51,6 @@ const TagProfile: React.FC = () => {
         const data = await tagAPI.getProfile(slug, { limit: 50 });
         setTag(data.tag);
         setStats(data.stats || null);
-        setRelatedParty(data.relatedParty || null);
         setRelatedTags(data.relatedTags || []);
         setMedia(data.media || []);
         setTotal(data.pagination?.total ?? (data.media?.length || 0));
@@ -185,55 +174,16 @@ const TagProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Related party */}
-              {relatedParty && (
-                <div className="flex justify-center md:justify-start mb-3">
-                  <Link
-                    to={relatedParty.slug ? `/party/${relatedParty.slug}` : `/party/${relatedParty._id}`}
-                    className="inline-flex items-center gap-3 px-4 py-2.5 rounded-lg bg-purple-900/30 border border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-900/40 transition-colors no-underline max-w-full"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-purple-600/40 flex items-center justify-center flex-shrink-0">
-                      <Users className="h-4 w-4 text-purple-200" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-white font-semibold text-sm truncate">{relatedParty.name}</div>
-                      <div className="text-xs text-gray-400 truncate">
-                        {relatedParty.description || 'Open the live tip chart for this tag'}
-                      </div>
-                    </div>
-                    <span className="text-xs text-purple-300 font-medium flex-shrink-0">Open party →</span>
-                  </Link>
-                </div>
-              )}
-
-              {/* Champions toggle */}
-              {!loading && !error && (
-                <div className="w-full max-w-lg">
-                  <button
-                    type="button"
-                    onClick={() => setShowChampions(!showChampions)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black/20 hover:bg-black/30 border border-amber-500/20 transition-colors"
-                  >
-                    <Crown className="h-4 w-4 text-amber-400" />
-                    <span className="text-sm font-semibold text-white">
-                      {showChampions ? 'Hide Champions' : `Champions of ${displayName}`}
-                    </span>
-                    {showChampions ? (
-                      <Minus className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Plus className="h-4 w-4 text-gray-400" />
-                    )}
-                  </button>
-                  {showChampions && slug && (
-                    <div className="mt-3 card bg-black/20 rounded-lg p-3 md:p-4">
-                      <MediaChampions
-                        tagSlug={slug}
-                        entityLabel={`#${displayName}`}
-                        maxDisplay={10}
-                        compact
-                      />
-                    </div>
-                  )}
+              {/* Champions strip — top 3 when a podium exists; tap expands full panel */}
+              {!loading && !error && slug && (
+                <div className="w-full max-w-lg flex justify-center md:justify-start">
+                  <MediaChampions
+                    tagSlug={slug}
+                    entityLabel={`#${displayName}`}
+                    variant="strip"
+                    compact
+                    maxDisplay={3}
+                  />
                 </div>
               )}
             </div>
