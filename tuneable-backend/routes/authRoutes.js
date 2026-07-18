@@ -1095,6 +1095,12 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           delete req.session.linkingUserUuid;
         };
         if (err) {
+          // err.oauthError carries the raw Spotify API response (e.g. 403
+          // "User not registered in the Developer Dashboard" in dev mode)
+          console.error('❌ Spotify OAuth callback error:', err.message);
+          if (err.oauthError) {
+            console.error('   Spotify API response:', err.oauthError.statusCode, err.oauthError.data);
+          }
           clearSpotifySession();
           return res.redirect(appendQueryParams(baseRedirect, {
             error: 'spotify_auth_failed',
@@ -1102,6 +1108,7 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           }));
         }
         if (!user) {
+          console.error('❌ Spotify OAuth callback returned no user (auth denied or session lost)');
           clearSpotifySession();
           return res.redirect(appendQueryParams(baseRedirect, {
             error: 'spotify_auth_failed',

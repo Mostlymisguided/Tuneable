@@ -46,6 +46,19 @@ const AuthCallback: React.FC = () => {
           autoClose: 10000,
           pauseOnHover: true,
         });
+
+        // Account-linking failures (e.g. Spotify import) don't invalidate the
+        // existing session - send the user back where they came from instead
+        // of the login page.
+        const isLinkingError = error === 'spotify_auth_failed'
+          || error === 'account_already_linked'
+          || error === 'account_linking_failed';
+        if (isLinkingError && localStorage.getItem('token')) {
+          const returnUrlParam = searchParams.get('returnUrl');
+          navigate(returnUrlParam || '/import', { replace: true });
+          return;
+        }
+
         navigate('/login', { replace: true });
         return;
       }
