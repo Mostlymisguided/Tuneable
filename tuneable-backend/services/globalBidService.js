@@ -124,17 +124,18 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     throw err;
   }
 
-  const globalParty = await Party.getGlobalParty();
+  const globalParty = await Party.getGlobalPartyForBid();
   if (!globalParty) {
     const err = new Error('Global Party not found. Please contact support.');
     err.status = 500;
     throw err;
   }
 
-  let partyMediaEntry = globalParty.media.find(
-    (m) => m.mediaId && m.mediaId.toString() === media._id.toString()
-  );
-  const isInitialPartyEntry = !partyMediaEntry;
+  const partyAlreadyHasMedia = await Party.exists({
+    _id: globalParty._id,
+    'media.mediaId': media._id,
+  });
+  const isInitialPartyEntry = !partyAlreadyHasMedia;
 
   const bid = new Bid({
     userId,
@@ -176,37 +177,13 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     console.error('Error setting up tag rankings:', error);
   }
 
-  if (!partyMediaEntry) {
-    partyMediaEntry = {
-      mediaId: media._id,
-      media_uuid: media.uuid,
-      addedBy: userId,
-      partyMediaAggregate: bidAmountPence,
-      partyBids: [bid._id],
-      status: 'active',
-      queuedAt: new Date(),
-      partyMediaBidTop: bidAmountPence,
-      partyMediaBidTopUser: userId,
-      partyMediaAggregateTop: bidAmountPence,
-      partyMediaAggregateTopUser: userId,
-    };
-    globalParty.media.push(partyMediaEntry);
-  } else {
-    partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmountPence;
-    partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
-    partyMediaEntry.partyBids.push(bid._id);
-    if (partyMediaEntry.status !== 'active' && partyMediaEntry.status !== 'vetoed') {
-      partyMediaEntry.status = 'active';
-    }
-  }
-
-  globalParty.media.forEach((entry) => {
-    if (entry.status && entry.status !== 'active' && entry.status !== 'vetoed') {
-      entry.status = 'active';
-    }
+  const { isNewMedia: isNewGlobalPartyMedia } = await Party.addGlobalBidToMedia({
+    partyId: globalParty._id,
+    media,
+    bid,
+    userId,
+    amount: bidAmountPence,
   });
-
-  await globalParty.save();
 
   const previousTopBidAmount = media.globalMediaBidTop || 0;
   const previousTopBidderId = media.globalMediaBidTopUser;
@@ -214,8 +191,10 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
 
   const userBalancePre = user.balance;
   const mediaAggregatePre = media.globalMediaAggregate || 0;
-  const userBidsPre = await Bid.find({ userId, status: 'active' }).lean();
-  const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const userAggregatePre = await Bid.sumActiveAmount({
+    userId,
+    excludeBidId: bid._id,
+  });
 
   media.bids = media.bids || [];
   media.bids.push(bid._id);
@@ -241,7 +220,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
       referenceTransactionId: bid._id,
       metadata: {
         bidScope: 'global',
-        isNewMedia: isInitialPartyEntry,
+        isNewMedia: isNewGlobalPartyMedia,
         platform: 'global-bid',
         tunebytesCalculatedAsync: true,
       },
@@ -253,6 +232,13 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
   const { applyWalletSpend } = require('../utils/welcomeCreditHelper');
   applyWalletSpend(user, bidAmountPence);
   await user.save();
+
+  setImmediate(() => {
+    const tuneBytesService = require('./tuneBytesService');
+    tuneBytesService.awardTuneBytesForBid(bid._id).catch((error) => {
+      console.error('Failed to calculate/award TuneBytes for global bid:', bid._id, error);
+    });
+  });
 
   return {
     bid,

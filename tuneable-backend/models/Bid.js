@@ -128,6 +128,16 @@ const bidSchema = new mongoose.Schema({
         enum: ['active', 'vetoed', 'refunded'],
         default: 'active'
     },
+    metricsUpdateStatus: {
+        type: String,
+        enum: ['pending', 'completed'],
+        default: 'pending'
+    },
+    tuneBytesAwardStatus: {
+        type: String,
+        enum: ['pending', 'completed'],
+        default: 'pending'
+    },
     
     // ========================================
     // VETO TRACKING
@@ -191,36 +201,49 @@ bidSchema.pre('save', function(next) {
     next();
 });
 
-// Update metrics after bid is saved
-bidSchema.post('save', async function(doc) {
-    try {
-        const bidMetricsEngine = require('../services/bidMetricsEngine');
-        await bidMetricsEngine.updateMetricsForBidChange({
-            _id: doc._id,
-            userId: doc.userId,
-            mediaId: doc.mediaId,
-            partyId: doc.partyId,
-            amount: doc.amount
-        }, 'create');
-    } catch (error) {
-        console.error('Error updating metrics after bid save:', error);
-    }
+// Metrics are derived data and can be recomputed. Schedule them after the
+// financial write so bid.save() is not blocked by many aggregate queries.
+bidSchema.post('save', function(doc) {
+    const bidData = {
+        _id: doc._id,
+        userId: doc.userId,
+        mediaId: doc.mediaId,
+        partyId: doc.partyId,
+        amount: doc.amount
+    };
+
+    setImmediate(async () => {
+        try {
+            const bidMetricsEngine = require('../services/bidMetricsEngine');
+            await bidMetricsEngine.updateMetricsForBidChange(bidData, 'create');
+            await doc.constructor.updateOne(
+                { _id: doc._id },
+                { $set: { metricsUpdateStatus: 'completed' } }
+            );
+        } catch (error) {
+            console.error('Error updating metrics after bid save:', error);
+        }
+    });
 });
 
 // Update metrics after bid is removed
-bidSchema.post('remove', async function(doc) {
-    try {
-        const bidMetricsEngine = require('../services/bidMetricsEngine');
-        await bidMetricsEngine.updateMetricsForBidChange({
-            _id: doc._id,
-            userId: doc.userId,
-            mediaId: doc.mediaId,
-            partyId: doc.partyId,
-            amount: doc.amount
-        }, 'delete');
-    } catch (error) {
-        console.error('Error updating metrics after bid removal:', error);
-    }
+bidSchema.post('remove', function(doc) {
+    const bidData = {
+        _id: doc._id,
+        userId: doc.userId,
+        mediaId: doc.mediaId,
+        partyId: doc.partyId,
+        amount: doc.amount
+    };
+
+    setImmediate(async () => {
+        try {
+            const bidMetricsEngine = require('../services/bidMetricsEngine');
+            await bidMetricsEngine.updateMetricsForBidChange(bidData, 'delete');
+        } catch (error) {
+            console.error('Error updating metrics after bid removal:', error);
+        }
+    });
 });
 
 // ========================================
@@ -254,6 +277,10 @@ bidSchema.index({ amount: -1 }); // For "top bids" queries
 
 // Compound indexes for common query patterns
 bidSchema.index({ partyId: 1, status: 1 }); // Party bids by status
+bidSchema.index({ userId: 1, status: 1, amount: 1 }); // User aggregate ledger snapshots
+bidSchema.index({ status: 1, amount: 1 }); // Platform aggregate ledger snapshots
+bidSchema.index({ metricsUpdateStatus: 1 });
+bidSchema.index({ tuneBytesAwardStatus: 1 });
 bidSchema.index({ userId: 1, createdAt: -1 }); // User's recent bids
 bidSchema.index({ mediaId: 1, createdAt: -1 }); // Media's recent bids
 bidSchema.index({ partyId: 1, createdAt: -1 }); // Party's recent bids
@@ -302,6 +329,23 @@ bidSchema.pre('save', function(next) {
     }
     next();
 });
+
+// Return only the aggregate value instead of hydrating every matching bid.
+bidSchema.statics.sumActiveAmount = async function({ userId = null, excludeBidId = null } = {}) {
+    const match = { status: 'active' };
+    if (userId) {
+        match.userId = userId;
+    }
+    if (excludeBidId) {
+        match._id = { $ne: excludeBidId };
+    }
+
+    const [result] = await this.aggregate([
+        { $match: match },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    return result?.total || 0;
+};
 
 // ========================================
 // NOTES ON USAGE

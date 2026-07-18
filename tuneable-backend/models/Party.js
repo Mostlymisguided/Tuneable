@@ -210,6 +210,110 @@ PartySchema.statics.getGlobalParty = async function() {
   return await this.findOne({ type: 'global' });
 };
 
+// Lightweight Global Party lookup for tip placement. The embedded media array
+// can be very large and is not needed to construct a bid.
+PartySchema.statics.getGlobalPartyForBid = async function() {
+  return await this.findOne({ type: 'global' })
+    .select('_id uuid name type')
+    .lean();
+};
+
+/**
+ * Atomically append a global bid to the matching media entry, or create the
+ * entry when it does not exist. This avoids reading and rewriting the entire
+ * Global Party document for every tip.
+ */
+PartySchema.statics.addGlobalBidToMedia = async function({
+  partyId,
+  media,
+  bid,
+  userId,
+  amount
+}) {
+  const existingResult = await this.updateOne(
+    {
+      _id: partyId,
+      media: {
+        $elemMatch: {
+          mediaId: media._id,
+          status: { $ne: 'vetoed' }
+        }
+      }
+    },
+    {
+      $inc: { 'media.$.partyMediaAggregate': amount },
+      $push: { 'media.$.partyBids': bid._id },
+      $set: { 'media.$.status': 'active' }
+    }
+  );
+
+  if (existingResult.matchedCount > 0) {
+    return { isNewMedia: false };
+  }
+
+  const vetoedResult = await this.updateOne(
+    {
+      _id: partyId,
+      media: {
+        $elemMatch: {
+          mediaId: media._id,
+          status: 'vetoed'
+        }
+      }
+    },
+    {
+      $inc: { 'media.$.partyMediaAggregate': amount },
+      $push: { 'media.$.partyBids': bid._id }
+    }
+  );
+
+  if (vetoedResult.matchedCount > 0) {
+    return { isNewMedia: false };
+  }
+
+  const newEntry = {
+    mediaId: media._id,
+    media_uuid: media.uuid,
+    addedBy: userId,
+    partyMediaAggregate: amount,
+    partyBids: [bid._id],
+    status: 'active',
+    queuedAt: new Date(),
+    partyMediaBidTop: amount,
+    partyMediaBidTopUser: userId,
+    partyMediaAggregateTop: amount,
+    partyMediaAggregateTopUser: userId
+  };
+
+  const insertResult = await this.updateOne(
+    { _id: partyId, 'media.mediaId': { $ne: media._id } },
+    { $push: { media: newEntry } }
+  );
+
+  if (insertResult.modifiedCount > 0) {
+    return { isNewMedia: true };
+  }
+
+  // Another request inserted this media between the two updates.
+  await this.updateOne(
+    {
+      _id: partyId,
+      media: {
+        $elemMatch: {
+          mediaId: media._id,
+          status: { $ne: 'vetoed' }
+        }
+      }
+    },
+    {
+      $inc: { 'media.$.partyMediaAggregate': amount },
+      $push: { 'media.$.partyBids': bid._id },
+      $set: { 'media.$.status': 'active' }
+    }
+  );
+  return { isNewMedia: false };
+};
+
 // Add indexes for performance
 PartySchema.index({ host: 1 });
 PartySchema.index({ partiers: 1 });

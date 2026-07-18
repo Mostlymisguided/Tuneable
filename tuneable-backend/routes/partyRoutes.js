@@ -2084,11 +2084,10 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         
         // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
         // Bid is already required at top of file
-        const userBidsPre = await Bid.find({
-          userId: userId,
-          status: 'active'
-        }).lean();
-        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        const userAggregatePre = await Bid.sumActiveAmount({
+          userId,
+          excludeBidId: bid._id
+        });
         
         // ✅ OPTIMIZED: Create ledger entry WITHOUT tunebytes (calculated async after response)
         // This significantly improves response time
@@ -2124,17 +2123,11 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         // ✅ OPTIMIZED: Calculate and award TuneBytes ASYNC (non-blocking, after response)
         // This improves response time significantly as tunebytes calculation can be CPU-intensive
         const tuneBytesService = require('../services/tuneBytesService');
-        tuneBytesService.calculateTuneBytesForBid(bid._id)
-          .then(calculation => {
-            if (calculation.tuneBytesEarned > 0) {
-              // Award tunebytes async (skip ledger entry since it's already in TIP entry)
-              return tuneBytesService.awardTuneBytesForBid(bid._id, true);
-            }
-          })
-          .catch(error => {
+        setImmediate(() => {
+          tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
             console.error('Failed to calculate/award TuneBytes for bid:', bid._id, error);
-            // Don't fail the bid if tunebytes calculation fails - they'll be calculated later
           });
+        });
         
         // THEN update user balance (promo-first welcome credit)
         applyWalletSpend(user, bidAmountPence);
@@ -2699,11 +2692,10 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         
         // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
         // Bid is already required at top of file
-        const userBidsPre = await Bid.find({
-          userId: userId,
-          status: 'active'
-        }).lean();
-        const userAggregatePre = userBidsPre.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+        const userAggregatePre = await Bid.sumActiveAmount({
+          userId,
+          excludeBidId: bid._id
+        });
         
         // ✅ OPTIMIZED: Create ledger entry WITHOUT tunebytes (calculated async after response)
         // This significantly improves response time
@@ -2738,17 +2730,11 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // ✅ OPTIMIZED: Calculate and award TuneBytes ASYNC (non-blocking, after response)
         // This improves response time significantly as tunebytes calculation can be CPU-intensive
         const tuneBytesService = require('../services/tuneBytesService');
-        tuneBytesService.calculateTuneBytesForBid(bid._id)
-          .then(calculation => {
-            if (calculation.tuneBytesEarned > 0) {
-              // Award tunebytes async (skip ledger entry since it's already in TIP entry)
-              return tuneBytesService.awardTuneBytesForBid(bid._id, true);
-            }
-          })
-          .catch(error => {
+        setImmediate(() => {
+          tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
             console.error('Failed to calculate/award TuneBytes for bid:', bid._id, error);
-            // Don't fail the bid if tunebytes calculation fails - they'll be calculated later
           });
+        });
         
         // THEN update user balance (promo-first welcome credit)
         applyWalletSpend(user, bidAmountPence);

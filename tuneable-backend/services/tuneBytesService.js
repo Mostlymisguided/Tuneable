@@ -123,6 +123,19 @@ class TuneBytesService {
    */
   async awardTuneBytesForBid(bidId, skipLedgerEntry = false) {
     try {
+      let transaction = await TuneBytesTransaction.findOne({ bidId });
+      if (transaction?.status === 'confirmed') {
+        await Bid.updateOne(
+          { _id: bidId },
+          { $set: { tuneBytesAwardStatus: 'completed' } }
+        );
+        return {
+          tuneBytesEarned: transaction.tuneBytesEarned,
+          transaction,
+          alreadyAwarded: true
+        };
+      }
+
       const bid = await Bid.findById(bidId).populate(['userId', 'mediaId']);
       if (!bid) {
         throw new Error(`Bid ${bidId} not found`);
@@ -131,71 +144,119 @@ class TuneBytesService {
       const user = bid.userId;
       const media = bid.mediaId;
 
-      // Calculate TuneBytes
-      const calculation = await this.calculateTuneBytesForBid(bidId);
+      // A pending transaction is a durable reservation. Reuse its calculation
+      // when retrying work interrupted between reservation and balance credit.
+      let calculation = transaction
+        ? {
+            tuneBytesEarned: transaction.tuneBytesEarned,
+            calculation: transaction.calculationSnapshot
+          }
+        : await this.calculateTuneBytesForBid(bidId);
       
       if (calculation.tuneBytesEarned <= 0) {
+        await Bid.updateOne(
+          { _id: bidId },
+          { $set: { tuneBytesAwardStatus: 'completed' } }
+        );
         console.log(`No TuneBytes earned for bid ${bidId} (value: ${calculation.tuneBytesEarned})`);
         return { tuneBytesEarned: 0, transaction: null };
       }
 
-      // Create transaction record
-      const transaction = new TuneBytesTransaction({
-        userId: user._id,
-        mediaId: media._id,
-        bidId: bid._id,
-        user_uuid: user.uuid,
-        media_uuid: media.uuid,
-        bid_uuid: bid.uuid,
-        username: user.username,
-        mediaTitle: media.title,
-        mediaArtist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown',
-        mediaCoverArt: media.coverArt,
-        tuneBytesEarned: calculation.tuneBytesEarned,
-        calculationSnapshot: calculation.calculation,
-        status: 'confirmed'
-      });
+      if (!transaction) {
+        transaction = new TuneBytesTransaction({
+          userId: user._id,
+          mediaId: media._id,
+          bidId: bid._id,
+          user_uuid: user.uuid,
+          media_uuid: media.uuid,
+          bid_uuid: bid.uuid,
+          username: user.username,
+          mediaTitle: media.title,
+          mediaArtist: Array.isArray(media.artist) && media.artist.length > 0 ? media.artist[0].name : 'Unknown',
+          mediaCoverArt: media.coverArt,
+          tuneBytesEarned: calculation.tuneBytesEarned,
+          calculationSnapshot: calculation.calculation,
+          status: 'pending'
+        });
 
+        try {
+          await transaction.save();
+        } catch (error) {
+          if (error?.code !== 11000) {
+            throw error;
+          }
+          transaction = await TuneBytesTransaction.findOne({ bidId });
+          if (transaction?.status === 'confirmed') {
+            await Bid.updateOne(
+              { _id: bidId },
+              { $set: { tuneBytesAwardStatus: 'completed' } }
+            );
+            return {
+              tuneBytesEarned: transaction.tuneBytesEarned,
+              transaction,
+              alreadyAwarded: true
+            };
+          }
+          if (!transaction) {
+            throw error;
+          }
+          calculation = {
+            tuneBytesEarned: transaction.tuneBytesEarned,
+            calculation: transaction.calculationSnapshot
+          };
+        }
+      }
+
+      // Credit once per bid. If a worker crashes after this update, a retry
+      // sees the history entry and only completes the pending transaction.
+      const creditedUserBefore = await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          'tuneBytesHistory.bidId': { $ne: bid._id }
+        },
+        {
+          $inc: { tuneBytes: calculation.tuneBytesEarned },
+          $push: {
+            tuneBytesHistory: {
+              mediaId: media._id,
+              earnedAmount: calculation.tuneBytesEarned,
+              earnedAt: new Date(),
+              bidId: bid._id,
+              discoveryRank: calculation.calculation.discoveryRank,
+              reason: calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth'
+            }
+          }
+        },
+        { new: false }
+      );
+
+      const didCreditBalance = Boolean(creditedUserBefore);
+      const tunebytesBefore = creditedUserBefore?.tuneBytes || 0;
+
+      transaction.status = 'confirmed';
       await transaction.save();
+      await Bid.updateOne(
+        { _id: bidId },
+        { $set: { tuneBytesAwardStatus: 'completed' } }
+      );
 
-      // Store verification hash
+      // Store verification only after the final status/hash has been saved.
       try {
         const verificationService = require('../services/transactionVerificationService');
         await verificationService.storeVerificationHash(transaction, 'TuneBytesTransaction');
       } catch (verifyError) {
         console.error('Failed to store verification hash for TuneBytes transaction:', verifyError);
-        // Don't fail the transaction if verification storage fails
       }
 
-      // Get current tunebytes before update
-      const tunebytesBefore = user.tuneBytes || 0;
-      const tunebytesAfter = tunebytesBefore + calculation.tuneBytesEarned;
-
-      // Update user's TuneBytes balance
-      await User.findByIdAndUpdate(user._id, {
-        $inc: { tuneBytes: calculation.tuneBytesEarned },
-        $push: {
-          tuneBytesHistory: {
-            mediaId: media._id,
-            earnedAmount: calculation.tuneBytesEarned,
-            earnedAt: new Date(),
-            bidId: bid._id,
-            discoveryRank: calculation.calculation.discoveryRank,
-            reason: calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth'
-          }
-        }
-      });
-
       // Log to ledger (only if not part of a tip transaction - tunebytes will be in TIP entry)
-      if (!skipLedgerEntry) {
+      if (!skipLedgerEntry && didCreditBalance) {
         try {
           const tuneableLedgerService = require('../services/tuneableLedgerService');
           const Bid = require('../models/Bid');
           
           // Get user's current balance and aggregate for ledger
           const updatedUser = await User.findById(user._id).lean();
-          const userBids = await Bid.find({ userId: user._id, status: 'active' });
-          const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
+          const userAggregatePre = await Bid.sumActiveAmount({ userId: user._id });
           
           await tuneableLedgerService.createTuneBytesTopUpEntry({
             userId: user._id,
@@ -217,12 +278,12 @@ class TuneBytesService {
           console.error('⚠️ Failed to create ledger entry for tunebytes award:', ledgerError);
           // Don't fail the transaction if ledger entry fails
         }
-      } else {
+      } else if (skipLedgerEntry && didCreditBalance) {
         console.log(`ℹ️ Skipping ledger entry for tunebytes (will be recorded in TIP entry): bid ${bidId}`);
       }
 
       // Send notification if TuneBytes earned is significant (> 0.1)
-      if (calculation.tuneBytesEarned >= 0.1) {
+      if (didCreditBalance && calculation.tuneBytesEarned >= 0.1) {
         try {
           const notificationService = require('../services/notificationService');
           const reason = calculation.calculation.discoveryRank <= 3 ? 'discovery' : 'popularity_growth';
@@ -238,18 +299,23 @@ class TuneBytesService {
         }
       }
 
-      console.log(`✅ Awarded ${calculation.tuneBytesEarned.toFixed(2)} TuneBytes to ${user.username} for bid on "${media.title}"`);
+      if (didCreditBalance) {
+        console.log(`✅ Awarded ${calculation.tuneBytesEarned.toFixed(2)} TuneBytes to ${user.username} for bid on "${media.title}"`);
+      }
 
       // Invalidate TuneBytes tag rankings cache (recalculate on next profile load)
       try {
         const tuneBytesTagRankingsService = require('./tuneBytesTagRankingsService');
-        tuneBytesTagRankingsService.invalidateUserTuneBytesTagRankings(user._id).catch(() => {});
-        tuneBytesTagRankingsService.calculateAndUpdateUserTuneBytesTagRankings(user._id, 10).catch(() => {});
+        if (didCreditBalance) {
+          tuneBytesTagRankingsService.invalidateUserTuneBytesTagRankings(user._id).catch(() => {});
+          tuneBytesTagRankingsService.calculateAndUpdateUserTuneBytesTagRankings(user._id, 10).catch(() => {});
+        }
       } catch (_) { /* non-blocking */ }
 
       return {
         tuneBytesEarned: calculation.tuneBytesEarned,
-        transaction: transaction
+        transaction,
+        alreadyAwarded: !didCreditBalance
       };
 
     } catch (error) {

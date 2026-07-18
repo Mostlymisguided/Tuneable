@@ -3171,16 +3171,19 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       }
     }
 
-    // Get Global Party using new system
+    // Load only the fields needed to construct the bid. The Global Party's
+    // embedded media array can be very large.
     const Party = require('../models/Party');
-    const globalParty = await Party.getGlobalParty();
+    const globalParty = await Party.getGlobalPartyForBid();
     
     if (!globalParty) {
       return res.status(500).json({ error: 'Global Party not found. Please contact support.' });
     }
 
-    // Check if media already exists in global party
-    let partyMediaEntry = globalParty.media.find(m => m.mediaId && m.mediaId.toString() === media._id.toString());
+    const partyAlreadyHasMedia = await Party.exists({
+      _id: globalParty._id,
+      'media.mediaId': media._id
+    });
     
     // Create bid using standard party bid flow
     const Bid = require('../models/Bid');
@@ -3200,7 +3203,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       mediaTitle: media.title,
       mediaArtist: media.artist?.[0]?.name || 'Unknown',
       mediaCoverArt: media.coverArt,
-      isInitialBid: !partyMediaEntry,
+      isInitialBid: !partyAlreadyHasMedia,
       mediaContentType: media.contentType,
       mediaContentForm: media.contentForm,
       mediaDuration: media.duration,
@@ -3269,40 +3272,13 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up label stats calculation:', error);
     }
 
-    // Add or update media in global party
-    if (!partyMediaEntry) {
-      partyMediaEntry = {
-        mediaId: media._id,
-        media_uuid: media.uuid,
-        addedBy: userId,
-        partyMediaAggregate: bidAmountPence, // Use pence
-        partyBids: [bid._id],
-        status: 'active',
-        queuedAt: new Date(),
-        partyMediaBidTop: bidAmountPence, // Use pence
-        partyMediaBidTopUser: userId,
-        partyMediaAggregateTop: bidAmountPence, // Use pence
-        partyMediaAggregateTopUser: userId
-      };
-      globalParty.media.push(partyMediaEntry);
-    } else {
-      partyMediaEntry.partyMediaAggregate = (partyMediaEntry.partyMediaAggregate || 0) + bidAmountPence; // Use pence
-      partyMediaEntry.partyBids = partyMediaEntry.partyBids || [];
-      partyMediaEntry.partyBids.push(bid._id);
-      // Ensure status is valid (fix any legacy 'queued' status)
-      if (partyMediaEntry.status !== 'active' && partyMediaEntry.status !== 'vetoed') {
-        partyMediaEntry.status = 'active';
-      }
-    }
-    
-    // Fix any legacy 'queued' statuses in all media entries before saving
-    globalParty.media.forEach(entry => {
-      if (entry.status && entry.status !== 'active' && entry.status !== 'vetoed') {
-        entry.status = 'active';
-      }
+    const { isNewMedia: isNewGlobalPartyMedia } = await Party.addGlobalBidToMedia({
+      partyId: globalParty._id,
+      media,
+      bid,
+      userId,
+      amount: bidAmountPence
     });
-    
-    await globalParty.save();
 
     // Store previous top bid info for outbid notification
     const previousTopBidAmount = media.globalMediaBidTop || 0; // Already in pence
@@ -3314,11 +3290,10 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     const mediaAggregatePre = media.globalMediaAggregate || 0;
     
     // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
-    const userBidsPre = await Bid.find({
-      userId: userId,
-      status: 'active'
-    }).lean();
-    const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const userAggregatePre = await Bid.sumActiveAmount({
+      userId,
+      excludeBidId: bid._id
+    });
 
     // Update media's bid arrays (BidMetricsEngine will handle aggregates)
     media.bids = media.bids || [];
@@ -3351,7 +3326,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         referenceTransactionId: bid._id,
         metadata: {
           bidScope: 'global',
-          isNewMedia: !partyMediaEntry,
+          isNewMedia: isNewGlobalPartyMedia,
           platform: 'global-bid',
           tunebytesCalculatedAsync: true // Flag for audit
         }
@@ -3408,16 +3383,25 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     applyWalletSpend(user, bidAmountPence);
     await user.save();
 
+    // Settle TuneBytes after the response path. Idempotency is enforced by the
+    // TuneBytes transaction model, so retries cannot award the bid twice.
+    setImmediate(() => {
+      const tuneBytesService = require('../services/tuneBytesService');
+      tuneBytesService.awardTuneBytesForBid(bid._id).catch(error => {
+        console.error('Failed to calculate/award TuneBytes for global bid:', bid._id, error);
+      });
+    });
+
     // Send high-value bid notification
     // Note: bid.amount is in pence, threshold is in pounds (£10 = 1000 pence)
     const { sendHighValueBidNotification } = require('../utils/emailService');
     const HIGH_VALUE_THRESHOLD_PENCE = 1000; // £10 in pence
     if (bidAmountPence >= HIGH_VALUE_THRESHOLD_PENCE) {
-      try {
-        await sendHighValueBidNotification(bid, media, user, 10); // Pass threshold in pounds
-      } catch (emailError) {
-        console.error('Failed to send high-value bid notification:', emailError);
-      }
+      setImmediate(() => {
+        sendHighValueBidNotification(bid, media, user, 10).catch(emailError => {
+          console.error('Failed to send high-value bid notification:', emailError);
+        });
+      });
     }
 
     res.json({

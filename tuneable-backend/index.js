@@ -44,6 +44,12 @@ console.log('Initializing server...');
 db.connectDB()
   .then(() => {
     console.log('Connected to the database successfully.');
+    const { recoverPendingBidWork } = require('./services/bidBackgroundRecoveryService');
+    setImmediate(() => {
+      recoverPendingBidWork().catch((error) => {
+        console.error('Failed to recover pending bid background work:', error);
+      });
+    });
   })
   .catch((err) => {
     console.error('Error connecting to the database:', err);

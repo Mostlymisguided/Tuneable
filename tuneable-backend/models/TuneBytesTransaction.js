@@ -93,9 +93,21 @@ const tuneBytesTransactionSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
+tuneBytesTransactionSchema.add({
+  // Versioned idempotency marker lets new awards be unique without requiring
+  // historical duplicate cleanup before deployment.
+  idempotencyVersion: { type: Number, default: 1 }
+});
 tuneBytesTransactionSchema.index({ userId: 1, createdAt: -1 }); // User's TuneBytes history
 tuneBytesTransactionSchema.index({ mediaId: 1, createdAt: -1 }); // Media's TuneBytes transactions
-tuneBytesTransactionSchema.index({ bidId: 1 }); // Unique per bid
+tuneBytesTransactionSchema.index(
+  { bidId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { idempotencyVersion: 1 },
+    name: 'unique_tunebytes_award_per_bid_v1'
+  }
+);
 tuneBytesTransactionSchema.index({ status: 1 }); // Filter by status
 tuneBytesTransactionSchema.index({ transactionHash: 1 }); // Hash lookup for verification
 

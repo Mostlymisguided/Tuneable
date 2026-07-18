@@ -59,7 +59,9 @@ class TuneableLedgerService {
       const mediaAggregatePost = mediaAggregatePre + amount;
       
       // Calculate global aggregate PRE and POST
-      const globalAggregatePre = await this._calculateGlobalAggregate();
+      const globalAggregatePre = await this._calculateGlobalAggregate({
+        excludeBidId: bidId
+      });
       // For TIP: global aggregate increases by amount (new active bid)
       const globalAggregatePost = globalAggregatePre + amount;
       
@@ -488,23 +490,9 @@ class TuneableLedgerService {
    * @private
    * @returns {Promise<number>} Total amount in pence
    */
-  async _calculateGlobalAggregate() {
+  async _calculateGlobalAggregate({ excludeBidId = null } = {}) {
     try {
-      const result = await Bid.aggregate([
-        {
-          $match: {
-            status: 'active' // Only count active bids
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$amount' }
-          }
-        }
-      ]);
-      
-      return result.length > 0 ? result[0].total : 0;
+      return await Bid.sumActiveAmount({ excludeBidId });
     } catch (error) {
       console.error('Error calculating global aggregate:', error);
       // Return 0 on error to avoid blocking ledger entry creation
