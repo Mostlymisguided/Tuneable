@@ -2943,7 +2943,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                 handleAddMediaSearch();
                               }
                             }}
-                            placeholder="Filter queue by title, artist, tag… or paste YouTube URL"
+                            placeholder="Filter by title, artist or tag"
                             className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm sm:text-base"
                             aria-label="Search tunes in party or library"
                           />
