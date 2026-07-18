@@ -10,25 +10,23 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
-import { authAPI, tagAPI, userAPI } from '../lib/api';
+import { authAPI, userAPI } from '../lib/api';
 import { buildOnboardingCompletePath } from '../utils/authHelpers';
 import { buildOAuthStartUrl } from '../utils/platform';
-import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_TIP_POUNDS } from '../constants';
 
-type OnboardingStep = 'tags' | 'tip' | 'import';
+type OnboardingStep = 'tip' | 'import';
 type ImportSource = 'spotify' | 'soundcloud';
 
-const MAX_TAGS = 8;
 const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
 const ONBOARDING_IMPORT_LIMIT = 25;
 
-const STEP_ORDER: OnboardingStep[] = ['tags', 'tip', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['tip', 'import'];
 
 function parseStep(value: string | null): OnboardingStep {
-  if (value === 'tip' || value === 'import') return value;
-  return 'tags';
+  if (value === 'import') return value;
+  return 'tip';
 }
 
 const Onboarding: React.FC = () => {
@@ -39,10 +37,6 @@ const Onboarding: React.FC = () => {
   const step = parseStep(searchParams.get('step'));
   const importSource = (searchParams.get('source') === 'soundcloud' ? 'soundcloud' : 'spotify') as ImportSource;
 
-  const [popularTags, setPopularTags] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagSearch, setTagSearch] = useState('');
-  const [isLoadingTags, setIsLoadingTags] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const [defaultTip, setDefaultTip] = useState(DEFAULT_TIP_POUNDS.toFixed(2));
@@ -70,8 +64,6 @@ const Onboarding: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    const existing = user.preferences?.favoriteTags ?? [];
-    if (existing.length > 0) setSelectedTags(existing);
     // Suggest £1.11 until the user saves a tip during onboarding
     if (!user.onboarding?.defaultTipPromptSeenAt) {
       setDefaultTip(DEFAULT_TIP_POUNDS.toFixed(2));
@@ -80,26 +72,6 @@ const Onboarding: React.FC = () => {
       setDefaultTip(tip.toFixed(2));
     }
   }, [user]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setIsLoadingTags(true);
-      try {
-        const data = await tagAPI.getPopular(48);
-        if (!cancelled) {
-          setPopularTags((data.tags || []).map((entry) => entry.tag));
-        }
-      } catch {
-        if (!cancelled) {
-          toast.error('Could not load tags — try refreshing');
-        }
-      } finally {
-        if (!cancelled) setIsLoadingTags(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   const checkConnections = useCallback(async () => {
     try {
@@ -165,12 +137,6 @@ const Onboarding: React.FC = () => {
     })();
   }, [step, searchParams, checkConnections, loadImportPreview]);
 
-  const filteredTagOptions = useMemo(() => {
-    const query = tagSearch.trim().toLowerCase();
-    if (!query) return popularTags;
-    return popularTags.filter((tag) => tag.toLowerCase().includes(query));
-  }, [popularTags, tagSearch]);
-
   const goToStep = (next: OnboardingStep) => {
     const params = new URLSearchParams(searchParams);
     params.set('step', next);
@@ -178,52 +144,6 @@ const Onboarding: React.FC = () => {
       params.delete('source');
     }
     setSearchParams(params, { replace: true });
-  };
-
-  const toggleTag = (tag: string) => {
-    const display = normalizeTagForStorage(tag);
-    if (!display) return;
-
-    setSelectedTags((prev) => {
-      if (prev.some((t) => tagsMatch(t, display))) {
-        return prev.filter((t) => !tagsMatch(t, display));
-      }
-      if (prev.length >= MAX_TAGS) {
-        toast.info(`Choose up to ${MAX_TAGS} tags`);
-        return prev;
-      }
-      return [...prev, display];
-    });
-  };
-
-  const addCustomTag = () => {
-    const display = normalizeTagForStorage(tagSearch.trim());
-    if (!display) {
-      toast.error('Enter a valid tag name');
-      return;
-    }
-    toggleTag(display);
-    setTagSearch('');
-  };
-
-  const saveTagsStep = async (options?: { skipped?: boolean }) => {
-    setIsSaving(true);
-    try {
-      const tags = options?.skipped ? [] : selectedTags;
-      await authAPI.updateProfile({
-        preferences: { favoriteTags: tags },
-        onboarding: { favoriteTagsSelectedAt: new Date().toISOString() },
-      });
-      if (options?.skipped) setSelectedTags([]);
-      await refreshUser();
-      goToStep('tip');
-    } catch (error: unknown) {
-      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
-        || 'Failed to save tags';
-      toast.error(message);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const saveTipStep = async () => {
@@ -261,7 +181,7 @@ const Onboarding: React.FC = () => {
         },
       });
       await refreshUser();
-      navigate(buildOnboardingCompletePath(selectedTags), { replace: true });
+      navigate(buildOnboardingCompletePath(user?.preferences?.favoriteTags ?? []), { replace: true });
     } catch (error: unknown) {
       const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
         || 'Failed to complete setup';
@@ -370,7 +290,7 @@ const Onboarding: React.FC = () => {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-white">Welcome to Tuneable</h1>
         <p className="mt-2 text-gray-400">
-          A quick setup so your feed matches your taste.
+          Two quick steps to get your library started.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           {STEP_ORDER.map((s, i) => (
@@ -385,102 +305,6 @@ const Onboarding: React.FC = () => {
       </div>
 
       <div className="flex-1 rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
-        {step === 'tags' && (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Choose your favourite tags</h2>
-              <p className="mt-2 text-sm text-gray-400">
-                Pick up to {MAX_TAGS} genres or styles. We&apos;ll use these to filter your music feed — or skip for now.
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={tagSearch}
-                onChange={(e) => setTagSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag(); } }}
-                placeholder="Search or add a tag…"
-                className="flex-1 rounded-lg border border-gray-600 bg-gray-800 px-4 py-2.5 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={addCustomTag}
-                disabled={!tagSearch.trim()}
-                className="rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-600 disabled:opacity-40"
-              >
-                Add
-              </button>
-            </div>
-
-            {selectedTags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {selectedTags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    className="rounded-full bg-purple-600 px-3 py-1 text-sm font-medium text-white"
-                  >
-                    {tag} ×
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {isLoadingTags ? (
-              <div className="flex items-center justify-center py-12 text-gray-400">
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Loading tags…
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {filteredTagOptions.map((tag) => {
-                  const selected = selectedTags.some((t) => tagsMatch(t, tag));
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleTag(tag)}
-                      className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                        selected
-                          ? 'border-purple-500 bg-purple-600/30 text-purple-200'
-                          : 'border-gray-600 bg-gray-800 text-gray-300 hover:border-gray-500'
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            <p className="text-sm text-gray-500">
-              {selectedTags.length} of {MAX_TAGS} selected
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => saveTagsStep({ skipped: true })}
-                disabled={isSaving}
-                className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50"
-              >
-                Skip for now
-              </button>
-              <button
-                type="button"
-                onClick={() => saveTagsStep()}
-                disabled={isSaving}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
-              >
-                {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-                Continue
-              </button>
-            </div>
-          </div>
-        )}
-
         {step === 'tip' && (
           <div className="space-y-6">
             <div className="flex items-start gap-3">
@@ -488,11 +312,11 @@ const Onboarding: React.FC = () => {
                 <Coins className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">How tipping works</h2>
+                <h2 className="text-xl font-semibold text-white">Tip to add music to your library</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Tuneable revolves around tipping to support your favourite music and artists.
-                  Adding a tune to your library means placing a tip — minimum <strong className="text-white">1p</strong>,
-                  with no maximum. You can change your default any time in settings.
+                  Adding a tune to your library means placing a tip. Your default is set to{' '}
+                  <strong className="text-white">£{DEFAULT_TIP_POUNDS.toFixed(2)}</strong>. Change it below if you
+                  wish, or continue with this amount. You can update it any time in settings.
                 </p>
               </div>
             </div>
@@ -545,22 +369,17 @@ const Onboarding: React.FC = () => {
               )}
             </div>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => goToStep('tags')}
-                className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800"
-              >
-                Back
-              </button>
+            <div>
               <button
                 type="button"
                 onClick={saveTipStep}
                 disabled={isSaving}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
               >
                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-                Continue
+                {Math.abs(parsedDefaultTip - DEFAULT_TIP_POUNDS) < 0.001
+                  ? `Continue with £${DEFAULT_TIP_POUNDS.toFixed(2)}`
+                  : `Save £${parsedDefaultTip.toFixed(2)} and continue`}
               </button>
             </div>
           </div>
