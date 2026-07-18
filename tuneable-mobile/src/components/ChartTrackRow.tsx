@@ -1,16 +1,24 @@
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  countSupporters,
+  MiniSupportersBar,
+} from '@/src/components/MiniSupportersBar';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { formatArtist, isUploadPlayable } from '@/src/lib/media';
+
+const COLLAPSED_TAG_COUNT = 2;
 
 type Props = {
   rank: number;
   item: ChartMediaItem;
   tipPence?: number;
   variant?: 'compact' | 'rich';
+  /** Hide the inline "Catalog only" hint; use play alert instead. */
+  hideCatalogHint?: boolean;
   onOpen: () => void;
   onPlay: () => void;
   onTip: () => void;
@@ -21,14 +29,35 @@ export function ChartTrackRow({
   item,
   tipPence,
   variant = 'compact',
+  hideCatalogHint = false,
   onOpen,
   onPlay,
   onTip,
 }: Props) {
+  const [footerExpanded, setFooterExpanded] = useState(false);
   const playable = isUploadPlayable(item);
   const displayTip = tipPence ?? item.partyMediaAggregate ?? 0;
   const durationLabel = formatDuration(item.duration);
-  const tags = (item.tags ?? []).slice(0, 3);
+  const allTags = item.tags ?? [];
+  const supporterCount = countSupporters(item.bids);
+  const hasFooter = allTags.length > 0 || supporterCount > 0;
+  const hiddenTagCount = Math.max(0, allTags.length - COLLAPSED_TAG_COUNT);
+  const canExpandFooter =
+    allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 3;
+
+  const handlePlay = () => {
+    if (playable) {
+      onPlay();
+      return;
+    }
+    Alert.alert(
+      'Catalog only',
+      'No upload yet — this tune can’t be played in the app until someone attaches audio.'
+    );
+  };
+
+  const showHint = !playable && !hideCatalogHint;
+  const toggleFooter = () => setFooterExpanded((open) => !open);
 
   if (variant === 'compact') {
     return (
@@ -47,7 +76,7 @@ export function ChartTrackRow({
           <Text style={styles.artist} numberOfLines={1}>
             {formatArtist(item.artist)}
           </Text>
-          {!playable ? (
+          {showHint ? (
             <Text style={styles.hint}>Catalog only — no upload yet</Text>
           ) : null}
         </Pressable>
@@ -57,18 +86,20 @@ export function ChartTrackRow({
             <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn}>
               <Ionicons name="heart" size={22} color="#f472b6" />
             </Pressable>
-            {playable ? (
-              <Pressable onPress={onPlay} hitSlop={8} style={styles.actionBtn}>
-                <Ionicons name="play-circle" size={28} color={colors.accentLight} />
-              </Pressable>
-            ) : (
-              <Ionicons name="musical-note" size={22} color={colors.textMuted} />
-            )}
+            <Pressable onPress={handlePlay} hitSlop={8} style={styles.actionBtn}>
+              <Ionicons
+                name={playable ? 'play-circle' : 'musical-note'}
+                size={playable ? 28 : 22}
+                color={playable ? colors.accentLight : colors.textMuted}
+              />
+            </Pressable>
           </View>
         </View>
       </View>
     );
   }
+
+  const collapsedTags = allTags.slice(0, COLLAPSED_TAG_COUNT);
 
   return (
     <View style={[styles.richCard, !playable && styles.rowMuted]}>
@@ -82,13 +113,15 @@ export function ChartTrackRow({
             source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
             style={styles.richCover}
           />
-          {playable ? (
-            <Pressable style={styles.playOverlay} onPress={onPlay} hitSlop={4}>
-              <View style={styles.playCircle}>
-                <Ionicons name="play" size={16} color="#fff" />
-              </View>
-            </Pressable>
-          ) : null}
+          <Pressable style={styles.playOverlay} onPress={handlePlay} hitSlop={4}>
+            <View style={[styles.playCircle, !playable && styles.playCircleMuted]}>
+              <Ionicons
+                name={playable ? 'play' : 'musical-note'}
+                size={playable ? 16 : 14}
+                color="#fff"
+              />
+            </View>
+          </Pressable>
         </Pressable>
 
         <Pressable style={styles.richMeta} onPress={onOpen}>
@@ -114,7 +147,7 @@ export function ChartTrackRow({
           <Text style={styles.artist} numberOfLines={1}>
             {formatArtist(item.artist)}
           </Text>
-          {!playable ? (
+          {showHint ? (
             <Text style={styles.hint}>Catalog only — no upload yet</Text>
           ) : null}
         </Pressable>
@@ -125,17 +158,47 @@ export function ChartTrackRow({
         </Pressable>
       </View>
 
-      {tags.length > 0 ? (
-        <View style={styles.tags}>
-          {tags.map((tag) => (
-            <View key={tag} style={styles.tagChip}>
-              <Text style={styles.tagText}>#{tag}</Text>
-            </View>
-          ))}
+      {hasFooter && !footerExpanded ? (
+        <View style={styles.denseFooter}>
+          <View style={styles.tagsInline}>
+            {collapsedTags.map((tag) => (
+              <View key={tag} style={styles.tagChip}>
+                <Text style={styles.tagText}>#{tag}</Text>
+              </View>
+            ))}
+            {hiddenTagCount > 0 ? (
+              <Pressable style={styles.moreChip} onPress={toggleFooter} hitSlop={6}>
+                <Text style={styles.moreChipText}>+{hiddenTagCount}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <MiniSupportersBar
+            bids={item.bids}
+            maxVisible={3}
+            variant="stack"
+            onStackPress={canExpandFooter ? toggleFooter : undefined}
+          />
         </View>
       ) : null}
 
-      <MiniSupportersBar bids={item.bids} maxVisible={4} />
+      {hasFooter && footerExpanded ? (
+        <View style={styles.expandedFooter}>
+          {allTags.length > 0 ? (
+            <View style={styles.tags}>
+              {allTags.map((tag) => (
+                <View key={tag} style={styles.tagChip}>
+                  <Text style={styles.tagText}>#{tag}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <MiniSupportersBar bids={item.bids} maxVisible={8} variant="chips" />
+          <Pressable style={styles.collapseBtn} onPress={toggleFooter} hitSlop={8}>
+            <Text style={styles.collapseText}>Show less</Text>
+            <Ionicons name="chevron-up" size={14} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -203,7 +266,7 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   richCard: {
-    marginBottom: 10,
+    marginBottom: 8,
     padding: 10,
     borderRadius: 14,
     backgroundColor: colors.card,
@@ -253,6 +316,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  playCircleMuted: {
+    borderColor: 'rgba(255,255,255,0.45)',
+    opacity: 0.85,
+  },
   richMeta: {
     flex: 1,
     minWidth: 0,
@@ -297,11 +364,25 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
+  denseFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 8,
+  },
+  tagsInline: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 8,
   },
   tagChip: {
     paddingHorizontal: 8,
@@ -312,5 +393,32 @@ const styles = StyleSheet.create({
   tagText: {
     color: '#ddd6fe',
     fontSize: 11,
+  },
+  moreChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  moreChipText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  expandedFooter: {
+    marginTop: 8,
+    gap: 8,
+  },
+  collapseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  collapseText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

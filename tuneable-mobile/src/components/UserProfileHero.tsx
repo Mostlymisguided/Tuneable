@@ -1,8 +1,17 @@
+import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { colors } from '@/src/theme/colors';
-import { formatPoundsFromPence } from '@/src/lib/format';
-import { DEFAULT_PROFILE_PIC, type TuneBytesTagRanking, type User, type UserStats } from '@/src/types/user';
+import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
+import {
+  DEFAULT_PROFILE_PIC,
+  type MediaChampionTitle,
+  type TipTagChampion,
+  type TuneBytesTagRanking,
+  type User,
+  type UserStats,
+} from '@/src/types/user';
 
 function formatJoinDate(date: string | undefined): string {
   if (!date) return 'Recently joined';
@@ -25,16 +34,18 @@ function roleLabel(role: string[] | undefined): string {
 }
 
 function badgeColors(rank: number) {
-  if (rank === 1) return ['#f59e0b', '#fcd34d'];
-  if (rank === 2) return ['#94a3b8', '#cbd5e1'];
-  if (rank === 3) return ['#b45309', '#fdba74'];
-  return ['#7c3aed', '#a855f7'];
+  if (rank === 1) return { border: '#f59e0b', bg: '#fcd34d', text: '#fde68a' };
+  if (rank === 2) return { border: '#94a3b8', bg: '#cbd5e1', text: '#e2e8f0' };
+  if (rank === 3) return { border: '#b45309', bg: '#fdba74', text: '#fdba74' };
+  return { border: '#7c3aed', bg: '#a855f7', text: '#ddd6fe' };
 }
 
 type Props = {
   user: User;
   stats: UserStats | null;
   rankings: TuneBytesTagRanking[];
+  tipTagChampions?: TipTagChampion[];
+  mediaChampions?: MediaChampionTitle[];
   isOwnProfile?: boolean;
   onWalletPress?: () => void;
 };
@@ -43,6 +54,8 @@ export function UserProfileHero({
   user,
   stats,
   rankings,
+  tipTagChampions = [],
+  mediaChampions = [],
   isOwnProfile = false,
   onWalletPress,
 }: Props) {
@@ -50,6 +63,10 @@ export function UserProfileHero({
     user.homeLocation?.display ||
     user.homeLocation?.city ||
     user.homeLocation?.country;
+
+  const tipTags = tipTagChampions.slice(0, 8);
+  const mediaTitles = mediaChampions.slice(0, 8);
+  const discovery = rankings.slice(0, 5);
 
   return (
     <View style={styles.wrap}>
@@ -87,48 +104,138 @@ export function UserProfileHero({
           <Metric label="Tips" value={String(stats?.totalBids ?? 0)} />
           <Metric
             label="TuneBytes"
-            value={(user.tuneBytes ?? 0).toLocaleString()}
+            value={formatTuneBytes(user.tuneBytes)}
           />
           <Metric label="Tunes" value={String(stats?.uniqueSongsCount ?? 0)} />
         </View>
 
-        <View style={styles.balanceRow}>
-          <View>
-            <Text style={styles.balanceLabel}>Wallet</Text>
-            <Text style={styles.balanceValue}>
-              {formatPoundsFromPence(user.balance)}
-            </Text>
+        {isOwnProfile ? (
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>Wallet</Text>
+              <Text style={styles.balanceValue}>
+                {formatPoundsFromPence(user.balance)}
+              </Text>
+            </View>
+            {onWalletPress ? (
+              <Pressable style={styles.walletBtn} onPress={onWalletPress}>
+                <Text style={styles.walletBtnText}>Top up</Text>
+              </Pressable>
+            ) : null}
           </View>
-          {isOwnProfile && onWalletPress ? (
-            <Pressable style={styles.walletBtn} onPress={onWalletPress}>
-              <Text style={styles.walletBtnText}>Top up</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        ) : null}
       </View>
 
-      {rankings.length > 0 ? (
-        <View style={styles.badgesCard}>
-          <Text style={styles.badgesTitle}>Champion badges</Text>
-          <View style={styles.badgesWrap}>
-            {rankings.map((ranking) => {
-              const [border, bg] = badgeColors(ranking.rank);
-              return (
-                <View
-                  key={`${ranking.tag}-${ranking.rank}`}
-                  style={[
-                    styles.badge,
-                    { borderColor: border, backgroundColor: `${bg}22` },
-                  ]}>
-                  <Ionicons name="trophy-outline" size={14} color={border} />
-                  <Text style={styles.badgeTag}>{ranking.tag}</Text>
-                  <Text style={styles.badgeMeta}>#{ranking.rank}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
+      {tipTags.length > 0 ? (
+        <BadgeSection
+          icon="trophy"
+          iconColor="#fbbf24"
+          title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}>
+          {tipTags.map((ranking) => {
+            const palette = badgeColors(ranking.rank);
+            return (
+              <View
+                key={`tip-${ranking.tag}-${ranking.rank}`}
+                style={[
+                  styles.badge,
+                  {
+                    borderColor: palette.border,
+                    backgroundColor: `${palette.bg}22`,
+                  },
+                ]}>
+                <Ionicons name="trophy" size={12} color={palette.border} />
+                <Text style={styles.badgeText}>#{ranking.rank}</Text>
+                <Text style={[styles.badgeMeta, { color: palette.text }]}>
+                  #{ranking.tag}
+                </Text>
+              </View>
+            );
+          })}
+        </BadgeSection>
       ) : null}
+
+      {mediaTitles.length > 0 ? (
+        <BadgeSection
+          icon="musical-notes"
+          iconColor="#fbbf24"
+          title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}>
+          {mediaTitles.map((title) => {
+            const palette = badgeColors(title.rank);
+            const id = title.uuid || title.mediaId;
+            return (
+              <Pressable
+                key={`media-${title.mediaId}-${title.rank}`}
+                onPress={() => {
+                  if (id) router.push(`/tune/${id}`);
+                }}
+                style={[
+                  styles.badge,
+                  {
+                    borderColor: palette.border,
+                    backgroundColor: `${palette.bg}22`,
+                    maxWidth: '100%',
+                  },
+                ]}>
+                <Ionicons name="trophy" size={12} color={palette.border} />
+                <Text style={styles.badgeText}>#{title.rank}</Text>
+                <Text
+                  style={[styles.badgeMeta, { color: palette.text, flexShrink: 1 }]}
+                  numberOfLines={1}>
+                  {title.title}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </BadgeSection>
+      ) : null}
+
+      {discovery.length > 0 ? (
+        <BadgeSection
+          icon="ribbon-outline"
+          iconColor={colors.accentLight}
+          title={isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}>
+          {discovery.map((ranking) => {
+            const palette = badgeColors(ranking.rank);
+            return (
+              <View
+                key={`disc-${ranking.tag}-${ranking.rank}`}
+                style={[
+                  styles.badge,
+                  {
+                    borderColor: palette.border,
+                    backgroundColor: `${palette.bg}22`,
+                  },
+                ]}>
+                <Ionicons name="sparkles-outline" size={12} color={palette.border} />
+                <Text style={styles.badgeText}>{ranking.tag}</Text>
+                <Text style={styles.badgeMeta}>#{ranking.rank}</Text>
+              </View>
+            );
+          })}
+        </BadgeSection>
+      ) : null}
+    </View>
+  );
+}
+
+function BadgeSection({
+  icon,
+  iconColor,
+  title,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.badgesCard}>
+      <View style={styles.badgesHeader}>
+        <Ionicons name={icon} size={16} color={iconColor} />
+        <Text style={styles.badgesTitle}>{title}</Text>
+      </View>
+      <View style={styles.badgesWrap}>{children}</View>
     </View>
   );
 }
@@ -248,11 +355,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
   },
+  badgesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
   badgesTitle: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 10,
   },
   badgesWrap: {
     flexDirection: 'row',
@@ -268,13 +380,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  badgeTag: {
+  badgeText: {
     color: colors.text,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   badgeMeta: {
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

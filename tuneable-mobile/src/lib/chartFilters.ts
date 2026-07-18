@@ -23,6 +23,8 @@ export type ChartFilterState = {
   selectedTagTerms: string[];
   searchQuery: string;
   bpmFilterRange: BpmFilterRange;
+  /** Profile library uses AND; Music chart uses OR (default). */
+  requireAllTags?: boolean;
 };
 
 export function formatBpmFilterLabel(range: BpmFilterRange): string {
@@ -84,7 +86,12 @@ export function filterChartMedia(
   media: ChartMediaItem[],
   filters: ChartFilterState
 ): ChartMediaItem[] {
-  const { selectedTagTerms, searchQuery, bpmFilterRange } = filters;
+  const {
+    selectedTagTerms,
+    searchQuery,
+    bpmFilterRange,
+    requireAllTags = false,
+  } = filters;
   const liveTerm = searchQuery.trim();
   const allTerms = liveTerm ? [...selectedTagTerms, liveTerm] : selectedTagTerms;
 
@@ -115,17 +122,23 @@ export function filterChartMedia(
           );
         });
 
+      const tags = (item.tags ?? [])
+        .map((tag) =>
+          tag && typeof tag === 'string' ? getCanonicalTag(tag) : ''
+        )
+        .filter(Boolean);
+
       const matchesTagSearch =
         tagTerms.length === 0 ||
-        tagTerms.some((tagTerm) => {
-          const canonicalSearchTag = getCanonicalTag(tagTerm);
-          const tags = (item.tags ?? [])
-            .map((tag) =>
-              tag && typeof tag === 'string' ? getCanonicalTag(tag) : ''
-            )
-            .filter(Boolean);
-          return tags.some((tag) => tag === canonicalSearchTag);
-        });
+        (requireAllTags
+          ? tagTerms.every((tagTerm) => {
+              const canonicalSearchTag = getCanonicalTag(tagTerm);
+              return tags.some((tag) => tag === canonicalSearchTag);
+            })
+          : tagTerms.some((tagTerm) => {
+              const canonicalSearchTag = getCanonicalTag(tagTerm);
+              return tags.some((tag) => tag === canonicalSearchTag);
+            }));
 
       return matchesRegularSearch && matchesTagSearch;
     });

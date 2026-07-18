@@ -9,16 +9,26 @@ export interface ChartMediaItem {
   _id?: string;
   uuid?: string;
   title?: string;
-  artist?: string | Array<string | { name?: string }>;
+  artist?: string | Array<string | { name?: string; userId?: string | { _id?: string; uuid?: string } }>;
   creatorDisplay?: string;
   duration?: number;
   coverArt?: string;
   partyMediaAggregate?: number;
   timePeriodBidValue?: number;
   globalMediaAggregate?: number;
-  bpm?: number | null;
+  globalMediaAggregateTop?: number;
   globalMediaAggregateTopRank?: number;
+  globalMediaAggregateTopUser?: {
+    _id?: string;
+    uuid?: string;
+    username?: string;
+  };
+  bpm?: number | null;
+  key?: string | null;
   album?: string | null;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
+  description?: string | null;
   tags?: string[];
   category?: string;
   status?: string;
@@ -45,6 +55,26 @@ export interface ChartMediaItem {
       homeLocation?: import('@/src/types/user').ResolvedLocation | null;
     };
   }>;
+}
+
+export interface RelatedMediaItem {
+  mediaId?: string;
+  _id?: string;
+  uuid?: string;
+  title?: string;
+  artist?: string;
+  coverArt?: string | null;
+  duration?: number;
+  bpm?: number | null;
+  tags?: string[];
+  globalMediaAggregate?: number;
+  sources?: MediaSources;
+}
+
+export interface RelatedPlaylistsResponse {
+  relatedMedia?: RelatedMediaItem[];
+  fansAlsoTip?: RelatedMediaItem[];
+  sourceTitle?: string | null;
 }
 
 export interface MediaProfileResponse {

@@ -18,7 +18,7 @@ import { partyAPI } from '@/src/api/party';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
-import { formatPoundsFromPence } from '@/src/lib/format';
+import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import {
   formatArtist,
   getChartTipPence,
@@ -173,7 +173,9 @@ export default function HomeScreen() {
           {typeof user?.tuneBytes === 'number' ? (
             <View style={[styles.statCard, styles.statCardFlex]}>
               <Text style={styles.statLabel}>TuneBytes</Text>
-              <Text style={styles.statValue}>{user.tuneBytes}</Text>
+              <Text style={styles.statValue}>
+                {formatTuneBytes(user.tuneBytes)}
+              </Text>
             </View>
           ) : null}
         </View>

@@ -1,5 +1,9 @@
 import { api } from './client';
-import type { ChartMediaItem, MediaProfileResponse } from '@/src/types/media';
+import type {
+  ChartMediaItem,
+  MediaProfileResponse,
+  RelatedPlaylistsResponse,
+} from '@/src/types/media';
 
 export type PlaceGlobalBidResponse = {
   message?: string;
@@ -48,6 +52,17 @@ export const mediaAPI = {
   getProfile: async (mediaId: string): Promise<MediaProfileResponse> => {
     const response = await api.get<MediaProfileResponse>(
       `/media/${mediaId}/profile`
+    );
+    return response.data;
+  },
+
+  getRelatedPlaylists: async (
+    mediaId: string,
+    params?: { relatedLimit?: number; fansLimit?: number }
+  ): Promise<RelatedPlaylistsResponse> => {
+    const response = await api.get<RelatedPlaylistsResponse>(
+      `/media/${mediaId}/related-playlists`,
+      { params }
     );
     return response.data;
   },

@@ -71,6 +71,7 @@ function RootNavigator() {
         }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />

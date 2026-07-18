@@ -18,6 +18,8 @@ type Props = {
   subtitle?: string;
   balancePence: number;
   defaultTipPounds?: number;
+  /** When set, overrides default tip when the sheet opens. */
+  initialAmountPounds?: number | null;
   onClose: () => void;
   onConfirm: (amountPounds: number) => Promise<void>;
 };
@@ -32,6 +34,7 @@ export function TipSheet({
   subtitle,
   balancePence,
   defaultTipPounds = 1.11,
+  initialAmountPounds = null,
   onClose,
   onConfirm,
 }: Props) {
@@ -42,13 +45,16 @@ export function TipSheet({
 
   useEffect(() => {
     if (visible) {
-      const start = Math.max(0.01, defaultTipPounds || 1.11);
+      const start = Math.max(
+        0.01,
+        initialAmountPounds ?? defaultTipPounds ?? 1.11
+      );
       setAmount(start);
       setAmountText(start.toFixed(2));
       setError(null);
       setSubmitting(false);
     }
-  }, [visible, defaultTipPounds]);
+  }, [visible, defaultTipPounds, initialAmountPounds]);
 
   const applyAmount = (next: number) => {
     const safe = Math.max(0.01, roundPounds(next));

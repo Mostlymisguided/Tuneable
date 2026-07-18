@@ -26,6 +26,12 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (identifier: string, password: string) => Promise<void>;
+  register: (input: {
+    username: string;
+    email: string;
+    password: string;
+    parentInviteCode: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
@@ -103,6 +109,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await saveSession(newToken, JSON.stringify(newUser));
   }, []);
 
+  const register = useCallback(
+    async (input: {
+      username: string;
+      email: string;
+      password: string;
+      parentInviteCode: string;
+    }) => {
+      const { token: newToken, user: newUser } = await authAPI.register({
+        username: input.username.trim(),
+        email: input.email.trim(),
+        password: input.password,
+        parentInviteCode: input.parentInviteCode.trim().toUpperCase(),
+      });
+      setToken(newToken);
+      setUser(newUser);
+      await saveSession(newToken, JSON.stringify(newUser));
+    },
+    []
+  );
+
   const refreshUser = useCallback(async () => {
     const { user: fresh } = await authAPI.getProfile();
     setUser(fresh);
@@ -145,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isAuthenticated: Boolean(token && user),
       login,
+      register,
       logout,
       refreshUser,
       updateBalance,
@@ -155,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       isLoading,
       login,
+      register,
       logout,
       refreshUser,
       updateBalance,

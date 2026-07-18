@@ -17,6 +17,8 @@ import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { colors } from '@/src/theme/colors';
 import type {
+  MediaChampionTitle,
+  TipTagChampion,
   TuneBytesTagRanking,
   User,
   UserLibraryItem,
@@ -30,6 +32,8 @@ export default function PublicUserProfileScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
+  const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
+  const [mediaChampions, setMediaChampions] = useState<MediaChampionTitle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,17 +45,26 @@ export default function PublicUserProfileScreen() {
       else setLoading(true);
       setError(null);
       try {
-        const [profileRes, libraryRes, rankingsRes] = await Promise.all([
-          userAPI.getProfileById(id),
-          userAPI.getTuneLibraryByUserId(id),
-          userAPI.getTuneBytesTagRankings(id, 5).catch(() => ({
-            tuneBytesTagRankings: [],
-          })),
-        ]);
+        const [profileRes, libraryRes, rankingsRes, championsRes] =
+          await Promise.all([
+            userAPI.getProfileById(id),
+            userAPI.getTuneLibraryByUserId(id),
+            userAPI.getTuneBytesTagRankings(id, 5).catch(() => ({
+              tuneBytesTagRankings: [],
+            })),
+            userAPI
+              .getChampionTitles(id, {
+                mediaLimit: 8,
+                checkMediaLimit: 40,
+              })
+              .catch(() => ({ tags: [], media: [] })),
+          ]);
         setUser(profileRes.user);
         setStats(profileRes.stats);
         setLibrary(libraryRes.library ?? []);
         setRankings(rankingsRes.tuneBytesTagRankings ?? []);
+        setTipTagChampions(championsRes.tags ?? []);
+        setMediaChampions(championsRes.media ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load profile');
       } finally {
@@ -90,7 +103,6 @@ export default function PublicUserProfileScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Profile</Text>
       </View>
 
       {loading && !user ? (
@@ -112,7 +124,13 @@ export default function PublicUserProfileScreen() {
             />
           }
           contentContainerStyle={styles.content}>
-          <UserProfileHero user={user} stats={stats} rankings={rankings} />
+          <UserProfileHero
+            user={user}
+            stats={stats}
+            rankings={rankings}
+            tipTagChampions={tipTagChampions}
+            mediaChampions={mediaChampions}
+          />
           <UserLibrarySection
             items={library}
             user={authUser}
@@ -131,15 +149,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingTop: 8,
-    marginBottom: 8,
-    gap: 4,
+    marginBottom: 4,
   },
   back: { marginLeft: -2 },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-  },
   content: {
     paddingHorizontal: 16,
     paddingBottom: 24,

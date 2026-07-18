@@ -14,6 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import axios from 'axios';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
+import { getApiErrorMessage } from '@/src/lib/apiError';
 import { colors } from '@/src/theme/colors';
 import { API_ORIGIN } from '@/src/api/client';
 import {
@@ -51,19 +52,12 @@ export default function LoginScreen() {
       await login(identifier, password);
       router.replace('/(tabs)');
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const message =
-          (err.response?.data as { message?: string } | undefined)?.message ||
-          err.message;
-        if (!err.response) {
-          setError(
-            `Cannot reach API at ${API_ORIGIN}. Is the backend running? On a device, use your Mac's LAN IP.`
-          );
-        } else {
-          setError(message || 'Login failed.');
-        }
+      if (axios.isAxiosError(err) && !err.response) {
+        setError(
+          `Cannot reach API at ${API_ORIGIN}. Is the backend running? On a device, use your Mac's LAN IP.`
+        );
       } else {
-        setError('Login failed.');
+        setError(getApiErrorMessage(err, 'Login failed.'));
       }
     } finally {
       setSubmitting(false);
@@ -189,6 +183,13 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
+          <Pressable
+            style={styles.linkBtn}
+            onPress={() => router.push('/register')}
+            disabled={busy}>
+            <Text style={styles.linkText}>New here? Create an account</Text>
+          </Pressable>
+
           <Text style={styles.hint}>API: {API_ORIGIN}</Text>
         </View>
       </KeyboardAvoidingView>
@@ -278,6 +279,15 @@ const styles = StyleSheet.create({
   googleText: {
     color: colors.text,
     fontSize: 16,
+    fontWeight: '600',
+  },
+  linkBtn: {
+    marginTop: 18,
+    alignItems: 'center',
+  },
+  linkText: {
+    color: colors.accentLight,
+    fontSize: 14,
     fontWeight: '600',
   },
   error: {

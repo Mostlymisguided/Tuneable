@@ -134,6 +134,33 @@ export interface TuneBytesTagRankingsResponse {
   tuneBytesTagRankings: TuneBytesTagRanking[];
 }
 
+export interface TipTagChampion {
+  tag: string;
+  rank: number;
+  totalAmount: number;
+  bidCount?: number;
+  totalUsers?: number;
+  medal?: string | null;
+}
+
+export interface MediaChampionTitle {
+  mediaId: string;
+  uuid?: string;
+  title: string;
+  rank: number;
+  totalAmount: number;
+  bidCount?: number;
+  medal?: string | null;
+}
+
+export interface ChampionTitlesResponse {
+  tags: TipTagChampion[];
+  media: MediaChampionTitle[];
+  podiumSize?: number;
+  scope?: string;
+  locationPlaceId?: string | null;
+}
+
 export interface LoginResponse {
   token: string;
   user: User;

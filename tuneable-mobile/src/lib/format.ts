@@ -4,6 +4,15 @@ export function formatPoundsFromPence(pence: number | undefined | null): string 
   return `£${value.toFixed(2)}`;
 }
 
+/** Format TuneBytes as a whole number (0 decimal places). */
+export function formatTuneBytes(value: number | undefined | null): string {
+  const n = Math.round(Number(value) || 0);
+  return n.toLocaleString(undefined, {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  });
+}
+
 /** Format duration in seconds as m:ss */
 export function formatDuration(seconds: number | undefined | null): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '';

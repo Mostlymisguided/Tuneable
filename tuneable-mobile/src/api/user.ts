@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  ChampionTitlesResponse,
   TuneBytesTagRankingsResponse,
   UserLibraryResponse,
   UserProfileResponse,
@@ -28,6 +29,23 @@ export const userAPI = {
     const response = await api.get<TuneBytesTagRankingsResponse>(
       `/users/${userId}/tunebytes-tag-rankings`,
       { params: { limit } }
+    );
+    return response.data;
+  },
+
+  getChampionTitles: async (
+    userId: string,
+    params?: {
+      mediaLimit?: number;
+      checkMediaLimit?: number;
+      tagLimit?: number;
+      checkTagLimit?: number;
+      locationPlaceId?: string;
+    }
+  ): Promise<ChampionTitlesResponse> => {
+    const response = await api.get<ChampionTitlesResponse>(
+      `/users/${userId}/champion-titles`,
+      { params }
     );
     return response.data;
   },
