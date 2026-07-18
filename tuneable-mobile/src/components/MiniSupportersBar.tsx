@@ -4,9 +4,7 @@ import { router } from 'expo-router';
 import { colors } from '@/src/theme/colors';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import type { ChartMediaItem } from '@/src/types/media';
-
-const DEFAULT_PROFILE_PIC =
-  'https://uploads.tuneable.stream/profile-pics/default-avatar.png';
+import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
 
 type Bid = NonNullable<ChartMediaItem['bids']>[number];
 

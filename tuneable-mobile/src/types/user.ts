@@ -23,6 +23,10 @@ export interface User {
   };
 }
 
+/** Canonical default avatar — keep in sync with backend User.profilePic default */
+export const DEFAULT_PROFILE_PIC =
+  'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
+
 export interface LocationAncestor {
   placeId?: string;
   placetype?: string;

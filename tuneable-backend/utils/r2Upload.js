@@ -2,6 +2,7 @@ const { S3Client } = require('@aws-sdk/client-s3');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
+const { buildReadableAudioKey, buildReadableCoverKey } = require('./readableUploadKey');
 
 // Check if R2 is configured
 const isR2Configured = () => {
@@ -277,10 +278,14 @@ const createMediaUpload = () => {
           });
         },
         key: function (req, file, cb) {
-          const username = req.user?.username || 'unknown';
-          const timestamp = Date.now();
-          const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const filename = `media-uploads/${username}-${timestamp}-${safeFilename}`;
+          const title = req.body?.title;
+          const artist = req.body?.artistName || req.body?.artist || req.user?.username;
+          const filename = buildReadableAudioKey({
+            title,
+            artist,
+            ext: path.extname(file.originalname) || '.mp3',
+            fallbackBasename: path.basename(file.originalname, path.extname(file.originalname)),
+          });
           cb(null, filename);
         }
       }),
@@ -310,10 +315,16 @@ const createMediaUpload = () => {
       storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, localUploadDir),
         filename: (req, file, cb) => {
-          const username = req.user?.username || 'unknown';
-          const timestamp = Date.now();
-          const safeFilename = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-          cb(null, `${username}-${timestamp}-${safeFilename}`);
+          const title = req.body?.title;
+          const artist = req.body?.artistName || req.body?.artist || req.user?.username;
+          const key = buildReadableAudioKey({
+            title,
+            artist,
+            ext: path.extname(file.originalname) || '.mp3',
+            fallbackBasename: path.basename(file.originalname, path.extname(file.originalname)),
+          });
+          // Local disk storage is relative to media-uploads/; strip the folder prefix
+          cb(null, key.replace(/^media-uploads\//, ''));
         }
       }),
       limits: { fileSize: 50 * 1024 * 1024 },
@@ -342,8 +353,13 @@ const createCoverArtUpload = () => {
         acl: 'public-read',
         contentType: multerS3.AUTO_CONTENT_TYPE,
         key: function (req, file, cb) {
-          const timestamp = Date.now();
-          const filename = `cover-art/cover-${timestamp}${path.extname(file.originalname)}`;
+          const title = req.body?.title;
+          const artist = req.body?.artistName || req.body?.artist;
+          const filename = buildReadableCoverKey({
+            title,
+            artist,
+            ext: path.extname(file.originalname) || '.jpg',
+          });
           cb(null, filename);
         }
       }),
@@ -367,8 +383,14 @@ const createCoverArtUpload = () => {
       storage: multer.diskStorage({
         destination: (req, file, cb) => cb(null, localUploadDir),
         filename: (req, file, cb) => {
-          const timestamp = Date.now();
-          cb(null, `cover-${timestamp}${path.extname(file.originalname)}`);
+          const title = req.body?.title;
+          const artist = req.body?.artistName || req.body?.artist;
+          const key = buildReadableCoverKey({
+            title,
+            artist,
+            ext: path.extname(file.originalname) || '.jpg',
+          });
+          cb(null, key.replace(/^cover-art\//, ''));
         }
       }),
       limits: { fileSize: 5 * 1024 * 1024 },

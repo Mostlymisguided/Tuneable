@@ -11,6 +11,7 @@ const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
+const { buildReadableAudioKey, buildReadableCoverKey } = require('../utils/readableUploadKey');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
@@ -769,8 +770,23 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       producer,
       label,
     } = req.body;
-    
-    // Upload audio file to R2 manually
+
+    // Resolve display metadata before upload so R2 keys are human-readable
+    const parsedTags = tags ? tags.split(',').map(t => normalizeTagForStorage(t.trim())).filter(t => t) : [];
+    const finalTitle = title || extractedMetadata?.title || 'Untitled';
+    const finalArtistName = artistName?.trim() || extractedMetadata?.artist || user.creatorProfile?.artistName || user.username;
+    const providedArtists = parseArtistsPayload(req.body.artists);
+    const finalAlbum = album || extractedMetadata?.album || null;
+    const finalGenres = genre ? [genre] : (extractedMetadata?.genres || []);
+    const finalDuration = duration ? parseInt(duration) : (extractedMetadata?.duration || null);
+    const finalExplicit = explicit === 'true' || explicit === true || extractedMetadata?.explicit || false;
+    const finalCoverArt = coverArt || null;
+
+    if (!finalTitle) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    // Upload audio file to R2 with artist-title key
     let fileUrl;
     try {
       console.log('📤 Uploading audio file to R2...');
@@ -783,12 +799,14 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
           secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
         },
       });
-      
-      const username = user.username || 'unknown';
-      const timestamp = Date.now();
-      const safeFilename = audioFile.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const audioKey = `media-uploads/${username}-${timestamp}-${safeFilename}`;
-      
+
+      const audioKey = buildReadableAudioKey({
+        title: finalTitle,
+        artist: finalArtistName,
+        ext: path.extname(audioFile.originalname) || '.mp3',
+        fallbackBasename: path.basename(audioFile.originalname, path.extname(audioFile.originalname)),
+      });
+
       const audioCommand = new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
         Key: audioKey,
@@ -797,31 +815,13 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         ACL: 'public-read',
         CacheControl: 'public, max-age=31536000'
       });
-      
+
       await s3Client.send(audioCommand);
       fileUrl = getPublicUrl(audioKey);
       console.log(`✅ Audio file uploaded to R2: ${fileUrl}`);
     } catch (uploadError) {
       console.error('❌ Error uploading audio file to R2:', uploadError.message);
       return res.status(500).json({ error: 'Failed to upload audio file' });
-    }
-    
-    // Parse tags (comma-separated string to array) and capitalize them
-    const parsedTags = tags ? tags.split(',').map(t => normalizeTagForStorage(t.trim())).filter(t => t) : [];
-    
-    // Determine final values (user input takes priority over extracted metadata)
-    const finalTitle = title || extractedMetadata?.title || 'Untitled';
-    const finalArtistName = artistName?.trim() || extractedMetadata?.artist || user.creatorProfile?.artistName || user.username;
-    const providedArtists = parseArtistsPayload(req.body.artists);
-    const finalAlbum = album || extractedMetadata?.album || null;
-    const finalGenres = genre ? [genre] : (extractedMetadata?.genres || []);
-    const finalDuration = duration ? parseInt(duration) : (extractedMetadata?.duration || null);
-    const finalExplicit = explicit === 'true' || explicit === true || extractedMetadata?.explicit || false;
-    const finalCoverArt = coverArt || null;
-    
-    // Validate required fields
-    if (!finalTitle) {
-      return res.status(400).json({ error: 'Title is required' });
     }
     
     // Map extracted metadata to Media model format
@@ -1014,10 +1014,13 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
           },
         });
         
-        const timestamp = Date.now();
-        const safeTitle = finalTitle.replace(/[^a-zA-Z0-9]/g, '_');
-        const coverArtKey = `cover-art/${safeTitle}-${timestamp}.jpg`;
-        
+        const coverArtKey = buildReadableCoverKey({
+          title: finalTitle,
+          artist: finalArtistName,
+          ext: path.extname(coverArtFile.originalname) || '.jpg',
+          uuid: media.uuid,
+        });
+
         const coverArtCommand = new PutObjectCommand({
           Bucket: process.env.R2_BUCKET_NAME,
           Key: coverArtKey,
@@ -1154,11 +1157,13 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         },
       });
 
-      const username = user.username || 'unknown';
-      const timestamp = Date.now();
-      const safeFilename = audioFile.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const mediaKey = media.uuid || media._id.toString();
-      const audioKey = `media-uploads/${mediaKey}-${username}-${timestamp}-${safeFilename}`;
+      const audioKey = buildReadableAudioKey({
+        title: media.title,
+        artist: media.artist,
+        ext: path.extname(audioFile.originalname) || '.mp3',
+        uuid: media.uuid || media._id.toString(),
+        fallbackBasename: path.basename(audioFile.originalname, path.extname(audioFile.originalname)),
+      });
 
       await s3Client.send(new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
@@ -2692,11 +2697,13 @@ router.put('/:id/cover-art', authMiddleware, coverArtUploadSingle.single('coverA
         },
       });
       
-      const timestamp = Date.now();
-      const safeTitle = (media.title || 'cover').replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileExt = path.extname(req.file.originalname) || '.jpg';
-      const coverArtKey = `cover-art/${safeTitle}-${timestamp}${fileExt}`;
-      
+      const coverArtKey = buildReadableCoverKey({
+        title: media.title,
+        artist: media.artist,
+        ext: path.extname(req.file.originalname) || '.jpg',
+        uuid: media.uuid,
+      });
+
       const coverArtCommand = new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
         Key: coverArtKey,

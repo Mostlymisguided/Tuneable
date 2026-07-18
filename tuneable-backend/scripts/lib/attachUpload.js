@@ -4,39 +4,19 @@ const {
   attachWithPendingRights,
   createMediaWithPendingRights,
 } = require('./libraryImport');
-
-function slugifySegment(str) {
-  return String(str || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-')
-    .slice(0, 60);
-}
-
-/**
- * Build a human-readable, URL-safe R2 object key from the track's metadata.
- * e.g. media-uploads/daft-punk-around-the-world-a1b2c3d4.mp3
- * A short id keeps it unique without polluting the readable part.
- */
-function buildReadableAudioKey(filePath, media) {
-  const ext = (path.extname(filePath) || '.mp3').toLowerCase();
-  const artist = Array.isArray(media.artist)
-    ? media.artist.map((a) => a?.name).filter(Boolean).join(', ')
-    : media.artist;
-  const artistSlug = slugifySegment(artist);
-  const titleSlug = slugifySegment(media.title || path.basename(filePath, path.extname(filePath)));
-  const base = [artistSlug, titleSlug].filter(Boolean).join('-') || 'track';
-  const shortId = String(media.uuid || '').replace(/-/g, '').slice(0, 8) || Date.now().toString(36);
-  return `media-uploads/${base}-${shortId}${ext}`;
-}
+const { buildReadableAudioKey } = require('../../utils/readableUploadKey');
 
 async function uploadToR2(filePath, media, username) {
   const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
   const { getPublicUrl } = require('../../utils/r2Upload');
   const buffer = fs.readFileSync(filePath);
-  const audioKey = buildReadableAudioKey(filePath, media);
+  const audioKey = buildReadableAudioKey({
+    title: media.title,
+    artist: media.artist,
+    ext: path.extname(filePath) || '.mp3',
+    uuid: media.uuid,
+    fallbackBasename: path.basename(filePath, path.extname(filePath)),
+  });
 
   const s3Client = new S3Client({
     region: 'auto',

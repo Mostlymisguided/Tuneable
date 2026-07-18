@@ -2,10 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 import { formatPoundsFromPence } from '@/src/lib/format';
-import type { TuneBytesTagRanking, User, UserStats } from '@/src/types/user';
-
-const DEFAULT_PROFILE_PIC =
-  'https://uploads.tuneable.stream/profile-pics/default-avatar.png';
+import { DEFAULT_PROFILE_PIC, type TuneBytesTagRanking, type User, type UserStats } from '@/src/types/user';
 
 function formatJoinDate(date: string | undefined): string {
   if (!date) return 'Recently joined';
