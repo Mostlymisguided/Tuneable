@@ -3680,6 +3680,27 @@ router.post('/admin/enrichment/process', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/media/admin/enrichment/backfill
+// @desc    Enqueue MusicBrainz tag/year/ISRC backfill for untagged media
+// @access  Private (Admin)
+router.post('/admin/enrichment/backfill', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const result = await metadataEnrichmentService.enqueueUntaggedBackfill({
+      limit: parseInt(req.body?.limit, 10) || 50,
+      onlyLinked: Boolean(req.body?.onlyLinked),
+      processImmediately: req.body?.processImmediately !== false,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error enqueueing enrichment backfill:', error);
+    res.status(500).json({ error: error.message || 'Failed to enqueue backfill' });
+  }
+});
+
 // @route   POST /api/media/admin/enrichment/:id/apply
 // @desc    Apply enrichment suggestion (optional field overrides)
 // @access  Private (Admin)

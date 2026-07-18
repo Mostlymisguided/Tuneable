@@ -823,6 +823,15 @@ export const mediaAPI = {
     return response.data;
   },
 
+  enqueueEnrichmentBackfill: async (params?: {
+    limit?: number;
+    onlyLinked?: boolean;
+    processImmediately?: boolean;
+  }) => {
+    const response = await api.post('/media/admin/enrichment/backfill', params || {});
+    return response.data;
+  },
+
   applyEnrichment: async (id: string, overrides?: Record<string, unknown>) => {
     const response = await api.post(`/media/admin/enrichment/${id}/apply`, overrides || {});
     return response.data;

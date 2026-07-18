@@ -3,14 +3,34 @@ const mongoose = require('mongoose');
 /**
  * Post-import metadata enrichment queue (MusicBrainz cross-ref).
  * High-confidence suggestions can be auto-applied; medium confidence needs admin review.
+ * Suggestions may include tags/genres/ISRC/releaseYear from MB recording lookup.
  */
 const candidateSchema = new mongoose.Schema({
   musicbrainzId: String,
+  musicbrainzReleaseId: { type: String, default: null },
   title: String,
   artist: String,
   album: { type: String, default: null },
   duration: { type: Number, default: 0 },
   releaseYear: { type: Number, default: null },
+  isrc: { type: String, default: null },
+  tags: { type: [String], default: [] },
+  genres: { type: [String], default: [] },
+  score: { type: Number, default: 0 },
+  matchType: { type: String, default: null },
+}, { _id: false });
+
+const suggestionSchema = new mongoose.Schema({
+  title: String,
+  artist: String,
+  album: { type: String, default: null },
+  duration: { type: Number, default: 0 },
+  isrc: { type: String, default: null },
+  releaseYear: { type: Number, default: null },
+  tags: { type: [String], default: [] },
+  genres: { type: [String], default: [] },
+  musicbrainzId: String,
+  musicbrainzReleaseId: { type: String, default: null },
   score: { type: Number, default: 0 },
   matchType: { type: String, default: null },
 }, { _id: false });
@@ -26,7 +46,7 @@ const metadataEnrichmentSchema = new mongoose.Schema({
 
   importSource: {
     type: String,
-    enum: ['soundcloud_likes', 'spotify_likes', 'library_import', 'manual', 'other'],
+    enum: ['soundcloud_likes', 'spotify_likes', 'library_import', 'manual', 'other', 'backfill'],
     default: 'library_import',
     index: true,
   },
@@ -56,24 +76,21 @@ const metadataEnrichmentSchema = new mongoose.Schema({
     default: null,
   },
 
+  /** When true, enrichment may proceed even if media already has an MBID (tag backfill). */
+  enrichTagsOnly: { type: Boolean, default: false },
+
   original: {
     title: String,
     artist: String,
     album: { type: String, default: null },
     duration: { type: Number, default: 0 },
     isrc: { type: String, default: null },
+    releaseYear: { type: Number, default: null },
+    tags: { type: [String], default: [] },
+    genres: { type: [String], default: [] },
   },
 
-  suggestion: {
-    title: String,
-    artist: String,
-    album: { type: String, default: null },
-    duration: { type: Number, default: 0 },
-    isrc: { type: String, default: null },
-    musicbrainzId: String,
-    score: { type: Number, default: 0 },
-    matchType: { type: String, default: null },
-  },
+  suggestion: suggestionSchema,
 
   candidates: [candidateSchema],
 

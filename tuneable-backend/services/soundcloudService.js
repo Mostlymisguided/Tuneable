@@ -234,6 +234,43 @@ function normalizeArtworkUrl(url) {
 }
 
 /**
+ * Parse SoundCloud tag_list (space-separated; multi-word tags in quotes).
+ */
+function parseSoundCloudTagList(tagList) {
+  if (!tagList || typeof tagList !== 'string') return [];
+  const tags = [];
+  const re = /"([^"]+)"|(\S+)/g;
+  let match;
+  while ((match = re.exec(tagList)) !== null) {
+    const raw = (match[1] || match[2] || '').trim();
+    if (!raw) continue;
+    if (/^https?:\/\//i.test(raw)) continue;
+    if (raw.length > 48) continue;
+    tags.push(raw);
+  }
+  return tags;
+}
+
+/**
+ * Genre + tag_list → deduped tag strings for Media.tags / Media.genres.
+ */
+function extractSoundCloudTags(track) {
+  const genre = typeof track?.genre === 'string' ? track.genre.trim() : '';
+  const fromList = parseSoundCloudTagList(track?.tag_list || '');
+  const seen = new Set();
+  const out = [];
+  for (const raw of [genre, ...fromList]) {
+    if (!raw) continue;
+    const key = raw.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(raw);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/**
  * Convert a SoundCloud track into Tuneable import format
  */
 function convertLikedTrackToTuneableFormat(track) {
@@ -247,6 +284,8 @@ function convertLikedTrackToTuneableFormat(track) {
     : null;
 
   const isrc = track?.isrc || track?.publisher_metadata?.isrc || null;
+  const tags = extractSoundCloudTags(track);
+  const genre = typeof track?.genre === 'string' ? track.genre.trim() : null;
 
   return {
     id,
@@ -266,12 +305,14 @@ function convertLikedTrackToTuneableFormat(track) {
       ...(id ? { soundcloud: id } : {}),
       ...(isrc ? { isrc } : {}),
     },
+    tags,
+    genres: genre ? [genre] : tags.slice(0, 3),
     isLocal: false,
     isPlayable: false,
     supportMode: 'tip',
     awaitingUpload: true,
     sourceLabel: 'SoundCloud Likes',
-    genre: track?.genre || null,
+    genre: genre || null,
     addedAt: track?.created_at || null,
   };
 }
@@ -281,5 +322,7 @@ module.exports = {
   convertLikedTrackToTuneableFormat,
   refreshAccessToken,
   isLikelyMixOrSet,
+  parseSoundCloudTagList,
+  extractSoundCloudTags,
   MIX_DURATION_SEC,
 };

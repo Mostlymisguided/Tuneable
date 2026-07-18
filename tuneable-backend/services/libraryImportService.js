@@ -23,6 +23,13 @@ const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 25000;
 
 function buildExternalMediaFromTrack(track) {
+  const tags = Array.isArray(track.tags)
+    ? track.tags.filter((t) => typeof t === 'string' && t.trim())
+    : [];
+  const genres = Array.isArray(track.genres)
+    ? track.genres.filter((t) => typeof t === 'string' && t.trim())
+    : (track.genre ? [String(track.genre).trim()].filter(Boolean) : []);
+
   return {
     title: track.title,
     artist: track.artist,
@@ -34,6 +41,8 @@ function buildExternalMediaFromTrack(track) {
     releaseYear: track.releaseYear || null,
     sources: track.sources || {},
     externalIds: track.externalIds || {},
+    tags,
+    genres,
   };
 }
 
@@ -152,6 +161,41 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
 
   if (externalMedia.externalIds?.isrc && !media.isrc) {
     media.isrc = normalizeIsrc(externalMedia.externalIds.isrc);
+    changed = true;
+  }
+
+  // Seed tags/genres onto catalog rows that have none (SoundCloud genre pass-through)
+  const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+  const incomingTags = Array.isArray(externalMedia.tags) ? externalMedia.tags : [];
+  const incomingGenres = Array.isArray(externalMedia.genres) ? externalMedia.genres : [];
+  if (incomingTags.length > 0) {
+    if (!media.tags || media.tags.length === 0) {
+      media.tags = incomingTags
+        .map((t) => normalizeTagForStorage(t))
+        .filter(Boolean)
+        .slice(0, 24);
+      changed = true;
+    } else {
+      const merged = [...media.tags];
+      let tagsChanged = false;
+      for (const raw of incomingTags) {
+        const normalized = normalizeTagForStorage(raw);
+        if (!normalized) continue;
+        if (merged.some((t) => tagsMatch(t, normalized))) continue;
+        merged.push(normalized);
+        tagsChanged = true;
+      }
+      if (tagsChanged) {
+        media.tags = merged.slice(0, 24);
+        changed = true;
+      }
+    }
+  }
+  if (incomingGenres.length > 0 && (!media.genres || media.genres.length === 0)) {
+    media.genres = incomingGenres
+      .map((t) => normalizeTagForStorage(t))
+      .filter(Boolean)
+      .slice(0, 12);
     changed = true;
   }
 

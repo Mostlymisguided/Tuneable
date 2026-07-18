@@ -59,7 +59,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     }
 
     const {
-      title, artist, sources, coverArt, duration, tags, category,
+      title, artist, sources, coverArt, duration, tags, genres, category,
       externalIds, album, releaseDate, releaseYear,
     } = externalMedia;
 
@@ -100,7 +100,10 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
         duration: duration || 0,
         sources: new Map(sourceEntries),
         externalIds: new Map(externalIdEntries),
-        tags: Array.isArray(tags) ? tags.map((tag) => normalizeTagForStorage(tag)) : [],
+        tags: Array.isArray(tags) ? tags.map((tag) => normalizeTagForStorage(tag)).filter(Boolean) : [],
+        genres: Array.isArray(genres)
+          ? genres.map((g) => normalizeTagForStorage(g)).filter(Boolean)
+          : [],
         category: category || 'Music',
         album: album || null,
         releaseDate: releaseDate || null,
