@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/locationHelpers';
 import { partyAPI } from '../lib/api';
 import type { Party } from '../types';
@@ -57,7 +57,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [amountInput, setAmountInput] = useState('');
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
   const [progressStep, setProgressStep] = useState<ProgressStep>(null);
-  const navigate = useNavigate();
   
   // Check if location mismatch and fetch user's location party
   const isLocationMismatch = party?.type === 'location' && 
@@ -291,16 +290,13 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                 This helps support artists in your local community!
               </p>
               {userLocationParty && (
-                <button
-                  onClick={() => {
-                    navigate(`/party/${(userLocationParty as any)?.id || (userLocationParty as any)?._id || ''}`);
-                    onClose();
-                  }}
-                  className="text-xs text-blue-300 underline mt-1 hover:text-blue-200 transition-colors"
-                  type="button"
+                <Link
+                  to={`/party/${(userLocationParty as any)?.id || (userLocationParty as any)?._id || ''}`}
+                  onClick={() => onClose()}
+                  className="inline-block text-xs text-blue-300 underline mt-1 hover:text-blue-200 transition-colors"
                 >
                   View {formatLocation(user.homeLocation)} Party →
-                </button>
+                </Link>
               )}
             </div>
           </div>

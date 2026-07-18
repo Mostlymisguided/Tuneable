@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -3034,12 +3034,14 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                       className="h-12 w-12 md:h-12 md:w-12 rounded object-cover flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
-                                      <p 
-                                        className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors text-sm md:text-base"
-                                        onClick={() => navigate(`/tune/${media._id || media.id}`)}
-                                        title="View tune profile"
-                                      >
-                                        {media.title}
+                                      <p className="text-white font-medium truncate text-sm md:text-base">
+                                        <Link
+                                          to={`/tune/${media._id || media.id}`}
+                                          className="cursor-pointer hover:text-purple-300 transition-colors"
+                                          title="View tune profile"
+                                        >
+                                          {media.title}
+                                        </Link>
                                       </p>
                                       <p className="text-gray-400 text-xs md:text-sm truncate">
                                         <ClickableArtistDisplay media={media} />

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Crown, Loader2, MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { mediaAPI, tagAPI, artistAPI } from '../lib/api';
@@ -132,7 +132,6 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   entityLabel,
   mediaTitle,
 }) => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(seedLocation);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
@@ -222,9 +221,9 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     };
   }, [mediaId, tagSlug, artistUserId, artistName, selectedLocation?.placeId, maxDisplay]);
 
-  const openProfile = (ranking: MediaChampionRanking) => {
+  const profilePath = (ranking: MediaChampionRanking) => {
     const id = ranking.user.uuid || ranking.user._id;
-    if (id) navigate(`/user/${id}`);
+    return id ? `/user/${id}` : undefined;
   };
 
   const podiumChampions = useMemo(() => {
@@ -434,15 +433,12 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
               const medal = medalForRank(ranking.rank, ranking.isChampion, ranking.medal) || 'gold';
               const styles = MEDAL_STYLES[medal];
               const isGold = ranking.rank === 1;
-              return (
-                <button
-                  key={ranking.user._id || ranking.user.uuid || ranking.rank}
-                  type="button"
-                  onClick={() => openProfile(ranking)}
-                  className={`flex flex-col items-center flex-1 max-w-[9rem] md:max-w-[11rem] group ${
-                    isGold ? '-mt-2' : ''
-                  }`}
-                >
+              const path = profilePath(ranking);
+              const podiumClassName = `flex flex-col items-center flex-1 max-w-[9rem] md:max-w-[11rem] group ${
+                isGold ? '-mt-2' : ''
+              }`;
+              const podiumContent = (
+                <>
                   <div className={`relative ${isGold ? 'scale-110' : ''}`}>
                     <div
                       className={`rounded-full overflow-hidden bg-gray-800 border-2 ${styles.border} ring-2 ${styles.ring} ${
@@ -481,7 +477,17 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
                     className={`mt-2 w-full rounded-t-md border ${styles.bar} ${styles.barHeight}`}
                     aria-hidden
                   />
-                </button>
+                </>
+              );
+              const key = ranking.user._id || ranking.user.uuid || ranking.rank;
+              return path ? (
+                <Link key={key} to={path} className={podiumClassName}>
+                  {podiumContent}
+                </Link>
+              ) : (
+                <div key={key} className={podiumClassName}>
+                  {podiumContent}
+                </div>
               );
             })}
           </div>
@@ -499,16 +505,14 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
           {(hasPodium ? restRankings : data.rankings).map((ranking) => {
             const medal = medalForRank(ranking.rank, ranking.isChampion, ranking.medal);
             const styles = medal ? MEDAL_STYLES[medal] : null;
-            return (
-              <div
-                key={ranking.user._id || ranking.user.uuid || ranking.rank}
-                className={`flex flex-row md:items-center md:justify-between p-1.5 md:p-4 rounded-lg hover:bg-purple-500/40 transition-all cursor-pointer ${
-                  styles
-                    ? `bg-black/20 border ${styles.border}/30`
-                    : 'bg-purple-900/20'
-                }`}
-                onClick={() => openProfile(ranking)}
-              >
+            const path = profilePath(ranking);
+            const rowClassName = `flex flex-row md:items-center md:justify-between p-1.5 md:p-4 rounded-lg hover:bg-purple-500/40 transition-all cursor-pointer ${
+              styles
+                ? `bg-black/20 border ${styles.border}/30`
+                : 'bg-purple-900/20'
+            }`;
+            const rowContent = (
+              <>
                 <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
                   <div
                     className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -581,6 +585,16 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
                     avg {penceToPounds(ranking.totalAmount / Math.max(ranking.bidCount, 1))}
                   </div>
                 </div>
+              </>
+            );
+            const key = ranking.user._id || ranking.user.uuid || ranking.rank;
+            return path ? (
+              <Link key={key} to={path} className={rowClassName}>
+                {rowContent}
+              </Link>
+            ) : (
+              <div key={key} className={rowClassName}>
+                {rowContent}
               </div>
             );
           })}

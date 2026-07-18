@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
@@ -22,8 +22,6 @@ interface TopBiddersProps {
 }
 
 const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
-  const navigate = useNavigate();
-
   if (!bids || bids.length === 0) {
     return null;
   }
@@ -70,12 +68,10 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
 
   return (
     <div className="space-y-2">
-      {topBids.map((bid, index) => (
-        <div
-          key={bid.userId.uuid || index}
-          className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-900/10 to-pink-900/10 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
-          onClick={() => bid.userId.uuid && navigate(`/user/${bid.userId.uuid}`)}
-        >
+      {topBids.map((bid, index) => {
+        const rowClassName = "flex items-center justify-between p-3 bg-gradient-to-r from-purple-900/10 to-pink-900/10 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer";
+        const rowContent = (
+          <>
           {/* Left: Profile + Username */}
           <div className="flex items-center space-x-3 flex-1 min-w-0">
             {/* Profile Picture */}
@@ -110,8 +106,18 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
               {penceToPounds(bid.amount || (bid._doc && bid._doc.amount) || 0)}
             </div>
           </div>
-        </div>
-      ))}
+          </>
+        );
+        return bid.userId.uuid ? (
+          <Link key={bid.userId.uuid} to={`/user/${bid.userId.uuid}`} className={rowClassName}>
+            {rowContent}
+          </Link>
+        ) : (
+          <div key={index} className={rowClassName}>
+            {rowContent}
+          </div>
+        );
+      })}
       
       {/* Show count if more bids exist */}
       {bids.length > maxDisplay && (

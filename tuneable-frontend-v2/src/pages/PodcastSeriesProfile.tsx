@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI } from '../lib/api';
@@ -536,10 +536,6 @@ const PodcastSeriesProfile: React.FC = () => {
     if (!dateString) return 'Unknown';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  const handleEpisodeClick = (episode: Episode) => {
-    navigate(`/podcasts/${episode._id}`);
   };
 
   const { setCurrentEpisode, play } = usePodcastPlayerStore();
@@ -1136,15 +1132,14 @@ const PodcastSeriesProfile: React.FC = () => {
                 >
                   <div className="flex flex-col sm:flex-row gap-4">
                     {/* Cover Art with Play overlay */}
-                    <div 
-                      className="relative flex-shrink-0 cursor-pointer group"
-                      onClick={() => handleEpisodeClick(episode)}
-                    >
-                      <img
-                        src={episode.coverArt || series?.coverArt || DEFAULT_COVER_ART}
-                        alt={episode.title}
-                        className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
-                      />
+                    <div className="relative flex-shrink-0 cursor-pointer group">
+                      <Link to={`/podcasts/${episode._id}`} className="block">
+                        <img
+                          src={episode.coverArt || series?.coverArt || DEFAULT_COVER_ART}
+                          alt={episode.title}
+                          className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
+                        />
+                      </Link>
                       {hasPlayable && (
                         <button
                           type="button"
@@ -1165,11 +1160,13 @@ const PodcastSeriesProfile: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 mb-1">
                             <span className="text-purple-400 font-bold text-lg">#{(currentPage - 1) * episodesPerPage + index + 1}</span>
-                            <h3 
-                              className="text-xl font-bold truncate cursor-pointer hover:text-purple-300"
-                              onClick={() => handleEpisodeClick(episode)}
-                            >
-                              {episode.title}
+                            <h3 className="text-xl font-bold truncate">
+                              <Link
+                                to={`/podcasts/${episode._id}`}
+                                className="cursor-pointer hover:text-purple-300"
+                              >
+                                {episode.title}
+                              </Link>
                             </h3>
                           </div>
                           {episode.episodeNumber && (

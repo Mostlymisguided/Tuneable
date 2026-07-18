@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
   Coins, 
@@ -74,7 +74,6 @@ interface PayoutFormData {
 
 const ArtistEscrowDashboard: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [escrowInfo, setEscrowInfo] = useState<EscrowInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMatching, setIsMatching] = useState(false);
@@ -921,12 +920,12 @@ const ArtistEscrowDashboard: React.FC = () => {
                           </span>
                         </div>
                         {media && (
-                          <button
-                            onClick={() => navigate(`/tune/${media._id || entry.mediaId}`)}
-                            className="mt-2 text-sm text-purple-400 hover:text-purple-300"
+                          <Link
+                            to={`/tune/${media._id || entry.mediaId}`}
+                            className="inline-block mt-2 text-sm text-purple-400 hover:text-purple-300"
                           >
                             View Media →
-                          </button>
+                          </Link>
                         )}
                       </div>
                     </div>

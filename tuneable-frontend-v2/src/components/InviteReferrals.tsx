@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { authAPI } from '../lib/api';
@@ -16,7 +16,6 @@ const InviteReferrals: React.FC = () => {
   const [newCodeLabel, setNewCodeLabel] = useState('');
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadReferrals();
@@ -377,9 +376,9 @@ const InviteReferrals: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {referrals.map((referral) => (
-              <div
+              <Link
                 key={referral.uuid}
-                onClick={() => navigate(`/user/${referral.uuid}`)}
+                to={`/user/${referral.uuid}`}
                 className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
               >
                 <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -424,7 +423,7 @@ const InviteReferrals: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

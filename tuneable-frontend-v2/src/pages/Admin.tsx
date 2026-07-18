@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Settings, 
   Users, 
@@ -1617,13 +1617,13 @@ const Admin: React.FC = () => {
                     {getSortedUsers().map((user) => (
                       <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => navigate(`/user/${user._id}`)}
+                          <Link
+                            to={`/user/${user._id}`}
                             className="text-sm font-medium text-white hover:text-purple-300 underline"
                             title="View profile"
                           >
                             {user.username}
-                          </button>
+                          </Link>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">{user.email}</div>
@@ -2026,13 +2026,13 @@ const Admin: React.FC = () => {
                                   Verify
                                 </button>
                               )}
-                              <button
-                                onClick={() => navigate(`/label/${label.slug}`)}
-                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                              <Link
+                                to={`/label/${label.slug}`}
+                                className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                 title="View label"
                               >
                                 View
-                              </button>
+                              </Link>
                             </div>
                           </td>
                         </tr>
@@ -2263,13 +2263,13 @@ const Admin: React.FC = () => {
                                       Verify
                                     </button>
                                   )}
-                                  <button
-                                    onClick={() => navigate(`/collective/${collective.slug}`)}
-                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                  <Link
+                                    to={`/collective/${collective.slug}`}
+                                    className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                     title="View collective"
                                   >
                                     View
-                                  </button>
+                                  </Link>
                                 </div>
                               </td>
                             </tr>
@@ -2486,12 +2486,12 @@ const Admin: React.FC = () => {
                                     />
                                   )}
                                   <div>
-                                    <button
-                                      onClick={() => navigate(`/tune/${bid.media._id}`)}
+                                    <Link
+                                      to={`/tune/${bid.media._id}`}
                                       className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
                                     >
                                       {bid.media?.title || 'Unknown'}
-                                    </button>
+                                    </Link>
                                     <div className="text-xs text-gray-400">
                                       {bid.media ? <ClickableArtistDisplay media={bid.media} /> : 'Unknown Artist'}
                                     </div>
@@ -2499,12 +2499,18 @@ const Admin: React.FC = () => {
                                 </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <button
-                                  onClick={() => bid.user?.uuid && navigate(`/user/${bid.user.uuid}`)}
-                                  className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
-                                >
-                                  {bid.user?.username || 'Unknown'}
-                                </button>
+                                {bid.user?.uuid ? (
+                                  <Link
+                                    to={`/user/${bid.user.uuid}`}
+                                    className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                                  >
+                                    {bid.user?.username || 'Unknown'}
+                                  </Link>
+                                ) : (
+                                  <span className="text-sm text-gray-300">
+                                    {bid.user?.username || 'Unknown'}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm font-medium text-green-400">
@@ -2868,12 +2874,12 @@ const Admin: React.FC = () => {
                                     ) : (
                                       <div className="space-y-2 group">
                                         <div className="flex items-center gap-2">
-                                          <button
-                                            onClick={() => navigate(`/tune/${item._id}`)}
+                                          <Link
+                                            to={`/tune/${item._id}`}
                                             className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
                                           >
                                             {item.title || 'Unknown'}
-                                          </button>
+                                          </Link>
                                           <button
                                             onClick={() => handleStartEdit(item)}
                                             className="opacity-0 group-hover:opacity-100 px-1 py-0.5 text-xs text-gray-400 hover:text-purple-400 transition-all"
@@ -2993,13 +2999,13 @@ const Admin: React.FC = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center space-x-2">
-                                  <button
-                                    onClick={() => navigate(`/tune/${item._id}`)}
-                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                  <Link
+                                    to={`/tune/${item._id}`}
+                                    className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                     title="View media"
                                   >
                                     View
-                                  </button>
+                                  </Link>
                                   {editingMediaId === item._id ? (
                                     <>
                                       <button
@@ -3193,12 +3199,12 @@ const Admin: React.FC = () => {
                                 />
                               )}
                               <div>
-                                <button
-                                  onClick={() => navigate(`/tune/${veto.media._id || veto.media.uuid}`)}
+                                <Link
+                                  to={`/tune/${veto.media._id || veto.media.uuid}`}
                                   className="text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
                                 >
                                   {veto.media?.title || 'Unknown'}
-                                </button>
+                                </Link>
                                 <div className="text-xs text-gray-400">
                                   {veto.media?.artist || 'Unknown Artist'}
                                 </div>
@@ -3207,12 +3213,18 @@ const Admin: React.FC = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {veto.type === 'bid' ? (
-                                  <button
-                                    onClick={() => veto.user?.uuid && navigate(`/user/${veto.user.uuid}`)}
-                                    className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
-                                  >
-                                    {veto.user?.username || 'Unknown'}
-                                  </button>
+                                  veto.user?.uuid ? (
+                                    <Link
+                                      to={`/user/${veto.user.uuid}`}
+                                      className="text-sm text-gray-300 hover:text-purple-400 transition-colors"
+                                    >
+                                      {veto.user?.username || 'Unknown'}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-sm text-gray-300">
+                                      {veto.user?.username || 'Unknown'}
+                                    </span>
+                                  )
                                 ) : (
                                   <div>
                                     <div className="text-sm text-gray-300">

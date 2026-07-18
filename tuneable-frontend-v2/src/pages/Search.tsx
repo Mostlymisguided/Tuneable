@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useSearchParams, useNavigate } from 'react-router-dom';
 import { searchAPI, partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucide-react';
@@ -533,14 +533,14 @@ const SearchPage: React.FC = () => {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate(`/party/${partyId}`)}
+            <RouterLink
+              to={`/party/${partyId}`}
               className="flex items-center space-x-2 px-4 py-2 text-white rounded-lg font-medium transition-colors border border-white hover:bg-white hover:text-gray-900"
               style={{ backgroundColor: 'transparent' }}
             >
               <ArrowLeft className="h-5 w-5" />
               <span>Back to Party</span>
-            </button>
+            </RouterLink>
             <h1 className="text-3xl font-bold text-gray-900">Add Songs</h1>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-500">Media Source:</span>

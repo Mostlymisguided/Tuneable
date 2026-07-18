@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -28,26 +28,38 @@ const VetoedQueueMediaCard: React.FC<VetoedQueueMediaCardProps> = ({
   showUnveto,
   onUnveto,
 }) => {
-  const navigate = useNavigate();
+  const tunePath = mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined;
+
+  const coverArt = (
+    <img
+      src={mediaData.coverArt || DEFAULT_COVER_ART}
+      alt={mediaData.title || 'Unknown Media'}
+      className="w-32 h-32 rounded object-cover cursor-pointer hover:opacity-80 transition-opacity"
+      width="128"
+      height="128"
+    />
+  );
 
   return (
     <div className="bg-red-900/20 border border-red-800/30 p-4 rounded-lg flex items-center space-x-4">
-      <img
-        src={mediaData.coverArt || DEFAULT_COVER_ART}
-        alt={mediaData.title || 'Unknown Media'}
-        className="w-32 h-32 rounded object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-        width="128"
-        height="128"
-        onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-      />
+      {tunePath ? (
+        <Link to={tunePath} className="flex-shrink-0">
+          {coverArt}
+        </Link>
+      ) : (
+        <div className="flex-shrink-0">{coverArt}</div>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2">
-          <h4
-            className="font-medium text-white text-lg truncate cursor-pointer hover:text-purple-300 transition-colors"
-            onClick={() => mediaData.uuid && navigate(`/tune/${mediaData.uuid}`)}
-          >
-            {mediaData.title || 'Unknown Media'}
+          <h4 className="font-medium text-white text-lg truncate">
+            {tunePath ? (
+              <Link to={tunePath} className="cursor-pointer hover:text-purple-300 transition-colors">
+                {mediaData.title || 'Unknown Media'}
+              </Link>
+            ) : (
+              mediaData.title || 'Unknown Media'
+            )}
           </h4>
           <span className="text-gray-400">•</span>
           <span className="text-gray-300 text-lg truncate font-light">

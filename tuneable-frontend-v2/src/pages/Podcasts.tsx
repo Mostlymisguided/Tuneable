@@ -1662,6 +1662,7 @@ const Podcasts: React.FC = () => {
                   isPlayLoading={!!fetchingPlayId && fetchingPlayId === epId}
                   canPlay={canPlayEpisode(episode)}
                   tipLabel={isExternal ? 'Add & Tip' : 'Tip'}
+                  episodePath={epId ? `/podcasts/${epId}` : undefined}
                   onEpisodeClick={(ep) => handleEpisodeClick(ep as PodcastEpisode)}
                   onSeriesClick={(ep, e) => handleSeriesClick(ep as PodcastEpisode, e)}
                   onPlay={(ep, e) => handleQueuePlay(ep as PodcastEpisode, e)}

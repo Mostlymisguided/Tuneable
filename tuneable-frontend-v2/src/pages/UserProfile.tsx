@@ -1972,9 +1972,9 @@ const UserProfile: React.FC = () => {
               {isOwnProfile && currentUser && 
                 !currentUser.role?.includes('creator') && (
                 <div className="mb-2">
-                  <button
-                    onClick={() => navigate('/creator/register')}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
+                  <Link
+                    to="/creator/register"
+                    className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
                   >
                     <Award className="w-4 h-4" />
                     <span>
@@ -1984,7 +1984,7 @@ const UserProfile: React.FC = () => {
                         ? 'Re-apply as Creator'
                         : 'Become a Creator'}
                     </span>
-                  </button>
+                  </Link>
                 </div>
               )}
 
@@ -2497,12 +2497,14 @@ const UserProfile: React.FC = () => {
                               className="h-12 w-12 md:h-12 md:w-12 rounded object-cover flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
-                              <p 
-                                className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors text-sm md:text-base"
-                                onClick={() => navigate(`/tune/${media._id || media.id}`)}
-                                title="View tune profile"
-                              >
-                                {media.title}
+                              <p className="text-white font-medium truncate text-sm md:text-base">
+                                <Link
+                                  to={`/tune/${media._id || media.id}`}
+                                  className="cursor-pointer hover:text-purple-300 transition-colors"
+                                  title="View tune profile"
+                                >
+                                  {media.title}
+                                </Link>
                               </p>
                               <p className="text-gray-400 text-xs md:text-sm truncate">
                                 <ClickableArtistDisplay media={media} />
@@ -2837,29 +2839,28 @@ const UserProfile: React.FC = () => {
                       <div className="w-8 text-sm font-semibold text-purple-300 text-center">
                         {index + 1}
                       </div>
-                      <img
-                        src={item.coverArt || DEFAULT_COVER_ART}
-                        alt={item.title}
-                        className="w-14 h-14 rounded-lg object-cover cursor-pointer"
-                        onClick={() => navigate(
-                          isPodcastQueueItem(item)
-                            ? `/podcasts/${item.mediaUuid || item.mediaId}`
-                            : `/tune/${item.mediaUuid || item.mediaId}`
-                        )}
-                      />
+                      <Link
+                        to={isPodcastQueueItem(item)
+                          ? `/podcasts/${item.mediaUuid || item.mediaId}`
+                          : `/tune/${item.mediaUuid || item.mediaId}`}
+                        className="flex-shrink-0"
+                      >
+                        <img
+                          src={item.coverArt || DEFAULT_COVER_ART}
+                          alt={item.title}
+                          className="w-14 h-14 rounded-lg object-cover cursor-pointer"
+                        />
+                      </Link>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => navigate(
-                              isPodcastQueueItem(item)
-                                ? `/podcasts/${item.mediaUuid || item.mediaId}`
-                                : `/tune/${item.mediaUuid || item.mediaId}`
-                            )}
+                          <Link
+                            to={isPodcastQueueItem(item)
+                              ? `/podcasts/${item.mediaUuid || item.mediaId}`
+                              : `/tune/${item.mediaUuid || item.mediaId}`}
                             className="text-left text-white font-semibold truncate hover:text-purple-300 transition-colors"
                           >
                             {item.title}
-                          </button>
+                          </Link>
                           <span className="text-xs px-2 py-0.5 rounded bg-gray-700/60 text-gray-200">
                             {item.sourceType.replace('_', ' ')}
                           </span>
@@ -2938,21 +2939,21 @@ const UserProfile: React.FC = () => {
                   return (
                     <div key={entry._id} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
                       <div className="flex items-start gap-4">
-                        <img
-                          src={entry.media.coverArt || DEFAULT_COVER_ART}
-                          alt={entry.media.title}
-                          className="w-16 h-16 rounded-lg object-cover cursor-pointer"
-                          onClick={() => navigate(path)}
-                        />
+                        <Link to={path} className="flex-shrink-0">
+                          <img
+                            src={entry.media.coverArt || DEFAULT_COVER_ART}
+                            alt={entry.media.title}
+                            className="w-16 h-16 rounded-lg object-cover cursor-pointer"
+                          />
+                        </Link>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => navigate(path)}
+                            <Link
+                              to={path}
                               className="text-left text-lg font-semibold text-white hover:text-purple-300 transition-colors truncate"
                             >
                               {entry.media.title}
-                            </button>
+                            </Link>
                             <span className={`px-2 py-0.5 rounded text-xs ${
                               entry.status === 'completed'
                                 ? 'bg-green-600/30 text-green-200'
@@ -3064,27 +3065,36 @@ const UserProfile: React.FC = () => {
                     <div className="flex items-start space-x-4">
                       {/* Media Cover Art */}
                       {tip.media?.coverArt && (
-                        <img
-                          src={tip.media.coverArt}
-                          alt={tip.media.title || 'Media'}
-                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0 cursor-pointer"
-                          onClick={() => {
-                            const mediaId = tip.media?._id || tip.media?.uuid;
-                            if (mediaId) navigate(`/tune/${mediaId}`);
-                          }}
-                        />
+                        (tip.media?._id || tip.media?.uuid) ? (
+                          <Link to={`/tune/${tip.media._id || tip.media.uuid}`} className="flex-shrink-0">
+                            <img
+                              src={tip.media.coverArt}
+                              alt={tip.media.title || 'Media'}
+                              className="w-16 h-16 rounded-lg object-cover cursor-pointer"
+                            />
+                          </Link>
+                        ) : (
+                          <img
+                            src={tip.media.coverArt}
+                            alt={tip.media.title || 'Media'}
+                            className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                          />
+                        )
                       )}
                       
                       <div className="flex-1 min-w-0">
                         {/* Media Title */}
-                        <h3
-                          className="text-lg font-semibold text-white cursor-pointer hover:text-purple-300 transition-colors mb-1"
-                          onClick={() => {
-                            const mediaId = tip.media?._id || tip.media?.uuid;
-                            if (mediaId) navigate(`/tune/${mediaId}`);
-                          }}
-                        >
-                          {tip.media?.title || tip.mediaTitle || 'Unknown Media'}
+                        <h3 className="text-lg font-semibold text-white mb-1">
+                          {(tip.media?._id || tip.media?.uuid) ? (
+                            <Link
+                              to={`/tune/${tip.media._id || tip.media.uuid}`}
+                              className="cursor-pointer hover:text-purple-300 transition-colors"
+                            >
+                              {tip.media?.title || tip.mediaTitle || 'Unknown Media'}
+                            </Link>
+                          ) : (
+                            tip.media?.title || tip.mediaTitle || 'Unknown Media'
+                          )}
                         </h3>
                         
                         {/* Artist */}
@@ -3097,15 +3107,18 @@ const UserProfile: React.FC = () => {
                         {/* Party/Scope Info */}
                         <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-2">
                           {tip.party ? (
-                            <span
-                              className="cursor-pointer hover:text-purple-300 transition-colors"
-                              onClick={() => {
-                                const partyId = tip.party?._id || tip.party?.uuid;
-                                if (partyId) navigate(`/party/${partyId}`);
-                              }}
-                            >
-                              {tip.party.type === 'global' ? '🌍 Global' : `🎉 ${tip.party.name || tip.partyName || 'Unknown Party'}`}
-                            </span>
+                            (tip.party._id || tip.party.uuid) ? (
+                              <Link
+                                to={`/party/${tip.party._id || tip.party.uuid}`}
+                                className="cursor-pointer hover:text-purple-300 transition-colors"
+                              >
+                                {tip.party.type === 'global' ? '🌍 Global' : `🎉 ${tip.party.name || tip.partyName || 'Unknown Party'}`}
+                              </Link>
+                            ) : (
+                              <span>
+                                {tip.party.type === 'global' ? '🌍 Global' : `🎉 ${tip.party.name || tip.partyName || 'Unknown Party'}`}
+                              </span>
+                            )
                           ) : (
                             <span>{tip.bidScope === 'global' ? '🌍 Global' : '🎉 Party'}</span>
                           )}
@@ -3915,13 +3928,13 @@ const UserProfile: React.FC = () => {
                         ? (user as any).creatorProfile.reviewNotes 
                         : 'Your creator application was not approved. You can re-apply with updated information.'}
                     </p>
-                    <button
-                      onClick={() => navigate('/creator/register')}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
+                    <Link
+                      to="/creator/register"
+                      className="w-fit px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
                     >
                       <Award className="w-5 h-5" />
                       <span>Re-apply as Creator</span>
-                    </button>
+                    </Link>
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -3930,13 +3943,13 @@ const UserProfile: React.FC = () => {
                     <p className="text-gray-400 mb-6 max-w-md mx-auto">
                       Join our community of verified creators and artists. Apply to get verified and start sharing your music on Tuneable.
                     </p>
-                    <button
-                      onClick={() => navigate('/creator/register')}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
+                    <Link
+                      to="/creator/register"
+                      className="w-fit px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
                     >
                       <Award className="w-5 h-5" />
                       <span>Become a Creator</span>
-                    </button>
+                    </Link>
                   </div>
                 )}
               </div>

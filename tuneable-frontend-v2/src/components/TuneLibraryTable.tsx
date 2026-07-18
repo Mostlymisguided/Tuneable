@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Music, Podcast, Play, Heart, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
@@ -76,7 +76,6 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
   itemPath,
   initialVisibleCount,
 }) => {
-  const navigate = useNavigate();
   const [showAll, setShowAll] = useState(false);
 
   const getSortIcon = (field: string) => {
@@ -191,13 +190,13 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                   </div>
                 </td>
                 <td className="px-2 md:px-4 py-3 max-w-[220px] w-[220px]">
-                  <button
-                    onClick={() => navigate(resolvePath(item))}
+                  <Link
+                    to={resolvePath(item)}
                     className="block w-full min-w-0 truncate text-sm font-medium text-white hover:text-purple-400 transition-colors text-left"
                     title={item.title}
                   >
                     {item.title}
-                  </button>
+                  </Link>
                   {tags.length > 0 && (
                     <div className="md:hidden mt-1">
                       <TagList tags={tags} mediaId={mediaId} limit={2} />
@@ -258,13 +257,13 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                       )}
                     </div>
                   ) : (
-                    <button
-                      onClick={() => navigate(resolvePath(item))}
+                    <Link
+                      to={resolvePath(item)}
                       className="inline-flex items-center px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                       title="View"
                     >
                       View
-                    </button>
+                    </Link>
                   )}
                 </td>
               </tr>

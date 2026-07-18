@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { AudioLines, Coins, Gift, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
-import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI } from '../lib/api';
+import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI, artistEscrowAPI } from '../lib/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
@@ -94,10 +94,18 @@ const Dashboard: React.FC = () => {
   // Creator Dashboard state
   const [creatorStats, setCreatorStats] = useState<any>(null);
   const [isLoadingCreatorStats, setIsLoadingCreatorStats] = useState(false);
-  const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels' | 'collectives'>('overview');
+  const [creatorActiveTab, setCreatorActiveTab] = useState<'overview' | 'media' | 'labels' | 'collectives' | 'escrow'>('overview');
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [isCollectiveModalOpen, setIsCollectiveModalOpen] = useState(false);
   const [isEmailInviteModalOpen, setIsEmailInviteModalOpen] = useState(false);
+  const [escrowSummary, setEscrowSummary] = useState<{
+    balance: number;
+    totalEscrowEarned?: number;
+    payoutEligible?: boolean;
+    payoutEligibilityReason?: string;
+    historyCount: number;
+  } | null>(null);
+  const [isLoadingEscrowSummary, setIsLoadingEscrowSummary] = useState(false);
   
   // My Media state
   const [myMedia, setMyMedia] = useState<any[]>([]);
@@ -465,6 +473,35 @@ Join here: ${inviteLink}`.trim();
       }
     };
     loadCollectives();
+  }, [user, creatorActiveTab]);
+
+  useEffect(() => {
+    const loadEscrowSummary = async () => {
+      if (!showCreatorDashboard(user) || creatorActiveTab !== 'escrow') return;
+
+      try {
+        setIsLoadingEscrowSummary(true);
+        const response = await artistEscrowAPI.getInfo();
+        if (response.success && response.escrow) {
+          setEscrowSummary({
+            balance: response.escrow.balance || 0,
+            totalEscrowEarned: response.escrow.totalEscrowEarned,
+            payoutEligible: response.escrow.payoutEligible,
+            payoutEligibilityReason: response.escrow.payoutEligibilityReason,
+            historyCount: response.escrow.history?.length || 0,
+          });
+        } else {
+          setEscrowSummary(null);
+        }
+      } catch (error) {
+        console.error('Failed to load escrow summary:', error);
+        toast.error('Failed to load escrow balance');
+        setEscrowSummary(null);
+      } finally {
+        setIsLoadingEscrowSummary(false);
+      }
+    };
+    loadEscrowSummary();
   }, [user, creatorActiveTab]);
 
   const handleSort = (field: string) => {
@@ -881,6 +918,17 @@ Join here: ${inviteLink}`.trim();
                     <Users className="hidden md:inline h-4 w-4 mr-2" />
                     Collectives
                   </button>
+                  <button
+                    onClick={() => setCreatorActiveTab('escrow')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      creatorActiveTab === 'escrow'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Coins className="hidden md:inline h-4 w-4 mr-2" />
+                    Escrow
+                  </button>
                 </nav>
               </div>
             </div>
@@ -948,57 +996,6 @@ Join here: ${inviteLink}`.trim();
                       {showCreatorDashboard(user) && (
                         <CreatorProfilePrompts user={user} />
                       )}
-
-                      {/* Quick Actions */}
-                      <div className="bg-gray-900 rounded-lg p-6">
-                        <h3 className="text-lg text-center md:text-left font-semibold text-white mb-4">Quick Actions</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <button
-                            onClick={handleUploadClick}
-                            className="flex items-center justify-between p-4 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
-                          >
-                            <div className="flex items-center">
-                              <Upload className="h-5 w-5 text-white mr-3" />
-                              <span className="text-white font-medium">Upload Media</span>
-                            </div>
-                            <ArrowUp className="h-4 w-4 text-white" />
-                          </button>
-                          <button
-                            onClick={() => navigate('/artist-escrow')}
-                            className="flex items-center justify-between p-4 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors"
-                          >
-                            <div className="flex items-center">
-                              <Coins className="h-5 w-5 text-white mr-3" />
-                              <span className="text-white font-medium">Escrow Balance</span>
-                            </div>
-                            <ArrowUp className="h-4 w-4 text-white" />
-                          </button>
-                          {(user?.creatorProfile?.verificationStatus === 'verified' || user?.role?.includes('admin')) && (
-                            <>
-                              <button
-                                onClick={() => setIsLabelModalOpen(true)}
-                                className="hidden md:flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                              >
-                                <div className="flex items-center">
-                                  <Building className="h-5 w-5 text-white mr-3" />
-                                  <span className="text-white font-medium">Create Label</span>
-                                </div>
-                                <Plus className="h-4 w-4 text-white" />
-                              </button>
-                              <button
-                                onClick={() => setIsCollectiveModalOpen(true)}
-                                className="hidden md:flex items-center justify-between p-4 bg-orange-500 hover:bg-pink-700 rounded-lg transition-colors"
-                              >
-                                <div className="flex items-center">
-                                  <Users className="h-5 w-5 text-white mr-3" />
-                                  <span className="text-white font-medium">Create Collective</span>
-                                </div>
-                                <Plus className="h-4 w-4 text-white" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   )}
 
@@ -1134,12 +1131,12 @@ Join here: ${inviteLink}`.trim();
                                             <Music className="h-5 w-5 text-gray-500" />
                                           </div>
                                         )}
-                                        <button
-                                          onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
+                                        <Link
+                                          to={`/tune/${String(item._id || item.uuid)}`}
                                           className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                         >
                                           {item.title}
-                                        </button>
+                                        </Link>
                                       </div>
                                     </td>
                                     <td className="px-4 py-3 text-gray-300">
@@ -1165,12 +1162,12 @@ Join here: ${inviteLink}`.trim();
                                       {new Date(item.uploadedAt || item.createdAt).toLocaleDateString()}
                                     </td>
                                     <td className="px-4 py-3">
-                                      <button
-                                        onClick={() => navigate(`/tune/${String(item._id || item.uuid)}`)}
-                                        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                      <Link
+                                        to={`/tune/${String(item._id || item.uuid)}`}
+                                        className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                       >
                                         View
-                                      </button>
+                                      </Link>
                                     </td>
                                   </tr>
                                 ))}
@@ -1406,12 +1403,12 @@ Join here: ${inviteLink}`.trim();
                                                     e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                   }}
                                                 />
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                <Link
+                                                  to={`/label/${label.slug}`}
                                                   className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                 >
                                                   {label.name}
-                                                </button>
+                                                </Link>
                                               </div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
@@ -1430,19 +1427,19 @@ Join here: ${inviteLink}`.trim();
                                             </td>
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-2">
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}`)}
-                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                <Link
+                                                  to={`/label/${label.slug}`}
+                                                  className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                 >
                                                   View
-                                                </button>
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                </Link>
+                                                <Link
+                                                  to={`/label/${label.slug}?edit=true`}
                                                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                                                 >
                                                   <Settings className="h-3 w-3" />
                                                   Manage
-                                                </button>
+                                                </Link>
                                               </div>
                                             </td>
                                           </tr>
@@ -1574,12 +1571,12 @@ Join here: ${inviteLink}`.trim();
                                                     e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                   }}
                                                 />
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                <Link
+                                                  to={`/label/${label.slug}`}
                                                   className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                 >
                                                   {label.name}
-                                                </button>
+                                                </Link>
                                               </div>
                                             </td>
                                             <td className="px-4 py-3 text-gray-300">{label.artistCount || 0}</td>
@@ -1598,19 +1595,19 @@ Join here: ${inviteLink}`.trim();
                                             </td>
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-2">
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}`)}
-                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                <Link
+                                                  to={`/label/${label.slug}`}
+                                                  className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                 >
                                                   View
-                                                </button>
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}?edit=true`)}
+                                                </Link>
+                                                <Link
+                                                  to={`/label/${label.slug}?edit=true`}
                                                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                                                 >
                                                   <Settings className="h-3 w-3" />
                                                   Manage
-                                                </button>
+                                                </Link>
                                               </div>
                                             </td>
                                           </tr>
@@ -1743,12 +1740,12 @@ Join here: ${inviteLink}`.trim();
                                                     e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                   }}
                                                 />
-                                                <button
-                                                  onClick={() => navigate(`/label/${label.slug}`)}
+                                                <Link
+                                                  to={`/label/${label.slug}`}
                                                   className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                 >
                                                   {label.name}
-                                                </button>
+                                                </Link>
                                               </div>
                                             </td>
                                             <td className="px-4 py-3">
@@ -1771,12 +1768,12 @@ Join here: ${inviteLink}`.trim();
                                               )}
                                             </td>
                                             <td className="px-4 py-3">
-                                              <button
-                                                onClick={() => navigate(`/label/${label.slug}`)}
-                                                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                              <Link
+                                                to={`/label/${label.slug}`}
+                                                className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                               >
                                                 View
-                                              </button>
+                                              </Link>
                                             </td>
                                           </tr>
                                         ))}
@@ -2066,12 +2063,12 @@ Join here: ${inviteLink}`.trim();
                                                       e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                     }}
                                                   />
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                  <Link
+                                                    to={`/collective/${collective.slug}`}
                                                     className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                   >
                                                     {collective.name}
-                                                  </button>
+                                                  </Link>
                                                 </div>
                                               </td>
                                               <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
@@ -2090,19 +2087,19 @@ Join here: ${inviteLink}`.trim();
                                               </td>
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                  <Link
+                                                    to={`/collective/${collective.slug}`}
+                                                    className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                   >
                                                     View
-                                                  </button>
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
+                                                  </Link>
+                                                  <Link
+                                                    to={`/collective/${collective.slug}?edit=true`}
                                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                                                   >
                                                     <Settings className="h-3 w-3" />
                                                     Manage
-                                                  </button>
+                                                  </Link>
                                                 </div>
                                               </td>
                                             </tr>
@@ -2159,12 +2156,12 @@ Join here: ${inviteLink}`.trim();
                                                       e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                     }}
                                                   />
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                  <Link
+                                                    to={`/collective/${collective.slug}`}
                                                     className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                   >
                                                     {collective.name}
-                                                  </button>
+                                                  </Link>
                                                 </div>
                                               </td>
                                               <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
@@ -2183,19 +2180,19 @@ Join here: ${inviteLink}`.trim();
                                               </td>
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                  <Link
+                                                    to={`/collective/${collective.slug}`}
+                                                    className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                   >
                                                     View
-                                                  </button>
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}?edit=true`)}
+                                                  </Link>
+                                                  <Link
+                                                    to={`/collective/${collective.slug}?edit=true`}
                                                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                                                   >
                                                     <Settings className="h-3 w-3" />
                                                     Manage
-                                                  </button>
+                                                  </Link>
                                                 </div>
                                               </td>
                                             </tr>
@@ -2253,12 +2250,12 @@ Join here: ${inviteLink}`.trim();
                                                       e.currentTarget.src = DEFAULT_PROFILE_PIC;
                                                     }}
                                                   />
-                                                  <button
-                                                    onClick={() => navigate(`/collective/${collective.slug}`)}
+                                                  <Link
+                                                    to={`/collective/${collective.slug}`}
                                                     className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                                   >
                                                     {collective.name}
-                                                  </button>
+                                                  </Link>
                                                 </div>
                                               </td>
                                               <td className="px-4 py-3">
@@ -2281,12 +2278,12 @@ Join here: ${inviteLink}`.trim();
                                                 )}
                                               </td>
                                               <td className="px-4 py-3">
-                                                <button
-                                                  onClick={() => navigate(`/collective/${collective.slug}`)}
-                                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                                <Link
+                                                  to={`/collective/${collective.slug}`}
+                                                  className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                                 >
                                                   View
-                                                </button>
+                                                </Link>
                                               </td>
                                             </tr>
                                           ))}
@@ -2331,6 +2328,77 @@ Join here: ${inviteLink}`.trim();
                       </div>
                     );
                   })()}
+
+                  {creatorActiveTab === 'escrow' && (
+                    <div className="space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">Escrow</h3>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Your tip earnings held for payout
+                          </p>
+                        </div>
+                        <Link
+                          to="/artist-escrow"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
+                          <Coins className="h-4 w-4 flex-shrink-0" />
+                          Manage Escrow
+                          <ArrowRight className="h-4 w-4 flex-shrink-0" />
+                        </Link>
+                      </div>
+
+                      {isLoadingEscrowSummary ? (
+                        <div className="text-center py-8">
+                          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+                          <p className="text-gray-400 mt-2">Loading escrow balance...</p>
+                        </div>
+                      ) : escrowSummary ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="bg-gray-900 rounded-lg p-5">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Coins className="h-5 w-5 text-yellow-400" />
+                              <p className="text-sm text-gray-400">Available Balance</p>
+                            </div>
+                            <p className="text-3xl font-bold text-yellow-400">
+                              {penceToPounds(escrowSummary.balance)}
+                            </p>
+                            <p className="text-sm text-gray-500 mt-2">
+                              {escrowSummary.historyCount} allocation{escrowSummary.historyCount !== 1 ? 's' : ''} in history
+                            </p>
+                          </div>
+                          <div className="bg-gray-900 rounded-lg p-5">
+                            <p className="text-sm text-gray-400 mb-2">Total Earned</p>
+                            <p className="text-3xl font-bold text-white">
+                              {escrowSummary.totalEscrowEarned !== undefined
+                                ? penceToPounds(escrowSummary.totalEscrowEarned)
+                                : penceToPounds(escrowSummary.balance)}
+                            </p>
+                            {escrowSummary.payoutEligible === false && escrowSummary.payoutEligibilityReason && (
+                              <p className="text-sm text-amber-400/90 mt-2">
+                                {escrowSummary.payoutEligibilityReason}
+                              </p>
+                            )}
+                            {escrowSummary.payoutEligible && (
+                              <p className="text-sm text-green-400 mt-2">
+                                Eligible for payout
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-gray-400 mb-4">Unable to load escrow balance</p>
+                          <Link
+                            to="/artist-escrow"
+                            className="inline-block px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                          >
+                            Open Escrow Dashboard
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : null}
             </div>
@@ -2415,10 +2483,13 @@ Join here: ${inviteLink}`.trim();
                   key={mediaId}
                   className="bg-black/20 rounded px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
                 >
-                  <div 
-                    className={`flex items-start md:items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                    onClick={isClickable ? () => navigate(`/tune/${mediaId}`) : undefined}
-                  >
+                  {React.createElement(
+                    isClickable ? Link : 'div',
+                    {
+                      ...(isClickable ? { to: `/tune/${mediaId}` } : {}),
+                      className: `flex items-start md:items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`,
+                    } as any,
+                    <>
                   {result.coverArt && (
                     <img 
                       src={result.coverArt} 
@@ -2445,7 +2516,8 @@ Join here: ${inviteLink}`.trim();
                         </span>
                       )}
                     </div>
-                </div>
+                    </>
+                  )}
                   <div 
                     className="flex justify-center items-center space-x-1"
                     onClick={(e) => e.stopPropagation()}
@@ -2622,8 +2694,8 @@ Join here: ${inviteLink}`.trim();
                   : 'Join our community of verified creators and start sharing your music'}
               </p>
             </div>
-            <button
-              onClick={() => navigate('/creator/register')}
+            <Link
+              to="/creator/register"
               className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 whitespace-nowrap"
             >
               <Award className="w-5 h-5" />
@@ -2634,7 +2706,7 @@ Join here: ${inviteLink}`.trim();
                   ? 'Re-apply'
                   : 'Join Now'}
               </span>
-            </button>
+            </Link>
           </div>
         </div>
       )}
@@ -2773,14 +2845,14 @@ Join here: ${inviteLink}`.trim();
             </span>
           </div>
           {user && (user._id || user.uuid) && (
-            <button
-              onClick={() => navigate(`/user/${user._id || user.uuid}?view=tip-history`)}
+            <Link
+              to={`/user/${user._id || user.uuid}?view=tip-history`}
               className="flex items-center space-x-2 px-4 mx-4 md:mx-0 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
             >
               <History className="h-4 w-4" />
               <span className="hidden md:block">View Tip History</span>
               <ArrowRight className="hidden md:block h-4 w-4" />
-            </button>
+            </Link>
           )}
         </div>
         

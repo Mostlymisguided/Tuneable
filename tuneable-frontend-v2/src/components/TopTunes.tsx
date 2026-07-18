@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
 import { toast } from 'react-toastify';
@@ -247,15 +247,13 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
 
               {/* Cover Art with Play Button Overlay */}
               <div className="flex-shrink-0 relative w-12 h-12">
-                <img
-                  src={song.coverArt || DEFAULT_COVER_ART}
-                  alt={song.title}
-                  className="w-full h-full rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => {
-                    const mediaId = song._id || song.id;
-                    if (mediaId) navigate(`/tune/${mediaId}`);
-                  }}
-                />
+                <Link to={`/tune/${song._id || song.id}`} className="block w-full h-full">
+                  <img
+                    src={song.coverArt || DEFAULT_COVER_ART}
+                    alt={song.title}
+                    className="w-full h-full rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                  />
+                </Link>
                 {/* Play Icon Overlay - Only visible on hover */}
                 <div 
                   className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg cursor-pointer hover:bg-black/60 transition-colors opacity-0 hover:opacity-100 group"
@@ -272,14 +270,13 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
 
               {/* Song Info */}
               <div className="flex-1 min-w-0">
-                <h3 
-                  className="text-white font-medium truncate cursor-pointer hover:text-purple-300 transition-colors"
-                  onClick={() => {
-                    const mediaId = song._id || song.id;
-                    if (mediaId) navigate(`/tune/${mediaId}`);
-                  }}
-                >
-                  {song.title}
+                <h3 className="text-white font-medium truncate">
+                  <Link
+                    to={`/tune/${song._id || song.id}`}
+                    className="cursor-pointer hover:text-purple-300 transition-colors"
+                  >
+                    {song.title}
+                  </Link>
                 </h3>
                 <div className="flex items-center space-x-2 text-sm text-gray-400">
                   <p className="truncate">

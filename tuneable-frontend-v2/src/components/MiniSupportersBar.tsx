@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import { Crown } from 'lucide-react';
@@ -32,7 +32,6 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   limit,
   className,
 }) => {
-  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
   const supporters = useMemo(() => {
@@ -87,9 +86,9 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
           const id = s.id;
           const rank = podiumRankById.get(id);
           return (
-            <button
+            <Link
               key={id}
-              onClick={() => navigate(`/user/${id}`)}
+              to={`/user/${id}`}
               className="flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 hover:bg-purple-400 transition-colors flex-shrink-0"
               title={`${penceToPounds(s.total)} (${s.count} tips)`}
             >
@@ -115,7 +114,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
               )}
               <span className="text-[10px] md:text-sm text-white whitespace-nowrap">{s.user.username}</span>
               <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
-            </button>
+            </Link>
           );
         })}
 

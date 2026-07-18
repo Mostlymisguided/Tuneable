@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import DOMPurify from 'dompurify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants';
@@ -2205,9 +2205,8 @@ const PodcastEpisodeProfile: React.FC = () => {
           className="flex-shrink-0 w-[132px] sm:w-[148px] snap-start group"
         >
           <div className="relative mb-2">
-            <button
-              type="button"
-              onClick={() => navigate(`/podcasts/${episode._id || episode.uuid}`)}
+            <Link
+              to={`/podcasts/${episode._id || episode.uuid}`}
               className="block w-full"
             >
               <img
@@ -2215,7 +2214,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                 alt={episode.title}
                 className="w-full aspect-square rounded-lg object-cover bg-black/30 shadow-md group-hover:ring-2 group-hover:ring-purple-500/50 transition-all"
               />
-            </button>
+            </Link>
             <button
               type="button"
               onClick={() => handlePlaySeriesEpisode(episode)}
@@ -2225,9 +2224,8 @@ const PodcastEpisodeProfile: React.FC = () => {
               <Play className="h-3.5 w-3.5" fill="currentColor" />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/podcasts/${episode._id || episode.uuid}`)}
+          <Link
+            to={`/podcasts/${episode._id || episode.uuid}`}
             className="block w-full text-left"
           >
             <div className="text-sm font-semibold text-white truncate hover:text-purple-300 transition-colors">{episode.title}</div>
@@ -2239,7 +2237,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                 episode.duration ? formatDuration(episode.duration) : null,
               ].filter(Boolean).join(' · ') || seriesTitle || 'Episode'}
             </div>
-          </button>
+          </Link>
         </div>
       ))}
     </div>
@@ -2422,13 +2420,12 @@ const PodcastEpisodeProfile: React.FC = () => {
                 More from this series
               </h2>
               {seriesId && (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/podcast/${seriesId}`)}
+                <Link
+                  to={`/podcast/${seriesId}`}
                   className="text-sm text-purple-300 hover:text-purple-200 transition-colors"
                 >
                   View series
-                </button>
+                </Link>
               )}
             </div>
             <div className="card bg-black/20 rounded-lg p-4">

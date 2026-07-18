@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Play, Clock, Heart, Loader } from 'lucide-react';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
@@ -72,6 +73,8 @@ export interface PodcastQueueMediaCardProps {
   isPlayLoading?: boolean;
   canPlay?: boolean;
   tipLabel?: string;
+  /** When set, episode title/artwork render as real links to this path. */
+  episodePath?: string;
   onEpisodeClick: (episode: PodcastEpisodeCardData) => void;
   onSeriesClick?: (episode: PodcastEpisodeCardData, e: React.MouseEvent) => void;
   onPlay: (episode: PodcastEpisodeCardData, e: React.MouseEvent) => void;
@@ -86,6 +89,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   isPlayLoading = false,
   canPlay = false,
   tipLabel = 'Send a tip',
+  episodePath,
   onEpisodeClick,
   onSeriesClick,
   onPlay,
@@ -136,15 +140,27 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
         <div className="flex flex-row items-start gap-2 md:contents">
           <div
             className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
-            onClick={() => onEpisodeClick(episode)}
+            onClick={episodePath ? undefined : () => onEpisodeClick(episode)}
           >
-            <img
-              src={coverArt}
-              alt={episode.title}
-              className="w-full h-full object-cover"
-              width="96"
-              height="96"
-            />
+            {episodePath ? (
+              <Link to={episodePath} className="block w-full h-full">
+                <img
+                  src={coverArt}
+                  alt={episode.title}
+                  className="w-full h-full object-cover"
+                  width="96"
+                  height="96"
+                />
+              </Link>
+            ) : (
+              <img
+                src={coverArt}
+                alt={episode.title}
+                className="w-full h-full object-cover"
+                width="96"
+                height="96"
+              />
+            )}
             {canPlay && (
               <div
                 className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -166,11 +182,22 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
 
           <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
             <div className="flex items-center gap-2 min-w-0">
-              <h4
-                className="flex-1 min-w-0 font-medium text-white text-sm truncate cursor-pointer hover:text-purple-300 transition-colors"
-                onClick={() => onEpisodeClick(episode)}
-              >
-                {episode.title}
+              <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
+                {episodePath ? (
+                  <Link
+                    to={episodePath}
+                    className="cursor-pointer hover:text-purple-300 transition-colors"
+                  >
+                    {episode.title}
+                  </Link>
+                ) : (
+                  <span
+                    className="cursor-pointer hover:text-purple-300 transition-colors"
+                    onClick={() => onEpisodeClick(episode)}
+                  >
+                    {episode.title}
+                  </span>
+                )}
               </h4>
               {durationLabel && (
                 <div className="flex items-center gap-1 flex-shrink-0">

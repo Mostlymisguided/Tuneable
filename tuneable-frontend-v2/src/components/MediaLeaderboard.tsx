@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Trophy, ChevronDown, ChevronUp, Globe, Users, Coins, MapPin } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 
@@ -50,7 +50,6 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
   mediaTitle = 'this media'
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const navigate = useNavigate();
 
   // Calculate Top 5 Party Supporters (by aggregate)
   const getTopPartySupporters = () => {
@@ -135,12 +134,12 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
           
           <div className="min-w-0">
             <div className="text-xs text-gray-300 mb-0.5">{label}</div>
-            <button
-              onClick={() => navigate(`/user/${user._id || user.uuid}`)}
+            <Link
+              to={`/user/${user._id || user.uuid}`}
               className="text-sm font-medium text-white hover:text-purple-300 transition-colors truncate block"
             >
               @{user.username}
-            </button>
+            </Link>
             {showLocation && formatLocation(user.homeLocation) && (
               <div className="flex items-center space-x-1 mt-0.5">
                 <MapPin className="w-3 h-3 text-gray-400" />
@@ -230,12 +229,12 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                         <img src={DEFAULT_PROFILE_PIC} alt="Tuneable" className="w-8 h-8" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <button
-                          onClick={() => navigate(`/user/${supporter.user._id || supporter.user.uuid}`)}
+                        <Link
+                          to={`/user/${supporter.user._id || supporter.user.uuid}`}
                           className="text-sm font-medium text-white hover:text-purple-300 transition-colors truncate block"
                         >
                           @{supporter.user.username}
-                        </button>
+                        </Link>
                         {formatLocation(supporter.user.homeLocation) && (
                           <div className="flex items-center space-x-1 mt-0.5">
                             <MapPin className="w-3 h-3 text-gray-400" />
@@ -289,12 +288,12 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                         <img src={DEFAULT_PROFILE_PIC} alt="Tuneable" className="w-8 h-8 " />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <button
-                          onClick={() => navigate(`/user/${bid.userId?.uuid}`)}
+                        <Link
+                          to={`/user/${bid.userId?.uuid}`}
                           className="text-sm font-medium text-white hover:text-yellow-300 transition-colors truncate block"
                         >
                           @{bid.userId?.username || 'Unknown'}
-                        </button>
+                        </Link>
                         {bid.createdAt && (
                           <span className="text-xs text-gray-400">
                             {new Date(bid.createdAt).toLocaleDateString()}

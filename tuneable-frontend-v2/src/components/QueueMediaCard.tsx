@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Play, X, Clock, Heart } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
@@ -60,7 +60,6 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   onTip,
   mediaHref,
 }) => {
-  const navigate = useNavigate();
   const tags = mediaData.tags ?? [];
   const bpm = getBpm(mediaData);
   const href =
@@ -116,17 +115,26 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         </div>
 
         <div className="flex flex-row items-start gap-2 md:contents">
-          <div
-            className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
-            onClick={() => href && navigate(href)}
-          >
-            <img
-              src={mediaData.coverArt || DEFAULT_COVER_ART}
-              alt={mediaData.title || 'Unknown Media'}
-              className="w-full h-full object-cover"
-              width="96"
-              height="96"
-            />
+          <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0">
+            {href ? (
+              <Link to={href} className="block w-full h-full">
+                <img
+                  src={mediaData.coverArt || DEFAULT_COVER_ART}
+                  alt={mediaData.title || 'Unknown Media'}
+                  className="w-full h-full object-cover"
+                  width="96"
+                  height="96"
+                />
+              </Link>
+            ) : (
+              <img
+                src={mediaData.coverArt || DEFAULT_COVER_ART}
+                alt={mediaData.title || 'Unknown Media'}
+                className="w-full h-full object-cover"
+                width="96"
+                height="96"
+              />
+            )}
             <div
               className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
               onClick={(e) => {
@@ -142,11 +150,17 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
 
           <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
             <div className="flex items-center gap-2 min-w-0">
-              <h4
-                className="flex-1 min-w-0 font-medium text-white text-sm truncate cursor-pointer hover:text-purple-300 transition-colors"
-                onClick={() => href && navigate(href)}
-              >
-                {mediaData.title || 'Unknown Media'}
+              <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
+                {href ? (
+                  <Link
+                    to={href}
+                    className="cursor-pointer hover:text-purple-300 transition-colors"
+                  >
+                    {mediaData.title || 'Unknown Media'}
+                  </Link>
+                ) : (
+                  mediaData.title || 'Unknown Media'
+                )}
               </h4>
               <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
                 {bpm != null && (

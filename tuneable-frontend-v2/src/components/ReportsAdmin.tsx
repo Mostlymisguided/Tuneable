@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { Flag, ExternalLink, CheckCircle, XCircle, Clock, User as UserIcon, Music, Building, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 interface Report {
   _id: string;
@@ -90,7 +90,6 @@ const statusColors: { [key: string]: string } = {
 };
 
 const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPendingCountChange }) => {
-  const navigate = useNavigate();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('pending');
@@ -324,12 +323,12 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
                     <div className="flex items-center space-x-3">
                       <TargetIcon className="w-5 h-5 text-purple-400" />
                       <div>
-                        <button
-                          onClick={() => navigate(targetInfo.link)}
+                        <Link
+                          to={targetInfo.link}
                           className="text-white font-medium hover:text-purple-300 transition-colors"
                         >
                           {targetInfo.title}
-                        </button>
+                        </Link>
                         {targetInfo.subtitle && (
                           <p className="text-gray-400 text-sm">
                             {targetInfo.subtitle}
@@ -342,12 +341,12 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
                     <div className="flex items-center space-x-3">
                       <UserIcon className="w-5 h-5 text-gray-400" />
                       <div>
-                        <button
-                          onClick={() => navigate(`/user/${report.reportedBy.uuid}`)}
+                        <Link
+                          to={`/user/${report.reportedBy.uuid}`}
                           className="text-gray-300 hover:text-white transition-colors"
                         >
                           @{report.reportedBy.username}
-                        </button>
+                        </Link>
                         {report.contactEmail && (
                           <p className="text-gray-500 text-sm">Contact: {report.contactEmail}</p>
                         )}
@@ -375,16 +374,14 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
                   {/* Actions */}
                   <div className="ml-4 flex flex-col space-y-2">
                     {report.category === 'duplicate' && report.mediaId && (
-                      <button
-                        onClick={() => navigate(
-                          `/admin?tab=bids-media-vetoes&sub=media&mergeSource=${encodeURIComponent(
-                            report.mediaId!.uuid || report.mediaId!._id
-                          )}`
-                        )}
-                        className="px-4 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      <Link
+                        to={`/admin?tab=bids-media-vetoes&sub=media&mergeSource=${encodeURIComponent(
+                          report.mediaId!.uuid || report.mediaId!._id
+                        )}`}
+                        className="text-center px-4 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
                       >
                         Merge…
-                      </button>
+                      </Link>
                     )}
                     {report.status === 'pending' && (
                       <>
@@ -420,13 +417,13 @@ const ReportsAdmin: React.FC<ReportsAdminProps> = ({ reportType = 'media', onPen
                         </button>
                       </>
                     )}
-                    <button
-                      onClick={() => navigate(targetInfo.link)}
+                    <Link
+                      to={targetInfo.link}
                       className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center space-x-1"
                     >
                       <ExternalLink className="w-4 h-4" />
                       <span>View</span>
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>

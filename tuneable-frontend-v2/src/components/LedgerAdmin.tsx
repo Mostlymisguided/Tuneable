@@ -17,7 +17,7 @@ import {
   RefreshCw,
   Clock
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { penceToPounds } from '../utils/currency';
 
 interface LedgerEntry {
@@ -78,7 +78,6 @@ interface LedgerStats {
 }
 
 const LedgerAdmin: React.FC = () => {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<LedgerStats | null>(null);
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -610,21 +609,21 @@ const LedgerAdmin: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button
-                          onClick={() => navigate(`/user/${entry.userId?._id || entry.userId}`)}
+                        <Link
+                          to={`/user/${entry.userId?._id || entry.userId}`}
                           className="text-sm text-purple-400 hover:text-purple-300 hover:underline"
                         >
                           {entry.username || entry.userId?.username || 'Unknown'}
-                        </button>
+                        </Link>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {entry.mediaTitle || entry.mediaId?.title ? (
-                          <button
-                            onClick={() => navigate(`/tune/${entry.mediaId?._id || entry.mediaId}`)}
+                          <Link
+                            to={`/tune/${entry.mediaId?._id || entry.mediaId}`}
                             className="text-sm text-purple-400 hover:text-purple-300 hover:underline"
                           >
                             {entry.mediaTitle || entry.mediaId?.title}
-                          </button>
+                          </Link>
                         ) : (
                           <span className="text-sm text-gray-500">N/A</span>
                         )}
@@ -804,26 +803,22 @@ const LedgerAdmin: React.FC = () => {
 
               <div className="border-t border-gray-700 pt-4 flex gap-2">
                 {selectedEntry.userId && (
-                  <button
-                    onClick={() => {
-                      setShowDetailsModal(false);
-                      navigate(`/user/${selectedEntry.userId._id}`);
-                    }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                  <Link
+                    to={`/user/${selectedEntry.userId._id}`}
+                    onClick={() => setShowDetailsModal(false)}
+                    className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                   >
                     View User Profile
-                  </button>
+                  </Link>
                 )}
                 {selectedEntry.mediaId && selectedEntry.mediaId._id && (
-                  <button
-                    onClick={() => {
-                      setShowDetailsModal(false);
-                      navigate(`/tune/${selectedEntry.mediaId!._id}`);
-                    }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                  <Link
+                    to={`/tune/${selectedEntry.mediaId!._id}`}
+                    onClick={() => setShowDetailsModal(false)}
+                    className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
                   >
                     View Media
-                  </button>
+                  </Link>
                 )}
               </div>
             </div>

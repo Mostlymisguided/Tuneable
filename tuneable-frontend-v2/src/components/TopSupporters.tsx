@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
@@ -24,8 +24,6 @@ interface TopSupportersProps {
 }
 
 const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, userStatsMap }) => {
-  const navigate = useNavigate();
-
   if (!bids || bids.length === 0) {
     return null;
   }
@@ -65,12 +63,11 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
 
   return (
     <div className="space-y-2 md:space-y-3">
-      {topSupporters.map((supporter: any, index: number) => (
-        <div
-          key={supporter.user._id || supporter.user.uuid || index}
-          className="flex flex-row md:items-center md:justify-between p-1.5 md:p-4 bg-purple-900/20 rounded-lg hover:bg-purple-500/40 transition-all cursor-pointer"
-          onClick={() => (supporter.user._id || supporter.user.uuid) && navigate(`/user/${supporter.user._id || supporter.user.uuid}`)}
-        >
+      {topSupporters.map((supporter: any, index: number) => {
+        const userId = supporter.user._id || supporter.user.uuid;
+        const rowClassName = "flex flex-row md:items-center md:justify-between p-1.5 md:p-4 bg-purple-900/20 rounded-lg hover:bg-purple-500/40 transition-all cursor-pointer";
+        const rowContent = (
+          <>
           {/* Left: Rank + Profile + Info */}
           <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
             {/* Rank Badge */}
@@ -131,8 +128,18 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
               </div>
             )}
           </div>
-        </div>
-      ))}
+          </>
+        );
+        return userId ? (
+          <Link key={userId} to={`/user/${userId}`} className={rowClassName}>
+            {rowContent}
+          </Link>
+        ) : (
+          <div key={index} className={rowClassName}>
+            {rowContent}
+          </div>
+        );
+      })}
     </div>
   );
 };
