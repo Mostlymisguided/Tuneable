@@ -32,6 +32,8 @@ interface BidConfirmationModalProps {
   viewerAggregate?: number;
   /** True when the current user already holds #1. */
   viewerIsChampion?: boolean;
+  /** Tags pre-selected when the modal opens (e.g. the tag page the tip came from). */
+  initialTags?: string[];
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -51,6 +53,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   championAggregate,
   viewerAggregate = 0,
   viewerIsChampion = false,
+  initialTags,
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -98,6 +101,19 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
       setAmountInput(bidAmount.toFixed(2));
     }
   }, [isOpen, bidAmount]);
+
+  // Pre-select tags on open (e.g. tipping from a tag profile page)
+  const initialTagsKey = (initialTags || []).join(',');
+  useEffect(() => {
+    if (isOpen) {
+      const seeded = (initialTags || [])
+        .map((tag) => normalizeTagForStorage(tag))
+        .filter(Boolean)
+        .slice(0, 5);
+      setTags(seeded);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialTagsKey]);
 
   const parsedAmount = parseFloat(amountInput);
   const effectiveAmount = Number.isFinite(parsedAmount) ? parsedAmount : 0;

@@ -8,6 +8,7 @@ const {
   TAG_ALIASES,
 } = require('../utils/tagNormalizer');
 const { generateSlug, getExistingTagParty } = require('./tagPartyService');
+const { loadBidsByMediaId } = require('./relatedMediaService');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 
@@ -85,6 +86,55 @@ function collectTagVariants(displayName, canonicalTag) {
 }
 
 /**
+ * Co-occurring tags across matched media, ranked by shared tip weight then count.
+ * Skips the current tag (and aliases). Returns top N with display name + slug.
+ */
+function computeRelatedTags(matchedMedia, currentDisplayName, { limit = 8 } = {}) {
+  const byCanonical = new Map();
+
+  for (const item of matchedMedia) {
+    if (!item.tags || !Array.isArray(item.tags)) continue;
+    const tipWeight = typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0;
+    const seenOnTrack = new Set();
+
+    for (const raw of item.tags) {
+      if (typeof raw !== 'string' || !raw.trim()) continue;
+      if (tagsMatch(raw, currentDisplayName)) continue;
+
+      const canonical = getCanonicalTag(raw) || normalizeTagForMatching(raw);
+      if (!canonical || seenOnTrack.has(canonical)) continue;
+      seenOnTrack.add(canonical);
+
+      const displayName = normalizeTagForStorage(raw) || raw.trim();
+      const existing = byCanonical.get(canonical);
+      if (existing) {
+        existing.tipWeight += tipWeight;
+        existing.count += 1;
+        // Prefer Title Case / storage form when we already have a nicer label
+        if (displayName.length > existing.name.length || /^[A-Z]/.test(displayName)) {
+          existing.name = displayName;
+        }
+      } else {
+        byCanonical.set(canonical, {
+          name: displayName,
+          tipWeight,
+          count: 1,
+        });
+      }
+    }
+  }
+
+  return [...byCanonical.values()]
+    .sort((a, b) => b.tipWeight - a.tipWeight || b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map(({ name }) => ({
+      name,
+      slug: generateSlug(name),
+    }))
+    .filter((t) => t.slug);
+}
+
+/**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
 async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
@@ -110,12 +160,14 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
   };
 
   // Broad candidate set via indexed tags field, then fuzzy-filter
+  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm';
+
   const candidates = await Media.find({
     ...baseQuery,
     tags: { $in: variants },
   })
     .sort({ globalMediaAggregate: -1, createdAt: -1 })
-    .select('title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bids')
+    .select(MEDIA_FIELDS)
     .populate('addedBy', 'username profilePic uuid')
     .lean();
 
@@ -125,7 +177,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
     pool = await Media.find(baseQuery)
       .sort({ globalMediaAggregate: -1, createdAt: -1 })
       .limit(500)
-      .select('title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bids')
+      .select(MEDIA_FIELDS)
       .populate('addedBy', 'username profilePic uuid')
       .lean();
   }
@@ -136,8 +188,16 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
   });
 
   const total = matched.length;
-  const media = matched.slice(skip, skip + limitNum);
+  const pageSlice = matched.slice(skip, skip + limitNum);
   const tipTotal = matched.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
+  const relatedTags = computeRelatedTags(matched, displayName, { limit: 8 });
+
+  // Attach active bids (with tipper user info) for supporters display on the page slice only
+  const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
+  const media = pageSlice.map((m) => ({
+    ...m,
+    bids: bidsByMediaId.get(m._id.toString()) || [],
+  }));
 
   let relatedParty = null;
   if (party) {
@@ -161,6 +221,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
       globalTagAggregate: tipTotal,
     },
     relatedParty,
+    relatedTags,
     media,
     pagination: {
       page: pageNum,

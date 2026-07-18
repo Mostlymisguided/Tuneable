@@ -454,4 +454,5 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
 
 module.exports = {
   getRelatedPlaylistsForMedia,
+  loadBidsByMediaId,
 };
