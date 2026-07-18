@@ -826,9 +826,27 @@ export const mediaAPI = {
   enqueueEnrichmentBackfill: async (params?: {
     limit?: number;
     onlyLinked?: boolean;
+    linkage?: 'linked' | 'unlinked' | 'any';
     processImmediately?: boolean;
+    mode?: 'supplement' | 'untagged';
   }) => {
     const response = await api.post('/media/admin/enrichment/backfill', params || {});
+    return response.data;
+  },
+
+  batchApplyEnrichments: async (ids: string[], overrides?: Record<string, unknown>) => {
+    const response = await api.post('/media/admin/enrichment/batch-apply', {
+      ids,
+      overrides: overrides || {},
+    });
+    return response.data;
+  },
+
+  batchDismissEnrichments: async (ids: string[], adminNotes?: string) => {
+    const response = await api.post('/media/admin/enrichment/batch-dismiss', {
+      ids,
+      adminNotes,
+    });
     return response.data;
   },
 

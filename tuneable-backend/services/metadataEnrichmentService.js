@@ -179,6 +179,21 @@ function mergeTagLists(existing, incoming, limit = MAX_TAGS) {
   return merged;
 }
 
+/** Tags from `incoming` that are not already present on `existing` (fuzzy match). */
+function filterNewTags(existing, incoming, limit = MAX_TAGS) {
+  const have = Array.isArray(existing) ? existing : [];
+  const out = [];
+  for (const raw of incoming || []) {
+    const normalized = normalizeTagForStorage(raw);
+    if (!normalized) continue;
+    if (have.some((t) => tagsMatch(t, normalized))) continue;
+    if (out.some((t) => tagsMatch(t, normalized))) continue;
+    out.push(normalized);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 function resolveImportSourceUrl(media, importSource) {
   if (!media) return null;
   const sources = mapToObject(media.sources);
@@ -376,7 +391,15 @@ async function processAlreadyLinked(item, media, alreadyMb) {
     matchType: 'already-linked',
   });
 
-  item.suggestion = suggestionFromCandidate(detailed, {
+  const newTags = filterNewTags(media.tags, detailed.tags || []);
+  const newGenres = filterNewTags(media.genres, detailed.genres || detailed.tags || [], MAX_GENRES);
+
+  item.suggestion = suggestionFromCandidate({
+    ...detailed,
+    // For tag-only review, suggest only tags not already on the media
+    tags: item.enrichTagsOnly ? newTags : (detailed.tags || []),
+    genres: item.enrichTagsOnly ? newGenres : (detailed.genres || []),
+  }, {
     title: media.title,
     artist: mediaPrimaryArtistName(media),
     album: media.album || detailed.album || null,
@@ -384,9 +407,7 @@ async function processAlreadyLinked(item, media, alreadyMb) {
   item.confidence = 'high';
   item.candidates = [];
 
-  const hasNewTags = (detailed.tags || []).length > 0
-    && (!(media.tags || []).length
-      || (detailed.tags || []).some((t) => !(media.tags || []).some((m) => tagsMatch(m, t))));
+  const hasNewTags = newTags.length > 0;
   const hasNewYear = detailed.releaseYear && !media.releaseYear;
   const hasNewIsrc = detailed.isrc && !media.isrc;
 
@@ -407,7 +428,11 @@ async function processAlreadyLinked(item, media, alreadyMb) {
     return item;
   }
 
-  await applySuggestionToMedia(media, item.suggestion, {
+  await applySuggestionToMedia(media, {
+    ...item.suggestion,
+    releaseYear: detailed.releaseYear,
+    isrc: detailed.isrc,
+  }, {
     applyIdentity: false,
     applyTags: false,
   });
@@ -624,13 +649,16 @@ async function listEnrichments({
 
   const enrichedItems = items.map((item) => {
     const media = mediaById.get(String(item.mediaId));
+    const currentTags = media?.tags || [];
+    const suggestedTags = item.suggestion?.tags || [];
     return {
       ...item,
       importSourceUrl: resolveImportSourceUrl(media, item.importSource),
-      currentTags: media?.tags || [],
+      currentTags,
       currentGenres: media?.genres || [],
       currentReleaseYear: media?.releaseYear || null,
       currentIsrc: media?.isrc || null,
+      newTags: filterNewTags(currentTags, suggestedTags),
     };
   });
 
@@ -681,7 +709,10 @@ async function applyEnrichment(itemId, actorId, overrides = {}) {
       || null,
   };
 
-  const applyIdentity = overrides.applyIdentity !== false;
+  // Tag-only / backfill rows should not rewrite title/artist unless asked
+  const applyIdentity = overrides.applyIdentity != null
+    ? Boolean(overrides.applyIdentity)
+    : !item.enrichTagsOnly;
   const applyTags = overrides.applyTags !== false;
 
   await applySuggestionToMedia(media, suggestion, { applyIdentity, applyTags });
@@ -711,6 +742,36 @@ async function dismissEnrichment(itemId, actorId, adminNotes) {
   if (adminNotes) item.adminNotes = adminNotes;
   await item.save();
   return item;
+}
+
+async function batchApplyEnrichments(ids, actorId, overrides = {}) {
+  const list = Array.isArray(ids) ? ids.slice(0, 100) : [];
+  const results = { applied: 0, failed: 0, errors: [] };
+  for (const id of list) {
+    try {
+      await applyEnrichment(id, actorId, overrides);
+      results.applied += 1;
+    } catch (err) {
+      results.failed += 1;
+      results.errors.push({ id, error: err.message || 'Apply failed' });
+    }
+  }
+  return results;
+}
+
+async function batchDismissEnrichments(ids, actorId, adminNotes) {
+  const list = Array.isArray(ids) ? ids.slice(0, 100) : [];
+  const results = { dismissed: 0, failed: 0, errors: [] };
+  for (const id of list) {
+    try {
+      await dismissEnrichment(id, actorId, adminNotes);
+      results.dismissed += 1;
+    } catch (err) {
+      results.failed += 1;
+      results.errors.push({ id, error: err.message || 'Dismiss failed' });
+    }
+  }
+  return results;
 }
 
 async function chooseCandidate(itemId, candidateIndex, actorId) {
@@ -759,15 +820,36 @@ async function enqueueAfterLibraryImport(tippedItems, {
 }
 
 /**
- * Enqueue MusicBrainz tag/year/ISRC backfill for music media missing tags.
- * Prefer already-linked MBIDs; also queues unmatched untagged tracks for search.
+ * Enqueue MusicBrainz tag/year/ISRC backfill for music media.
+ *
+ * @param {object} opts
+ * @param {'supplement'|'untagged'} [opts.mode='supplement']
+ *   - supplement: whole library (incl. already tagged); new MB tags → needs_review
+ *   - untagged: only media with empty tags
+ * @param {'linked'|'unlinked'|'any'} [opts.linkage='linked']
+ *   - linked: only tracks with externalIds.musicbrainz (fast lookup)
+ *   - unlinked: only tracks without an MBID (search by title+artist)
+ *   - any: both
+ * @param {boolean} [opts.onlyLinked] Deprecated — prefer linkage
+ * @param {number} [opts.limit=50]
+ * @param {boolean} [opts.processImmediately=true]
  */
 async function enqueueUntaggedBackfill({
   limit = 50,
-  onlyLinked = false,
+  onlyLinked,
+  linkage,
   processImmediately = true,
+  mode = 'supplement',
 } = {}) {
   const capped = Math.min(Math.max(limit, 1), 200);
+  const supplement = mode !== 'untagged';
+
+  let resolvedLinkage = linkage;
+  if (!resolvedLinkage) {
+    if (onlyLinked === false) resolvedLinkage = 'any';
+    else if (onlyLinked === true) resolvedLinkage = 'linked';
+    else resolvedLinkage = 'linked';
+  }
 
   const baseQuery = {
     status: { $ne: 'deleted' },
@@ -781,30 +863,55 @@ async function enqueueUntaggedBackfill({
           { contentType: { $exists: false } },
         ],
       },
-      {
-        $or: [
-          { tags: { $exists: false } },
-          { tags: { $size: 0 } },
-          { tags: null },
-        ],
-      },
     ],
   };
 
-  if (onlyLinked) {
-    baseQuery['externalIds.musicbrainz'] = { $exists: true, $nin: [null, ''] };
+  if (!supplement) {
+    baseQuery.$and.push({
+      $or: [
+        { tags: { $exists: false } },
+        { tags: { $size: 0 } },
+        { tags: null },
+      ],
+    });
   }
 
+  if (resolvedLinkage === 'linked') {
+    baseQuery['externalIds.musicbrainz'] = { $exists: true, $nin: [null, ''] };
+  } else if (resolvedLinkage === 'unlinked') {
+    baseQuery.$and.push({
+      $or: [
+        { 'externalIds.musicbrainz': { $exists: false } },
+        { 'externalIds.musicbrainz': null },
+        { 'externalIds.musicbrainz': '' },
+      ],
+    });
+  }
+
+  // Avoid re-queueing media that already finished a tag backfill (applied / skipped).
+  // Dismissed items can be re-queued later if desired.
+  const doneIds = await MetadataEnrichment.distinct('mediaId', {
+    importSource: 'backfill',
+    status: { $in: ['applied', 'auto_applied', 'skipped'] },
+  });
+  if (doneIds.length > 0) {
+    baseQuery._id = { $nin: doneIds };
+  }
+
+  // Pull a wider candidate set, then skip open queue rows
   const mediaList = await Media.find(baseQuery)
     .select('_id uuid externalIds tags genres releaseYear isrc title artist')
     .sort({ updatedAt: -1 })
-    .limit(capped)
+    .limit(capped * 3)
     .lean();
 
   const created = [];
   let skippedOpen = 0;
+  let skippedDone = 0;
 
   for (const media of mediaList) {
+    if (created.length >= capped) break;
+
     const open = await MetadataEnrichment.findOne({
       mediaId: media._id,
       status: { $in: ['pending', 'processing', 'needs_review'] },
@@ -815,6 +922,7 @@ async function enqueueUntaggedBackfill({
     }
 
     const hasMb = Boolean(mapToObject(media.externalIds).musicbrainz);
+    // Linked → tag-only review. Unlinked → full search/match so apply can store MBID.
     const item = await enqueueEnrichment(media._id, {
       importSource: 'backfill',
       force: true,
@@ -830,7 +938,11 @@ async function enqueueUntaggedBackfill({
   return {
     enqueued: created.length,
     skippedOpen,
+    skippedDone,
     scanned: mediaList.length,
+    mode: supplement ? 'supplement' : 'untagged',
+    linkage: resolvedLinkage,
+    onlyLinked: resolvedLinkage === 'linked',
   };
 }
 
@@ -844,8 +956,11 @@ module.exports = {
   listEnrichments,
   applyEnrichment,
   dismissEnrichment,
+  batchApplyEnrichments,
+  batchDismissEnrichments,
   chooseCandidate,
   scoreCandidate,
+  filterNewTags,
   HIGH_SCORE,
   MEDIUM_SCORE,
 };

@@ -3665,7 +3665,7 @@ router.post('/admin/enrichment/process', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/media/admin/enrichment/backfill
-// @desc    Enqueue MusicBrainz tag/year/ISRC backfill for untagged media
+// @desc    Enqueue MusicBrainz tag/year/ISRC backfill (supplement or untagged)
 // @access  Private (Admin)
 router.post('/admin/enrichment/backfill', authMiddleware, async (req, res) => {
   try {
@@ -3673,15 +3673,71 @@ router.post('/admin/enrichment/backfill', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
     const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const mode = req.body?.mode === 'untagged' ? 'untagged' : 'supplement';
+    const linkage = ['linked', 'unlinked', 'any'].includes(req.body?.linkage)
+      ? req.body.linkage
+      : undefined;
     const result = await metadataEnrichmentService.enqueueUntaggedBackfill({
       limit: parseInt(req.body?.limit, 10) || 50,
-      onlyLinked: Boolean(req.body?.onlyLinked),
+      onlyLinked: req.body?.onlyLinked,
+      linkage,
       processImmediately: req.body?.processImmediately !== false,
+      mode,
     });
     res.json({ success: true, ...result });
   } catch (error) {
     console.error('Error enqueueing enrichment backfill:', error);
     res.status(500).json({ error: error.message || 'Failed to enqueue backfill' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/batch-apply
+// @desc    Apply multiple enrichment suggestions
+// @access  Private (Admin)
+router.post('/admin/enrichment/batch-apply', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const result = await metadataEnrichmentService.batchApplyEnrichments(
+      ids,
+      req.user._id,
+      req.body?.overrides || {}
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error batch-applying enrichments:', error);
+    res.status(500).json({ error: error.message || 'Failed to batch apply' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/batch-dismiss
+// @desc    Dismiss multiple enrichment items
+// @access  Private (Admin)
+router.post('/admin/enrichment/batch-dismiss', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const result = await metadataEnrichmentService.batchDismissEnrichments(
+      ids,
+      req.user._id,
+      req.body?.adminNotes
+    );
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error batch-dismissing enrichments:', error);
+    res.status(500).json({ error: error.message || 'Failed to batch dismiss' });
   }
 });
 
