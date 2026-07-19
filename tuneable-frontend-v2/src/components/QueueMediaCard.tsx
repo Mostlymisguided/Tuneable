@@ -33,7 +33,24 @@ function formatDuration(duration: number | string | undefined) {
 
 function getBpm(mediaData: { bpm?: number | null }): number | null {
   const bpm = mediaData?.bpm;
-  return typeof bpm === 'number' && bpm > 0 ? bpm : null;
+  if (typeof bpm !== 'number' || !Number.isFinite(bpm) || bpm <= 0) return null;
+  return Math.round(bpm);
+}
+
+function getReleaseYear(mediaData: {
+  releaseYear?: number | null;
+  releaseDate?: string | Date | null;
+}): number | null {
+  const year = mediaData?.releaseYear;
+  if (typeof year === 'number' && Number.isFinite(year) && year >= 1900 && year <= 2100) {
+    return Math.trunc(year);
+  }
+  const date = mediaData?.releaseDate;
+  if (!date) return null;
+  const parsed = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const fromDate = parsed.getFullYear();
+  return fromDate >= 1900 && fromDate <= 2100 ? fromDate : null;
 }
 
 export interface QueueMediaCardProps {
@@ -62,9 +79,33 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
 }) => {
   const tags = mediaData.tags ?? [];
   const bpm = getBpm(mediaData);
+  const releaseYear = getReleaseYear(mediaData);
   const href =
     mediaHref ||
     (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
+
+  const metaParts: React.ReactNode[] = [];
+  if (releaseYear != null) {
+    metaParts.push(
+      <span key="year" title={`Released ${releaseYear}`} className="tabular-nums">
+        {releaseYear}
+      </span>
+    );
+  }
+  if (bpm != null) {
+    metaParts.push(
+      <span key="bpm" title={`${bpm} BPM`} className="tabular-nums">
+        <span className="md:hidden">{bpm}</span>
+        <span className="hidden md:inline">{bpm} BPM</span>
+      </span>
+    );
+  }
+  metaParts.push(
+    <span key="duration" className="flex items-center gap-1">
+      <Clock className="h-3 w-3 text-gray-500" />
+      <span>{formatDuration(mediaData.duration)}</span>
+    </span>
+  );
 
   const chartBadge = (
     <div className="w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center">
@@ -163,17 +204,16 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
                 )}
               </h4>
               <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
-                {bpm != null && (
-                  <span title={`${bpm} BPM`} className="tabular-nums">
-                    <span className="md:hidden">{bpm}</span>
-                    <span className="hidden md:inline">{bpm} BPM</span>
-                  </span>
+                {metaParts.flatMap((part, i) =>
+                  i === 0
+                    ? [part]
+                    : [
+                        <span key={`sep-${i}`} className="text-gray-600" aria-hidden>
+                          ·
+                        </span>,
+                        part,
+                      ]
                 )}
-                {bpm != null && <span className="text-gray-600" aria-hidden>·</span>}
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-gray-500" />
-                  <span>{formatDuration(mediaData.duration)}</span>
-                </span>
               </div>
             </div>
             <p className="text-gray-400 text-xs truncate">

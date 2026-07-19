@@ -160,7 +160,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
   };
 
   // Broad candidate set via indexed tags field, then fuzzy-filter
-  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm';
+  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear';
 
   const candidates = await Media.find({
     ...baseQuery,

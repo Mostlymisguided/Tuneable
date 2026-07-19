@@ -190,6 +190,8 @@ const formatMediaEntry = (record) => {
     coverArt: media.coverArt || null,
     duration: media.duration || 0,
     bpm: typeof media.bpm === 'number' && media.bpm > 0 ? media.bpm : null,
+    releaseDate: media.releaseDate || null,
+    releaseYear: typeof media.releaseYear === 'number' ? media.releaseYear : null,
     globalMediaAggregate: media.globalMediaAggregate || 0,
     tags: media.tags || [],
     sharedTags: record.sharedTags || [],
@@ -300,7 +302,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   }
 
   const candidateMedia = await Media.find(candidateQuery)
-    .select('_id uuid title artist coverArt duration bpm globalMediaAggregate tags sources contentType contentForm relationships creatorDisplay')
+    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear globalMediaAggregate tags sources contentType contentForm relationships creatorDisplay')
     .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
     .limit(settings.candidatePoolSize)
     .lean();

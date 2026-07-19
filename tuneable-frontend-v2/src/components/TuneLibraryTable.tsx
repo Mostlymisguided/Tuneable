@@ -23,6 +23,8 @@ export interface LibraryItem {
   coverArt?: string;
   duration?: number;
   bpm?: number;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
   tags?: string[];
   contentForm?: string[];
   sources?: Record<string, string>;

@@ -108,6 +108,8 @@ function libraryItemToQueueShape(item: LibraryItem) {
     coverArt: item.coverArt,
     duration: item.duration,
     bpm: item.bpm,
+    releaseDate: item.releaseDate ?? null,
+    releaseYear: item.releaseYear ?? null,
     tags: item.tags || [],
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate,

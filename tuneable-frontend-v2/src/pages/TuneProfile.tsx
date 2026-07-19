@@ -176,6 +176,8 @@ interface RecommendedMediaItem {
   coverArt?: string | null;
   duration?: number;
   bpm?: number | null;
+  releaseDate?: string | Date | null;
+  releaseYear?: number | null;
   globalMediaAggregate?: number;
   tags?: string[];
   sharedTags?: string[];
@@ -1617,6 +1619,8 @@ const TuneProfile: React.FC = () => {
     coverArt: item.coverArt || DEFAULT_COVER_ART,
     duration: item.duration || 0,
     bpm: item.bpm ?? null,
+    releaseDate: item.releaseDate ?? null,
+    releaseYear: item.releaseYear ?? null,
     tags: item.tags?.length ? item.tags : item.sharedTags || [],
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,

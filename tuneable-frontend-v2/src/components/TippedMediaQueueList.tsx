@@ -26,6 +26,8 @@ export interface TippedQueueItem {
   coverArt?: string | null;
   duration?: number;
   bpm?: number | null;
+  releaseDate?: string | Date | null;
+  releaseYear?: number | null;
   tags?: string[];
   bids?: Array<{
     amount?: number;
@@ -109,6 +111,8 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     coverArt: item.coverArt || DEFAULT_COVER_ART,
     duration: item.duration || 0,
     bpm: item.bpm ?? null,
+    releaseDate: item.releaseDate ?? null,
+    releaseYear: item.releaseYear ?? null,
     tags: item.tags || [],
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,
