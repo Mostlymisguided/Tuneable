@@ -22,7 +22,7 @@ import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTab
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { normalizeSources } from '../utils/mediaPlayability';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
 
 interface SearchResult {
   _id?: string;
@@ -72,11 +72,7 @@ const Dashboard: React.FC = () => {
   };
 
   const libraryChampionTip = useMemo(
-    () =>
-      computeChampionTipContext(libraryItemToTip?.bids, user, {
-        fallbackChampionAggregatePence: libraryItemToTip?.globalMediaAggregateTop,
-        fallbackChampionUser: libraryItemToTip?.globalMediaAggregateTopUser,
-      }),
+    () => resolveTipStatInputs(libraryItemToTip, user),
     [libraryItemToTip, user]
   );
   const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
@@ -2859,7 +2855,13 @@ Join here: ${inviteLink}`.trim();
         onConfirm={handlePlaceLibraryTip}
         bidAmount={Math.max(minimumBid, getUserDefaultTip())}
         minTip={minimumBid}
-        avgTip={libraryItemToTip ? libraryItemToTip.globalMediaAggregateAvg / 100 : undefined}
+        avgTip={
+          libraryItemToTip
+            ? (libraryItemToTip.globalMediaAggregateAvg > 0
+                ? libraryItemToTip.globalMediaAggregateAvg / 100
+                : averageTipPounds(libraryItemToTip.bids))
+            : undefined
+        }
         championAggregate={libraryChampionTip?.championAggregate}
         viewerAggregate={libraryChampionTip?.viewerAggregate}
         viewerIsChampion={libraryChampionTip?.viewerIsChampion}

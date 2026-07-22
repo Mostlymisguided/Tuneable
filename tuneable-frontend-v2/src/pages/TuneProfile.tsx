@@ -59,7 +59,7 @@ import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly, normalizeSources } from '../utils/mediaPlayability';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
 import AiToolsEditor from '../components/AiToolsEditor';
@@ -445,6 +445,11 @@ const TuneProfile: React.FC = () => {
         fallbackChampionUser: (media as any)?.globalMediaAggregateTopUser,
       }),
     [media, user]
+  );
+
+  const recommendedTipStats = useMemo(
+    () => resolveTipStatInputs(recommendedItemToTip, user),
+    [recommendedItemToTip, user]
   );
 
   // Check if user can edit this tune
@@ -4021,6 +4026,10 @@ const TuneProfile: React.FC = () => {
         onConfirm={handleConfirmRecommendedTip}
         bidAmount={user?.preferences?.defaultTip || 1.11}
         minTip={minimumBid}
+        avgTip={recommendedTipStats.avgTip}
+        championAggregate={recommendedTipStats.championAggregate}
+        viewerAggregate={recommendedTipStats.viewerAggregate}
+        viewerIsChampion={recommendedTipStats.viewerIsChampion}
         mediaTitle={recommendedItemToTip?.title || 'Unknown'}
         mediaArtist={recommendedItemToTip?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

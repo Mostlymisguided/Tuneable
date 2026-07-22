@@ -9,7 +9,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from 'react-toastify';
 import {
   isNativeAudioPlatform,
@@ -435,7 +435,8 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
   const getAverageTip = () => {
     const avg = (media as any)?.globalMediaAggregateAvg;
-    return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
+    if (typeof avg === 'number' && avg > 0) return avg / 100;
+    return averageTipPounds((media as any)?.bids);
   };
 
   const championTip = computeChampionTipContext((media as any)?.bids, user, {

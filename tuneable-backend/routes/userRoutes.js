@@ -829,7 +829,8 @@ async function fetchTuneLibraryForUser(user) {
     
     // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm releaseDate releaseYear globalMediaAggregate uuid _id tags contentForm sources')
+      .select('title artist coverArt duration bpm releaseDate releaseYear globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources')
+      .populate('globalMediaAggregateTopUser', 'username uuid _id')
       .lean();
     
     // Create media lookup
@@ -1002,6 +1003,8 @@ async function fetchTuneLibraryForUser(user) {
             sources,
             globalMediaAggregate,
             globalMediaAggregateAvg,
+            globalMediaAggregateTop: media?.globalMediaAggregateTop || 0,
+            globalMediaAggregateTopUser: media?.globalMediaAggregateTopUser || null,
             globalUserMediaAggregate: aggregate.userBidTotal || 0,
             bidCount: aggregate.bidCount || 0,
             tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,

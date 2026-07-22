@@ -8,7 +8,7 @@ import { Play, Pause, Volume2, VolumeX, X, Heart } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from 'react-toastify';
 
 /** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */
@@ -186,7 +186,8 @@ const PersistentPodcastPlayer: React.FC = () => {
 
   const getAverageTip = () => {
     const avg = (currentEpisode as any)?.globalMediaAggregateAvg;
-    return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
+    if (typeof avg === 'number' && avg > 0) return avg / 100;
+    return averageTipPounds((currentEpisode as any)?.bids);
   };
 
   const championTip = computeChampionTipContext((currentEpisode as any)?.bids, user, {

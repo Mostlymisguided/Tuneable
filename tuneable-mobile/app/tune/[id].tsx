@@ -26,9 +26,8 @@ import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { canUploadMedia } from '@/src/lib/permissions';
 import {
-  averageTipPounds,
   buildTipStatChips,
-  computeChampionTipContext,
+  resolveTipStatInputs,
 } from '@/src/lib/tipStats';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
@@ -141,12 +140,8 @@ export default function TuneProfileScreen() {
     ].filter((part): part is string => Boolean(part));
   }, [media, durationLabel]);
 
-  const championCtx = useMemo(
-    () =>
-      computeChampionTipContext(media?.bids, user, {
-        fallbackChampionAggregatePence: media?.globalMediaAggregateTop,
-        fallbackChampionUser: media?.globalMediaAggregateTopUser,
-      }),
+  const tipStats = useMemo(
+    () => resolveTipStatInputs(media, user),
     [media, user]
   );
 
@@ -154,12 +149,12 @@ export default function TuneProfileScreen() {
     () =>
       buildTipStatChips({
         minTip: MIN_TIP,
-        avgTip: averageTipPounds(media?.bids),
-        championAggregate: championCtx?.championAggregate,
-        viewerAggregate: championCtx?.viewerAggregate,
-        viewerIsChampion: championCtx?.viewerIsChampion,
+        avgTip: tipStats.avgTip,
+        championAggregate: tipStats.championAggregate,
+        viewerAggregate: tipStats.viewerAggregate,
+        viewerIsChampion: tipStats.viewerIsChampion,
       }),
-    [media?.bids, championCtx]
+    [tipStats]
   );
 
   const aboutFields = useMemo(() => {

@@ -129,6 +129,85 @@ export function amountToTakeChampion(
   return Math.max(minTip, Math.round(raw * 100) / 100);
 }
 
+export function averageTipPounds(bids: TipBidLike[] | null | undefined): number | undefined {
+  const list = (bids ?? []).filter(
+    (b) => typeof b.amount === 'number' && (b.amount ?? 0) > 0
+  );
+  if (list.length === 0) return undefined;
+  const total = list.reduce((sum, b) => sum + (b.amount ?? 0), 0);
+  return Math.round((total / list.length / 100) * 100) / 100;
+}
+
+/**
+ * Resolve avg + champion tip-stat inputs from a media-like object.
+ * Handles thin chart/queue payloads that omit precomputed avg fields.
+ */
+export function resolveTipStatInputs(
+  media: {
+    bids?: TipBidLike[] | null;
+    globalMediaAggregate?: number | null;
+    globalMediaAggregateAvg?: number | null;
+    globalMediaAggregateTop?: number | null;
+    globalMediaAggregateTopUser?: TipViewerLike | string | null;
+    partyMediaAggregateTop?: number | null;
+    partyMediaAggregateTopUser?: TipViewerLike | string | null;
+    partyBids?: TipBidLike[] | null;
+  } | null | undefined,
+  viewer?: TipViewerLike
+): {
+  avgTip?: number;
+  championAggregate?: number;
+  viewerAggregate?: number;
+  viewerIsChampion: boolean;
+} {
+  if (!media) {
+    return { viewerIsChampion: false };
+  }
+
+  const bids =
+    Array.isArray(media.bids) && media.bids.length > 0
+      ? media.bids
+      : Array.isArray(media.partyBids)
+        ? media.partyBids
+        : [];
+
+  let avgTip = averageTipPounds(bids);
+  const storedAvgPence =
+    typeof media.globalMediaAggregateAvg === 'number' ? media.globalMediaAggregateAvg : 0;
+  if (avgTip == null && storedAvgPence > 0) {
+    avgTip = Math.round((storedAvgPence / 100) * 100) / 100;
+  }
+
+  const fallbackChampionAggregatePence =
+    (typeof media.globalMediaAggregateTop === 'number' && media.globalMediaAggregateTop > 0
+      ? media.globalMediaAggregateTop
+      : undefined) ??
+    (typeof media.partyMediaAggregateTop === 'number' && media.partyMediaAggregateTop > 0
+      ? media.partyMediaAggregateTop
+      : undefined);
+
+  const champion = computeChampionTipContext(bids, viewer, {
+    fallbackChampionAggregatePence,
+    fallbackChampionUser:
+      media.globalMediaAggregateTopUser ?? media.partyMediaAggregateTopUser ?? undefined,
+  });
+
+  if (avgTip == null && champion && champion.championAggregate > 0) {
+    const totalPence =
+      typeof media.globalMediaAggregate === 'number' ? media.globalMediaAggregate : 0;
+    if (totalPence <= 0 || Math.round(totalPence) === Math.round(champion.championAggregate * 100)) {
+      avgTip = champion.championAggregate;
+    }
+  }
+
+  return {
+    avgTip,
+    championAggregate: champion?.championAggregate,
+    viewerAggregate: champion?.viewerAggregate,
+    viewerIsChampion: champion?.viewerIsChampion ?? false,
+  };
+}
+
 export function buildTipStatChips(options: {
   minTip: number;
   avgTip?: number;
@@ -193,13 +272,4 @@ export function buildTipStatChips(options: {
   }
 
   return chips;
-}
-
-export function averageTipPounds(bids: TipBidLike[] | null | undefined): number | undefined {
-  const list = (bids ?? []).filter(
-    (b) => typeof b.amount === 'number' && (b.amount ?? 0) > 0
-  );
-  if (list.length === 0) return undefined;
-  const total = list.reduce((sum, b) => sum + (b.amount ?? 0), 0);
-  return Math.round((total / list.length / 100) * 100) / 100;
 }

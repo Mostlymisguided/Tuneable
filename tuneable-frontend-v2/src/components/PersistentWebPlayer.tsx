@@ -11,7 +11,7 @@ import { type YouTubePlayerRef } from './YouTubePlayer';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from 'react-toastify';
 
 // Helper function to format time (seconds to MM:SS)
@@ -629,7 +629,8 @@ const PersistentWebPlayer: React.FC = () => {
 
   const getCurrentMediaAverageTip = () => {
     const avg = (currentMedia as any)?.globalMediaAggregateAvg;
-    return typeof avg === 'number' && avg > 0 ? avg / 100 : undefined;
+    if (typeof avg === 'number' && avg > 0) return avg / 100;
+    return averageTipPounds((currentMedia as any)?.bids);
   };
 
   const currentMediaChampionTip = computeChampionTipContext((currentMedia as any)?.bids, user, {

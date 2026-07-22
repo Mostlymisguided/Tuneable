@@ -304,7 +304,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
 
           {/* Tip stat shortcuts */}
           <TipStatChips
-            className="mt-4 flex items-center justify-center flex-wrap gap-2"
+            className="mt-4 flex w-full items-center justify-center flex-wrap gap-2"
             minTip={minTip}
             avgTip={avgTip}
             championAggregate={championAggregate}

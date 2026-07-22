@@ -24,7 +24,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import {
   isLocationMatch,
@@ -572,6 +572,8 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
             coverArt: actualMedia.coverArt,
             sources: sources,
             globalMediaAggregate: typeof actualMedia.globalMediaAggregate === 'number' ? actualMedia.globalMediaAggregate : 0,
+            globalMediaAggregateTop: typeof actualMedia.globalMediaAggregateTop === 'number' ? actualMedia.globalMediaAggregateTop : (typeof item.globalMediaAggregateTop === 'number' ? item.globalMediaAggregateTop : 0),
+            globalMediaAggregateTopUser: actualMedia.globalMediaAggregateTopUser || item.globalMediaAggregateTopUser || null,
             partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
             totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
             bids: item.partyBids || item.bids || actualMedia.bids || [], // Use party-specific bids (PartyUserMediaAggregate) if available, fallback to global bids
@@ -1776,23 +1778,21 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         viewerIsChampion: false,
       };
     }
-    let avgTip: number | undefined;
+    const resolved = resolveTipStatInputs(pendingMedia, user);
+    // Prefer party-scoped average when party bid data is richer than slim chart bids
+    let avgTip = resolved.avgTip;
     try {
       const avg = calculateAverageBid(pendingMedia);
-      avgTip = avg > 0 ? avg : undefined;
+      if (avg > 0) avgTip = avg;
     } catch (e) {
       console.error('Error computing tip stats:', e);
     }
-    const champion = computeChampionTipContext(pendingMedia?.bids, user, {
-      fallbackChampionAggregatePence: pendingMedia?.globalMediaAggregateTop,
-      fallbackChampionUser: pendingMedia?.globalMediaAggregateTopUser,
-    });
     return {
       minTip,
       avgTip,
-      championAggregate: champion?.championAggregate,
-      viewerAggregate: champion?.viewerAggregate,
-      viewerIsChampion: champion?.viewerIsChampion ?? false,
+      championAggregate: resolved.championAggregate,
+      viewerAggregate: resolved.viewerAggregate,
+      viewerIsChampion: resolved.viewerIsChampion,
     };
   }, [pendingMedia, isInlineBid, calculateAverageBid, user]);
 

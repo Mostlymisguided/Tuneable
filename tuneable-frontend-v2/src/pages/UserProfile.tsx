@@ -166,7 +166,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
-import { computeChampionTipContext } from '../utils/tipStats';
+import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
@@ -1099,16 +1099,19 @@ const UserProfile: React.FC = () => {
   };
 
   const calculateAverageBid = (media: any): number => {
-    if (!media || !media.globalMediaAggregateAvg) return 0;
-    return media.globalMediaAggregateAvg / 100; // Convert from pence to pounds
+    if (!media) return 0;
+    if (media.globalMediaAggregateAvg > 0) {
+      return media.globalMediaAggregateAvg / 100; // Convert from pence to pounds
+    }
+    const bids = Array.isArray(media.bids) ? media.bids : [];
+    const positive = bids.filter((b: any) => typeof b?.amount === 'number' && b.amount > 0);
+    if (positive.length === 0) return 0;
+    const total = positive.reduce((sum: number, b: any) => sum + b.amount, 0);
+    return total / positive.length / 100;
   };
 
   const libraryChampionTip = useMemo(
-    () =>
-      computeChampionTipContext(libraryItemToTip?.bids, currentUser, {
-        fallbackChampionAggregatePence: libraryItemToTip?.globalMediaAggregateTop,
-        fallbackChampionUser: libraryItemToTip?.globalMediaAggregateTopUser,
-      }),
+    () => resolveTipStatInputs(libraryItemToTip, currentUser),
     [libraryItemToTip, currentUser]
   );
 
@@ -4584,7 +4587,7 @@ const UserProfile: React.FC = () => {
         onConfirm={handlePlaceLibraryTip}
         bidAmount={currentUser?.preferences?.defaultTip || 1.11}
         minTip={0.01}
-        avgTip={libraryItemToTip ? calculateAverageBid(libraryItemToTip) : undefined}
+        avgTip={libraryItemToTip ? calculateAverageBid(libraryItemToTip) || libraryChampionTip.avgTip : undefined}
         championAggregate={libraryChampionTip?.championAggregate}
         viewerAggregate={libraryChampionTip?.viewerAggregate}
         viewerIsChampion={libraryChampionTip?.viewerIsChampion}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Play } from 'lucide-react';
@@ -11,6 +11,7 @@ import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlaya
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
+import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import BidConfirmationModal from './BidConfirmationModal';
@@ -39,6 +40,13 @@ export interface TippedQueueItem {
     };
   }>;
   globalMediaAggregate?: number;
+  globalMediaAggregateAvg?: number;
+  globalMediaAggregateTop?: number;
+  globalMediaAggregateTopUser?: string | {
+    _id?: string;
+    uuid?: string;
+    id?: string;
+  };
   sources?: Record<string, string>;
   contentType?: string[] | string;
   contentForm?: string[] | string;
@@ -72,6 +80,11 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
   const [itemToTip, setItemToTip] = useState<TippedQueueItem | null>(null);
   const [isPlacingTip, setIsPlacingTip] = useState(false);
+
+  const tipStats = useMemo(
+    () => resolveTipStatInputs(itemToTip, user),
+    [itemToTip, user]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -262,6 +275,10 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         onConfirm={handleConfirmTip}
         bidAmount={user?.preferences?.defaultTip || 1.11}
         minTip={minimumBid}
+        avgTip={tipStats.avgTip}
+        championAggregate={tipStats.championAggregate}
+        viewerAggregate={tipStats.viewerAggregate}
+        viewerIsChampion={tipStats.viewerIsChampion}
         mediaTitle={itemToTip?.title || 'Unknown'}
         mediaArtist={itemToTip ? getCreatorDisplay(itemToTip) : undefined}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
