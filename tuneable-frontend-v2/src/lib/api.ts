@@ -364,14 +364,22 @@ export const partyAPI = {
   },
   
   addMediaToParty: async (partyId: string, mediaData: any) => {
-    const response = await api.post(`/parties/${partyId}/media/add`, mediaData);
+    const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
+    const currentLocation = getTipCurrentLocation();
+    const response = await api.post(`/parties/${partyId}/media/add`, {
+      ...mediaData,
+      ...(currentLocation ? { currentLocation } : {}),
+    });
     return response.data;
   },
   
   placeBid: async (partyId: string, mediaId: string, bidAmount: number, tags?: string[]) => {
+    const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
+    const currentLocation = getTipCurrentLocation();
     const response = await api.post(`/parties/${partyId}/media/${mediaId}/bid`, {
       bidAmount,
-      ...(tags && tags.length > 0 ? { tags } : {})
+      ...(tags && tags.length > 0 ? { tags } : {}),
+      ...(currentLocation ? { currentLocation } : {}),
     });
     return response.data;
   },
@@ -875,9 +883,15 @@ export const mediaAPI = {
     tags?: string[];
     sources: Record<string, string>;
   }, tags?: string[]) => {
+    const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
+    const currentLocation = getTipCurrentLocation();
     const payload = externalMedia
-      ? { amount, externalMedia }
-      : { amount, ...(tags && tags.length > 0 ? { tags } : {}) };
+      ? { amount, externalMedia, ...(currentLocation ? { currentLocation } : {}) }
+      : {
+          amount,
+          ...(tags && tags.length > 0 ? { tags } : {}),
+          ...(currentLocation ? { currentLocation } : {}),
+        };
     const response = await api.post(`/media/${mediaId}/global-bid`, payload);
     return response.data;
   },
@@ -1053,6 +1067,11 @@ export const locationAPI = {
 
   resolve: async (mapboxId: string) => {
     const response = await api.post('/locations/resolve', { mapboxId });
+    return response.data as { location: Record<string, unknown> };
+  },
+
+  reverse: async (longitude: number, latitude: number) => {
+    const response = await api.post('/locations/reverse', { longitude, latitude });
     return response.data as { location: Record<string, unknown> };
   },
 };

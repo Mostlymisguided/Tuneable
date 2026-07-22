@@ -8,14 +8,14 @@ const Bid = require('../models/Bid');
 const Party = require('../models/Party');
 const { isValidObjectId } = require('../utils/validators');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
-const { getBidLocationSnapshot, getUserBidLocation } = require('../utils/locationUtils');
+const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
 
 /**
  * @param {string} userId
- * @param {{ mediaId?: string, amount: number, externalMedia?: object }} options amount in pounds
+ * @param {{ mediaId?: string, amount: number, externalMedia?: object, currentLocation?: object }} options amount in pounds
  */
-async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMedia } = {}) {
+async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMedia, currentLocation } = {}) {
   if (!amount || amount < 0.01) {
     const err = new Error('Minimum bid is £0.01');
     err.status = 400;
@@ -155,7 +155,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     mediaContentType: media.contentType,
     mediaContentForm: media.contentForm,
     mediaDuration: media.duration,
-    ...getBidLocationSnapshot(getUserBidLocation(user)),
+    ...buildBidLocationSnapshot(user, currentLocation),
   });
 
   await bid.save();

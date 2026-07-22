@@ -329,6 +329,8 @@ const SearchPage: React.FC = () => {
     const rawAmount = bidAmounts[song.id] ?? '';
     const parsedAmount = parseFloat(rawAmount);
     const songBidAmount = Number.isFinite(parsedAmount) ? parsedAmount : (party?.minimumBid || 0.01);
+    const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
+    const currentLocation = getTipCurrentLocation();
     
     try {
       if (song.isPodcast) {
@@ -341,7 +343,10 @@ const SearchPage: React.FC = () => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ amount: songBidAmount })
+            body: JSON.stringify({
+              amount: songBidAmount,
+              ...(currentLocation ? { currentLocation } : {}),
+            })
           });
 
           if (response.ok) {
@@ -395,7 +400,10 @@ const SearchPage: React.FC = () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
               },
-              body: JSON.stringify({ amount: songBidAmount })
+              body: JSON.stringify({
+                amount: songBidAmount,
+                ...(currentLocation ? { currentLocation } : {}),
+              })
             });
 
             if (bidResponse.ok) {

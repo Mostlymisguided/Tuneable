@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, MapPin, User, X, CheckCircle } from 'lucide-react';
+import { Mail, MapPin, Navigation, User, X, CheckCircle } from 'lucide-react';
 import { emailAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import { useCurrentLocation } from '../contexts/CurrentLocationContext';
+import { formatLocation } from '../utils/locationHelpers';
 
 interface User {
   _id?: string;
@@ -16,6 +18,8 @@ interface User {
     region?: string;
     country?: string;
     countryCode?: string;
+    placeId?: string;
+    display?: string;
   };
 }
 
@@ -30,13 +34,22 @@ interface Prompt {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   action: () => void | Promise<void>;
+  actionLabel?: string;
   priority: number;
 }
 
 const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss }) => {
   const navigate = useNavigate();
+  const {
+    currentLocation,
+    status: currentLocationStatus,
+    promptDismissed,
+    enableCurrentLocation,
+    dismissPrompt,
+  } = useCurrentLocation();
   const [dismissedPrompts, setDismissedPrompts] = useState<Set<string>>(new Set());
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isEnablingLocation, setIsEnablingLocation] = useState(false);
 
   if (!user) return null;
 
@@ -71,6 +84,35 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     }
   };
 
+  const handleEnableCurrentLocation = async () => {
+    setIsEnablingLocation(true);
+    try {
+      const location = await enableCurrentLocation();
+      if (location) {
+        toast.success(
+          `Current location set to ${formatLocation(location)} — tips will influence charts there too`
+        );
+        return;
+      }
+      const { getCurrentLocationStatus } = await import('../utils/currentLocationCache');
+      if (getCurrentLocationStatus() === 'denied') {
+        toast.error('Location permission denied. You can enable it in your browser settings.');
+      } else {
+        toast.error('Could not detect your current location');
+      }
+    } finally {
+      setIsEnablingLocation(false);
+    }
+  };
+
+  const hasHomeLocation = !!(user.homeLocation?.city || user.homeLocation?.country || user.homeLocation?.placeId);
+  const showCurrentLocationPrompt =
+    hasHomeLocation &&
+    !currentLocation &&
+    !promptDismissed &&
+    currentLocationStatus !== 'denied' &&
+    currentLocationStatus !== 'unavailable';
+
   const prompts: Prompt[] = [];
 
   // Email verification prompt
@@ -97,15 +139,28 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     });
   }
 
-  // Location prompt
-  if (!user.homeLocation?.city || !user.homeLocation?.country) {
+  // Home location prompt
+  if (!hasHomeLocation) {
     prompts.push({
       id: 'location',
-      title: 'Add Location Info',
-      description: 'Add your location to help others discover you',
+      title: 'Add Home Location',
+      description: 'Add your home location so tips influence charts where you\'re from',
       icon: MapPin,
       action: handleAddLocation,
       priority: 3
+    });
+  }
+
+  // Current location — tip-time presence for local charts
+  if (showCurrentLocationPrompt) {
+    prompts.push({
+      id: 'currentLocation',
+      title: 'Enable Current Location',
+      description: 'Tip once and influence charts at home and where you are now',
+      icon: Navigation,
+      action: handleEnableCurrentLocation,
+      actionLabel: isEnablingLocation ? 'Detecting...' : 'Enable',
+      priority: 4
     });
   }
 
@@ -118,6 +173,9 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
 
   const handleDismiss = (promptId: string) => {
     setDismissedPrompts(prev => new Set([...prev, promptId]));
+    if (promptId === 'currentLocation') {
+      dismissPrompt();
+    }
     if (onDismiss) {
       onDismiss(promptId);
     }
@@ -136,6 +194,9 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       <div className="space-y-3">
         {activePrompts.map((prompt) => {
           const Icon = prompt.icon;
+          const isBusy =
+            (isSendingEmail && prompt.id === 'email') ||
+            (isEnablingLocation && prompt.id === 'currentLocation');
           return (
             <div
               key={prompt.id}
@@ -155,10 +216,10 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
                   onClick={async () => {
                     await prompt.action();
                   }}
-                  disabled={isSendingEmail && prompt.id === 'email'}
+                  disabled={isBusy}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  {isSendingEmail && prompt.id === 'email' ? 'Sending...' : 'Complete'}
+                  {prompt.actionLabel || (isBusy ? 'Sending...' : 'Complete')}
                 </button>
                 <button
                   onClick={() => handleDismiss(prompt.id)}
@@ -177,12 +238,3 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
 };
 
 export default UserProfilePrompts;
-
-
-
-
-
-
-
-
-

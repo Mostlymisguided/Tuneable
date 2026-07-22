@@ -3032,7 +3032,7 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
 router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
   try {
     const { mediaId } = req.params;
-    const { amount, externalMedia, tags } = req.body;
+    const { amount, externalMedia, tags, currentLocation } = req.body;
     const userId = req.user._id;
 
     // Validate amount
@@ -3207,9 +3207,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       mediaContentType: media.contentType,
       mediaContentForm: media.contentForm,
       mediaDuration: media.duration,
-      ...require('../utils/locationUtils').getBidLocationSnapshot(
-        require('../utils/locationUtils').getUserBidLocation(user)
-      ),
+      ...require('../utils/locationUtils').buildBidLocationSnapshot(user, currentLocation),
     });
 
     // Snapshot podium before the new bid (for champion title steal notifications)
@@ -3561,7 +3559,7 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 // @route   GET /api/media/:mediaId/champions
 // @desc    Tip-aggregate champions for a media item (global or Mapbox place scope)
 // @access  Public
-// @query   locationPlaceId — optional Mapbox place id; tippers whose home ancestor chain includes it
+// @query   locationPlaceId — optional Mapbox place id; tippers whose home/current ancestor chain includes it
 // @query   limit — max rankings (default 10, max 50)
 router.get('/:mediaId/champions', async (req, res) => {
   try {

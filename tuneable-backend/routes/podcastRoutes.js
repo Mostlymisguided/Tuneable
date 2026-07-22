@@ -16,7 +16,7 @@ const taddyService = require('../services/taddyService');
 const podcastAdapter = require('../services/podcastAdapter');
 const spotifyService = require('../services/spotifyService');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
-const { getBidLocationSnapshot, getUserBidLocation } = require('../utils/locationUtils');
+const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 
 const router = express.Router();
 
@@ -227,7 +227,7 @@ function parseDuration(durationStr) {
 router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
   try {
     const { episodeId } = req.params;
-    const { amount } = req.body;
+    const { amount, currentLocation } = req.body;
     const userId = req.user._id;
     
     if (!amount || amount <= 0) {
@@ -293,7 +293,7 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       mediaTitle: episode.title,
       mediaArtist: episode.host && episode.host.length > 0 ? episode.host[0].name : '',
       mediaCoverArt: episode.coverArt || '',
-      ...getBidLocationSnapshot(getUserBidLocation(user)),
+      ...buildBidLocationSnapshot(user, currentLocation),
     });
     
     await bid.save();
@@ -357,7 +357,7 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
 router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) => {
   try {
     const { episodeId, partyId } = req.params;
-    const { amount } = req.body;
+    const { amount, currentLocation } = req.body;
     const userId = req.user._id;
     
     console.log('🎧 Podcast bidding request:', { episodeId, partyId, amount, userId });
@@ -459,7 +459,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       mediaTitle: episode.title,
       mediaArtist: episode.host && episode.host.length > 0 ? episode.host[0].name : '',
       mediaCoverArt: episode.coverArt || '',
-      ...getBidLocationSnapshot(getUserBidLocation(user)),
+      ...buildBidLocationSnapshot(user, currentLocation),
     });
     
     await bid.save();

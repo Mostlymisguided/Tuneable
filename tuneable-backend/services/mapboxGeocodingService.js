@@ -1,6 +1,7 @@
 const axios = require('axios');
 
 const MAPBOX_FORWARD_URL = 'https://api.mapbox.com/search/geocode/v6/forward';
+const MAPBOX_REVERSE_URL = 'https://api.mapbox.com/search/geocode/v6/reverse';
 const PLACE_TYPES = 'country,region,district,place,locality,neighborhood';
 
 function getAccessToken() {
@@ -169,6 +170,42 @@ function parseFeatureToLocation(feature) {
 }
 
 /**
+ * Reverse geocode lat/lng into Tuneable's location shape.
+ * Defaults to permanent geocoding so results are safe to store on Bid snapshots.
+ */
+async function reverseGeocode(longitude, latitude, options = {}) {
+  const lng = Number(longitude);
+  const lat = Number(latitude);
+
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+    throw new Error('Valid longitude and latitude are required');
+  }
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+    throw new Error('Coordinates out of range');
+  }
+
+  const response = await axios.get(MAPBOX_REVERSE_URL, {
+    params: {
+      access_token: getAccessToken(),
+      longitude: lng,
+      latitude: lat,
+      types: options.types || PLACE_TYPES,
+      limit: Math.min(Math.max(options.limit || 1, 1), 5),
+      language: options.language || 'en',
+      permanent: options.permanent !== false,
+    },
+    timeout: 10000,
+  });
+
+  const feature = response.data?.features?.[0];
+  if (!feature) {
+    return null;
+  }
+
+  return parseFeatureToLocation(feature);
+}
+
+/**
  * Permanent forward geocode for a free-text place query (batch migrations).
  */
 async function geocodeQuery(query, options = {}) {
@@ -208,6 +245,7 @@ async function geocodeQuery(query, options = {}) {
 module.exports = {
   suggest,
   resolveByMapboxId,
+  reverseGeocode,
   geocodeQuery,
   parseFeatureToLocation,
   featureToSuggestion,

@@ -65,13 +65,18 @@ const EpisodeCard: React.FC<EpisodeCardProps> = ({
 
     setIsBoosting(true);
     try {
+      const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
+      const currentLocation = getTipCurrentLocation();
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/${episode.id}/boost`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ amount: boostAmount })
+        body: JSON.stringify({
+          amount: boostAmount,
+          ...(currentLocation ? { currentLocation } : {}),
+        })
       });
 
       if (response.ok) {

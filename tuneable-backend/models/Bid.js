@@ -89,6 +89,7 @@ const bidSchema = new mongoose.Schema({
     // BIDDER LOCATION SNAPSHOT (Mapbox / Tunefeed filtering)
     // ========================================
     bidderHomePlaceId: { type: String },
+    bidderCurrentPlaceId: { type: String },
     bidderLocationAncestorIds: [{ type: String }],
     bidderLocationDisplay: { type: String },
     

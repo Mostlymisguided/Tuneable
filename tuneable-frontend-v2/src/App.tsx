@@ -6,6 +6,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CurrentLocationProvider } from './contexts/CurrentLocationContext';
 import { useWebPlayerStore } from './stores/webPlayerStore';
 import { usePodcastPlayerStore } from './stores/podcastPlayerStore';
 import Navbar from './components/Navbar';
@@ -443,7 +444,9 @@ function App() {
   return (
     <Elements stripe={stripePromise}>
       <AuthProvider>
-        <AppContent />
+        <CurrentLocationProvider>
+          <AppContent />
+        </CurrentLocationProvider>
       </AuthProvider>
     </Elements>
   );

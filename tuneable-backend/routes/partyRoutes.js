@@ -16,7 +16,7 @@ const { broadcastToParty } = require('../utils/socketIO');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
-const { getBidLocationSnapshot } = require('../utils/locationUtils');
+const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
 const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 // Note: Old bidCalculations utility functions are no longer used
@@ -1678,7 +1678,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
 router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId } = req.params;
-        const { url, title, artist, bidAmount, platform, duration, tags, category, externalIds, coverArt, album, releaseDate, releaseYear } = req.body;
+        const { url, title, artist, bidAmount, platform, duration, tags, category, externalIds, coverArt, album, releaseDate, releaseYear, currentLocation } = req.body;
         const userId = req.user._id;
 
         if (!mongoose.isValidObjectId(partyId)) {
@@ -1917,7 +1917,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             mediaContentForm: media.contentForm,
             mediaDuration: media.duration,
             platform: detectedPlatform,
-            ...getBidLocationSnapshot(user.homeLocation),
+            ...buildBidLocationSnapshot(user, currentLocation),
             
             // Note: Aggregate values are computed dynamically by BidMetricsEngine
             // and are no longer stored in the Bid model
@@ -2163,7 +2163,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), async (req, res) => {
     try {
         const { partyId, mediaId } = req.params;
-        const { bidAmount, tags } = req.body;
+        const { bidAmount, tags, currentLocation } = req.body;
         const userId = req.user._id;
 
         if (!mongoose.isValidObjectId(partyId)) {
@@ -2496,7 +2496,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             mediaContentForm: populatedMedia.contentForm,
             mediaDuration: populatedMedia.duration,
             platform: detectedPlatform,
-            ...getBidLocationSnapshot(user.homeLocation),
+            ...buildBidLocationSnapshot(user, currentLocation),
             
             // Note: Aggregate values are computed dynamically by BidMetricsEngine
             // and are no longer stored in the Bid model

@@ -365,48 +365,76 @@ function applyResolvedLocation(locationData, existingLocation = null) {
   return merged;
 }
 
+function hasUsableLocation(location) {
+  return !!(location?.placeId || location?.city || location?.country);
+}
+
 /**
- * Prefer homeLocation, fall back to secondaryLocation for bid snapshots.
+ * Home for bid stamps: prefer homeLocation, fall back to secondaryLocation.
  */
 function getUserBidLocation(user) {
   if (!user) return null;
-  if (user.homeLocation?.placeId || user.homeLocation?.city || user.homeLocation?.country) {
+  if (hasUsableLocation(user.homeLocation)) {
     return user.homeLocation;
   }
-  if (user.secondaryLocation?.placeId || user.secondaryLocation?.city || user.secondaryLocation?.country) {
+  if (hasUsableLocation(user.secondaryLocation)) {
     return user.secondaryLocation;
   }
   return user.homeLocation || user.secondaryLocation || null;
 }
 
-/**
- * Snapshot home location onto a Bid for Tunefeed filtering and leaderboard display.
- */
-function getBidLocationSnapshot(homeLocation) {
-  if (!homeLocation) {
-    return {};
+function collectAncestorIds(location) {
+  if (!location) return [];
+  const placeId = location.placeId || null;
+  const ancestorIds = Array.isArray(location.ancestorIds) ? location.ancestorIds : [];
+  if (placeId) {
+    return [...new Set([placeId, ...ancestorIds])];
   }
+  return [...new Set(ancestorIds)];
+}
 
-  const placeId = homeLocation.placeId || null;
-  const ancestorIds = Array.isArray(homeLocation.ancestorIds) ? homeLocation.ancestorIds : [];
-  const bidderLocationAncestorIds = placeId
-    ? [...new Set([placeId, ...ancestorIds])]
-    : [...ancestorIds];
+function formatLocationDisplay(location) {
+  if (!location) return null;
+  return (
+    location.display ||
+    [location.city, location.region, location.country].filter(Boolean).join(', ') ||
+    null
+  );
+}
+
+/**
+ * Snapshot home (+ optional current) location onto a Bid for Tunefeed / local charts.
+ * Ancestor IDs are the union of both places so one tip can influence charts in both.
+ */
+function getBidLocationSnapshot(homeLocation, currentLocation = null) {
+  const home = hasUsableLocation(homeLocation) ? homeLocation : null;
+  const current = hasUsableLocation(currentLocation) ? currentLocation : null;
+
+  const bidderLocationAncestorIds = [
+    ...new Set([...collectAncestorIds(home), ...collectAncestorIds(current)]),
+  ];
 
   if (!bidderLocationAncestorIds.length) {
     return {};
   }
 
-  const display =
-    homeLocation.display ||
-    [homeLocation.city, homeLocation.region, homeLocation.country].filter(Boolean).join(', ') ||
-    null;
-
   return {
-    bidderHomePlaceId: placeId,
+    bidderHomePlaceId: home?.placeId || null,
+    bidderCurrentPlaceId: current?.placeId || null,
     bidderLocationAncestorIds,
-    bidderLocationDisplay: display,
+    bidderLocationDisplay: formatLocationDisplay(home) || formatLocationDisplay(current),
   };
+}
+
+/**
+ * Build bid location fields from the user profile plus optional tip-time current location.
+ */
+function buildBidLocationSnapshot(user, currentLocationInput = null) {
+  const home = getUserBidLocation(user);
+  const current = currentLocationInput
+    ? applyResolvedLocation(currentLocationInput)
+    : null;
+  return getBidLocationSnapshot(home, current);
 }
 
 module.exports = {
@@ -416,5 +444,6 @@ module.exports = {
   applyResolvedLocation,
   getUserBidLocation,
   getBidLocationSnapshot,
+  buildBidLocationSnapshot,
 };
 
