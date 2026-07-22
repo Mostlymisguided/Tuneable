@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
@@ -43,6 +43,119 @@ const SoundCloudIcon = ({ className }: { className?: string }) => (
     <path d="M1.175 12.225c-.051 0-.094.046-.101.1l-.233 2.154.233 2.144c.007.058.05.098.101.098.05 0 .09-.04.099-.098l.255-2.144-.27-2.154c-.009-.054-.049-.1-.084-.1m-.099-1.521c-.06 0-.114.047-.117.113l-.282 3.662.282 3.649c.002.062.058.11.117.11.056 0 .105-.048.117-.11l.326-3.649-.326-3.662c-.012-.066-.061-.113-.117-.113m2.147-1.36c-.075 0-.132.061-.136.141l-.328 5.02.328 4.99c.004.076.061.13.136.13.07 0 .129-.054.136-.13l.375-4.99-.375-5.02c-.007-.08-.066-.141-.136-.141m4.289-2.459c-.086 0-.155.071-.16.16l-.367 7.08.367 7.046c.004.086.074.15.16.15.083 0 .15-.064.16-.15l.42-7.046-.42-7.08c-.01-.089-.077-.16-.16-.16m-.98.731c-.082 0-.147.066-.152.152l-.348 6.35.348 6.32c.005.083.07.145.152.145.078 0 .142-.062.152-.145l.396-6.32-.396-6.35c-.01-.086-.074-.152-.152-.152m2.447-1.428c-.09 0-.163.074-.168.167l-.387 7.577.387 7.54c.005.09.078.158.168.158.087 0 .158-.068.168-.158l.443-7.54-.443-7.577c-.01-.093-.081-.167-.168-.167m5.348-.118c-.005-.501-.058-1.836-1.47-3.02-.632-.53-1.503-.794-2.588-.794v13.405h6.69c2.074 0 3.771-1.686 3.771-3.76 0-2.031-1.609-3.688-3.616-3.76l-.787-.071" />
   </svg>
 );
+
+const BADGE_ROW_TOLERANCE_PX = 2;
+
+/** Clamps a flex-wrap badge list to N rows by default, with Show all / Show less. */
+const CollapsibleBadgeWrap: React.FC<{
+  children: React.ReactNode;
+  maxRows?: number;
+  className?: string;
+}> = ({ children, maxRows = 2, className = '' }) => {
+  const [expanded, setExpanded] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
+  const [hiddenCount, setHiddenCount] = useState(0);
+
+  const measure = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    // Measure unrestricted so row positions aren't affected by the clamp.
+    const prevMaxHeight = el.style.maxHeight;
+    const prevOverflow = el.style.overflow;
+    el.style.maxHeight = 'none';
+    el.style.overflow = 'visible';
+
+    const items = Array.from(el.children) as HTMLElement[];
+    if (items.length === 0) {
+      el.style.maxHeight = prevMaxHeight;
+      el.style.overflow = prevOverflow;
+      setCollapsedHeight(null);
+      setHiddenCount(0);
+      return;
+    }
+
+    const containerTop = el.getBoundingClientRect().top;
+    const rowTops: number[] = [];
+    for (const item of items) {
+      const top = item.getBoundingClientRect().top - containerTop;
+      if (!rowTops.some((t) => Math.abs(t - top) < BADGE_ROW_TOLERANCE_PX)) {
+        rowTops.push(top);
+      }
+    }
+    rowTops.sort((a, b) => a - b);
+
+    if (rowTops.length <= maxRows) {
+      el.style.maxHeight = prevMaxHeight;
+      el.style.overflow = prevOverflow;
+      setCollapsedHeight(null);
+      setHiddenCount(0);
+      return;
+    }
+
+    const cutoffTop = rowTops[maxRows - 1];
+    const height = Math.ceil(
+      Math.max(
+        ...items
+          .map((item) => {
+            const rect = item.getBoundingClientRect();
+            const top = rect.top - containerTop;
+            return Math.abs(top - cutoffTop) < BADGE_ROW_TOLERANCE_PX
+              ? rect.bottom - containerTop
+              : 0;
+          })
+      )
+    );
+    const hidden = items.filter((item) => {
+      const bottom = item.getBoundingClientRect().bottom - containerTop;
+      return bottom > height + 1;
+    }).length;
+
+    el.style.maxHeight = prevMaxHeight;
+    el.style.overflow = prevOverflow;
+    setCollapsedHeight(height);
+    setHiddenCount(hidden);
+  }, [maxRows]);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children, measure]);
+
+  const overflows = collapsedHeight != null && hiddenCount > 0;
+  const clamped = overflows && !expanded;
+
+  return (
+    <div>
+      <div
+        ref={wrapRef}
+        className={`relative flex flex-wrap gap-2 ${className}`.trim()}
+        style={
+          clamped
+            ? { maxHeight: collapsedHeight ?? undefined, overflow: 'hidden' }
+            : undefined
+        }
+      >
+        {children}
+      </div>
+      {overflows && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          {expanded ? 'Show less' : `Show all (${hiddenCount} more)`}
+        </button>
+      )}
+    </div>
+  );
+};
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
@@ -2075,7 +2188,7 @@ const UserProfile: React.FC = () => {
                       {isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}
                     </h3>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <CollapsibleBadgeWrap>
                     {tipTagChampions.slice(0, 8).map((ranking) => (
                       <Link
                         key={`tip-${ranking.tag}-${ranking.rank}`}
@@ -2088,7 +2201,7 @@ const UserProfile: React.FC = () => {
                         <span className="opacity-90">#{ranking.tag}</span>
                       </Link>
                     ))}
-                  </div>
+                  </CollapsibleBadgeWrap>
                 </div>
               )}
 
@@ -2102,7 +2215,7 @@ const UserProfile: React.FC = () => {
                       {isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}
                     </h3>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <CollapsibleBadgeWrap>
                     {mediaChampionTitles.slice(0, 8).map((title) => (
                       <Link
                         key={`media-${title.mediaId}-${title.rank}`}
@@ -2115,7 +2228,7 @@ const UserProfile: React.FC = () => {
                         <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
                       </Link>
                     ))}
-                  </div>
+                  </CollapsibleBadgeWrap>
                 </div>
               )}
 
@@ -2151,7 +2264,7 @@ const UserProfile: React.FC = () => {
                       );
                     })}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <CollapsibleBadgeWrap key={selectedChampionScopePlaceId}>
                     {scopedTipTagChampions.slice(0, 6).map((ranking) => (
                       <Link
                         key={`scoped-tip-${selectedChampionScopePlaceId}-${ranking.tag}-${ranking.rank}`}
@@ -2176,7 +2289,7 @@ const UserProfile: React.FC = () => {
                         <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
                       </Link>
                     ))}
-                  </div>
+                  </CollapsibleBadgeWrap>
                 </div>
               )}
 
@@ -2190,7 +2303,7 @@ const UserProfile: React.FC = () => {
                       {isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}
                     </h3>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <CollapsibleBadgeWrap>
                     {tuneBytesTagRankings.slice(0, 5).map((ranking) => (
                       <Link
                         key={ranking.tag}
@@ -2203,7 +2316,7 @@ const UserProfile: React.FC = () => {
                         <span className="opacity-90">#{ranking.tag}</span>
                       </Link>
                     ))}
-                  </div>
+                  </CollapsibleBadgeWrap>
                   {isOwnProfile && (
                     <button
                       type="button"
