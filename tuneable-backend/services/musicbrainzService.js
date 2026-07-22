@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { parseReleaseDate } = require('../utils/releaseDateUtils');
 
 const MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'TuneableLocal/1.0 ( https://tuneable.stream )';
@@ -39,23 +40,45 @@ function getArtistCredit(recording) {
   return parts.join('') || 'Unknown Artist';
 }
 
-function buildReleaseLabel(recording) {
-  const release = Array.isArray(recording?.releases) ? recording.releases[0] : null;
-  if (!release) return null;
+function buildReleaseLabel(recording, release = null) {
+  const picked = release || pickRelease(recording)?.release;
+  if (!picked) return null;
 
-  if (release.title && release.date) {
-    return `${release.title} (${release.date.slice(0, 4)})`;
+  if (picked.title && picked.date) {
+    return `${picked.title} (${picked.date.slice(0, 4)})`;
   }
 
-  return release.title || null;
+  return picked.title || null;
 }
 
+/**
+ * Prefer MusicBrainz first-release-date, else earliest dated release (not a random reissue).
+ * @returns {{ release: object|null, dateRaw: string|null }}
+ */
 function pickRelease(recording) {
+  const firstReleaseDate = recording?.['first-release-date'] || null;
   const releases = Array.isArray(recording?.releases) ? recording.releases : [];
-  if (releases.length === 0) return null;
-  // Prefer a dated release
-  const dated = releases.find((r) => r?.date);
-  return dated || releases[0];
+
+  if (releases.length === 0) {
+    return { release: null, dateRaw: firstReleaseDate || null };
+  }
+
+  const dated = releases
+    .filter((r) => r?.date)
+    .map((r) => ({
+      release: r,
+      parsed: parseReleaseDate(r.date),
+      sortKey: String(r.date),
+    }))
+    .filter((entry) => entry.parsed.releaseYear)
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+  const earliest = dated[0] || null;
+  const release = earliest?.release || releases[0] || null;
+
+  // Prefer official first-release-date when present; fall back to earliest release date
+  const dateRaw = firstReleaseDate || earliest?.release?.date || release?.date || null;
+  return { release, dateRaw };
 }
 
 /**
@@ -92,9 +115,8 @@ function mapMusicBrainzTags(mbTags, { minCount = 1, limit = 8 } = {}) {
 }
 
 function mapRecordingToTrack(recording) {
-  const release = pickRelease(recording);
-  const releaseDate = release?.date || null;
-  const releaseYear = releaseDate ? Number.parseInt(releaseDate.slice(0, 4), 10) : null;
+  const { release, dateRaw } = pickRelease(recording);
+  const parsed = parseReleaseDate(dateRaw);
   const isrcs = Array.isArray(recording.isrcs)
     ? recording.isrcs.filter((c) => typeof c === 'string' && c.trim())
     : [];
@@ -107,9 +129,12 @@ function mapRecordingToTrack(recording) {
     duration: normalizeDuration(recording.length),
     coverArt: null,
     category: 'Music',
-    album: release?.title || buildReleaseLabel(recording),
-    releaseDate,
-    releaseYear: Number.isFinite(releaseYear) ? releaseYear : null,
+    album: release?.title || buildReleaseLabel(recording, release),
+    releaseDate: parsed.releaseDate
+      ? parsed.releaseDate.toISOString().slice(0, 10)
+      : (parsed.precision === 'year' && parsed.releaseYear ? String(parsed.releaseYear) : dateRaw),
+    releaseYear: parsed.releaseYear,
+    releaseDatePrecision: parsed.precision,
     isrc: isrcs[0] || null,
     isrcs,
     tags,
@@ -155,9 +180,8 @@ async function searchRecordings(query, offset = 0, limit = 20) {
     : [];
 
   const tracks = recordings.map((recording) => {
-    const release = Array.isArray(recording.releases) ? recording.releases[0] : null;
-    const releaseDate = release?.date || null;
-    const releaseYear = releaseDate ? Number.parseInt(releaseDate.slice(0, 4), 10) : null;
+    const { release, dateRaw } = pickRelease(recording);
+    const parsed = parseReleaseDate(dateRaw);
 
     return {
       id: recording.id,
@@ -166,9 +190,12 @@ async function searchRecordings(query, offset = 0, limit = 20) {
       duration: normalizeDuration(recording.length),
       coverArt: null,
       category: 'Music',
-      album: buildReleaseLabel(recording),
-      releaseDate,
-      releaseYear: Number.isFinite(releaseYear) ? releaseYear : null,
+      album: buildReleaseLabel(recording, release),
+      releaseDate: parsed.releaseDate
+        ? parsed.releaseDate.toISOString().slice(0, 10)
+        : (parsed.precision === 'year' && parsed.releaseYear ? String(parsed.releaseYear) : dateRaw),
+      releaseYear: parsed.releaseYear,
+      releaseDatePrecision: parsed.precision,
       isrc: null,
       isrcs: [],
       tags: [],
@@ -218,8 +245,36 @@ async function getRecording(mbid) {
   return mapRecordingToTrack(response.data);
 }
 
+/**
+ * Lookup recordings by ISRC.
+ */
+async function searchByIsrc(isrc, limit = 5) {
+  const code = String(isrc || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (code.length < 12) return [];
+
+  const response = await axios.get(`${MUSICBRAINZ_API}/recording`, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      Accept: 'application/json',
+    },
+    params: {
+      query: `isrc:${code}`,
+      fmt: 'json',
+      limit: Math.max(1, Math.min(limit, 25)),
+    },
+    timeout: 15000,
+  });
+
+  const recordings = Array.isArray(response.data?.recordings)
+    ? response.data.recordings
+    : [];
+
+  return recordings.map(mapRecordingToTrack);
+}
+
 module.exports = {
   searchRecordings,
   getRecording,
+  searchByIsrc,
   mapMusicBrainzTags,
 };

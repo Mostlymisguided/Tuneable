@@ -1,7 +1,7 @@
 /**
  * Post-import MusicBrainz enrichment: score → auto-apply high confidence,
  * queue medium confidence for admin review.
- * Also pulls folksonomy tags, ISRC, and release year via recording lookup.
+ * Also pulls folksonomy tags, ISRC, and release date/year via recording lookup.
  */
 
 const Media = require('../models/Media');
@@ -24,6 +24,10 @@ const {
   levenshtein,
   normalizeIsrc,
 } = require('../utils/mediaMatchUtils');
+const {
+  parseReleaseDate,
+  applyReleaseToMedia,
+} = require('../utils/releaseDateUtils');
 
 const MB_GAP_MS = 1100;
 const HIGH_SCORE = 0.82;
@@ -145,6 +149,7 @@ function snapshotMedia(media) {
     album: media.album || null,
     duration: media.duration || 0,
     isrc: media.isrc || null,
+    releaseDate: media.releaseDate || null,
     releaseYear: media.releaseYear || null,
     tags: Array.isArray(media.tags) ? [...media.tags] : [],
     genres: Array.isArray(media.genres) ? [...media.genres] : [],
@@ -215,7 +220,7 @@ function resolveImportSourceUrl(media, importSource) {
 }
 
 /**
- * Enrich a scored candidate with recording lookup (tags, ISRC, year, release id).
+ * Enrich a scored candidate with recording lookup (tags, ISRC, release date, release id).
  */
 async function enrichCandidateDetails(candidate) {
   if (!candidate?.musicbrainzId) return candidate;
@@ -229,7 +234,9 @@ async function enrichCandidateDetails(candidate) {
       artist: details.artist || candidate.artist,
       album: details.album || candidate.album,
       duration: details.duration || candidate.duration,
+      releaseDate: details.releaseDate ?? candidate.releaseDate ?? null,
       releaseYear: details.releaseYear ?? candidate.releaseYear ?? null,
+      releaseDatePrecision: details.releaseDatePrecision ?? candidate.releaseDatePrecision ?? null,
       isrc: details.isrc || candidate.isrc || null,
       tags: normalizeTagList(details.tags || []),
       genres: normalizeTagList(details.genres || details.tags || [], MAX_GENRES),
@@ -248,7 +255,9 @@ function suggestionFromCandidate(candidate, extras = {}) {
     album: candidate.album || null,
     duration: candidate.duration || 0,
     isrc: candidate.isrc || null,
+    releaseDate: candidate.releaseDate || null,
     releaseYear: candidate.releaseYear || null,
+    releaseDatePrecision: candidate.releaseDatePrecision || null,
     tags: normalizeTagList(candidate.tags || []),
     genres: normalizeTagList(candidate.genres || candidate.tags || [], MAX_GENRES),
     musicbrainzId: candidate.musicbrainzId,
@@ -321,9 +330,11 @@ async function applySuggestionToMedia(media, suggestion, {
   if (suggestion.duration && (!media.duration || media.duration === 0)) {
     media.duration = suggestion.duration;
   }
-  if (suggestion.releaseYear && !media.releaseYear) {
-    media.releaseYear = suggestion.releaseYear;
-  }
+  const parsedRelease = parseReleaseDate(
+    suggestion.releaseDate || (suggestion.releaseYear ? String(suggestion.releaseYear) : null),
+    suggestion.releaseDatePrecision || null
+  );
+  applyReleaseToMedia(media, parsedRelease, 'musicbrainz');
 
   ensureMap(media, 'externalIds');
   if (suggestion.musicbrainzId) {
@@ -352,7 +363,7 @@ async function applySuggestionToMedia(media, suggestion, {
 function mediaNeedsTagEnrichment(media) {
   const hasTags = Array.isArray(media.tags) && media.tags.length > 0;
   const hasGenres = Array.isArray(media.genres) && media.genres.length > 0;
-  const hasYear = Boolean(media.releaseYear);
+  const hasYear = Boolean(media.releaseYear || media.releaseDate);
   const hasIsrc = Boolean(media.isrc);
   return !hasTags || !hasGenres || !hasYear || !hasIsrc;
 }
@@ -369,7 +380,9 @@ async function processAlreadyLinked(item, media, alreadyMb) {
       album: media.album || null,
       duration: media.duration || 0,
       isrc: media.isrc || null,
+      releaseDate: media.releaseDate || null,
       releaseYear: media.releaseYear || null,
+      releaseDatePrecision: media.releaseDatePrecision || null,
       tags: media.tags || [],
       genres: media.genres || [],
       musicbrainzId: alreadyMb,
@@ -408,10 +421,18 @@ async function processAlreadyLinked(item, media, alreadyMb) {
   item.candidates = [];
 
   const hasNewTags = newTags.length > 0;
-  const hasNewYear = detailed.releaseYear && !media.releaseYear;
+  const hasNewYear = detailed.releaseYear && !media.releaseYear && !media.releaseDate;
+  const hasNewReleaseDate = Boolean(
+    detailed.releaseDate
+    && (
+      !media.releaseDate
+      || (media.releaseDatePrecision === 'year')
+      || (!media.releaseDatePrecision && media.releaseYear && !media.releaseDate)
+    )
+  );
   const hasNewIsrc = detailed.isrc && !media.isrc;
 
-  if (!hasNewTags && !hasNewYear && !hasNewIsrc) {
+  if (!hasNewTags && !hasNewYear && !hasNewReleaseDate && !hasNewIsrc) {
     item.status = 'skipped';
     item.error = null;
     item.processedAt = new Date();
@@ -419,7 +440,7 @@ async function processAlreadyLinked(item, media, alreadyMb) {
     return item;
   }
 
-  // Tags always need admin review; year/ISRC alone can auto-fill on confirmed MB links
+  // Tags always need admin review; year/date/ISRC alone can auto-fill on confirmed MB links
   if (hasNewTags) {
     item.status = 'needs_review';
     item.error = null;
@@ -430,7 +451,9 @@ async function processAlreadyLinked(item, media, alreadyMb) {
 
   await applySuggestionToMedia(media, {
     ...item.suggestion,
+    releaseDate: detailed.releaseDate,
     releaseYear: detailed.releaseYear,
+    releaseDatePrecision: detailed.releaseDatePrecision,
     isrc: detailed.isrc,
   }, {
     applyIdentity: false,
@@ -494,7 +517,9 @@ async function processEnrichmentItem(itemOrId) {
         artist: track.artist,
         album: track.album || null,
         duration: track.duration || 0,
+        releaseDate: track.releaseDate || null,
         releaseYear: track.releaseYear || null,
+        releaseDatePrecision: track.releaseDatePrecision || null,
         isrc: null,
         tags: [],
         genres: [],
@@ -525,7 +550,9 @@ async function processEnrichmentItem(itemOrId) {
         artist: detailed.artist,
         album: detailed.album || null,
         duration: detailed.duration || 0,
+        releaseDate: detailed.releaseDate || null,
         releaseYear: detailed.releaseYear || null,
+        releaseDatePrecision: detailed.releaseDatePrecision || null,
         isrc: detailed.isrc || null,
         tags: detailed.tags || [],
         genres: detailed.genres || [],
@@ -700,7 +727,9 @@ async function applyEnrichment(itemId, actorId, overrides = {}) {
     album: overrides.album ?? item.suggestion.album,
     duration: overrides.duration ?? item.suggestion.duration,
     isrc: overrides.isrc ?? item.suggestion.isrc,
+    releaseDate: overrides.releaseDate ?? item.suggestion.releaseDate,
     releaseYear: overrides.releaseYear ?? item.suggestion.releaseYear,
+    releaseDatePrecision: overrides.releaseDatePrecision ?? item.suggestion.releaseDatePrecision,
     tags: overrides.tags ?? item.suggestion.tags ?? [],
     genres: overrides.genres ?? item.suggestion.genres ?? [],
     musicbrainzId: overrides.musicbrainzId || item.suggestion.musicbrainzId,

@@ -218,6 +218,8 @@ export interface Media {
   EP?: string;
   releaseDate?: string;
   releaseYear?: number;
+  releaseDatePrecision?: 'day' | 'month' | 'year' | null;
+  releaseDateSource?: string | null;
   
   // Episode/Series
   episodeNumber?: number;
@@ -313,6 +315,7 @@ export interface SearchResult {
   album?: string | null;
   releaseDate?: string | null;
   releaseYear?: number | null;
+  releaseDatePrecision?: 'day' | 'month' | 'year' | null;
 }
 
 

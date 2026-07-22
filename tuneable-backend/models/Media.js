@@ -317,6 +317,14 @@ const mediaSchema = new mongoose.Schema({
   EP: { type: String },
   releaseDate: { type: Date, default: null },
   releaseYear: { type: Number, min: 1900, max: 2100, default: null }, // Year-only option when full date is unknown
+  /** How precise releaseDate/releaseYear is: day | month | year */
+  releaseDatePrecision: {
+    type: String,
+    enum: ['day', 'month', 'year', null],
+    default: null,
+  },
+  /** Where release date came from: spotify | musicbrainz | manual | id3 | rekordbox | … */
+  releaseDateSource: { type: String, default: null },
   
   // Label/Publisher (hybrid subdocument)
   label: [{

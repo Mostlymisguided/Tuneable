@@ -35,6 +35,7 @@ const {
 } = require('../services/gearService');
 const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
+const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const Gear = require('../models/Gear');
 
 /**
@@ -2077,6 +2078,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
             media.releaseYear = yearValue;
           }
           value = dateValue;
+          media.releaseDatePrecision = dateValue ? 'day' : (yearValue ? 'year' : null);
+          media.releaseDateSource = 'manual';
         } else if (field === 'releaseYear') {
           // If releaseYear is set but releaseDate is not, extract from releaseDate if it exists
           if (!value && media.releaseDate) {
@@ -2084,6 +2087,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
             if (yearValue) {
               value = yearValue;
             }
+          }
+          if (value && !media.releaseDate) {
+            media.releaseDatePrecision = 'year';
+            media.releaseDateSource = 'manual';
           }
         }
         
@@ -3089,7 +3096,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         return res.status(400).json({ error: 'External media metadata is required to create a new track.' });
       }
 
-      const { title, artist, sources, coverArt, duration, tags, category, externalIds, album, releaseDate, releaseYear } = externalMedia;
+      const { title, artist, sources, coverArt, duration, tags, category, externalIds, album, releaseDate, releaseYear, releaseDatePrecision } = externalMedia;
       if (!title || !artist) {
         return res.status(400).json({ error: 'Title and artist are required for new media.' });
       }
@@ -3121,6 +3128,14 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       if (!media) {
         const sourcesMap = new Map(sourceEntries);
         const externalIdsMap = new Map(externalIdEntries);
+        const parsedRelease = parseReleaseDate(
+          releaseDate || (releaseYear ? String(releaseYear) : null),
+          releaseDatePrecision || null
+        );
+        const releaseSource = externalIds?.spotify || sources?.spotify
+          ? 'spotify'
+          : (externalIds?.musicbrainz ? 'musicbrainz' : null);
+
         const seededChips = applyTipChipsToMedia(
           { tags: [], elements: [] },
           Array.isArray(tags) ? tags : []
@@ -3137,8 +3152,10 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           elements: seededChips.elements,
           category: category || 'Music',
           album: album || null,
-          releaseDate: releaseDate || null,
-          releaseYear: releaseYear || null,
+          releaseDate: parsedRelease.releaseDate,
+          releaseYear: parsedRelease.releaseYear || releaseYear || null,
+          releaseDatePrecision: parsedRelease.precision,
+          releaseDateSource: releaseSource,
           addedBy: userId,
           globalMediaAggregate: 0,
           contentType: ['music'],

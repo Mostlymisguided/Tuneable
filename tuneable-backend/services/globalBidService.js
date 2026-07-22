@@ -11,6 +11,7 @@ const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
 const { applyTipChipsToMedia } = require('../utils/elementNormalizer');
+const { parseReleaseDate } = require('../utils/releaseDateUtils');
 
 /**
  * @param {string} userId
@@ -61,7 +62,7 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
 
     const {
       title, artist, sources, coverArt, duration, tags, genres, category,
-      externalIds, album, releaseDate, releaseYear,
+      externalIds, album, releaseDate, releaseYear, releaseDatePrecision,
     } = externalMedia;
 
     if (!title || !artist) {
@@ -94,6 +95,14 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     }
 
     if (!media) {
+      const parsedRelease = parseReleaseDate(
+        releaseDate || (releaseYear ? String(releaseYear) : null),
+        releaseDatePrecision || null
+      );
+      const releaseSource = externalIds?.spotify || sources?.spotify
+        ? 'spotify'
+        : (externalIds?.musicbrainz ? 'musicbrainz' : null);
+
       const seededChips = applyTipChipsToMedia(
         { tags: [], elements: [] },
         Array.isArray(tags) ? tags : []
@@ -113,8 +122,10 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
           : [],
         category: category || 'Music',
         album: album || null,
-        releaseDate: releaseDate || null,
-        releaseYear: releaseYear || null,
+        releaseDate: parsedRelease.releaseDate,
+        releaseYear: parsedRelease.releaseYear || releaseYear || null,
+        releaseDatePrecision: parsedRelease.precision,
+        releaseDateSource: releaseSource,
         addedBy: userId,
         globalMediaAggregate: 0,
         contentType: ['music'],

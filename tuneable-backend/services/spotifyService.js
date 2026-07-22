@@ -4,8 +4,109 @@
  */
 
 const axios = require('axios');
+const { parseReleaseDate } = require('../utils/releaseDateUtils');
 
 const SPOTIFY_API = 'https://api.spotify.com/v1';
+const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
+
+let clientTokenCache = {
+  accessToken: null,
+  expiresAt: 0,
+};
+
+/**
+ * App-level client-credentials token (no user scope). Good for track metadata lookups.
+ */
+async function getClientAccessToken() {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are required for client credentials');
+  }
+
+  if (clientTokenCache.accessToken && Date.now() < clientTokenCache.expiresAt - 30_000) {
+    return clientTokenCache.accessToken;
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const res = await axios.post(
+    SPOTIFY_TOKEN_URL,
+    new URLSearchParams({ grant_type: 'client_credentials' }).toString(),
+    {
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      timeout: 15000,
+    }
+  );
+
+  clientTokenCache = {
+    accessToken: res.data.access_token,
+    expiresAt: Date.now() + (Number(res.data.expires_in) || 3600) * 1000,
+  };
+  return clientTokenCache.accessToken;
+}
+
+function releaseFieldsFromAlbum(album = {}) {
+  const precision = album.release_date_precision || null;
+  const parsed = parseReleaseDate(album.release_date || null, precision);
+  return {
+    releaseDate: parsed.releaseDate
+      ? parsed.releaseDate.toISOString().slice(0, 10)
+      : (parsed.precision === 'year' && parsed.releaseYear ? String(parsed.releaseYear) : album.release_date || null),
+    releaseYear: parsed.releaseYear,
+    releaseDatePrecision: parsed.precision,
+  };
+}
+
+/**
+ * Fetch up to 50 tracks by Spotify ID (client credentials).
+ * @param {string[]} trackIds
+ * @returns {Promise<Map<string, object>>} id → track
+ */
+async function getTracksByIds(trackIds) {
+  const ids = [...new Set((trackIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  const out = new Map();
+  if (ids.length === 0) return out;
+
+  const accessToken = await getClientAccessToken();
+
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const res = await axios.get(`${SPOTIFY_API}/tracks`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      params: { ids: chunk.join(',') },
+      timeout: 20000,
+    });
+    for (const track of res.data.tracks || []) {
+      if (track?.id) out.set(track.id, track);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Search Spotify for a track by ISRC (client credentials).
+ */
+async function searchTrackByIsrc(isrc) {
+  const code = String(isrc || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (code.length < 12) return null;
+
+  const accessToken = await getClientAccessToken();
+  const res = await axios.get(`${SPOTIFY_API}/search`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: {
+      q: `isrc:${code}`,
+      type: 'track',
+      limit: 1,
+    },
+    timeout: 15000,
+  });
+
+  return res.data?.tracks?.items?.[0] || null;
+}
 
 /**
  * Get all saved shows for a user (paginated)
@@ -132,6 +233,7 @@ function convertSavedTrackToTuneableFormat(savedTrack) {
     ? track.artists.map(artist => artist?.name).filter(Boolean)
     : [];
   const primaryArtist = artistNames[0] || 'Unknown Artist';
+  const release = releaseFieldsFromAlbum(album);
 
   return {
     id: track.id,
@@ -141,8 +243,9 @@ function convertSavedTrackToTuneableFormat(savedTrack) {
     coverArt: album.images?.[0]?.url || null,
     duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : 0,
     album: album.name || null,
-    releaseDate: album.release_date || null,
-    releaseYear: album.release_date ? Number.parseInt(album.release_date.slice(0, 4), 10) : null,
+    releaseDate: release.releaseDate,
+    releaseYear: release.releaseYear,
+    releaseDatePrecision: release.releaseDatePrecision,
     category: 'Music',
     sources: track.external_urls?.spotify
       ? { spotify: track.external_urls.spotify }
@@ -161,6 +264,14 @@ function convertSavedTrackToTuneableFormat(savedTrack) {
   };
 }
 
+/**
+ * Map a raw Spotify track API object into release fields for backfill/import.
+ */
+function releaseFieldsFromTrack(track) {
+  if (!track) return null;
+  return releaseFieldsFromAlbum(track.album || {});
+}
+
 module.exports = {
   getSavedShows,
   getSavedTracks,
@@ -168,4 +279,9 @@ module.exports = {
   convertShowToSeriesFormat,
   convertEpisodeToOurFormat,
   convertSavedTrackToTuneableFormat,
+  getClientAccessToken,
+  getTracksByIds,
+  searchTrackByIsrc,
+  releaseFieldsFromAlbum,
+  releaseFieldsFromTrack,
 };

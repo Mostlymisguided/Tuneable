@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 /**
  * Post-import metadata enrichment queue (MusicBrainz cross-ref).
  * High-confidence suggestions can be auto-applied; medium confidence needs admin review.
- * Suggestions may include tags/genres/ISRC/releaseYear from MB recording lookup.
+ * Suggestions may include tags/genres/ISRC/releaseDate/releaseYear from MB recording lookup.
  */
 const candidateSchema = new mongoose.Schema({
   musicbrainzId: String,
@@ -12,7 +12,13 @@ const candidateSchema = new mongoose.Schema({
   artist: String,
   album: { type: String, default: null },
   duration: { type: Number, default: 0 },
+  releaseDate: { type: String, default: null },
   releaseYear: { type: Number, default: null },
+  releaseDatePrecision: {
+    type: String,
+    enum: ['day', 'month', 'year', null],
+    default: null,
+  },
   isrc: { type: String, default: null },
   tags: { type: [String], default: [] },
   genres: { type: [String], default: [] },
@@ -26,7 +32,13 @@ const suggestionSchema = new mongoose.Schema({
   album: { type: String, default: null },
   duration: { type: Number, default: 0 },
   isrc: { type: String, default: null },
+  releaseDate: { type: String, default: null },
   releaseYear: { type: Number, default: null },
+  releaseDatePrecision: {
+    type: String,
+    enum: ['day', 'month', 'year', null],
+    default: null,
+  },
   tags: { type: [String], default: [] },
   genres: { type: [String], default: [] },
   musicbrainzId: String,
@@ -85,6 +97,7 @@ const metadataEnrichmentSchema = new mongoose.Schema({
     album: { type: String, default: null },
     duration: { type: Number, default: 0 },
     isrc: { type: String, default: null },
+    releaseDate: { type: Date, default: null },
     releaseYear: { type: Number, default: null },
     tags: { type: [String], default: [] },
     genres: { type: [String], default: [] },
