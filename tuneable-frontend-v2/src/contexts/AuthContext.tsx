@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { authAPI, setAuthTokenGetter } from '../lib/api';
+import type { ResolvedLocation } from '../utils/locationHelpers';
 
 // Define types directly to avoid import issues
 export interface User {
@@ -23,27 +24,8 @@ export interface User {
   primaryInviteCode?: string;
   balance: number;
   inviteCredits?: number;
-  homeLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-    countryCode?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-    detectedFromIP?: boolean;
-  };
-  secondaryLocation?: {
-    city?: string;
-    region?: string;
-    country?: string;
-    countryCode?: string;
-    coordinates?: {
-      lat: number;
-      lng: number;
-    };
-  } | null;
+  homeLocation?: ResolvedLocation;
+  secondaryLocation?: ResolvedLocation | null;
   role: string[];
   isActive: boolean;
   joinedParties?: {
@@ -106,8 +88,6 @@ export interface User {
     submittedAt?: Date;
   };
 }
-
-import type { ResolvedLocation } from '../utils/locationHelpers';
 
 interface RegisterData {
   username: string;
