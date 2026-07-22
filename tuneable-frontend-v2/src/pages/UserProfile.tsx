@@ -25,7 +25,6 @@ import {
   Award,
   Plus,
   Minus,
-  Gift,
   Tag,
   Undo2,
   Crown
@@ -1968,26 +1967,6 @@ const UserProfile: React.FC = () => {
               
               <div className="mb-2"></div>
 
-              {/* Become a Creator Button - Only show if user doesn't have 'creator' role */}
-              {isOwnProfile && currentUser && 
-                !currentUser.role?.includes('creator') && (
-                <div className="mb-2">
-                  <Link
-                    to="/creator/register"
-                    className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors border border-purple-400/50"
-                  >
-                    <Award className="w-4 h-4" />
-                    <span>
-                      {(user as any).creatorProfile?.verificationStatus === 'pending' 
-                        ? 'Creator Application Pending' 
-                        : (user as any).creatorProfile?.verificationStatus === 'rejected'
-                        ? 'Re-apply as Creator'
-                        : 'Become a Creator'}
-                    </span>
-                  </Link>
-                </div>
-              )}
-
               {/* Collective Memberships - Above label affiliations */}
               {collectiveMemberships.length > 0 && (
                 <div className="mb-2">
@@ -2321,29 +2300,6 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* User metrics - Tips, TuneBytes, Tunes */}
-              {stats && (
-                <div className="mb-4">
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-2 sm:gap-2 md:gap-3 lg:grid-cols-3 w-fit max-w-full">
-                    <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
-                      <BarChart3 className="w-6 h-6 md:w-5 md:h-5 text-purple-400 mx-auto mb-1 md:mb-1.5" />
-                      <div className="text-lg md:text-base font-bold text-white">{stats.totalBids || 0}</div>
-                      <div className="text-xs text-gray-300">Tips</div>
-                    </div>
-                    <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
-                      <Gift className="w-6 h-6 md:w-5 md:h-5 text-purple-400 mx-auto mb-1 md:mb-1.5" />
-                      <div className="text-lg md:text-base font-bold text-white">{(user?.tuneBytes ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                      <div className="text-xs text-gray-300">TuneBytes</div>
-                    </div>
-                    <div className="card bg-black/20 rounded-lg p-2 md:p-2.5 text-center">
-                      <Music className="w-6 h-6 md:w-5 md:h-5 text-yellow-400 mx-auto mb-1 md:mb-1.5" />
-                      <div className="text-lg md:text-base font-bold text-white">{stats.uniqueSongsCount || 0}</div>
-                      <div className="text-xs text-gray-300">Tunes</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
               </div>
           </div>
         </div>

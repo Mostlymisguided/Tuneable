@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { AudioLines, Coins, Gift, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, X, History, ArrowRight } from 'lucide-react';
+import { AudioLines, Coins, Gift, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, History, ArrowRight } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI, artistEscrowAPI } from '../lib/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -48,7 +48,6 @@ const Dashboard: React.FC = () => {
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
-  const [isCreatorBannerDismissed, setIsCreatorBannerDismissed] = useState(false);
   
   // Increase tip modal (Dashboard tune library)
   const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
@@ -207,11 +206,6 @@ Join here: ${inviteLink}`.trim();
     setIsEmailInviteModalOpen(true);
   }, []);
 
-  const handleDismissCreatorBanner = useCallback(() => {
-    setIsCreatorBannerDismissed(true);
-    localStorage.setItem('creatorBannerDismissed', 'true');
-  }, []);
-
   const handleFacebookShare = useCallback(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
     const quote = inviteCode 
@@ -368,15 +362,7 @@ Join here: ${inviteLink}`.trim();
   }, []);
 
   useEffect(() => {
-    // Check if creator banner has been dismissed
-    const dismissed = localStorage.getItem('creatorBannerDismissed');
-    if (dismissed === 'true') {
-      setIsCreatorBannerDismissed(true);
-    }
-  }, []);
-
-  // Open add-tune panel when navigated from AddMediaModal (Search option)
-  useEffect(() => {
+    // Open add-tune panel when navigated from AddMediaModal (Search option)
     const state = location.state as { openAddTune?: boolean } | null;
     if (state?.openAddTune) {
       setShowAddTunePanel(true);
@@ -2670,46 +2656,6 @@ Join here: ${inviteLink}`.trim();
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <UserProfilePrompts user={user} />
       </div>
-
-      {/* Become a Creator Banner */}
-      {user && 
-        !isCreatorBannerDismissed &&
-        !user.role?.includes('creator') && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-lg p-6 flex flex-col md:flex-row items-center justify-between gap-4 relative">
-            <button
-              onClick={handleDismissCreatorBanner}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
-              aria-label="Dismiss banner"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex-1 pr-8">
-              <h3 className="text-xl font-semibold text-white mb-2">Become a Creator</h3>
-              <p className="text-gray-300">
-                {user.creatorProfile?.verificationStatus === 'pending' 
-                  ? 'Your application is under review' 
-                  : user.creatorProfile?.verificationStatus === 'rejected'
-                  ? 'Re-apply to become a verified creator'
-                  : 'Join our community of verified creators and start sharing your music'}
-              </p>
-            </div>
-            <Link
-              to="/creator/register"
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 whitespace-nowrap"
-            >
-              <Award className="w-5 h-5" />
-              <span>
-                {user.creatorProfile?.verificationStatus === 'pending' 
-                  ? 'View Application' 
-                  : user.creatorProfile?.verificationStatus === 'rejected'
-                  ? 'Re-apply'
-                  : 'Join Now'}
-              </span>
-            </Link>
-          </div>
-        </div>
-      )}
 
       {/* Invited Users Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
