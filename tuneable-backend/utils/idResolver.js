@@ -33,7 +33,7 @@ async function resolvePartyIdValue(partyId) {
         // Special case: "global" slug for the global party
         if (partyId === 'global') {
             const Party = require('../models/Party');
-            const globalParty = await Party.getGlobalParty();
+            const globalParty = await Party.getGlobalPartyMeta();
             return globalParty ? globalParty._id.toString() : null;
         }
         

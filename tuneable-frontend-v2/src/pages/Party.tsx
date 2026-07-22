@@ -702,8 +702,10 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   const fetchPartyDetails = async () => {
     try {
-      // First update party statuses based on current time
-      await partyAPI.updateStatuses();
+      // Global Party has no schedule-based status — skip the expensive all-parties update
+      if (partyId !== 'global') {
+        await partyAPI.updateStatuses();
+      }
       
       // Then fetch the updated party details
       const response = await partyAPI.getPartyDetails(partyId!);
@@ -753,6 +755,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         locationPlaceId ? { locationPlaceId } : undefined
       );
       setSortedMedia(response.media || []);
+      if (Array.isArray((response as any).topLocations)) {
+        setParty((prev: any) => prev ? { ...prev, topLocations: (response as any).topLocations } : prev);
+      }
     } catch (error: any) {
       console.error('Error fetching sorted media:', error);
       // Check if it's an authentication error
@@ -1437,10 +1442,26 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       .slice(0, 30);
   }, [party]);
 
-  // Top countries by tip volume (global party location quick picks)
+  // Top countries by tip volume (prefer server aggregate; fall back to scanning slim bids)
   const topLocations = useMemo(() => {
     if (!party || !isGlobalParty) {
       return [] as Array<{ pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }>;
+    }
+
+    const serverLocations = (party as any).topLocations;
+    if (Array.isArray(serverLocations) && serverLocations.length > 0) {
+      return serverLocations
+        .filter((loc: any) => loc?.placeId)
+        .map((loc: any) => ({
+          pick: {
+            placeId: loc.placeId,
+            country: loc.country || loc.display || 'Unknown',
+            countryCode: loc.countryCode || '',
+            display: loc.display || loc.country || 'Unknown',
+          },
+          total: loc.total || 0,
+          count: loc.count || 0,
+        }));
     }
 
     const startDate = getPeriodStartDate(selectedTimePeriod);
@@ -1894,9 +1915,10 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const getUserBid = (media: any) => {
     if (!user?._id) return null;
     const bids = media.bids || media.mediaId?.bids || [];
+    const currentUserId = String(user._id);
     return bids.find((bid: any) => {
-      const bidUserId = bid.userId?._id || bid.userId;
-      return bidUserId === user._id && bid.status === 'active';
+      const bidUserId = bid.userId?._id || bid.userId?.id || bid.userId;
+      return bidUserId != null && String(bidUserId) === currentUserId && bid.status === 'active';
     });
   };
 

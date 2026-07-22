@@ -288,6 +288,8 @@ bidSchema.index({ partyId: 1, createdAt: -1 }); // Party's recent bids
 bidSchema.index({ transactionHash: 1 }); // Hash lookup for verification
 bidSchema.index({ status: 1, bidderLocationAncestorIds: 1, createdAt: -1, mediaId: 1 }); // Tunefeed location filter
 bidSchema.index({ mediaId: 1, status: 1, bidderLocationAncestorIds: 1 }); // Media champions by place
+bidSchema.index({ mediaId: 1, status: 1, amount: -1 }); // Global Party top supporters per media
+bidSchema.index({ status: 1, bidderHomePlaceId: 1, createdAt: -1 }); // Global Party top locations
 
 // ========================================
 // HASH GENERATION

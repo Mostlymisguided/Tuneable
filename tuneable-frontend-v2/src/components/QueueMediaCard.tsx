@@ -243,7 +243,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         )}
 
         <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
-          <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} scrollable={true} />
+          <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} limit={5} scrollable={false} />
         </div>
 
         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">

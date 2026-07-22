@@ -584,6 +584,7 @@ mediaSchema.post('save', function(doc) {
 mediaSchema.index({ globalMediaAggregate: -1 });
 mediaSchema.index({ globalMediaBidTop: -1 });
 mediaSchema.index({ globalMediaAggregateTop: -1 });
+mediaSchema.index({ contentType: 1, contentForm: 1, status: 1, globalMediaAggregate: -1 }); // Global Party chart
 mediaSchema.index({ addedBy: 1 });
 mediaSchema.index({ "sources.youtube": 1 });
 mediaSchema.index({ contentType: 1 });

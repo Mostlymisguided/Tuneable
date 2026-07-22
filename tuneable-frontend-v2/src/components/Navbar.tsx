@@ -84,7 +84,7 @@ const Navbar: React.FC = () => {
                   </Link>
                 )}
                 <Link
-                  to="/party/global"
+                  to="/party/global?period=all-time"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
                   style={{ textDecoration: 'none' }}
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}

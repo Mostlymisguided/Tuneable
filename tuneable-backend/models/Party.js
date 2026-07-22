@@ -182,7 +182,9 @@ PartySchema.methods.calculateStatus = function() {
 
 // Static method to update all party statuses
 PartySchema.statics.updateAllStatuses = async function() {
-  const parties = await this.find({});
+  // Avoid loading embedded media[] (Global Party can be huge)
+  const parties = await this.find({})
+    .select('_id status startTime endTime type privacy');
   const updates = [];
   
   for (const party of parties) {
@@ -215,6 +217,14 @@ PartySchema.statics.getGlobalParty = async function() {
 PartySchema.statics.getGlobalPartyForBid = async function() {
   return await this.findOne({ type: 'global' })
     .select('_id uuid name type')
+    .lean();
+};
+
+// Lean Global Party metadata for read paths (details, resolve, sorted chart).
+// Never pulls the embedded media[] array.
+PartySchema.statics.getGlobalPartyMeta = async function() {
+  return await this.findOne({ type: 'global' })
+    .select('_id uuid name type status privacy minimumBid partyCode partiers host kickedUsers startTime endTime watershed mediaSource tags description slug createdAt updatedAt location')
     .lean();
 };
 

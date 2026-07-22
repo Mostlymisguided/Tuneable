@@ -458,7 +458,7 @@ const Parties: React.FC = () => {
       }`}
       onClick={isUserInParty(party) || party.type === 'global' || party.type === 'tag' ? () => {
         if (party.type === 'global') {
-          navigate('/party/global');
+          navigate('/party/global?period=all-time');
         } else if (party.type === 'tag' && party.slug) {
           navigate(`/party/${party.slug}`);
         } else {

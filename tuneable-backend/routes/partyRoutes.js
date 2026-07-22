@@ -19,6 +19,10 @@ const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to hand
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
 const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+const {
+    fetchAllTimeGlobalChart,
+    fetchPeriodGlobalChart,
+} = require('../utils/globalPartyChart');
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
 // via Bid model hooks (post('save') and post('remove'))
@@ -676,126 +680,39 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
         const { id } = req.params;
         const userId = req.user?._id; // Optional - may be null for unauthenticated users
 
-        // Check if this is the Global Party
-        const isGlobalParty = await Party.getGlobalParty();
-        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id && isGlobalParty._id.toString() === id;
+        // Lean meta check for Global Party (avoids loading embedded media[])
+        const globalPartyMeta = await Party.getGlobalPartyMeta();
+        const isRequestingGlobalParty = globalPartyMeta && globalPartyMeta._id
+            && globalPartyMeta._id.toString() === id;
 
         let party;
-        
-        // First, check if this is a tag party
-        party = await Party.findById(id);
-        if (!party) {
-            return res.status(404).json({ error: 'Party not found' });
-        }
-        const isTagParty = party && party.type === 'tag';
+        let globalTopLocations = null;
         
         if (isRequestingGlobalParty) {
-            // For Global Party, we need to aggregate ALL media with ANY bids
-            console.log('🌍 Fetching Global Party - aggregating all media with bids...');
-            
-            // Performance monitoring for Global Party
-            const startTime = Date.now();
-            
-            // Get the Global Party object
-            party = isGlobalParty;
-            
-            // Find ALL media that has ANY bids (party or global)
-            // Bid and Media are already required at top of file
-            
-            // Query all media with bids, but only populate ACTIVE bids
-            // This ensures we only count active bids in the aggregate calculation
-            // Global Party shows tunes only (exclude podcast episodes/series)
-            const allMediaWithBids = await Media.find({
-                ...GLOBAL_PARTY_TUNES_FILTER,
-                bids: { $exists: true, $ne: [] },
-                status: { $ne: 'vetoed' } // Exclude globally vetoed media
-            })
-            .populate({
-                path: 'bids',
-                model: 'Bid',
-                match: { status: 'active' }, // ✅ Only populate active bids (exclude vetoed)
-                populate: {
-                    path: 'userId',
-                    select: 'username profilePic uuid homeLocation secondaryLocation'
-                }
-            })
-            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
-            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
-            .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation');
+            console.log('🌍 Fetching Global Party chart (slim supporters)...');
+            const chart = await fetchAllTimeGlobalChart({ userId });
+            console.log(`🌍 Global Party Performance Metrics:`);
+            console.log(`   - Processing time: ${chart.meta.processingTimeMs}ms`);
+            console.log(`   - Media count: ${chart.meta.count}`);
+            if (chart.meta.processingTimeMs > 5000) {
+                console.warn(`⚠️  Global Party processing took ${chart.meta.processingTimeMs}ms - consider optimization!`);
+            }
 
-            // Convert to party media format for consistent frontend handling
-            // Recalculate partyMediaAggregate from active bids on-the-fly to ensure accuracy
-            party.media = allMediaWithBids
-                .map(media => {
-                    // Filter to only active bids (populate match may not filter all cases)
-                    const activeBids = (media.bids || []).filter(bid => bid.status === 'active');
-                    
-                    // Skip media with no active bids
-                    if (activeBids.length === 0) {
-                        return null;
-                    }
-                    
-                    // Recalculate globalMediaAggregate from active bids only (in pence)
-                    // This ensures accuracy regardless of stale stored values
-                    const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
-                        return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
-                    }, 0);
-                    
-                    // Calculate top bid from active bids
-                    const topBid = activeBids.reduce((max, bid) => {
-                        return (bid.amount || 0) > (max.amount || 0) ? bid : max;
-                    }, activeBids[0] || { amount: 0 });
-                    
-                    // Calculate user aggregates to find top aggregate user
-                    const userAggregates = {};
-                    activeBids.forEach(bid => {
-                        const userId = bid.userId?._id?.toString() || bid.userId?.toString();
-                        if (userId) {
-                            if (!userAggregates[userId]) {
-                                userAggregates[userId] = {
-                                    userId: bid.userId?._id || bid.userId,
-                                    total: 0
-                                };
-                            }
-                            userAggregates[userId].total += (bid.amount || 0);
-                        }
-                    });
-                    
-                    // Find user with highest aggregate
-                    const topAggregateUser = Object.values(userAggregates).reduce(
-                        (max, user) => user.total > max.total ? user : max,
-                        { total: 0, userId: null }
-                    );
-                    
-                    return {
-                        mediaId: media,
-                        media_uuid: media.uuid,
-                        addedBy: media.addedBy?._id || media.addedBy,
-                        // Use calculated aggregate from active bids (accurate, not stale)
-                        partyMediaAggregate: calculatedGlobalMediaAggregate,
-                        partyBids: activeBids, // Only include active bids
-                        status: 'active',
-                        queuedAt: media.createdAt || new Date(),
-                        partyMediaBidTop: topBid.amount || 0,
-                        partyMediaBidTopUser: topBid.userId?._id || topBid.userId || null,
-                        partyMediaAggregateTop: topAggregateUser.total || 0,
-                        partyMediaAggregateTopUser: topAggregateUser.userId || null
-                    };
-                })
-                .filter(media => media !== null); // Remove media with no active bids
-            
-            // Populate partiers, host, and kickedUsers for Global Party
-            const User = require('../models/User');
-            // Use actual partiers who joined, not all users - filter out deleted users
-            party.partiers = (await User.find({ _id: { $in: party.partiers } }).select('username uuid')).filter(user => user !== null);
+            party = {
+                ...globalPartyMeta,
+                media: chart.media,
+            };
+            globalTopLocations = chart.topLocations;
+
+            party.partiers = (await User.find({ _id: { $in: party.partiers || [] } })
+                .select('username uuid')).filter(Boolean);
             party.host = await User.findOne({ username: 'Tuneable' }).select('username uuid');
-            // Populate kickedUsers if they exist
             if (party.kickedUsers && party.kickedUsers.length > 0) {
                 const kickedUserIds = party.kickedUsers.map(ku => ku.userId).filter(Boolean);
                 const kickedUsers = await User.find({ _id: { $in: kickedUserIds } }).select('username uuid');
                 const kickedByIds = party.kickedUsers.map(ku => ku.kickedBy).filter(Boolean);
                 const kickedByUsers = await User.find({ _id: { $in: kickedByIds } }).select('username uuid');
-                
+
                 party.kickedUsers = party.kickedUsers.map(ku => {
                     const user = kickedUsers.find(u => u._id.toString() === ku.userId.toString());
                     const kickedBy = kickedByUsers.find(u => u._id.toString() === ku.kickedBy.toString());
@@ -806,21 +723,47 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                     };
                 });
             }
-            
-            // Performance monitoring - log Global Party metrics
-            const endTime = Date.now();
-            const processingTime = endTime - startTime;
-            console.log(`🌍 Global Party Performance Metrics:`);
-            console.log(`   - Processing time: ${processingTime}ms`);
-            console.log(`   - Partiers count: ${party.partiers.length}`);
-            console.log(`   - Media count: ${party.media.length}`);
-            
-            // Log warning if processing takes too long (performance canary)
-            if (processingTime > 5000) {
-                console.warn(`⚠️  Global Party processing took ${processingTime}ms - consider optimization!`);
-            }
-            
-        } else if (isTagParty) {
+
+            // Slim chart rows are already flattened — return directly
+            const responseParty = {
+                _id: party._id,
+                name: party.name,
+                location: party.location,
+                host: party.host,
+                partyCode: party.partyCode,
+                partiers: party.partiers,
+                kickedUsers: party.kickedUsers || [],
+                startTime: party.startTime,
+                endTime: party.endTime,
+                watershed: party.watershed,
+                type: party.type,
+                status: party.status,
+                mediaSource: party.mediaSource,
+                tags: party.tags || [],
+                description: party.description || '',
+                slug: party.slug || null,
+                privacy: party.privacy || 'public',
+                minimumBid: party.minimumBid || 0.33,
+                createdAt: party.createdAt,
+                updatedAt: party.updatedAt,
+                media: party.media,
+                topLocations: globalTopLocations || [],
+            };
+
+            return res.status(200).json({
+                message: 'Party details fetched successfully',
+                party: responseParty,
+            });
+        }
+
+        // First, check if this is a tag party
+        party = await Party.findById(id);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        const isTagParty = party && party.type === 'tag';
+        
+        if (isTagParty) {
             // For Tag Party, we need to aggregate ALL media with the tag that has ANY bids
             const tagPartyTag = party.tags && party.tags.length > 0 ? party.tags[0] : null;
             
@@ -1251,7 +1194,11 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
         // Private parties are excluded from the public parties list (see GET /api/parties)
         // Actions (tips, adding media, etc.) still require authentication
 
-        console.log('Fetched Party Details:', JSON.stringify(party, null, 2));
+        console.log('Fetched Party Details:', {
+            partyId: party._id,
+            type: party.type,
+            mediaCount: Array.isArray(party.media) ? party.media.length : 0,
+        });
 
         // ✅ **Flatten `mediaId` structure & extract platform URLs with PARTY-SPECIFIC bid values and status**
         const processedMedia = party.media.map((entry) => {
@@ -1261,18 +1208,14 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             let sourcesObj = {};
             if (entry.mediaId.sources) {
                 if (entry.mediaId.sources instanceof Map) {
-                    // Convert Map to plain object
-                    console.log(`📼 Converting Map sources for media: ${entry.mediaId.title}`);
                     entry.mediaId.sources.forEach((value, key) => {
                         if (value) sourcesObj[key] = value;
                     });
                 } else if (typeof entry.mediaId.sources === 'object') {
-                    // Already an object, just copy and filter null values
                     Object.entries(entry.mediaId.sources).forEach(([key, value]) => {
                         if (value) sourcesObj[key] = value;
                     });
                 }
-                console.log(`📼 Sources for "${entry.mediaId.title}":`, Object.keys(sourcesObj).join(', '));
             }
 
             return {
@@ -3819,9 +3762,8 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             });
         }
 
-        // Check if this is the Global Party
-        const isGlobalParty = await Party.getGlobalParty();
-        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
+        const globalPartyMeta = await Party.getGlobalPartyMeta();
+        const isRequestingGlobalParty = globalPartyMeta && globalPartyMeta._id.toString() === partyId;
 
         if (!isRequestingGlobalParty && !req.user) {
             return res.status(401).json({ error: 'Please log in to view sorted media' });
@@ -3831,23 +3773,32 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             return res.status(400).json({ error: 'Location filtering is only available for the global party' });
         }
 
-        let party;
-
         if (isRequestingGlobalParty) {
-            // For Global Party, we need to aggregate ALL media with ANY bids
-            console.log('🌍 Time-based sorting for Global Party - aggregating all media with bids...');
-            
-            // Get the Global Party object
-            party = isGlobalParty;
-            
-            // For Global Party, we'll handle media aggregation below
-        } else {
-            // Regular party fetching logic
-            party = await Party.findById(partyId)
+            console.log('🌍 Time-based sorting for Global Party (slim chart)...');
+            const { getPeriodStartDate } = require('../utils/globalPartyChart');
+            const chart = await fetchPeriodGlobalChart({
+                timePeriod,
+                locationPlaceId: locationPlaceId || null,
+                userId: req.user?._id,
+            });
+            console.log(`🌍 Global Party time sorting: ${chart.meta.count} media in ${chart.meta.processingTimeMs}ms${locationPlaceId ? ` (location: ${locationPlaceId})` : ''}`);
+
+            return res.json({
+                timePeriod,
+                media: chart.media,
+                count: chart.media.length,
+                periodStartDate: getPeriodStartDate(timePeriod),
+                periodEndDate: new Date(),
+                locationFilter: locationPlaceId ? { placeId: locationPlaceId } : null,
+                topLocations: chart.topLocations || [],
+            });
+        }
+
+        let party = await Party.findById(partyId)
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear uuid featuring creatorDisplay', // Updated to schema grammar
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear uuid featuring creatorDisplay',
                     populate: [
                         {
                             path: 'bids',
@@ -3884,121 +3835,42 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 })
                 .populate('media.addedBy', 'username');
 
-            if (!party) {
-                return res.status(404).json({ error: 'Party not found' });
-            }
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Calculate date ranges
         const now = new Date();
         let startDate = null;
 
         switch (timePeriod) {
             case 'today':
-                startDate = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // 24 hours ago
+                startDate = new Date(now.getTime() - (24 * 60 * 60 * 1000));
                 break;
             case 'this-week':
-                startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)); // 7 days ago
+                startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
                 break;
             case 'this-month':
-                startDate = new Date(now.getTime() - (28 * 24 * 60 * 60 * 1000)); // 28 days ago
+                startDate = new Date(now.getTime() - (28 * 24 * 60 * 60 * 1000));
                 break;
             case 'this-year':
-                startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000)); // 365 days ago
+                startDate = new Date(now.getTime() - (365 * 24 * 60 * 60 * 1000));
                 break;
             case 'all-time':
-                startDate = null; // No date filter
+                startDate = null;
                 break;
         }
 
-        let bids;
-        let allMediaWithBids;
+        let bidQuery = { 
+            partyId: party._id,
+            status: 'active'
+        };
 
-        const bidPopulateMatch = { status: 'active' };
-        if (locationPlaceId) {
-            bidPopulateMatch.bidderLocationAncestorIds = locationPlaceId;
+        if (startDate) {
+            bidQuery.createdAt = { $gte: startDate };
         }
 
-        if (isRequestingGlobalParty) {
-            // For Global Party, get bids from ALL parties within the time period
-            let bidQuery = { 
-                status: 'active' // Only count active bids
-            };
+        const bids = await Bid.find(bidQuery).select('mediaId amount createdAt');
 
-            if (startDate) {
-                bidQuery.createdAt = { $gte: startDate };
-            }
-
-            if (locationPlaceId) {
-                bidQuery.bidderLocationAncestorIds = locationPlaceId;
-            }
-
-            bids = await Bid.find(bidQuery).select('mediaId amount createdAt partyId bidderLocationAncestorIds bidderLocationDisplay');
-
-            const matchingMediaIds = locationPlaceId
-                ? [...new Set(bids.map((bid) => bid.mediaId?.toString()).filter(Boolean))]
-                : null;
-            
-            // Get all media that has bids within the time period (tunes only for Global Party)
-            const Media = require('../models/Media');
-            const mediaQuery = {
-                ...GLOBAL_PARTY_TUNES_FILTER,
-                bids: { $exists: true, $ne: [] },
-                status: { $ne: 'vetoed' } // Exclude globally vetoed media (matches main party fetch)
-            };
-            if (matchingMediaIds && matchingMediaIds.length === 0) {
-                allMediaWithBids = [];
-                bids = [];
-            } else {
-            if (matchingMediaIds && matchingMediaIds.length > 0) {
-                mediaQuery._id = { $in: matchingMediaIds };
-            }
-            allMediaWithBids = await Media.find(mediaQuery)
-            .populate({
-                path: 'bids',
-                model: 'Bid',
-                match: bidPopulateMatch,
-                populate: {
-                    path: 'userId',
-                    select: 'username profilePic uuid homeLocation secondaryLocation'
-                }
-            })
-            .populate('globalMediaBidTopUser', 'username profilePic uuid homeLocation secondaryLocation')
-            .populate('globalMediaAggregateTopUser', 'username profilePic uuid homeLocation secondaryLocation')
-            .populate('addedBy', 'username profilePic uuid homeLocation secondaryLocation')
-            .populate({
-                path: 'artist.userId',
-                model: 'User',
-                select: 'username profilePic uuid creatorProfile.artistName'
-            })
-            .populate({
-                path: 'artist.collectiveId',
-                model: 'Collective',
-                select: 'name slug profilePicture verificationStatus'
-            })
-            .populate({
-                path: 'featuring.userId',
-                model: 'User',
-                select: 'username profilePic uuid creatorProfile.artistName'
-            });
-            }
-
-            console.log(`🌍 Global Party time sorting: Found ${bids.length} bids within time period, ${allMediaWithBids.length} media with bids${locationPlaceId ? ` (location: ${locationPlaceId})` : ''}`);
-        } else {
-            // Regular party logic - get bids for this specific party
-            let bidQuery = { 
-                partyId: party._id,
-                status: 'active' // Only count active bids
-            };
-
-            if (startDate) {
-                bidQuery.createdAt = { $gte: startDate };
-            }
-
-            bids = await Bid.find(bidQuery).select('mediaId amount createdAt');
-        }
-
-        // Calculate bid values for each media within the time period
         const mediaBidValues = {};
         bids.forEach(bid => {
             const mediaId = bid.mediaId?.toString();
@@ -4007,80 +3879,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             }
         });
 
-        let processedMedia;
-
-        if (isRequestingGlobalParty) {
-            // For Global Party, process all media with bids
-            processedMedia = allMediaWithBids
-                .map((media) => {
-                    // Filter to only active bids (populate match may not filter all cases)
-                    const activeBids = (media.bids || []).filter((bid) => {
-                        if (bid.status !== 'active') return false;
-                        if (!locationPlaceId) return true;
-                        return Array.isArray(bid.bidderLocationAncestorIds)
-                            && bid.bidderLocationAncestorIds.includes(locationPlaceId);
-                    });
-                    
-                    // Skip media with no active bids
-                    if (activeBids.length === 0) {
-                        return null;
-                    }
-                    
-                    // Recalculate globalMediaAggregate from active bids only (in pence)
-                    // This ensures accuracy regardless of stale stored values
-                    const calculatedGlobalMediaAggregate = activeBids.reduce((sum, bid) => {
-                        return sum + (typeof bid.amount === 'number' ? bid.amount : 0);
-                    }, 0);
-                    
-                    const availablePlatforms = Object.entries(media.sources || {})
-                        .filter(([key, value]) => value)
-                        .map(([key, value]) => ({ platform: key, url: value }));
-
-                    const timePeriodBidValue = mediaBidValues[media._id.toString()] || 0;
-
-                    // Get artist name from Media subdocument array
-                    const artistName = Array.isArray(media.artist) && media.artist.length > 0
-                        ? media.artist[0].name
-                        : 'Unknown Artist';
-
-                    return {
-                        _id: media._id,
-                        id: media._id || media.uuid, // Use ObjectId first, fallback to UUID
-                        uuid: media._id || media.uuid, // Also include uuid field for consistency
-                        title: media.title,
-                        artist: artistName, // Backward compatibility string
-                        artists: Array.isArray(media.artist) ? media.artist : [], // Full artist array with userIds for ClickableArtistDisplay
-                        featuring: media.featuring || [], // Featuring artists array
-                        creatorDisplay: media.creatorDisplay, // Creator display string
-                        duration: media.duration,
-                        coverArt: media.coverArt,
-                        sources: media.sources,
-                        availablePlatforms,
-                        globalMediaAggregate: calculatedGlobalMediaAggregate, // Use calculated value (accurate, not stale)
-                        partyMediaAggregate: calculatedGlobalMediaAggregate, // For Global Party, use calculated global aggregate
-                        timePeriodBidValue, // Bid value for the specific time period
-                        bids: activeBids, // Only include active bids for TopBidders component
-                        tags: media.tags || [], // Include tags for display
-                        category: media.category || null, // Include category for display
-                        bpm: media.bpm ?? null,
-                        releaseDate: media.releaseDate || null,
-                        releaseYear: media.releaseYear ?? null,
-                        addedBy: media.addedBy,
-                        status: 'active', // Global Party media is always active
-                        queuedAt: media.createdAt || new Date(),
-                        playedAt: null,
-                        completedAt: null,
-                        vetoedAt: null,
-                        vetoedBy: null,
-                        contentType: media.contentType || 'music'
-                    };
-                })
-                .filter(media => media !== null) // Remove media with no active bids
-                .filter(media => !locationPlaceId || (media.timePeriodBidValue || 0) > 0)
-                .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
-        } else {
-            // Regular party logic - process party media
-            processedMedia = party.media
+        const processedMedia = party.media
                 .map((entry) => {
                     if (!entry.mediaId) return null;
 
@@ -4090,35 +3889,34 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
 
                     const timePeriodBidValue = mediaBidValues[entry.mediaId._id.toString()] || 0;
 
-                    // Get artist name from Media subdocument array
                     const artistName = Array.isArray(entry.mediaId.artist) && entry.mediaId.artist.length > 0
                         ? entry.mediaId.artist[0].name
                         : 'Unknown Artist';
 
                     return {
                         _id: entry.mediaId._id,
-                        id: entry.mediaId._id || entry.mediaId.uuid, // Use ObjectId first, fallback to UUID
-                        uuid: entry.mediaId._id || entry.mediaId.uuid, // Also include uuid field for consistency
+                        id: entry.mediaId._id || entry.mediaId.uuid,
+                        uuid: entry.mediaId._id || entry.mediaId.uuid,
                         title: entry.mediaId.title,
-                        artist: artistName, // Backward compatibility string
-                        artists: Array.isArray(entry.mediaId.artist) ? entry.mediaId.artist : [], // Full artist array with userIds for ClickableArtistDisplay
-                        featuring: entry.mediaId.featuring || [], // Featuring artists array
-                        creatorDisplay: entry.mediaId.creatorDisplay, // Creator display string
+                        artist: artistName,
+                        artists: Array.isArray(entry.mediaId.artist) ? entry.mediaId.artist : [],
+                        featuring: entry.mediaId.featuring || [],
+                        creatorDisplay: entry.mediaId.creatorDisplay,
                         duration: entry.mediaId.duration,
                         coverArt: entry.mediaId.coverArt,
                         sources: entry.mediaId.sources,
                         availablePlatforms,
-                        globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Schema grammar
-                        partyMediaAggregate: entry.partyMediaAggregate || 0, // All-time party-media aggregate (schema grammar)
-                        timePeriodBidValue, // Bid value for the specific time period
-                        bids: entry.partyBids || [], // Use party-specific bids (PartyUserMediaAggregate) for regular parties
-                        tags: entry.mediaId.tags || [], // Include tags for display
-                        category: entry.mediaId.category || null, // Include category for display
+                        globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0,
+                        partyMediaAggregate: entry.partyMediaAggregate || 0,
+                        timePeriodBidValue,
+                        bids: entry.partyBids || [],
+                        tags: entry.mediaId.tags || [],
+                        category: entry.mediaId.category || null,
                         bpm: entry.mediaId.bpm ?? null,
                         releaseDate: entry.mediaId.releaseDate || null,
                         releaseYear: entry.mediaId.releaseYear ?? null,
-                        addedBy: entry.addedBy,
-                        status: entry.status,
+                        addedBy: entry.mediaId.addedBy || entry.addedBy,
+                        status: entry.status || 'active',
                         queuedAt: entry.queuedAt,
                         playedAt: entry.playedAt,
                         completedAt: entry.completedAt,
@@ -4128,9 +3926,8 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                     };
                 })
                 .filter(media => media !== null)
-                .filter(media => media.status !== 'vetoed') // ✅ Filter out vetoed media
-                .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0)); // Sort by time period bid value
-        }
+                .filter(media => media.status !== 'vetoed')
+                .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0));
 
         res.json({
             timePeriod: timePeriod,
