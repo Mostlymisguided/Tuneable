@@ -85,13 +85,12 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
 
   const metaParts: React.ReactNode[] = [];
-  if (releaseYear != null) {
-    metaParts.push(
-      <span key="year" title={`Released ${releaseYear}`} className="tabular-nums">
-        {releaseYear}
-      </span>
-    );
-  }
+  metaParts.push(
+    <span key="duration" className="flex items-center gap-1">
+      <Clock className="h-3 w-3 text-gray-500" />
+      <span>{formatDuration(mediaData.duration)}</span>
+    </span>
+  );
   if (bpm != null) {
     metaParts.push(
       <span key="bpm" title={`${bpm} BPM`} className="tabular-nums">
@@ -100,12 +99,13 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
       </span>
     );
   }
-  metaParts.push(
-    <span key="duration" className="flex items-center gap-1">
-      <Clock className="h-3 w-3 text-gray-500" />
-      <span>{formatDuration(mediaData.duration)}</span>
-    </span>
-  );
+  if (releaseYear != null) {
+    metaParts.push(
+      <span key="year" title={`Released ${releaseYear}`} className="tabular-nums">
+        {releaseYear}
+      </span>
+    );
+  }
 
   const chartBadge = (
     <div className="w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center">
