@@ -216,7 +216,7 @@ const UserProfile: React.FC = () => {
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
+  const [, setStats] = useState<UserStats | null>(null);
   const [, setMediaWithBids] = useState<MediaWithBids[]>([]);
   const [tuneBytesTagRankings, setTuneBytesTagRankings] = useState<Array<{
     tag: string;
