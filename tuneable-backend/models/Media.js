@@ -211,7 +211,7 @@ const mediaSchema = new mongoose.Schema({
   timeSignature: { type: String, default: '4/4' },
   bitrate: { type: Number },
   sampleRate: { type: Number },
-  elements: { type: [String], default: [] }, // Instrument/element tags (musical content, e.g. "vocals", "808s")
+  elements: { type: [String], default: [] }, // Musical content (instruments/sonic ingredients). Tip chips classified via elementNormalizer.
   encodedBy: { type: String, default: null }, // Encoder/DAW string from ID3 (e.g. "Logic Pro", "LAME")
 
   // Production equipment / gear (structured; mirrors aiUsage.tools pattern)

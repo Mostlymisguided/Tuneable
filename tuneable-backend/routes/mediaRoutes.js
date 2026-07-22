@@ -23,6 +23,10 @@ const {
 } = require('../utils/libraryXml');
 const { canUploadMedia, canEditMedia, canDeleteMedia, isAdmin } = require('../utils/permissionHelpers');
 const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+const {
+  applyTipChipsToMedia,
+  normalizeElementList,
+} = require('../utils/elementNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const {
   attachGearIdsToProductionStack,
@@ -2110,6 +2114,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
             value = [];
           }
         }
+
+        if (field === 'elements') {
+          value = normalizeElementList(value);
+        }
         
         // Check if value actually changed
         if (media[field] !== value) {
@@ -3113,6 +3121,10 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       if (!media) {
         const sourcesMap = new Map(sourceEntries);
         const externalIdsMap = new Map(externalIdEntries);
+        const seededChips = applyTipChipsToMedia(
+          { tags: [], elements: [] },
+          Array.isArray(tags) ? tags : []
+        );
 
         media = new Media({
           title,
@@ -3121,7 +3133,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           duration: duration || 0,
           sources: sourcesMap,
           externalIds: externalIdsMap,
-          tags: Array.isArray(tags) ? tags.map(tag => normalizeTagForStorage(tag)) : [],
+          tags: seededChips.tags,
+          elements: seededChips.elements,
           category: category || 'Music',
           album: album || null,
           releaseDate: releaseDate || null,
@@ -3147,26 +3160,15 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     }
 
     if (media && Array.isArray(tags) && tags.length > 0) {
-      const normalizedTags = tags
-        .map(tag => normalizeTagForStorage(tag))
-        .filter(tag => typeof tag === 'string' && tag.trim().length > 0);
-
-      if (normalizedTags.length > 0) {
-        const existingTags = Array.isArray(media.tags)
-          ? media.tags.map((t) => normalizeTagForStorage(t)).filter(Boolean)
-          : [];
-        let didAddTag = false;
-
-        normalizedTags.forEach((tag) => {
-          if (!existingTags.some((t) => tagsMatch(t, tag))) {
-            existingTags.push(tag);
-            didAddTag = true;
-          }
-        });
-
-        if (didAddTag) {
-          media.tags = existingTags;
-          await media.save();
+      const applied = applyTipChipsToMedia(media, tags);
+      if (applied.didAddTag || applied.didAddElement) {
+        media.tags = applied.tags;
+        media.elements = applied.elements;
+        await media.save();
+        if (applied.didAddElement) {
+          console.log(
+            `✅ Merged tip elements into media: "${media.title}" → [${applied.elements.join(', ')}]`
+          );
         }
       }
     }

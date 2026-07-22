@@ -10,6 +10,7 @@ const { isValidObjectId } = require('../utils/validators');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { applyTipChipsToMedia } = require('../utils/elementNormalizer');
 
 /**
  * @param {string} userId
@@ -93,6 +94,11 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     }
 
     if (!media) {
+      const seededChips = applyTipChipsToMedia(
+        { tags: [], elements: [] },
+        Array.isArray(tags) ? tags : []
+      );
+
       media = new Media({
         title,
         artist: [{ name: artist, userId: null, verified: false }],
@@ -100,7 +106,8 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
         duration: duration || 0,
         sources: new Map(sourceEntries),
         externalIds: new Map(externalIdEntries),
-        tags: Array.isArray(tags) ? tags.map((tag) => normalizeTagForStorage(tag)).filter(Boolean) : [],
+        tags: seededChips.tags,
+        elements: seededChips.elements,
         genres: Array.isArray(genres)
           ? genres.map((g) => normalizeTagForStorage(g)).filter(Boolean)
           : [],

@@ -6,8 +6,12 @@ import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/
 import { partyAPI } from '../lib/api';
 import type { Party } from '../types';
 import type { User } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
-import { normalizeTagForStorage } from '../utils/tagNormalizer';
+import {
+  isKnownElement,
+  normalizeTipChipForDisplay,
+} from '../utils/elementNormalizer';
 import TipStatChips from './TipStatChips';
 
 type ProgressStep = 'placing' | 'processing' | 'updating' | null;
@@ -63,13 +67,16 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
   const [progressStep, setProgressStep] = useState<ProgressStep>(null);
   const [isEnablingCurrentLocation, setIsEnablingCurrentLocation] = useState(false);
+  const { user: authUser } = useAuth();
+  // Prefer explicit prop (party tips); fall back to auth so chart influence shows everywhere
+  const effectiveUser = user ?? authUser;
   const {
     currentLocation,
     status: currentLocationStatus,
     enableCurrentLocation,
   } = useCurrentLocation();
 
-  const homeLocation = user?.homeLocation || null;
+  const homeLocation = effectiveUser?.homeLocation || null;
   const homeLabel = homeLocation ? formatLocation(homeLocation) : null;
   const currentLabel = currentLocation ? formatLocation(currentLocation) : null;
   const samePlace =
@@ -100,15 +107,15 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const isLocationMismatch = party?.type === 'location' && 
     party?.locationFilter && 
     party.locationFilter.countryCode &&
-    user?.homeLocation && 
-    !isLocationMatch(party.locationFilter as { city?: string; countryCode: string }, user.homeLocation);
+    effectiveUser?.homeLocation && 
+    !isLocationMatch(party.locationFilter as { city?: string; countryCode: string }, effectiveUser.homeLocation);
   
   useEffect(() => {
-    if (isLocationMismatch && user?.homeLocation?.countryCode) {
+    if (isLocationMismatch && effectiveUser?.homeLocation?.countryCode) {
       // Fetch user's location party
       partyAPI.findLocationParty(
-        user.homeLocation.countryCode,
-        user.homeLocation.city
+        effectiveUser.homeLocation.countryCode,
+        effectiveUser.homeLocation.city
       ).then(({ party }) => {
         if (party) {
           setUserLocationParty({ id: party.id, _id: party._id });
@@ -120,7 +127,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     } else {
       setUserLocationParty(null);
     }
-  }, [isLocationMismatch, user?.homeLocation]);
+  }, [isLocationMismatch, effectiveUser?.homeLocation]);
 
   // Reset progress step when modal closes
   useEffect(() => {
@@ -137,13 +144,16 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     }
   }, [isOpen, bidAmount]);
 
-  // Pre-select tags on open (e.g. tipping from a tag profile page)
+  // Pre-select chips on open (e.g. tipping from a tag profile page)
   const initialTagsKey = (initialTags || []).join(',');
   useEffect(() => {
     if (isOpen) {
       const seeded = (initialTags || [])
-        .map((tag) => normalizeTagForStorage(tag))
+        .map((tag) => normalizeTipChipForDisplay(tag))
         .filter(Boolean)
+        .filter((chip, index, arr) =>
+          arr.findIndex((c) => c.toLowerCase() === chip.toLowerCase()) === index
+        )
         .slice(0, 5);
       setTags(seeded);
     }
@@ -168,28 +178,23 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     const input = tagInput.trim();
     if (!input) return;
 
-    // Split by comma and process each tag
-    // Handles: "tag1, tag2, tag3" or "tag1,tag2,tag3" or "tag1,,tag2," (multiple/trailing commas)
-    // Filters out empty strings from multiple commas or trailing commas
+    // Split by comma; classify display form client-side (backend re-classifies on save)
     const newTags = input
       .split(',')
       .map(tag => tag.trim())
-      .filter(tag => tag.length > 0) // Filter empty strings from multiple/trailing commas
-      .map(tag => normalizeTagForStorage(tag)) // Use same normalization logic as backend
+      .filter(tag => tag.length > 0)
+      .map(tag => normalizeTipChipForDisplay(tag))
       .filter(tag => {
-        // Check if tag already exists (case-insensitive comparison)
         const tagLower = tag.toLowerCase();
         return !tags.some(existingTag => existingTag.toLowerCase() === tagLower);
       });
 
-    // Add new tags (respecting the 5 tag limit)
     const remainingSlots = 5 - tags.length;
     if (remainingSlots > 0 && newTags.length > 0) {
       const tagsToAdd = newTags.slice(0, remainingSlots);
       setTags([...tags, ...tagsToAdd]);
       setTagInput('');
     } else if (remainingSlots === 0) {
-      // Already at max tags
       setTagInput('');
     }
   };
@@ -330,7 +335,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         )}
 
         {/* Chart influence: home + current location */}
-        {user && (
+        {effectiveUser && (
           <div className="mb-4 p-3 bg-gray-700/80 border border-gray-600 rounded-lg">
             <div className="flex items-start gap-2">
               <MapPin className="h-5 w-5 text-purple-400 flex-shrink-0 mt-0.5" />
@@ -420,13 +425,13 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         )}
 
         {/* Location Mismatch Info */}
-        {isLocationMismatch && party?.locationFilter && user?.homeLocation && (
+        {isLocationMismatch && party?.locationFilter && effectiveUser?.homeLocation && (
           <div className="mb-4 p-3 bg-blue-900/30 border border-blue-600 rounded-lg flex items-start space-x-2">
             <MapPin className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium text-blue-300">Your {actionLabel} Location</p>
               <p className="text-xs text-blue-400 mt-1">
-                Your {actionLabelLower} will appear in the <strong>{formatLocation(user.homeLocation)}</strong> party, 
+                Your {actionLabelLower} will appear in the <strong>{formatLocation(effectiveUser.homeLocation)}</strong> party, 
                 not this {formatLocationFilter(party.locationFilter)} party. 
                 This helps support artists in your local community!
               </p>
@@ -436,23 +441,23 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                   onClick={() => onClose()}
                   className="inline-block text-xs text-blue-300 underline mt-1 hover:text-blue-200 transition-colors"
                 >
-                  View {formatLocation(user.homeLocation)} Party →
+                  View {formatLocation(effectiveUser.homeLocation)} Party →
                 </Link>
               )}
             </div>
           </div>
         )}
 
-        {/* Tag Input Section */}
+        {/* Tip chips: discovery tags + musical elements (classified on save) */}
         <div className="mb-4">
           <div className="flex items-center space-x-2 mb-2">
             <Tag className="h-4 w-4 text-purple-400" />
             <label className="text-sm font-medium text-gray-300">
-              Add Tags (Optional)
+              Add Tags & Elements (Optional)
             </label>
           </div>
           <p className="text-xs text-gray-400 mb-2">
-            Help others discover this tune with tags like genre, mood, or setting
+            Genre, mood, setting — or instruments like guitar, 808s, vocals
           </p>
           
           <div className="flex space-x-2 mb-2">
@@ -461,9 +466,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="e.g., chill, electronic, workout"
+              placeholder="e.g., chill, guitar, workout"
               className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-              maxLength={20}
+              maxLength={32}
               disabled={isLoading}
             />
             <button
@@ -475,28 +480,37 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             </button>
           </div>
           <p className="text-xs text-gray-400">
-            Press Enter to add • Max 5 tags • {tags.length}/5 used
+            Press Enter to add • Max 5 • {tags.length}/5 used
           </p>
 
-          {/* Tags Display */}
           {tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-3 py-1 bg-purple-600 text-white text-sm rounded-full flex items-center gap-2"
-                >
-                  {tag}
-                  <button
-                    onClick={() => handleRemoveTag(tag)}
-                    className="text-purple-200 hover:text-white ml-1"
-                    type="button"
-                    disabled={isLoading}
+              {tags.map((tag, index) => {
+                const asElement = isKnownElement(tag);
+                return (
+                  <span
+                    key={index}
+                    className={`px-3 py-1 text-white text-sm rounded-full flex items-center gap-2 ${
+                      asElement ? 'bg-teal-600' : 'bg-purple-600'
+                    }`}
+                    title={asElement ? 'Musical element' : 'Discovery tag'}
                   >
-                    ×
-                  </button>
-                </span>
-              ))}
+                    {tag}
+                    <button
+                      onClick={() => handleRemoveTag(tag)}
+                      className={`ml-1 ${
+                        asElement
+                          ? 'text-teal-200 hover:text-white'
+                          : 'text-purple-200 hover:text-white'
+                      }`}
+                      type="button"
+                      disabled={isLoading}
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           )}
         </div>

@@ -18,7 +18,8 @@ const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
-const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+const { normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { applyTipChipsToMedia, classifyTipChips } = require('../utils/elementNormalizer');
 const {
     fetchAllTimeGlobalChart,
     fetchPeriodGlobalChart,
@@ -47,29 +48,6 @@ const deriveCodeFromPartyId = (objectId) => {
 const GLOBAL_PARTY_TUNES_FILTER = {
   contentType: { $in: ['music'] },
   contentForm: { $in: ['tune'] }
-};
-
-/**
- * Merge tags and ensure they're in display/storage form (Title Case + aliases)
- * @param {Array} existingTags - Existing tags array
- * @param {Array} newTags - New tags to merge
- * @returns {Array} - Merged and normalized tags array
- */
-const mergeTags = (existingTags, newTags) => {
-  if (!newTags || !Array.isArray(newTags) || newTags.length === 0) {
-    return (existingTags || []).map(tag => normalizeTagForStorage(tag)).filter(Boolean);
-  }
-
-  const merged = [...(existingTags || []).map(tag => normalizeTagForStorage(tag)).filter(Boolean)];
-
-  newTags.forEach(tag => {
-    const normalizedTag = normalizeTagForStorage(tag);
-    if (normalizedTag && !merged.some(t => tagsMatch(t, normalizedTag))) {
-      merged.push(normalizedTag);
-    }
-  });
-
-  return merged;
 };
 
 /**
@@ -1718,9 +1696,11 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             }
         }
 
-        // Use only user-provided tags (no extraction from YouTube)
-        // Capitalize tags for consistent display
-        let videoTags = Array.isArray(tags) ? tags.map(tag => normalizeTagForStorage(tag)) : [];
+        // Use only user-provided tip chips (no extraction from YouTube).
+        // Split known musical elements from discovery tags at write time.
+        const classifiedChips = classifyTipChips(Array.isArray(tags) ? tags : []);
+        let videoTags = classifiedChips.tags;
+        let videoElements = classifiedChips.elements;
         let videoCategory = category || 'Unknown';
         
         // Re-check if media already exists to prevent duplicates (existingMedia was already checked above for minimumBid)
@@ -1755,10 +1735,12 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         if (existingMedia) {
             // Use existing media
             media = existingMedia;
-            // Merge tags if provided
-            if (videoTags && videoTags.length > 0) {
-                media.tags = mergeTags(media.tags, videoTags);
-                console.log(`✅ Merged tags into existing media: "${media.title}" (${media._id})`);
+            // Merge tip chips (tags + elements) if provided
+            if ((videoTags && videoTags.length > 0) || (videoElements && videoElements.length > 0)) {
+                const applied = applyTipChipsToMedia(media, [...videoTags, ...videoElements]);
+                media.tags = applied.tags;
+                media.elements = applied.elements;
+                console.log(`✅ Merged tip chips into existing media: "${media.title}" (${media._id})`);
             }
             console.log(`✅ Using existing media: "${media.title}" (${media._id})`);
         } else {
@@ -1772,6 +1754,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
                 sources: sourcePayload,
                 externalIds: externalIds || {},
                 tags: videoTags,
+                elements: videoElements,
                 category: videoCategory || 'Music',
                 album: album || null,
                 releaseDate: releaseDate || null,
@@ -2546,16 +2529,16 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         // Update media global bid value
         const media = await Media.findById(actualMediaId);
         if (media) {
-            // Merge tags if provided (tags are already capitalized in mergeTags)
+            // Merge tip chips: known instruments → elements, rest → discovery tags
             if (tags && Array.isArray(tags) && tags.length > 0) {
                 const tagsBefore = media.tags || [];
-                // Capitalize incoming tags before merging
-                const capitalizedTags = tags.map(tag => normalizeTagForStorage(tag));
-                media.tags = mergeTags(media.tags, capitalizedTags);
-                console.log(`✅ Merged tags into media: "${media.title}" (${media._id})`);
-                console.log(`   Tags before: [${tagsBefore.join(', ')}]`);
-                console.log(`   New tags: [${tags.join(', ')}]`);
-                console.log(`   Tags after: [${(media.tags || []).join(', ')}]`);
+                const elementsBefore = media.elements || [];
+                const applied = applyTipChipsToMedia(media, tags);
+                media.tags = applied.tags;
+                media.elements = applied.elements;
+                console.log(`✅ Merged tip chips into media: "${media.title}" (${media._id})`);
+                console.log(`   Tags before: [${tagsBefore.join(', ')}] → after: [${(media.tags || []).join(', ')}]`);
+                console.log(`   Elements before: [${elementsBefore.join(', ')}] → after: [${(media.elements || []).join(', ')}]`);
             }
             
             // Store previous top tip info for outtipped notification
