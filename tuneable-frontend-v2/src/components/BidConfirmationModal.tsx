@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus } from 'lucide-react';
+import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus, Navigation } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/locationHelpers';
 import { partyAPI } from '../lib/api';
 import type { Party } from '../types';
 import type { User } from '../contexts/AuthContext';
+import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { normalizeTagForStorage } from '../utils/tagNormalizer';
 import TipStatChips from './TipStatChips';
 
@@ -60,6 +62,39 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [amountInput, setAmountInput] = useState('');
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
   const [progressStep, setProgressStep] = useState<ProgressStep>(null);
+  const [isEnablingCurrentLocation, setIsEnablingCurrentLocation] = useState(false);
+  const {
+    currentLocation,
+    status: currentLocationStatus,
+    enableCurrentLocation,
+  } = useCurrentLocation();
+
+  const homeLocation = user?.homeLocation || null;
+  const homeLabel = homeLocation ? formatLocation(homeLocation) : null;
+  const currentLabel = currentLocation ? formatLocation(currentLocation) : null;
+  const samePlace =
+    !!(homeLocation?.placeId && currentLocation?.placeId && homeLocation.placeId === currentLocation.placeId);
+  const canOfferCurrentLocation =
+    currentLocationStatus !== 'denied' && currentLocationStatus !== 'unavailable';
+
+  const handleEnableCurrentLocation = async () => {
+    setIsEnablingCurrentLocation(true);
+    try {
+      const location = await enableCurrentLocation();
+      if (location) {
+        toast.success(`Current location: ${formatLocation(location)}`);
+        return;
+      }
+      const { getCurrentLocationStatus } = await import('../utils/currentLocationCache');
+      if (getCurrentLocationStatus() === 'denied') {
+        toast.error('Location permission denied. You can enable it in browser settings.');
+      } else {
+        toast.error('Could not detect your current location');
+      }
+    } finally {
+      setIsEnablingCurrentLocation(false);
+    }
+  };
   
   // Check if location mismatch and fetch user's location party
   const isLocationMismatch = party?.type === 'location' && 
@@ -290,6 +325,96 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               <p className="text-xs text-red-400 mt-1">
                 You need £{effectiveAmount.toFixed(2)} but only have £{userBalance.toFixed(2)}
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Chart influence: home + current location */}
+        {user && (
+          <div className="mb-4 p-3 bg-gray-700/80 border border-gray-600 rounded-lg">
+            <div className="flex items-start gap-2">
+              <MapPin className="h-5 w-5 text-purple-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white">Chart influence</p>
+
+                {samePlace && currentLabel ? (
+                  <p className="text-xs text-gray-300 mt-1">
+                    Home &amp; current: <span className="text-white">{currentLabel}</span>
+                  </p>
+                ) : (
+                  <div className="mt-1 space-y-1 text-xs text-gray-300">
+                    <p>
+                      Home:{' '}
+                      <span className="text-white">
+                        {homeLabel || 'Not set'}
+                      </span>
+                    </p>
+                    <p>
+                      Current:{' '}
+                      <span className="text-white">
+                        {currentLabel ||
+                          (currentLocationStatus === 'denied'
+                            ? 'Permission denied'
+                            : currentLocationStatus === 'unavailable'
+                              ? 'Unavailable'
+                              : currentLocationStatus === 'loading' || isEnablingCurrentLocation
+                                ? 'Detecting…'
+                                : 'Not enabled')}
+                      </span>
+                    </p>
+                  </div>
+                )}
+
+                {currentLocation && homeLabel && !samePlace && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    This tip will influence charts in both places.
+                  </p>
+                )}
+
+                {currentLocation && !homeLabel && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    This tip will influence charts where you are now.
+                  </p>
+                )}
+
+                {!currentLocation && canOfferCurrentLocation && (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-gray-400">
+                      Enable location to also influence charts where you are.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleEnableCurrentLocation}
+                      disabled={isLoading || isEnablingCurrentLocation || currentLocationStatus === 'loading'}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-md transition-colors shrink-0"
+                    >
+                      {isEnablingCurrentLocation || currentLocationStatus === 'loading' ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Detecting…
+                        </>
+                      ) : (
+                        <>
+                          <Navigation className="h-3.5 w-3.5" />
+                          Enable
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {!currentLocation && currentLocationStatus === 'denied' && (
+                  <p className="text-xs text-amber-300/90 mt-2">
+                    Location blocked in browser settings — tip will use home only.
+                  </p>
+                )}
+
+                {!homeLabel && !currentLocation && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Add a home location on your profile so tips count on local charts.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
