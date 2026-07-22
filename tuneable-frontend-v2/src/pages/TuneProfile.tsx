@@ -2534,19 +2534,17 @@ const TuneProfile: React.FC = () => {
         {!isEditMode && (isLoadingRelatedPlaylists || relatedMedia.length > 0) && (
           <div className="mb-8 px-2 md:px-0">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-                <Music className="h-5 w-5 text-cyan-300" />
-                Related Tunes
+              <h2 className="text-lg md:text-xl font-bold text-white">
+                Related
               </h2>
               {!isLoadingRelatedPlaylists && relatedMedia.length > 0 && (
                 <button
                   type="button"
                   onClick={handlePlayRelatedTunes}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
-                  aria-label="Play related tunes"
+                  className="flex items-center justify-center p-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-colors"
+                  aria-label="Play related"
                 >
                   <Play className="h-4 w-4" fill="currentColor" />
-                  Play
                 </button>
               )}
             </div>
