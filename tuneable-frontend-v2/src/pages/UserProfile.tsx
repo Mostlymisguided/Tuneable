@@ -1068,13 +1068,6 @@ const UserProfile: React.FC = () => {
     }
   }, [viewTab, isOwnProfile, isSettingsMode, userId]);
 
-  const formatJoinDate = (dateString: string) => {
-    if (!dateString) return 'Unknown';
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Unknown';
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  };
-
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '--:--';
     const mins = Math.floor(seconds / 60);
@@ -1318,18 +1311,23 @@ const UserProfile: React.FC = () => {
     navigate('/import');
   };
 
+  const ELEVATED_ROLES = ['admin', 'moderator', 'creator'] as const;
+
+  const hasElevatedRole = (roles: string[] = []) =>
+    ELEVATED_ROLES.some((role) => roles.includes(role));
+
   const getRoleDisplay = (roles: string[]) => {
     if (roles.includes('admin')) return 'Admin';
     if (roles.includes('moderator')) return 'Moderator';
     if (roles.includes('creator')) return 'Creator';
-    return 'User';
+    return null;
   };
 
-  const getRoleColor = (roles: string[]) => {
-    if (roles.includes('admin')) return 'text-white';
-    if (roles.includes('moderator')) return 'text-blue-400';
-    if (roles.includes('creator')) return 'text-white';
-    return 'text-green-400';
+  const getRoleBadgeStyle = (roles: string[]) => {
+    if (roles.includes('admin')) return 'text-amber-300 border-amber-500/30';
+    if (roles.includes('moderator')) return 'text-blue-400 border-blue-500/30';
+    if (roles.includes('creator')) return 'text-purple-300 border-purple-500/30';
+    return 'text-gray-200 border-white/20';
   };
 
   // Load tune library (for own profile uses /me, for other users uses their userId)
@@ -2024,22 +2022,15 @@ const UserProfile: React.FC = () => {
           </div>
           
           <div className="card p-4 flex flex-col sm:flex-row items-start relative">
-            <div className='absolute top-0 right-0 flex flex-col items-end gap-2'>
-
-              {/* Member Since */}
-              <div className="flex rounded-full p-4 items-center">
-                <span className="px-3 py-2 bg-purple-600/50 text-white text-xs md:text-base rounded-full font-semibold">
-                  {formatJoinDate(user.createdAt)}
-                </span>
-              </div>
-
-              {/* Role (Admin/Moderator/Creator/User) */}
-              <div className="flex rounded-full p-4 pt-0 items-center">
-                <span className={`px-3 py-2 bg-purple-600/50 text-xs md:text-base rounded-full font-semibold ${getRoleColor(user.role)}`}>
+            {hasElevatedRole(user.role) && (
+              <div className="absolute top-0 right-0 p-3">
+                <span
+                  className={`inline-flex items-center px-3 py-2 bg-black/20 border rounded-lg text-xs md:text-sm font-medium ${getRoleBadgeStyle(user.role)}`}
+                >
                   {getRoleDisplay(user.role)}
                 </span>
               </div>
-            </div>
+            )}
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
               <img
