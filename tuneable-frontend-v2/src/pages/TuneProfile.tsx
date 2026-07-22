@@ -2092,9 +2092,9 @@ const TuneProfile: React.FC = () => {
       : (media as any).releaseYear
         ? String((media as any).releaseYear)
         : null,
-    media.bpm ? `${media.bpm} BPM` : null,
-    media.key,
     media.duration ? formatDuration(media.duration) : null,
+    media.key,
+    media.bpm ? `${media.bpm} BPM` : null,
   ].filter((part): part is string => Boolean(part));
 
   const topTagRankings = tagRankings.slice(0, 3);
