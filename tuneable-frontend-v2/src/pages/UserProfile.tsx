@@ -30,6 +30,19 @@ import {
   Crown
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
+
+/** SoundCloud brand mark (waveform + cloud) — lucide has no official logo */
+const SoundCloudIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className={className}
+    aria-hidden="true"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M1.175 12.225c-.051 0-.094.046-.101.1l-.233 2.154.233 2.144c.007.058.05.098.101.098.05 0 .09-.04.099-.098l.255-2.144-.27-2.154c-.009-.054-.049-.1-.084-.1m-.099-1.521c-.06 0-.114.047-.117.113l-.282 3.662.282 3.649c.002.062.058.11.117.11.056 0 .105-.048.117-.11l.326-3.649-.326-3.662c-.012-.066-.061-.113-.117-.113m2.147-1.36c-.075 0-.132.061-.136.141l-.328 5.02.328 4.99c.004.076.061.13.136.13.07 0 .129-.054.136-.13l.375-4.99-.375-5.02c-.007-.08-.066-.141-.136-.141m4.289-2.459c-.086 0-.155.071-.16.16l-.367 7.08.367 7.046c.004.086.074.15.16.15.083 0 .15-.064.16-.15l.42-7.046-.42-7.08c-.01-.089-.077-.16-.16-.16m-.98.731c-.082 0-.147.066-.152.152l-.348 6.35.348 6.32c.005.083.07.145.152.145.078 0 .142-.062.152-.145l.396-6.32-.396-6.35c-.01-.086-.074-.152-.152-.152m2.447-1.428c-.09 0-.163.074-.168.167l-.387 7.577.387 7.54c.005.09.078.158.168.158.087 0 .158-.068.168-.158l.443-7.54-.443-7.577c-.01-.093-.081-.167-.168-.167m5.348-.118c-.005-.501-.058-1.836-1.47-3.02-.632-.53-1.503-.794-2.588-.794v13.405h6.69c2.074 0 3.771-1.686 3.771-3.76 0-2.031-1.609-3.688-3.616-3.76l-.787-.071" />
+  </svg>
+);
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
@@ -1555,7 +1568,7 @@ const UserProfile: React.FC = () => {
         icon: Facebook,
         url: user.socialMedia.facebook,
         platform: 'facebook' as const,
-        color: 'hover:bg-blue-600/30 hover:border-blue-500'
+        color: 'hover:bg-blue-600/30 hover:border-blue-500 text-blue-400'
       });
     }
     
@@ -1566,7 +1579,7 @@ const UserProfile: React.FC = () => {
         icon: Youtube,
         url: user.socialMedia.youtube,
         platform: undefined, // YouTube not supported in modal
-        color: 'hover:bg-red-600/30 hover:border-red-500'
+        color: 'hover:bg-red-600/30 hover:border-red-500 text-red-400'
       });
     }
     
@@ -1574,10 +1587,10 @@ const UserProfile: React.FC = () => {
     if (user?.socialMedia?.soundcloud) {
       socialLinks.push({
         name: 'SoundCloud',
-        icon: Music2,
+        icon: SoundCloudIcon,
         url: user.socialMedia.soundcloud,
         platform: 'soundcloud' as const,
-        color: 'hover:bg-orange-600/30 hover:border-orange-500'
+        color: 'hover:bg-orange-600/30 hover:border-orange-500 text-orange-400'
       });
     }
     
@@ -1588,7 +1601,7 @@ const UserProfile: React.FC = () => {
         icon: Instagram,
         url: user.socialMedia.instagram,
         platform: 'instagram' as const,
-        color: 'hover:bg-pink-600/30 hover:border-pink-500'
+        color: 'hover:bg-pink-600/30 hover:border-pink-500 text-pink-400'
       });
     }
     
@@ -1615,7 +1628,7 @@ const UserProfile: React.FC = () => {
     if (!user?.socialMedia?.soundcloud) {
       unconnected.push({
         name: 'SoundCloud',
-        icon: Music2,
+        icon: SoundCloudIcon,
         platform: 'soundcloud' as const,
         color: 'border-orange-500 text-orange-300 hover:bg-orange-600/20'
       });
@@ -2052,45 +2065,6 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Social Media Buttons - Hide in anonymous mode (unless own profile) */}
-              {!((user as any)?.preferences?.anonymousMode && !isOwnProfile) && getSocialMediaLinks().length > 0 && (
-                <div className="mb-2">
-                  <div className="flex flex-wrap gap-2">
-                    {getSocialMediaLinks().map((social) => (
-                      <a
-                        key={social.name}
-                        href={social.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`flex items-center space-x-2 px-4 py-2 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all ${social.color}`}
-                      >
-                        <social.icon className="w-4 h-4" />
-                        <span className="text-sm font-medium">{social.name}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Connect Social Media Buttons - Only for own profile */}
-              {isOwnProfile && getUnconnectedSocialAccounts().length > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs text-gray-400 mb-2">Connect accounts:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {getUnconnectedSocialAccounts().map((social) => (
-                      <button
-                        key={social.name}
-                        onClick={() => openSocialModal(social.platform)}
-                        className={`flex items-center space-x-2 px-3 py-1.5 bg-black/10 border rounded-lg text-xs font-medium transition-all ${social.color}`}
-                      >
-                        <social.icon className="w-3.5 h-3.5" />
-                        <span>Add {social.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Tip champion badges (by aggregate tips on tags) */}
               {tipTagChampions.length > 0 &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
@@ -2297,6 +2271,47 @@ const UserProfile: React.FC = () => {
                       />
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Social Media Buttons — below champion badges; icons only */}
+              {!((user as any)?.preferences?.anonymousMode && !isOwnProfile) && getSocialMediaLinks().length > 0 && (
+                <div className="mb-2">
+                  <div className="flex flex-wrap gap-2">
+                    {getSocialMediaLinks().map((social) => (
+                      <a
+                        key={social.name}
+                        href={social.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={social.name}
+                        aria-label={social.name}
+                        className={`inline-flex items-center justify-center p-2.5 bg-black/20 border border-white/20 rounded-lg text-gray-200 transition-all ${social.color}`}
+                      >
+                        <social.icon className="w-5 h-5" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Connect Social Media Buttons - Only for own profile */}
+              {isOwnProfile && getUnconnectedSocialAccounts().length > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {getUnconnectedSocialAccounts().map((social) => (
+                      <button
+                        key={social.name}
+                        type="button"
+                        onClick={() => openSocialModal(social.platform)}
+                        title={`Add ${social.name}`}
+                        aria-label={`Add ${social.name}`}
+                        className={`inline-flex items-center justify-center p-2 bg-black/10 border rounded-lg transition-all ${social.color}`}
+                      >
+                        <social.icon className="w-4 h-4" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
