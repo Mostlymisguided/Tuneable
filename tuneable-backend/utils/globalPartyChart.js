@@ -215,13 +215,71 @@ async function loadTopSupportersByMedia(mediaIds, {
 /**
  * Country tip volume from Bid location snapshots (no full bid populate).
  */
-async function computeTopLocations({ startDate = null, limit = 30 } = {}) {
+/**
+ * Parse "City, Region, Country" style display strings.
+ */
+function parseLocationDisplayParts(display) {
+  const parts = String(display || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    return { placeLabel: null, country: null };
+  }
+  if (parts.length === 1) {
+    return { placeLabel: null, country: parts[0] };
+  }
+  return {
+    placeLabel: parts[0],
+    country: parts[parts.length - 1],
+  };
+}
+
+function countryMetaFromUserLocation(location) {
+  if (!location) return null;
+  if (location.featureType === 'country' && location.placeId) {
+    return {
+      placeId: location.placeId,
+      country: location.country || location.label || location.display || 'Country',
+      countryCode: location.countryCode || '',
+    };
+  }
+  const ancestor = Array.isArray(location.ancestors)
+    ? location.ancestors.find((a) => a.placetype === 'country')
+    : null;
+  if (ancestor?.placeId) {
+    return {
+      placeId: ancestor.placeId,
+      country: ancestor.label || location.country || 'Country',
+      countryCode: ancestor.countryCode || location.countryCode || '',
+    };
+  }
+  if (location.country) {
+    return {
+      placeId: null,
+      country: location.country,
+      countryCode: location.countryCode || '',
+    };
+  }
+  return null;
+}
+
+/**
+ * Popular location chips: top countries + top lower-level places by tip volume.
+ * Uses denormalized bid snapshot fields when present; falls back to display parsing
+ * + a small User lookup to resolve country Mapbox placeIds for older bids.
+ */
+async function computeTopLocations({
+  startDate = null,
+  limitCountries = 3,
+  limitPlaces = 4,
+} = {}) {
   const match = { status: 'active', bidderHomePlaceId: { $exists: true, $ne: null } };
   if (startDate) {
     match.createdAt = { $gte: startDate };
   }
 
-  const rows = await Bid.aggregate([
+  const placeRows = await Bid.aggregate([
     { $match: match },
     {
       $group: {
@@ -229,26 +287,180 @@ async function computeTopLocations({ startDate = null, limit = 30 } = {}) {
         total: { $sum: '$amount' },
         count: { $sum: 1 },
         display: { $first: '$bidderLocationDisplay' },
+        placeLabel: { $first: '$bidderPlaceLabel' },
+        featureType: { $first: '$bidderFeatureType' },
+        countryPlaceId: { $first: '$bidderCountryPlaceId' },
+        country: { $first: '$bidderCountry' },
+        countryCode: { $first: '$bidderCountryCode' },
+        userId: { $first: '$userId' },
       },
     },
     { $sort: { total: -1, count: -1 } },
-    { $limit: limit },
   ]);
 
-  return rows.map((row) => {
-    const display = row.display || '';
-    // Display is often "City, Country" — take last segment as country label
-    const parts = display.split(',').map((p) => p.trim()).filter(Boolean);
-    const country = parts.length ? parts[parts.length - 1] : 'Unknown';
-    return {
+  // Enrich place rows missing country placeId (legacy snapshots)
+  const missingCountryUserIds = [
+    ...new Set(
+      placeRows
+        .filter((row) => !row.countryPlaceId && row.userId)
+        .map((row) => row.userId.toString())
+    ),
+  ];
+
+  const userCountryById = new Map();
+  if (missingCountryUserIds.length > 0) {
+    const users = await User.find({ _id: { $in: missingCountryUserIds } })
+      .select('homeLocation secondaryLocation')
+      .lean();
+    for (const user of users) {
+      const meta =
+        countryMetaFromUserLocation(user.homeLocation) ||
+        countryMetaFromUserLocation(user.secondaryLocation);
+      if (meta) userCountryById.set(user._id.toString(), meta);
+    }
+  }
+
+  const countryTotals = new Map(); // key -> { placeId, country, countryCode, total, count }
+
+  const addCountry = (meta, total, count) => {
+    if (!meta?.country) return;
+    const key = meta.placeId || `name:${String(meta.country).toLowerCase()}`;
+    const existing = countryTotals.get(key);
+    if (existing) {
+      existing.total += total;
+      existing.count += count;
+      if (!existing.placeId && meta.placeId) existing.placeId = meta.placeId;
+      if (!existing.countryCode && meta.countryCode) existing.countryCode = meta.countryCode;
+    } else {
+      countryTotals.set(key, {
+        placeId: meta.placeId || null,
+        country: meta.country,
+        countryCode: meta.countryCode || '',
+        total,
+        count,
+      });
+    }
+  };
+
+  const places = [];
+  for (const row of placeRows) {
+    const parsed = parseLocationDisplayParts(row.display);
+    const featureType = row.featureType || null;
+    let countryPlaceId = row.countryPlaceId || null;
+    let country = row.country || parsed.country || null;
+    let countryCode = row.countryCode || '';
+
+    if (!countryPlaceId && row.userId) {
+      const fromUser = userCountryById.get(row.userId.toString());
+      if (fromUser) {
+        countryPlaceId = fromUser.placeId || countryPlaceId;
+        country = fromUser.country || country;
+        countryCode = fromUser.countryCode || countryCode;
+      }
+    }
+
+    if (country) {
+      addCountry({ placeId: countryPlaceId, country, countryCode }, row.total, row.count);
+    }
+
+    const isCountryHome =
+      featureType === 'country' ||
+      (!row.placeLabel && !parsed.placeLabel && !!country);
+
+    if (isCountryHome) continue;
+
+    const label = row.placeLabel || parsed.placeLabel;
+    if (!label || !row._id) continue;
+
+    places.push({
       placeId: row._id,
-      country,
-      countryCode: '',
-      display: country,
+      label,
+      country: country || '',
+      countryCode,
+      display: row.display || [label, country].filter(Boolean).join(', '),
+      kind: 'place',
+      featureType: featureType || 'place',
       total: row.total,
       count: row.count,
-    };
-  });
+    });
+  }
+
+  // Resolve country placeIds still missing (name-only keys) via users with that country
+  const unresolvedCountries = [...countryTotals.values()].filter((c) => !c.placeId && c.country);
+  if (unresolvedCountries.length > 0) {
+    const names = unresolvedCountries.map((c) => c.country);
+    const users = await User.find({
+      $or: [
+        { 'homeLocation.country': { $in: names } },
+        { 'secondaryLocation.country': { $in: names } },
+      ],
+    })
+      .select('homeLocation secondaryLocation')
+      .limit(Math.min(names.length * 3, 50))
+      .lean();
+
+    const placeIdByCountryName = new Map();
+    for (const user of users) {
+      for (const loc of [user.homeLocation, user.secondaryLocation]) {
+        const meta = countryMetaFromUserLocation(loc);
+        if (meta?.placeId && meta.country && !placeIdByCountryName.has(meta.country.toLowerCase())) {
+          placeIdByCountryName.set(meta.country.toLowerCase(), meta);
+        }
+      }
+    }
+
+    for (const entry of countryTotals.values()) {
+      if (entry.placeId || !entry.country) continue;
+      const resolved = placeIdByCountryName.get(entry.country.toLowerCase());
+      if (resolved?.placeId) {
+        entry.placeId = resolved.placeId;
+        if (!entry.countryCode && resolved.countryCode) {
+          entry.countryCode = resolved.countryCode;
+        }
+      }
+    }
+  }
+
+  // Merge name-only country buckets into placeId buckets after resolution
+  for (const [key, entry] of [...countryTotals.entries()]) {
+    if (!key.startsWith('name:') || !entry.placeId) continue;
+    const placeKey = entry.placeId;
+    const existing = countryTotals.get(placeKey);
+    if (existing) {
+      existing.total += entry.total;
+      existing.count += entry.count;
+      if (!existing.countryCode && entry.countryCode) existing.countryCode = entry.countryCode;
+      countryTotals.delete(key);
+    } else {
+      countryTotals.set(placeKey, entry);
+      countryTotals.delete(key);
+    }
+  }
+
+  const countries = [...countryTotals.values()]
+    .filter((c) => c.placeId)
+    .sort((a, b) => b.total - a.total || b.count - a.count)
+    .slice(0, limitCountries)
+    .map((c) => ({
+      placeId: c.placeId,
+      label: c.country,
+      country: c.country,
+      countryCode: c.countryCode || '',
+      display: c.country,
+      kind: 'country',
+      featureType: 'country',
+      total: c.total,
+      count: c.count,
+    }));
+
+  const countryPlaceIds = new Set(countries.map((c) => c.placeId));
+  const topPlaces = places
+    .filter((p) => !countryPlaceIds.has(p.placeId))
+    .sort((a, b) => b.total - a.total || b.count - a.count)
+    .slice(0, limitPlaces);
+
+  // Countries first, then places — keeps the chip row scannable
+  return [...countries, ...topPlaces];
 }
 
 /**

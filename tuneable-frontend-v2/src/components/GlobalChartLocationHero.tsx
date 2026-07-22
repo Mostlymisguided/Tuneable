@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import LocationAutocomplete from './LocationAutocomplete';
 import {
   formatLocation,
-  countryPickToResolvedLocation,
+  locationPickToResolvedLocation,
   type CountryLocationPick,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
@@ -22,6 +22,10 @@ interface GlobalChartLocationHeroProps {
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
   popularLocationsLabel?: string;
+}
+
+function chipLabel(loc: LocationQuickPick): string {
+  return loc.label || loc.display || loc.country;
 }
 
 function LocationQuickPickButtons({
@@ -51,12 +55,13 @@ function LocationQuickPickButtons({
       </button>
       {locationQuickPicks.map((loc) => {
         const selected = selectedLocation?.placeId === loc.placeId;
+        const name = chipLabel(loc);
         return (
           <button
             key={loc.placeId}
             type="button"
             onClick={() =>
-              onLocationChange(selected ? null : countryPickToResolvedLocation(loc))
+              onLocationChange(selected ? null : locationPickToResolvedLocation(loc))
             }
             className={`${chipClass} ${
               selected
@@ -71,7 +76,7 @@ function LocationQuickPickButtons({
                   : undefined
             }
           >
-            {loc.country}
+            {name}
             {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
           </button>
         );

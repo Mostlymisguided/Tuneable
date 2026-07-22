@@ -40,7 +40,8 @@ import {
   Twitter,
   Facebook,
   Linkedin,
-  Instagram
+  Instagram,
+  Info
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
@@ -201,7 +202,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [showAllFields, setShowAllFields] = useState(false);
+  const [showEpisodeInfo, setShowEpisodeInfo] = useState(false);
   
   // Claim modal (rights-pending limbo only)
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -1959,9 +1960,11 @@ const PodcastEpisodeProfile: React.FC = () => {
     'Rating',
   ]);
 
-  const detailFields = showAllFields
-    ? filteredFields
-    : filteredFields.filter((field) => !HEADER_DETAIL_LABELS.has(field.label)).slice(0, 8);
+  // Exclude hero-duplicated labels; show remaining populated fields in Info panel
+  const detailFields = filteredFields.filter((field) => !HEADER_DETAIL_LABELS.has(field.label));
+  const hasEpisodeInfoContent = Boolean(
+    media.description || detailFields.length > 0 || media.transcript
+  );
 
   const formatPeopleNames = (people?: Array<{ name: string }> | string) => {
     if (!people) return null;
@@ -2392,6 +2395,19 @@ const PodcastEpisodeProfile: React.FC = () => {
                   Play
                 </button>
                 {renderShareButton()}
+                {!isEditMode && hasEpisodeInfoContent && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEpisodeInfo((prev) => !prev)}
+                    aria-expanded={showEpisodeInfo}
+                    aria-controls="episode-info"
+                    className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+                  >
+                    <Info className="h-4 w-4" />
+                    <span>Info</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showEpisodeInfo ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleOpenTipModal}
@@ -2410,6 +2426,68 @@ const PodcastEpisodeProfile: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Episode details — expanded from Info control */}
+        {!isEditMode && showEpisodeInfo && hasEpisodeInfoContent && (
+          <div id="episode-info" className="mb-8 px-2 md:px-0">
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              {media.description && (
+                <div
+                  className="text-gray-300 text-sm md:text-base leading-relaxed prose prose-invert prose-sm max-w-none mb-6
+                    [&_p]:mb-3 [&_p:last-child]:mb-0 [&_p:first-child]:mt-0
+                    [&_a]:text-purple-400 [&_a]:hover:text-purple-300 [&_a]:underline [&_a]:break-words
+                    [&_strong]:text-white [&_strong]:font-semibold
+                    [&_em]:italic
+                    [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3
+                    [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3
+                    [&_li]:mb-1
+                    [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-white
+                    [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-white
+                    [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-white
+                    [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3"
+                  dangerouslySetInnerHTML={{ __html: sanitizeDescription(media.description) }}
+                />
+              )}
+
+              {detailFields.length > 0 && (
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 ${media.description ? 'pt-6 border-t border-gray-700' : ''}`}>
+                  {detailFields.map((field, index) => {
+                    const IconComponent = field.icon;
+                    return (
+                      <div key={index} className="flex items-start space-x-3">
+                        <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
+                        <div>
+                          <div className="text-sm text-gray-300">{field.label}</div>
+                          <div className="text-white font-medium">
+                            {getFieldValue(field.value, (field as any).fieldName)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {media.transcript && (
+                <div className={`mt-6 ${media.description || detailFields.length > 0 ? 'pt-6 border-t border-gray-700' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={() => setShowTranscript(!showTranscript)}
+                    className="inline-flex items-center gap-2 text-lg font-semibold text-white hover:text-purple-300 transition-colors"
+                  >
+                    Transcript
+                    {showTranscript ? <Minus className="h-4 w-4 text-gray-400" /> : <Plus className="h-4 w-4 text-gray-400" />}
+                  </button>
+                  {showTranscript && (
+                    <div className="mt-3 text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4 max-h-96 overflow-y-auto">
+                      {media.transcript}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* More from this series — discovery rail directly below header */}
         {!isEditMode && (isLoadingSeriesEpisodes || seriesEpisodes.length > 0) && (
@@ -2480,74 +2558,6 @@ const PodcastEpisodeProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* About this episode */}
-        <div className="mb-8 px-2 md:px-0">
-          <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h2 className="text-xl md:text-2xl font-bold text-white">About this episode</h2>
-            <button
-              onClick={() => setShowAllFields(!showAllFields)}
-              className="flex items-center px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm md:text-base"
-            >
-              {showAllFields ? 'Show Less' : 'Show All'}
-            </button>
-          </div>
-
-          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-            {media.description && (
-              <div
-                className="text-gray-300 text-sm md:text-base leading-relaxed prose prose-invert prose-sm max-w-none mb-6
-                  [&_p]:mb-3 [&_p:last-child]:mb-0 [&_p:first-child]:mt-0
-                  [&_a]:text-purple-400 [&_a]:hover:text-purple-300 [&_a]:underline [&_a]:break-words
-                  [&_strong]:text-white [&_strong]:font-semibold
-                  [&_em]:italic
-                  [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-3
-                  [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-3
-                  [&_li]:mb-1
-                  [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-white
-                  [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-white
-                  [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3]:text-white
-                  [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-3"
-                dangerouslySetInnerHTML={{ __html: sanitizeDescription(media.description) }}
-              />
-            )}
-
-            <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 ${media.description ? 'pt-6 border-t border-gray-700' : ''}`}>
-              {detailFields.map((field, index) => {
-                const IconComponent = field.icon;
-                return (
-                  <div key={index} className="flex items-start space-x-3">
-                    <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm text-gray-300">{field.label}</div>
-                      <div className="text-white font-medium">
-                        {getFieldValue(field.value, (field as any).fieldName)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {media.transcript && (
-              <div className="mt-6 pt-6 border-t border-gray-700">
-                <button
-                  type="button"
-                  onClick={() => setShowTranscript(!showTranscript)}
-                  className="inline-flex items-center gap-2 text-lg font-semibold text-white hover:text-purple-300 transition-colors"
-                >
-                  Transcript
-                  {showTranscript ? <Minus className="h-4 w-4 text-gray-400" /> : <Plus className="h-4 w-4 text-gray-400" />}
-                </button>
-                {showTranscript && (
-                  <div className="mt-3 text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4 max-h-96 overflow-y-auto">
-                    {media.transcript}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
         {renderSlimSupportSection()}
 
         {/* Champions - collapsible */}

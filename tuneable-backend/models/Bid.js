@@ -92,6 +92,12 @@ const bidSchema = new mongoose.Schema({
     bidderCurrentPlaceId: { type: String },
     bidderLocationAncestorIds: [{ type: String }],
     bidderLocationDisplay: { type: String },
+    // Denormalized for Global Party location quick-picks (country vs place buckets)
+    bidderCountryPlaceId: { type: String },
+    bidderCountry: { type: String },
+    bidderCountryCode: { type: String },
+    bidderPlaceLabel: { type: String },
+    bidderFeatureType: { type: String },
     
     // ========================================
     // PERFORMANCE OPTIMIZATION (Phase 1)
@@ -289,7 +295,8 @@ bidSchema.index({ transactionHash: 1 }); // Hash lookup for verification
 bidSchema.index({ status: 1, bidderLocationAncestorIds: 1, createdAt: -1, mediaId: 1 }); // Tunefeed location filter
 bidSchema.index({ mediaId: 1, status: 1, bidderLocationAncestorIds: 1 }); // Media champions by place
 bidSchema.index({ mediaId: 1, status: 1, amount: -1 }); // Global Party top supporters per media
-bidSchema.index({ status: 1, bidderHomePlaceId: 1, createdAt: -1 }); // Global Party top locations
+bidSchema.index({ status: 1, bidderHomePlaceId: 1, createdAt: -1 }); // Global Party top places
+bidSchema.index({ status: 1, bidderCountryPlaceId: 1, createdAt: -1 }); // Global Party top countries
 
 // ========================================
 // HASH GENERATION

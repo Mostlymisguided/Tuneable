@@ -38,7 +38,8 @@ import {
   Linkedin,
   Instagram,
   SlidersHorizontal,
-  Bot
+  Bot,
+  Info
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import ReportModal from '../components/ReportModal';
@@ -229,7 +230,7 @@ const TuneProfile: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [showAllFields, setShowAllFields] = useState(false);
+  const [showTuneInfo, setShowTuneInfo] = useState(false);
   
   // Claim tune modal (rights-pending limbo only)
   const [showClaimModal, setShowClaimModal] = useState(false);
@@ -1293,7 +1294,7 @@ const TuneProfile: React.FC = () => {
       file.type === 'audio/mp3' ||
       file.name.toLowerCase().endsWith('.mp3');
     if (!isMp3) {
-      toast.error('Please select an MP3 file');
+      toast.error('Please select an audio file (MP3)');
       return;
     }
     if (file.size > 50 * 1024 * 1024) {
@@ -2063,27 +2064,13 @@ const TuneProfile: React.FC = () => {
     { label: 'Encoded By', value: media.encodedBy, icon: SlidersHorizontal },
   ];
 
-  // Populated discovery fields first; catalog/tech (ISRC, UPC, etc.) only in Show All
-  const COLLAPSED_FIELD_LABELS = [
-    'Duration',
-    'BPM',
-    'Release Date',
-    'Key',
-    'Elements',
-    'Pitch',
-    'Album',
-    'Featuring',
-    'Producer',
-    'Tags',
-  ];
-  const COLLAPSED_FIELD_LIMIT = 8;
-  const mediaFieldsByLabel = new Map(mediaFields.map((field) => [field.label, field]));
-  const detailFields = showAllFields
-    ? mediaFields
-    : COLLAPSED_FIELD_LABELS.map((label) => mediaFieldsByLabel.get(label))
-        .filter((field): field is (typeof mediaFields)[number] => Boolean(field))
-        .filter((field) => getFieldValue(field.value, (field as { fieldName?: string }).fieldName, '') !== '')
-        .slice(0, COLLAPSED_FIELD_LIMIT);
+  const detailFields = mediaFields.filter((field) => {
+    if (field.label === 'Title' || field.label === 'Artist' || field.label === 'Explicit') return true;
+    const value = field.value;
+    if (value === null || value === undefined || value === '') return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    return true;
+  });
 
   const heroMetadata = [
     media.album,
@@ -2472,6 +2459,19 @@ const TuneProfile: React.FC = () => {
                   </button>
                 )}
                 {renderShareButton()}
+                {!isEditMode && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTuneInfo((prev) => !prev)}
+                    aria-expanded={showTuneInfo}
+                    aria-controls="tune-info"
+                    className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+                  >
+                    <Info className="h-4 w-4" />
+                    <span>Info</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${showTuneInfo ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleOpenTipModal}
@@ -2490,6 +2490,45 @@ const TuneProfile: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Tune details — expanded from Info control */}
+        {!isEditMode && showTuneInfo && (
+          <div id="tune-info" className="mb-8 px-2 md:px-0">
+            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {detailFields.map((field, index) => {
+                  const IconComponent = field.icon;
+                  const isArtistField = field.label === 'Artist';
+
+                  return (
+                    <div key={index} className="flex items-start space-x-3">
+                      <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
+                      <div>
+                        <div className="text-sm text-gray-300">{field.label}</div>
+                        <div className="text-white font-medium">
+                          {isArtistField ? (
+                            <ClickableArtistDisplay media={media} />
+                          ) : (
+                            getFieldValue(field.value, (field as any).fieldName)
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {media.lyrics && (
+                <div className="mt-6 pt-6 border-t border-gray-700">
+                  <h3 className="text-lg font-semibold text-white mb-3">Lyrics</h3>
+                  <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
+                    {media.lyrics}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Related Tunes — discovery rail directly below header */}
         {!isEditMode && (isLoadingRelatedPlaylists || relatedMedia.length > 0) && (
@@ -2511,13 +2550,11 @@ const TuneProfile: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="card bg-black/20 rounded-lg p-4">
-              {isLoadingRelatedPlaylists ? (
-                <div className="text-gray-400 text-sm">Loading related tunes...</div>
-              ) : (
-                renderRecommendedQueueList(relatedMedia)
-              )}
-            </div>
+            {isLoadingRelatedPlaylists ? (
+              <div className="text-gray-400 text-sm">Loading related tunes...</div>
+            ) : (
+              renderRecommendedQueueList(relatedMedia)
+            )}
           </div>
         )}
 
@@ -2563,53 +2600,6 @@ const TuneProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {/* About this tune */}
-        <div className="mb-8 px-2 md:px-0">
-          <div className="flex items-center justify-between mb-3 md:mb-4">
-            <h2 className="text-xl md:text-2xl font-bold text-white">About this tune</h2>
-            <button
-              onClick={() => setShowAllFields(!showAllFields)}
-              className="flex items-center px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white transition-colors text-sm md:text-base"
-            >
-              {showAllFields ? 'Show Less' : 'Show All'}
-            </button>
-          </div>
-          
-          <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-              {detailFields.map((field, index) => {
-                const IconComponent = field.icon;
-                const isArtistField = field.label === 'Artist';
-                
-                return (
-                  <div key={index} className="flex items-start space-x-3">
-                    <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
-                    <div>
-                      <div className="text-sm text-gray-300">{field.label}</div>
-                      <div className="text-white font-medium">
-                        {isArtistField ? (
-                          <ClickableArtistDisplay media={media} />
-                        ) : (
-                          getFieldValue(field.value, (field as any).fieldName)
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {media.lyrics && (
-              <div className="mt-6 pt-6 border-t border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-3">Lyrics</h3>
-                <div className="text-gray-300 whitespace-pre-wrap bg-black/10 rounded-lg p-4">
-                  {media.lyrics}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {renderSlimSupportSection()}
 
         {/* Production Stack Section */}
@@ -3951,10 +3941,10 @@ const TuneProfile: React.FC = () => {
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
                     >
                       <Upload className="h-4 w-4" />
-                      <span>Replace MP3</span>
+                      <span>Replace audio</span>
                     </button>
                     <p className="text-xs text-gray-400 mt-1">
-                      Upload a new MP3 to replace the current audio file used for playback.
+                      Upload a new audio file (MP3) to replace the current file used for playback.
                     </p>
                   </div>
                 )}
@@ -4111,7 +4101,7 @@ const TuneProfile: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl md:text-2xl font-bold text-white">
                 {attachAudioReplace
-                  ? 'Replace MP3'
+                  ? 'Replace audio'
                   : isContributorAudioUpload()
                     ? 'Upload on behalf'
                     : 'Upload audio'}
@@ -4127,10 +4117,10 @@ const TuneProfile: React.FC = () => {
 
             <p className="text-gray-300 text-sm mb-4">
               {attachAudioReplace
-                ? `Replace the MP3 for "${media.title}". The previous file will no longer be used for playback.`
+                ? `Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`
                 : isContributorAudioUpload()
-                  ? `Attach an MP3 for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
-                  : `Attach your MP3 for "${media.title}". This will make the tune playable on Tuneable.`}
+                  ? `Attach an audio file (MP3) for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
+                  : `Attach your audio file (MP3) for "${media.title}". This will make the tune playable on Tuneable.`}
             </p>
 
             {isContributorAudioUpload() && (
@@ -4145,7 +4135,7 @@ const TuneProfile: React.FC = () => {
             )}
 
             <div className="mb-4">
-              <label className="block text-white font-medium mb-2">MP3 file</label>
+              <label className="block text-white font-medium mb-2">Audio file (MP3)</label>
               <input
                 ref={audioFileInputRef}
                 type="file"
@@ -4160,7 +4150,7 @@ const TuneProfile: React.FC = () => {
                 className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <Upload className="h-5 w-5" />
-                {attachAudioFile ? attachAudioFile.name : 'Choose MP3 file'}
+                {attachAudioFile ? attachAudioFile.name : 'Choose Audio File'}
               </button>
               {attachAudioFile && (
                 <p className="text-xs text-gray-400 mt-1">

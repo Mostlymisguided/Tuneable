@@ -403,6 +403,61 @@ function formatLocationDisplay(location) {
 }
 
 /**
+ * Country-level Mapbox place from a resolved location (self or ancestors).
+ */
+function extractCountryFromLocation(location) {
+  if (!location) return null;
+
+  if (location.featureType === 'country' && location.placeId) {
+    const name = location.country || location.label || location.display || null;
+    if (!name) return null;
+    return {
+      placeId: location.placeId,
+      country: name,
+      countryCode: location.countryCode || '',
+    };
+  }
+
+  const ancestors = Array.isArray(location.ancestors) ? location.ancestors : [];
+  const countryAncestor = ancestors.find((a) => a.placetype === 'country');
+  if (countryAncestor?.placeId) {
+    return {
+      placeId: countryAncestor.placeId,
+      country: countryAncestor.label || location.country || 'Country',
+      countryCode: countryAncestor.countryCode || location.countryCode || '',
+    };
+  }
+
+  if (location.country) {
+    return {
+      placeId: null,
+      country: location.country,
+      countryCode: location.countryCode || '',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Short place label for chips (city/town), excluding country-only homes.
+ */
+function extractPlaceLabel(location) {
+  if (!location || location.featureType === 'country') return null;
+
+  if (location.city) return location.city;
+  if (location.label && location.featureType && location.featureType !== 'country') {
+    return location.label;
+  }
+
+  const display = formatLocationDisplay(location);
+  if (!display) return null;
+  const parts = display.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts[0];
+  return null;
+}
+
+/**
  * Snapshot home (+ optional current) location onto a Bid for Tunefeed / local charts.
  * Ancestor IDs are the union of both places so one tip can influence charts in both.
  */
@@ -418,11 +473,20 @@ function getBidLocationSnapshot(homeLocation, currentLocation = null) {
     return {};
   }
 
+  const country = extractCountryFromLocation(home) || extractCountryFromLocation(current);
+  const placeLabel = extractPlaceLabel(home) || extractPlaceLabel(current);
+  const primary = home || current;
+
   return {
     bidderHomePlaceId: home?.placeId || null,
     bidderCurrentPlaceId: current?.placeId || null,
     bidderLocationAncestorIds,
     bidderLocationDisplay: formatLocationDisplay(home) || formatLocationDisplay(current),
+    bidderCountryPlaceId: country?.placeId || null,
+    bidderCountry: country?.country || null,
+    bidderCountryCode: country?.countryCode || null,
+    bidderPlaceLabel: placeLabel || null,
+    bidderFeatureType: primary?.featureType || null,
   };
 }
 
@@ -445,5 +509,8 @@ module.exports = {
   getUserBidLocation,
   getBidLocationSnapshot,
   buildBidLocationSnapshot,
+  extractCountryFromLocation,
+  extractPlaceLabel,
+  formatLocationDisplay,
 };
 

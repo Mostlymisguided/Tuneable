@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Headphones, Music, Home, LogOut, Compass, Podcast, Plus, MessagesSquare } from 'lucide-react';
+import { User as UserIcon, Headphones, Music, Home, LogOut, Compass, Podcast, Plus } from 'lucide-react';
 import AddMediaModal from './AddMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -71,18 +71,7 @@ const Navbar: React.FC = () => {
                   <Headphones className="h-5 w-5 sm:hidden" />
                   <span className="hidden sm:inline">Podcasts</span>
                 </Link>
-                {user.role?.includes('admin') && (
-                  <Link
-                    to="/conversations"
-                    className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
-                    style={{ textDecoration: 'none' }}
-                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                  >
-                    <MessagesSquare className="h-5 w-5 sm:hidden" />
-                    <span className="hidden sm:inline">Talks</span>
-                  </Link>
-                )}
+                {/* Talks nav hidden for now; /conversations still reachable by URL */}
                 <Link
                   to="/party/global?period=all-time"
                   className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"

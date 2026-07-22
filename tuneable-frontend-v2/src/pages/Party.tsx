@@ -30,7 +30,7 @@ import {
   isLocationMatch,
   formatLocation,
   getCountryPickFromLocation,
-  countryPickToResolvedLocation,
+  locationPickToResolvedLocation,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
@@ -1442,30 +1442,71 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       .slice(0, 30);
   }, [party]);
 
-  // Top countries by tip volume (prefer server aggregate; fall back to scanning slim bids)
+  // Top countries + places by tip volume (prefer server aggregate; fall back to scanning slim bids)
   const topLocations = useMemo(() => {
     if (!party || !isGlobalParty) {
-      return [] as Array<{ pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }>;
+      return [] as Array<{
+        pick: {
+          placeId: string;
+          country: string;
+          countryCode: string;
+          display: string;
+          label: string;
+          kind: 'country' | 'place';
+          featureType?: string;
+        };
+        total: number;
+        count: number;
+      }>;
     }
 
     const serverLocations = (party as any).topLocations;
     if (Array.isArray(serverLocations) && serverLocations.length > 0) {
       return serverLocations
         .filter((loc: any) => loc?.placeId)
-        .map((loc: any) => ({
-          pick: {
-            placeId: loc.placeId,
-            country: loc.country || loc.display || 'Unknown',
-            countryCode: loc.countryCode || '',
-            display: loc.display || loc.country || 'Unknown',
-          },
-          total: loc.total || 0,
-          count: loc.count || 0,
-        }));
+        .map((loc: any) => {
+          const kind: 'country' | 'place' =
+            loc.kind === 'place' || loc.featureType === 'place' || loc.featureType === 'locality'
+              ? 'place'
+              : loc.kind === 'country' || loc.featureType === 'country'
+                ? 'country'
+                : loc.label && loc.label !== loc.country
+                  ? 'place'
+                  : 'country';
+          const label = loc.label || loc.display || loc.country || 'Unknown';
+          return {
+            pick: {
+              placeId: loc.placeId,
+              country: loc.country || (kind === 'country' ? label : '') || 'Unknown',
+              countryCode: loc.countryCode || '',
+              display: loc.display || label,
+              label,
+              kind,
+              featureType: loc.featureType || kind,
+            },
+            total: loc.total || 0,
+            count: loc.count || 0,
+          };
+        });
     }
 
     const startDate = getPeriodStartDate(selectedTimePeriod);
-    const counts: Record<string, { pick: NonNullable<ReturnType<typeof getCountryPickFromLocation>>; total: number; count: number }> = {};
+    const counts: Record<
+      string,
+      {
+        pick: {
+          placeId: string;
+          country: string;
+          countryCode: string;
+          display: string;
+          label: string;
+          kind: 'country' | 'place';
+          featureType?: string;
+        };
+        total: number;
+        count: number;
+      }
+    > = {};
     const media = getPartyMedia().filter((it: any) => it.status === 'active');
 
     for (const item of media) {
@@ -1484,7 +1525,18 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
         const key = countryPick.placeId;
         const amount = typeof bid.amount === 'number' ? bid.amount : 0;
-        if (!counts[key]) counts[key] = { pick: countryPick, total: 0, count: 0 };
+        if (!counts[key]) {
+          counts[key] = {
+            pick: {
+              ...countryPick,
+              label: countryPick.label || countryPick.country,
+              kind: 'country',
+              featureType: 'country',
+            },
+            total: 0,
+            count: 0,
+          };
+        }
         counts[key].total += amount;
         counts[key].count += 1;
       }
@@ -1495,13 +1547,17 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   }, [party, isGlobalParty, selectedTimePeriod]);
 
   const locationQuickPicks = useMemo(() => {
-    const maxPicks = isMobile ? 5 : 6;
+    // Server already returns ~3 countries + ~4 places; allow room for user pin
+    const maxPicks = isMobile ? 8 : 9;
     const userPick = getCountryPickFromLocation(user?.homeLocation);
     const picks: Array<{
       placeId: string;
       country: string;
       countryCode: string;
       display: string;
+      label: string;
+      kind: 'country' | 'place';
+      featureType?: string;
       total: number;
       isUser: boolean;
     }> = [];
@@ -1510,6 +1566,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
       picks.push({
         ...userPick,
+        label: userPick.label || userPick.country,
+        kind: 'country',
+        featureType: 'country',
         total: userStats?.total ?? 0,
         isUser: true,
       });
@@ -1518,7 +1577,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     for (const { pick, total } of topLocations) {
       if (picks.length >= maxPicks) break;
       if (picks.some((p) => p.placeId === pick.placeId)) continue;
-      picks.push({ ...pick, total, isUser: false });
+      picks.push({
+        ...pick,
+        label: pick.label || pick.display || pick.country,
+        total,
+        isUser: false,
+      });
     }
 
     return picks;
@@ -2504,13 +2568,14 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                 <div className="flex flex-wrap gap-2">
                   {locationQuickPicks.map((loc) => {
                     const selected = selectedLocation?.placeId === loc.placeId;
+                    const name = loc.label || loc.display || loc.country;
                     return (
                       <button
                         key={loc.placeId}
                         type="button"
                         onClick={() =>
                           handleLocationFilterChange(
-                            selected ? null : countryPickToResolvedLocation(loc)
+                            selected ? null : locationPickToResolvedLocation(loc)
                           )
                         }
                         className={`rounded-full px-3 py-1 text-xs transition-colors ${
@@ -2526,7 +2591,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                               : undefined
                         }
                       >
-                        {loc.country}
+                        {name}
                         {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
                         {loc.total > 0 && (
                           <span className="ml-2 text-[10px] opacity-70">

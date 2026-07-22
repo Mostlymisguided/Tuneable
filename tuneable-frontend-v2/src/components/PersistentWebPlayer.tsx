@@ -827,7 +827,7 @@ const PersistentWebPlayer: React.FC = () => {
               <button
                   onClick={() => previous()}
                 disabled={currentMediaIndex === 0 || !currentMedia}
-                  className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Previous Song"
               >
                 <SkipBack className="h-3 w-3 md:h-4 md:w-4" />
@@ -836,7 +836,7 @@ const PersistentWebPlayer: React.FC = () => {
               <button
                   onClick={() => togglePlayPause()}
               disabled={!currentMedia}
-                  className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-600 border border-purple-500 text-white hover:bg-purple-700 hover:border-purple-400 disabled:opacity-50 disabled:cursor-not-allowed"
               title={currentMedia ? (isPlaying ? 'Pause' : 'Play') : 'No media playing'}
               >
                 {isPlaying ? (
@@ -849,7 +849,7 @@ const PersistentWebPlayer: React.FC = () => {
               <button
                   onClick={next}
                 disabled={currentMediaIndex >= queue.length - 1 || !currentMedia}
-                  className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Next Song"
               >
                 <SkipForward className="h-3 w-3 md:h-4 md:w-4" />
@@ -861,7 +861,7 @@ const PersistentWebPlayer: React.FC = () => {
               {/* Mute Toggle */}
               <button
                 onClick={toggleMute}
-                className="w-6 h-6 md:w-12 md:h-12 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (

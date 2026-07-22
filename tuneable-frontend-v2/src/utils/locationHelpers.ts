@@ -24,6 +24,10 @@ export interface CountryLocationPick {
   country: string;
   countryCode: string;
   display: string;
+  /** Chip label (country name or city/town). Defaults to country when omitted. */
+  label?: string;
+  kind?: 'country' | 'place';
+  featureType?: string;
 }
 
 /**
@@ -41,6 +45,9 @@ export function getCountryPickFromLocation(
       country: name,
       countryCode: location.countryCode || '',
       display: name,
+      label: name,
+      kind: 'country',
+      featureType: 'country',
     };
   }
 
@@ -52,6 +59,9 @@ export function getCountryPickFromLocation(
       country: name,
       countryCode: countryAncestor.countryCode || location.countryCode || '',
       display: name,
+      label: name,
+      kind: 'country',
+      featureType: 'country',
     };
   }
 
@@ -60,14 +70,32 @@ export function getCountryPickFromLocation(
 
 /** Build a minimal ResolvedLocation for country-level Tunefeed filtering. */
 export function countryPickToResolvedLocation(pick: CountryLocationPick): ResolvedLocation {
+  return locationPickToResolvedLocation({
+    ...pick,
+    kind: pick.kind || 'country',
+    featureType: pick.featureType || 'country',
+    label: pick.label || pick.country,
+  });
+}
+
+/** Build a ResolvedLocation from a country or place quick-pick chip. */
+export function locationPickToResolvedLocation(pick: CountryLocationPick): ResolvedLocation {
+  const kind = pick.kind || 'country';
+  const label = pick.label || pick.display || pick.country;
+  const display =
+    kind === 'country'
+      ? pick.country || label
+      : pick.display || label;
+
   return {
     placeProvider: 'mapbox',
     placeId: pick.placeId,
-    featureType: 'country',
-    country: pick.country,
-    countryCode: pick.countryCode,
-    display: pick.display,
-    label: pick.country,
+    featureType: pick.featureType || (kind === 'place' ? 'place' : 'country'),
+    country: pick.country || undefined,
+    countryCode: pick.countryCode || undefined,
+    city: kind === 'place' ? label : undefined,
+    display,
+    label,
     ancestorIds: [pick.placeId],
   };
 }

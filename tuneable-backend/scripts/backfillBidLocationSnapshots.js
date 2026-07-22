@@ -83,6 +83,9 @@ function bidMissingLocationQuery() {
     $or: [
       { bidderLocationAncestorIds: { $exists: false } },
       { bidderLocationAncestorIds: { $size: 0 } },
+      // Re-stamp older snapshots that lack country/place chip fields
+      { bidderCountryPlaceId: { $exists: false } },
+      { bidderCountryPlaceId: null },
     ],
   };
 }
