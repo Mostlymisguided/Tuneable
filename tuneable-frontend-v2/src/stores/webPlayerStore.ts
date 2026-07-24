@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isMediaPlayable } from '../utils/mediaPlayability';
 
 // Lightweight Media interface for webplayer (subset of full Media)
 interface PlayerMedia {
@@ -17,6 +18,28 @@ interface PlayerMedia {
   featuring?: any[];
   sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
   minimumBid?: number;
+  isPlayable?: boolean;
+  rightsCleared?: boolean;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+}
+
+function mediaKey(media: PlayerMedia | null | undefined): string {
+  if (!media) return '';
+  return String(media._id || media.id || '');
+}
+
+/** Find next/previous playable index. `fromIndex` is exclusive (skips that slot). */
+function findPlayableIndex(
+  queue: PlayerMedia[],
+  fromIndex: number,
+  direction: 1 | -1
+): number {
+  let i = fromIndex + direction;
+  while (i >= 0 && i < queue.length) {
+    if (isMediaPlayable(queue[i])) return i;
+    i += direction;
+  }
+  return -1;
 }
 
 interface TopBidder {
@@ -58,6 +81,8 @@ interface WebPlayerState {
   togglePlayPause: () => void;
   next: () => void;
   previous: () => void;
+  /** If current track isn't playable, advance to the next playable one (preserves play state). */
+  ensureCurrentPlayable: () => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   setIsHost: (isHost: boolean) => void;
@@ -175,60 +200,85 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       
       next: () => {
         const { queue, currentMediaIndex, sendWebSocketMessage, isHost } = get();
-        if (queue.length > 0) {
-          const nextIndex = currentMediaIndex + 1;
-          
-          // If we've reached the end of the queue, stop the player
-          if (nextIndex >= queue.length) {
-            set({ 
-              currentMedia: null, 
-              currentMediaIndex: 0,
-              isPlaying: false
-            });
-            return;
-          }
-          
-          // Move to next media and auto-play for smooth autotransition
-          set({ 
-            currentMedia: queue[nextIndex], 
-            currentMediaIndex: nextIndex,
-            isPlaying: true // Autotransition: auto-play next media when current finishes
-          });
-          
-          if (isHost && sendWebSocketMessage) {
-            sendWebSocketMessage({ type: 'NEXT' });
-          }
-        } else {
-          // No media in queue, stop the player
-          set({ 
-            currentMedia: null, 
+        if (queue.length === 0) {
+          set({
+            currentMedia: null,
             currentMediaIndex: 0,
-            isPlaying: false
+            isPlaying: false,
           });
+          return;
+        }
+
+        const nextIndex = findPlayableIndex(queue, currentMediaIndex, 1);
+        if (nextIndex < 0) {
+          set({
+            currentMedia: null,
+            currentMediaIndex: 0,
+            isPlaying: false,
+          });
+          return;
+        }
+
+        set({
+          currentMedia: queue[nextIndex],
+          currentMediaIndex: nextIndex,
+          isPlaying: true,
+          currentTime: 0,
+          duration: 0,
+          topBidder: null,
+        });
+
+        if (isHost && sendWebSocketMessage) {
+          sendWebSocketMessage({ type: 'NEXT' });
         }
       },
-      
+
       previous: () => {
         const { queue, currentMediaIndex, isPlaying, sendWebSocketMessage, isHost } = get();
-        if (queue.length > 0) {
-          const prevIndex = currentMediaIndex - 1;
-          
-          // If we're at the beginning, don't go back
-          if (prevIndex < 0) {
-            return;
-          }
-          
-          // Move to previous media
-          set({ 
-            currentMedia: queue[prevIndex], 
-            currentMediaIndex: prevIndex,
-            isPlaying: isPlaying // Keep the current playing state
-          });
-          
-          if (isHost && sendWebSocketMessage) {
-            sendWebSocketMessage({ type: 'PREVIOUS' });
-          }
+        if (queue.length === 0) return;
+
+        const prevIndex = findPlayableIndex(queue, currentMediaIndex, -1);
+        if (prevIndex < 0) return;
+
+        set({
+          currentMedia: queue[prevIndex],
+          currentMediaIndex: prevIndex,
+          isPlaying,
+          currentTime: 0,
+          duration: 0,
+          topBidder: null,
+        });
+
+        if (isHost && sendWebSocketMessage) {
+          sendWebSocketMessage({ type: 'PREVIOUS' });
         }
+      },
+
+      ensureCurrentPlayable: () => {
+        const { queue, currentMedia, currentMediaIndex, isPlaying } = get();
+        if (!currentMedia || isMediaPlayable(currentMedia)) return;
+
+        const nextIndex = findPlayableIndex(queue, currentMediaIndex, 1);
+        if (nextIndex < 0) {
+          set({
+            currentMedia: null,
+            currentMediaIndex: 0,
+            isPlaying: false,
+            currentTime: 0,
+            duration: 0,
+            topBidder: null,
+          });
+          return;
+        }
+
+        set({
+          currentMedia: queue[nextIndex],
+          currentMediaIndex: nextIndex,
+          isPlaying,
+          currentTime: 0,
+          duration: 0,
+          topBidder: null,
+        });
       },
       
       setVolume: (volume) => {
@@ -244,18 +294,25 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       },
       
       setQueue: (queue) => {
-        set({ queue });
+        const { currentMedia, currentMediaIndex } = get();
+        let nextIndex = currentMediaIndex;
+        const key = mediaKey(currentMedia);
+        if (key && queue.length > 0) {
+          const found = queue.findIndex((m) => mediaKey(m) === key);
+          if (found >= 0) nextIndex = found;
+        }
+        set({ queue, currentMediaIndex: nextIndex });
       },
-      
+
       addToQueue: (media) => {
-        set((state) => ({ 
-          queue: [...state.queue, media] 
+        set((state) => ({
+          queue: [...state.queue, media],
         }));
       },
-      
+
       removeFromQueue: (mediaId) => {
         set((state) => ({
-          queue: state.queue.filter(media => (media._id || media.id) !== mediaId)
+          queue: state.queue.filter((media) => (media._id || media.id) !== mediaId),
         }));
       },
       

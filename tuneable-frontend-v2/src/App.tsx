@@ -71,13 +71,8 @@ const Fade = cssTransition({
 
 // Component to handle simple conditional player rendering
 const PlayerRenderer = () => {
-  const { currentMedia } = useWebPlayerStore();
+  const { currentMedia, ensureCurrentPlayable } = useWebPlayerStore();
   const { currentEpisode } = usePodcastPlayerStore();
-
-  // When podcast player has an episode, show only the podcast player (don't touch web player)
-  if (currentEpisode) {
-    return <PersistentPodcastPlayer />;
-  }
 
   // Helper function to detect media type (upload-only for playback; YouTube is catalog-only)
   const detectMediaType = (media: any): 'audio' | null => {
@@ -94,15 +89,31 @@ const PlayerRenderer = () => {
     return null;
   };
 
+  const mediaId = currentMedia?._id || currentMedia?.id;
+  const canPlayCurrent =
+    !!currentMedia && isMediaPlayable(currentMedia) && detectMediaType(currentMedia) === 'audio';
+
+  // Auto-advance past catalog/unplayable items so the queue never stalls
+  useEffect(() => {
+    if (currentEpisode) return;
+    if (!currentMedia || canPlayCurrent) return;
+    ensureCurrentPlayable();
+  }, [currentEpisode, mediaId, canPlayCurrent, ensureCurrentPlayable, currentMedia]);
+
+  // When podcast player has an episode, show only the podcast player (don't touch web player)
+  if (currentEpisode) {
+    return <PersistentPodcastPlayer />;
+  }
+
   if (!currentMedia) {
     return <PersistentWebPlayer />; // Empty player chrome
   }
 
-  if (isMediaPlayable(currentMedia) && detectMediaType(currentMedia) === 'audio') {
+  if (canPlayCurrent) {
     return <MP3Player media={currentMedia} />;
   }
 
-  // Catalog entries awaiting upload — no audio engine
+  // Catalog entries awaiting upload — no audio engine (briefly, until ensureCurrentPlayable advances)
   return <PersistentWebPlayer />;
 };
 

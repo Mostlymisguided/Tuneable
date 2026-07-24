@@ -175,7 +175,7 @@ import {
   getChampionScopePicksFromLocation,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
-import { normalizeSources } from '../utils/mediaPlayability';
+import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
@@ -1371,33 +1371,49 @@ const UserProfile: React.FC = () => {
   };
 
   // Handle playing media from Tune Library with auto-transition
-  const handlePlayLibrary = (item: LibraryItem, index: number, list?: LibraryItem[]) => {
+  const handlePlayLibrary = (item: LibraryItem, _index: number, list?: LibraryItem[]) => {
     try {
       // Use provided list or full library to maintain the order the user sees.
       // Sources come from the library payload — no per-track profile fetches.
       const sortedLibrary = list ?? getSortedLibrary();
 
-      const allFormattedMedia = sortedLibrary.map((libItem) => ({
-        id: libItem.mediaUuid || libItem.mediaId,
-        _id: libItem.mediaId,
-        title: libItem.title,
-        artist: libItem.artist,
-        duration: libItem.duration,
-        coverArt: libItem.coverArt,
-        sources: normalizeSources(libItem.sources),
-        globalMediaAggregate: libItem.globalMediaAggregate,
-        bids: [],
-        addedBy: null,
-        totalBidValue: libItem.globalMediaAggregate,
-        sourceType: 'library',
-      })) as any[];
+      const allFormattedMedia = sortedLibrary
+        .map((libItem) => ({
+          id: libItem.mediaUuid || libItem.mediaId,
+          _id: libItem.mediaId,
+          title: libItem.title,
+          artist: libItem.artist,
+          duration: libItem.duration,
+          coverArt: libItem.coverArt,
+          sources: normalizeSources(libItem.sources),
+          globalMediaAggregate: libItem.globalMediaAggregate,
+          bids: [],
+          addedBy: null,
+          totalBidValue: libItem.globalMediaAggregate,
+          sourceType: 'library',
+        }))
+        .filter((media) => isMediaPlayable(media)) as any[];
+
+      if (allFormattedMedia.length === 0) {
+        toast.info('No playable tracks in this list — tip on tracks awaiting upload or wait for audio to be added.');
+        return;
+      }
+
+      const itemId = item.mediaUuid || item.mediaId;
+      const queueIndex = allFormattedMedia.findIndex(
+        (m) => (m._id || m.id) === itemId || m._id === item.mediaId || m.id === item.mediaUuid
+      );
+      if (queueIndex < 0) {
+        toast.info('This track is not playable yet — tip to support adding audio.');
+        return;
+      }
 
       // Clear podcast player so PlayerRenderer switches to web player
       usePodcastPlayerStore.getState().clear();
       // Set entire library as queue for auto-transition
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)
-      setCurrentMedia(allFormattedMedia[index], index);
+      setCurrentMedia(allFormattedMedia[queueIndex], queueIndex);
       play();
       setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);
@@ -1572,29 +1588,41 @@ const UserProfile: React.FC = () => {
         playPodcast();
       } else {
         const musicItems = queueItems.filter((queueItem) => !isPodcastQueueItem(queueItem));
-        const allFormattedMedia = musicItems.map((queueItem) => ({
-          id: queueItem.mediaUuid || queueItem.mediaId,
-          _id: queueItem.mediaId,
-          title: queueItem.title,
-          artist: queueItem.artist,
-          duration: queueItem.duration,
-          coverArt: queueItem.coverArt,
-          sources: normalizeSources(queueItem.sources),
-          globalMediaAggregate: 0,
-          bids: [],
-          addedBy: null,
-          totalBidValue: 0,
-          sourceType: 'user_queue' as const,
-        })) as any[];
+        const allFormattedMedia = musicItems
+          .map((queueItem) => ({
+            id: queueItem.mediaUuid || queueItem.mediaId,
+            _id: queueItem.mediaId,
+            title: queueItem.title,
+            artist: queueItem.artist,
+            duration: queueItem.duration,
+            coverArt: queueItem.coverArt,
+            sources: normalizeSources(queueItem.sources),
+            globalMediaAggregate: 0,
+            bids: [],
+            addedBy: null,
+            totalBidValue: 0,
+            sourceType: 'user_queue' as const,
+          }))
+          .filter((media) => isMediaPlayable(media)) as any[];
+
+        if (allFormattedMedia.length === 0) {
+          toast.info('No playable tracks in this queue — tip on tracks awaiting upload or wait for audio to be added.');
+          return;
+        }
 
         const queueIndex = allFormattedMedia.findIndex(
           (queueItem) => (queueItem._id || queueItem.id) === item.mediaId
             || (queueItem._id || queueItem.id) === item.mediaUuid
         );
 
+        if (queueIndex < 0) {
+          toast.info('This track is not playable yet — tip to support adding audio.');
+          return;
+        }
+
         usePodcastPlayerStore.getState().clear();
         setQueue(allFormattedMedia);
-        setCurrentMedia(allFormattedMedia[Math.max(queueIndex, 0)], Math.max(queueIndex, 0));
+        setCurrentMedia(allFormattedMedia[queueIndex], queueIndex);
         play();
         setGlobalPlayerActive(true);
       }

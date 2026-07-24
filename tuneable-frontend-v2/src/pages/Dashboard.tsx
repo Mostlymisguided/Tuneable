@@ -21,7 +21,7 @@ import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipCtaLabel from '../components/TipCtaLabel';
-import { normalizeSources } from '../utils/mediaPlayability';
+import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
 import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
 
 interface SearchResult {
@@ -537,32 +537,48 @@ Join here: ${inviteLink}`.trim();
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = (item: LibraryItem, index: number) => {
+  const handlePlay = (item: LibraryItem, _index: number) => {
     try {
       // Use sorted library to maintain the order the user sees.
       // Sources come from the library payload — no per-track profile fetches.
       const sortedLibrary = getSortedLibrary();
 
-      const allFormattedMedia = sortedLibrary.map((libItem) => ({
-        id: libItem.mediaUuid || libItem.mediaId,
-        _id: libItem.mediaId,
-        title: libItem.title,
-        artist: libItem.artist,
-        duration: libItem.duration,
-        coverArt: libItem.coverArt,
-        sources: normalizeSources(libItem.sources),
-        globalMediaAggregate: libItem.globalMediaAggregate,
-        bids: [],
-        addedBy: null,
-        totalBidValue: libItem.globalMediaAggregate,
-      })) as any[];
+      const allFormattedMedia = sortedLibrary
+        .map((libItem) => ({
+          id: libItem.mediaUuid || libItem.mediaId,
+          _id: libItem.mediaId,
+          title: libItem.title,
+          artist: libItem.artist,
+          duration: libItem.duration,
+          coverArt: libItem.coverArt,
+          sources: normalizeSources(libItem.sources),
+          globalMediaAggregate: libItem.globalMediaAggregate,
+          bids: [],
+          addedBy: null,
+          totalBidValue: libItem.globalMediaAggregate,
+        }))
+        .filter((media) => isMediaPlayable(media)) as any[];
+
+      if (allFormattedMedia.length === 0) {
+        toast.info('No playable tracks in your library — tip on tracks awaiting upload or wait for audio to be added.');
+        return;
+      }
+
+      const itemId = item.mediaUuid || item.mediaId;
+      const queueIndex = allFormattedMedia.findIndex(
+        (m) => (m._id || m.id) === itemId || m._id === item.mediaId || m.id === item.mediaUuid
+      );
+      if (queueIndex < 0) {
+        toast.info('This track is not playable yet — tip to support adding audio.');
+        return;
+      }
 
       // Clear podcast player so PlayerRenderer switches to web player
       usePodcastPlayerStore.getState().clear();
       // Set entire library as queue for auto-transition
       setQueue(allFormattedMedia);
       // Set current media to the clicked item (with its index)
-      setCurrentMedia(allFormattedMedia[index], index);
+      setCurrentMedia(allFormattedMedia[queueIndex], queueIndex);
       play();
       setGlobalPlayerActive(true);
       toast.success(`Now playing: ${item.title}`);

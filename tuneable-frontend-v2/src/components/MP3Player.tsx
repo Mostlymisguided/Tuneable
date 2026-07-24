@@ -206,6 +206,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           .catch((error) => {
             console.error('MP3Player: Native audio init failed:', error);
             setIsLoading(false);
+            useWebPlayerStore.getState().next();
           });
 
         return;
@@ -255,9 +256,14 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           }
         };
 
-      audioRef.current.onerror = (error) => {
-        console.error('MP3Player: Audio playback error:', error);
-        console.error('MP3Player: Audio element error details:', {
+      audioRef.current.onerror = () => {
+        const mediaKey = media?._id || media?.id;
+        const current = useWebPlayerStore.getState().currentMedia;
+        const currentKey = current?._id || current?.id;
+        // Ignore stale errors after we've already advanced (e.g. cleanup clearing src)
+        if (!mediaKey || mediaKey !== currentKey) return;
+
+        console.error('MP3Player: Audio playback error:', {
           error: audioRef.current?.error,
           networkState: audioRef.current?.networkState,
           readyState: audioRef.current?.readyState,
@@ -278,6 +284,8 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           });
         
         setIsLoading(false);
+        // Skip broken files so the queue keeps moving
+        useWebPlayerStore.getState().next();
       };
 
       audioRef.current.onloadstart = () => {
@@ -304,6 +312,8 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         return;
       }
       if (audioRef.current) {
+        audioRef.current.onerror = null;
+        audioRef.current.onended = null;
         audioRef.current.pause();
         audioRef.current.src = '';
         audioRef.current.load();

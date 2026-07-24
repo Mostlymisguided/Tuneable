@@ -532,8 +532,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       // This ensures the queue is updated even if it's the "same" party (e.g., on page reload)
       console.log('Updating global player queue for party:', partyId);
         
-        // Filter to only include active media for the WebPlayer
-        const queuedMedia = getPartyMedia().filter((item: any) => item.status === 'active');
+        // Filter to only include active, playable media for the WebPlayer
+        const queuedMedia = getPartyMedia().filter((item: any) => {
+          if (item.status !== 'active') return false;
+          const actualMedia = item.mediaId || item;
+          return isMediaPlayable(enrichMediaWithPlayability(actualMedia));
+        });
         console.log('Queued media for WebPlayer:', queuedMedia.length);
         console.log('All party media statuses:', getPartyMedia().map((s: any) => ({ title: s.mediaId?.title, status: s.status })));
         
@@ -636,8 +640,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Update WebPlayer queue when sorting or tag filtering changes
   useEffect(() => {
     if (party) {
-      // Use getDisplayMedia() to respect both time sorting AND tag filtering
-      const displayMedia = getDisplayMedia();
+      // Use getDisplayMedia() to respect both time sorting AND tag filtering;
+      // only enqueue playable tracks so auto-advance never stalls.
+      const displayMedia = getDisplayMedia().filter((item: any) => {
+        const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+        return isMediaPlayable(enrichMediaWithPlayability(mediaData));
+      });
       
       if (displayMedia.length > 0) {
         console.log('Updating WebPlayer queue with filtered display media:', displayMedia.length);

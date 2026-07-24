@@ -23,6 +23,9 @@ type MusicPlayerState = {
 
 let sound: Audio.Sound | null = null;
 let audioModeReady = false;
+/** Guard against skip loops when many consecutive tracks fail to load. */
+let consecutiveLoadFailures = 0;
+let skipAfterFailureInFlight = false;
 
 async function ensureAudioMode() {
   if (audioModeReady) return;
@@ -40,18 +43,38 @@ function getStore(): MusicPlayerState {
   return useMusicPlayerStore.getState();
 }
 
+async function skipAfterFailure(reason: string) {
+  if (skipAfterFailureInFlight) return;
+  skipAfterFailureInFlight = true;
+  try {
+    const { queue } = getStore();
+    consecutiveLoadFailures += 1;
+    useMusicPlayerStore.setState({
+      error: reason,
+      isPlaying: false,
+      isLoading: false,
+    });
+
+    if (queue.length === 0 || consecutiveLoadFailures > queue.length) {
+      consecutiveLoadFailures = 0;
+      return;
+    }
+
+    await getStore().next();
+  } finally {
+    skipAfterFailureInFlight = false;
+  }
+}
+
 function onStatus(status: AVPlaybackStatus) {
   if (!status.isLoaded) {
     if (status.error) {
-      useMusicPlayerStore.setState({
-        error: status.error,
-        isPlaying: false,
-        isLoading: false,
-      });
+      void skipAfterFailure(status.error);
     }
     return;
   }
 
+  consecutiveLoadFailures = 0;
   useMusicPlayerStore.setState({
     isPlaying: status.isPlaying,
     isLoading: status.isBuffering,
@@ -79,11 +102,7 @@ async function unloadSound() {
 async function loadAndPlay(item: ChartMediaItem) {
   const uri = getUploadUrl(item);
   if (!uri) {
-    useMusicPlayerStore.setState({
-      error: 'No upload audio for this track',
-      isPlaying: false,
-      isLoading: false,
-    });
+    await skipAfterFailure('No upload audio for this track');
     return;
   }
 
@@ -97,12 +116,30 @@ async function loadAndPlay(item: ChartMediaItem) {
     error: null,
   });
 
-  const created = await Audio.Sound.createAsync(
-    { uri },
-    { shouldPlay: true, progressUpdateIntervalMillis: 500 },
-    onStatus
-  );
-  sound = created.sound;
+  try {
+    const created = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: true, progressUpdateIntervalMillis: 500 },
+      onStatus
+    );
+    sound = created.sound;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load audio';
+    await skipAfterFailure(message);
+  }
+}
+
+function findPlayableIndex(
+  queue: ChartMediaItem[],
+  fromIndex: number,
+  direction: 1 | -1
+): number {
+  let i = fromIndex + direction;
+  while (i >= 0 && i < queue.length) {
+    if (isUploadPlayable(queue[i])) return i;
+    i += direction;
+  }
+  return -1;
 }
 
 export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
@@ -129,6 +166,7 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
     let index = playable.findIndex((m) => mediaId(m) === requestedId);
     if (index < 0) index = 0;
 
+    consecutiveLoadFailures = 0;
     set({ queue: playable, currentIndex: index, error: null });
     await loadAndPlay(playable[index]);
   },
@@ -158,12 +196,13 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
 
   next: async () => {
     const { queue, currentIndex } = get();
-    if (currentIndex + 1 >= queue.length) {
+    const nextIndex = findPlayableIndex(queue, currentIndex, 1);
+    if (nextIndex < 0) {
       await get().pause();
       set({ isPlaying: false });
+      consecutiveLoadFailures = 0;
       return;
     }
-    const nextIndex = currentIndex + 1;
     set({ currentIndex: nextIndex });
     await loadAndPlay(queue[nextIndex]);
   },
@@ -174,11 +213,11 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
       await get().seek(0);
       return;
     }
-    if (currentIndex <= 0) {
+    const prevIndex = findPlayableIndex(queue, currentIndex, -1);
+    if (prevIndex < 0) {
       await get().seek(0);
       return;
     }
-    const prevIndex = currentIndex - 1;
     set({ currentIndex: prevIndex });
     await loadAndPlay(queue[prevIndex]);
   },
@@ -190,6 +229,7 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
 
   clear: async () => {
     await unloadSound();
+    consecutiveLoadFailures = 0;
     set({
       queue: [],
       currentIndex: 0,

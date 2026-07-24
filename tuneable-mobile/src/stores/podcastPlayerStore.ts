@@ -27,6 +27,8 @@ type PodcastPlayerState = {
 
 let sound: Audio.Sound | null = null;
 let audioModeReady = false;
+let consecutiveLoadFailures = 0;
+let skipAfterFailureInFlight = false;
 
 async function ensureAudioMode() {
   if (audioModeReady) return;
@@ -51,18 +53,42 @@ async function unloadSound() {
   sound = null;
 }
 
+function getStore(): PodcastPlayerState {
+  return usePodcastPlayerStore.getState();
+}
+
+async function skipAfterFailure(reason: string) {
+  if (skipAfterFailureInFlight) return;
+  skipAfterFailureInFlight = true;
+  try {
+    const { queue } = getStore();
+    consecutiveLoadFailures += 1;
+    usePodcastPlayerStore.setState({
+      error: reason,
+      isPlaying: false,
+      isLoading: false,
+    });
+
+    if (queue.length === 0 || consecutiveLoadFailures > queue.length) {
+      consecutiveLoadFailures = 0;
+      return;
+    }
+
+    await getStore().next();
+  } finally {
+    skipAfterFailureInFlight = false;
+  }
+}
+
 function onStatus(status: AVPlaybackStatus) {
   if (!status.isLoaded) {
     if (status.error) {
-      usePodcastPlayerStore.setState({
-        error: status.error,
-        isPlaying: false,
-        isLoading: false,
-      });
+      void skipAfterFailure(status.error);
     }
     return;
   }
 
+  consecutiveLoadFailures = 0;
   usePodcastPlayerStore.setState({
     isPlaying: status.isPlaying,
     isLoading: status.isBuffering,
@@ -72,18 +98,14 @@ function onStatus(status: AVPlaybackStatus) {
   });
 
   if (status.didJustFinish && !status.isLooping) {
-    void usePodcastPlayerStore.getState().next();
+    void getStore().next();
   }
 }
 
 async function loadAndPlay(item: PodcastEpisode) {
   const uri = getEpisodeAudioUrl(item);
   if (!uri) {
-    usePodcastPlayerStore.setState({
-      error: 'No audio URL for this episode',
-      isPlaying: false,
-      isLoading: false,
-    });
+    await skipAfterFailure('No audio URL for this episode');
     return;
   }
 
@@ -97,12 +119,30 @@ async function loadAndPlay(item: PodcastEpisode) {
     error: null,
   });
 
-  const created = await Audio.Sound.createAsync(
-    { uri },
-    { shouldPlay: true, progressUpdateIntervalMillis: 500 },
-    onStatus
-  );
-  sound = created.sound;
+  try {
+    const created = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: true, progressUpdateIntervalMillis: 500 },
+      onStatus
+    );
+    sound = created.sound;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load audio';
+    await skipAfterFailure(message);
+  }
+}
+
+function findPlayableIndex(
+  queue: PodcastEpisode[],
+  fromIndex: number,
+  direction: 1 | -1
+): number {
+  let i = fromIndex + direction;
+  while (i >= 0 && i < queue.length) {
+    if (isEpisodePlayable(queue[i])) return i;
+    i += direction;
+  }
+  return -1;
 }
 
 export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
@@ -130,6 +170,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
     let index = playable.findIndex((e) => episodeId(e) === requestedId);
     if (index < 0) index = 0;
 
+    consecutiveLoadFailures = 0;
     set({ queue: playable, currentIndex: index, error: null });
     await loadAndPlay(playable[index]);
   },
@@ -155,12 +196,13 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
 
   next: async () => {
     const { queue, currentIndex } = get();
-    if (currentIndex + 1 >= queue.length) {
+    const nextIndex = findPlayableIndex(queue, currentIndex, 1);
+    if (nextIndex < 0) {
       await get().pause();
       set({ isPlaying: false });
+      consecutiveLoadFailures = 0;
       return;
     }
-    const nextIndex = currentIndex + 1;
     set({ currentIndex: nextIndex });
     await loadAndPlay(queue[nextIndex]);
   },
@@ -171,11 +213,11 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
       await get().seek(0);
       return;
     }
-    if (currentIndex <= 0) {
+    const prevIndex = findPlayableIndex(queue, currentIndex, -1);
+    if (prevIndex < 0) {
       await get().seek(0);
       return;
     }
-    const prevIndex = currentIndex - 1;
     set({ currentIndex: prevIndex });
     await loadAndPlay(queue[prevIndex]);
   },
@@ -187,6 +229,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
 
   clear: async () => {
     await unloadSound();
+    consecutiveLoadFailures = 0;
     set({
       queue: [],
       currentIndex: 0,

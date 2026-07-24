@@ -83,6 +83,10 @@ const PersistentPodcastPlayer: React.FC = () => {
     if (!currentEpisode || !audioUrl || !audioRef.current) {
       setIsPlayerReady(false);
       setIsLoading(false);
+      // Episode in the player but no audio URL — advance so the queue doesn't stall
+      if (currentEpisode && !audioUrl) {
+        usePodcastPlayerStore.getState().next();
+      }
       return;
     }
 
@@ -110,6 +114,12 @@ const PersistentPodcastPlayer: React.FC = () => {
 
     el.onerror = () => {
       setIsLoading(false);
+      const episodeKey = currentEpisode?._id || currentEpisode?.id;
+      const active = usePodcastPlayerStore.getState().currentEpisode;
+      const activeKey = active?._id || active?.id;
+      if (!episodeKey || episodeKey !== activeKey) return;
+      // Skip broken episodes so the podcast queue keeps moving
+      usePodcastPlayerStore.getState().next();
     };
 
     el.onended = () => {
@@ -119,6 +129,8 @@ const PersistentPodcastPlayer: React.FC = () => {
 
     el.load();
     return () => {
+      el.onerror = null;
+      el.onended = null;
       el.pause();
       el.src = '';
     };

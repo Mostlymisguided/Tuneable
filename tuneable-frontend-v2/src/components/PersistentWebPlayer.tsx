@@ -458,18 +458,8 @@ const PersistentWebPlayer: React.FC = () => {
               },
               onError: (event: any) => {
                 console.error('YouTube player error:', event.data);
-                // Error 150/101: Video cannot be played in embedded players (embedding disabled)
-                if (event.data === 150 || event.data === 101) {
-                  console.error('Video cannot be played in embedded player - embedding may be disabled');
-                  // Don't reset playing state here - let the user see the error
-                  // The video will need to be played directly on YouTube
-                } else {
-                  // For other errors, reset playing state
-                  const currentIsPlaying = useWebPlayerStore.getState().isPlaying;
-                  if (currentIsPlaying) {
-                    useWebPlayerStore.getState().pause();
-                  }
-                }
+                // Embedding disabled or other playback failures — advance the queue
+                useWebPlayerStore.getState().next();
               }
             }
           });
