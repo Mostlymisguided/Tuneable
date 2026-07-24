@@ -1864,6 +1864,9 @@ router.get('/me/wallet-history', authMiddleware, async (req, res) => {
       description: tx.description,
       stripeSessionId: tx.stripeSessionId,
       stripePaymentIntentId: tx.stripePaymentIntentId,
+      storeTransactionId: tx.storeTransactionId,
+      storeProductId: tx.storeProductId,
+      platform: tx.platform,
       metadata: tx.metadata || {},
       createdAt: tx.createdAt,
       updatedAt: tx.updatedAt
@@ -3646,6 +3649,177 @@ router.post('/admin/revoke-welcome-credit', authMiddleware, async (req, res) => 
   } catch (error) {
     console.error('Error revoking welcome credit:', error);
     res.status(500).json({ error: 'Failed to revoke welcome credit' });
+  }
+});
+
+// @route   POST /api/users/admin/freeze-wallet
+// @desc    Freeze tipping/pledges/payouts for suspicious activity (admin only)
+// @access  Private (Admin)
+router.post('/admin/freeze-wallet', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, reason } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    targetUser.walletFrozenAt = new Date();
+    targetUser.walletFrozenReason = reason || 'Suspicious tipping activity';
+    targetUser.walletFrozenBy = req.user._id;
+    await targetUser.save();
+
+    try {
+      const notificationService = require('../services/notificationService');
+      await notificationService.createNotification({
+        userId: targetUser._id,
+        type: 'admin_announcement',
+        title: 'Wallet Frozen',
+        message: targetUser.walletFrozenReason
+          ? `Your wallet has been frozen: ${targetUser.walletFrozenReason}`
+          : 'Your wallet has been frozen pending review. Contact support for help.',
+        link: '/wallet',
+        linkText: 'View Wallet',
+        groupKey: `wallet_freeze_${targetUser._id}_${Date.now()}`,
+      });
+    } catch (notificationError) {
+      console.error('Failed to create wallet freeze notification:', notificationError);
+    }
+
+    res.json({
+      message: `Froze wallet for ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        walletFrozenAt: targetUser.walletFrozenAt,
+        walletFrozenReason: targetUser.walletFrozenReason,
+      },
+    });
+  } catch (error) {
+    console.error('Error freezing wallet:', error);
+    res.status(500).json({ error: 'Failed to freeze wallet' });
+  }
+});
+
+// @route   POST /api/users/admin/unfreeze-wallet
+// @desc    Clear wallet freeze (admin only)
+// @access  Private (Admin)
+router.post('/admin/unfreeze-wallet', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    targetUser.walletFrozenAt = null;
+    targetUser.walletFrozenReason = null;
+    targetUser.walletFrozenBy = null;
+    await targetUser.save();
+
+    res.json({
+      message: `Unfroze wallet for ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        walletFrozenAt: null,
+      },
+    });
+  } catch (error) {
+    console.error('Error unfreezing wallet:', error);
+    res.status(500).json({ error: 'Failed to unfreeze wallet' });
+  }
+});
+
+// @route   POST /api/users/admin/hold-payout
+// @desc    Manually hold artist payouts (admin only)
+// @access  Private (Admin)
+router.post('/admin/hold-payout', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId, reason } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    targetUser.payoutHeldAt = new Date();
+    targetUser.payoutHeldReason = reason || 'Payout under review';
+    targetUser.payoutHeldBy = req.user._id;
+    await targetUser.save();
+
+    res.json({
+      message: `Payout hold placed for ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        payoutHeldAt: targetUser.payoutHeldAt,
+        payoutHeldReason: targetUser.payoutHeldReason,
+      },
+    });
+  } catch (error) {
+    console.error('Error holding payout:', error);
+    res.status(500).json({ error: 'Failed to hold payout' });
+  }
+});
+
+// @route   POST /api/users/admin/release-payout-hold
+// @desc    Clear manual payout hold (admin only)
+// @access  Private (Admin)
+router.post('/admin/release-payout-hold', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    targetUser.payoutHeldAt = null;
+    targetUser.payoutHeldReason = null;
+    targetUser.payoutHeldBy = null;
+    await targetUser.save();
+
+    res.json({
+      message: `Payout hold released for ${targetUser.username}`,
+      user: {
+        _id: targetUser._id,
+        username: targetUser.username,
+        payoutHeldAt: null,
+      },
+    });
+  } catch (error) {
+    console.error('Error releasing payout hold:', error);
+    res.status(500).json({ error: 'Failed to release payout hold' });
   }
 });
 

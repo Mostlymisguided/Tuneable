@@ -12,6 +12,8 @@ interface UserTopUpModalProps {
   currentBalance?: number; // in pence
   currentTunebytes?: number;
   welcomeCreditRemainingPence?: number;
+  walletFrozenAt?: string | null;
+  payoutHeldAt?: string | null;
   onTopUpComplete?: () => void;
 }
 
@@ -23,6 +25,8 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
   currentBalance,
   currentTunebytes,
   welcomeCreditRemainingPence = 0,
+  walletFrozenAt = null,
+  payoutHeldAt = null,
   onTopUpComplete
 }) => {
   const [activeTab, setActiveTab] = useState<'balance' | 'tunebytes'>('balance');
@@ -31,6 +35,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
   const [description, setDescription] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [isFreezeBusy, setIsFreezeBusy] = useState(false);
 
   const handleBalanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,8 +129,78 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
     }
   };
 
+  const handleToggleWalletFreeze = async () => {
+    const freezing = !walletFrozenAt;
+    const reason = freezing
+      ? window.prompt('Freeze reason (shown to user):', 'Suspicious tipping activity')
+      : null;
+    if (freezing && reason === null) return;
+    if (
+      !window.confirm(
+        freezing
+          ? `Freeze wallet for ${username}? They will not be able to tip, pledge, or request payouts.`
+          : `Unfreeze wallet for ${username}?`
+      )
+    ) {
+      return;
+    }
+
+    setIsFreezeBusy(true);
+    try {
+      if (freezing) {
+        const result = await userAPI.freezeWallet(userId, reason || undefined);
+        toast.success(result.message || `Froze wallet for ${username}`);
+      } else {
+        const result = await userAPI.unfreezeWallet(userId);
+        toast.success(result.message || `Unfroze wallet for ${username}`);
+      }
+      if (onTopUpComplete) onTopUpComplete();
+      onClose();
+    } catch (error: any) {
+      console.error('Error toggling wallet freeze:', error);
+      toast.error(error.response?.data?.error || 'Failed to update wallet freeze');
+    } finally {
+      setIsFreezeBusy(false);
+    }
+  };
+
+  const handleTogglePayoutHold = async () => {
+    const holding = !payoutHeldAt;
+    const reason = holding
+      ? window.prompt('Payout hold reason:', 'Payout under review')
+      : null;
+    if (holding && reason === null) return;
+    if (
+      !window.confirm(
+        holding
+          ? `Hold payouts for ${username}?`
+          : `Release payout hold for ${username}?`
+      )
+    ) {
+      return;
+    }
+
+    setIsFreezeBusy(true);
+    try {
+      if (holding) {
+        const result = await userAPI.holdPayout(userId, reason || undefined);
+        toast.success(result.message || `Payout hold placed for ${username}`);
+      } else {
+        const result = await userAPI.releasePayoutHold(userId);
+        toast.success(result.message || `Payout hold released for ${username}`);
+      }
+      if (onTopUpComplete) onTopUpComplete();
+      onClose();
+    } catch (error: any) {
+      console.error('Error toggling payout hold:', error);
+      toast.error(error.response?.data?.error || 'Failed to update payout hold');
+    } finally {
+      setIsFreezeBusy(false);
+    }
+  };
+
   const handleClose = () => {
-    if (!isSubmitting && !isRevoking) {
+    if (!isSubmitting && !isRevoking && !isFreezeBusy) {
       setBalanceAmount('');
       setTunebytesAmount('');
       setDescription('');
@@ -136,7 +211,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
 
   if (!isOpen) return null;
 
-  const busy = isSubmitting || isRevoking;
+  const busy = isSubmitting || isRevoking || isFreezeBusy;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50" style={{ zIndex: 10000 }}>
@@ -177,6 +252,16 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                 {penceToPounds(welcomeCreditRemainingPence || 0)}
               </span>
             </div>
+            {walletFrozenAt && (
+              <div>
+                <span className="text-red-400 font-semibold">Wallet frozen</span>
+              </div>
+            )}
+            {payoutHeldAt && (
+              <div>
+                <span className="text-amber-400 font-semibold">Payout held</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -302,6 +387,36 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                   </button>
                 </div>
               )}
+
+              <div className="pt-4 border-t border-gray-700 space-y-2">
+                <p className="text-xs text-gray-400">
+                  Abuse controls: freeze blocks tips, pledges, and payouts. Payout hold only blocks artist withdrawals.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleToggleWalletFreeze}
+                  disabled={busy}
+                  className={`w-full px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
+                    walletFrozenAt
+                      ? 'bg-emerald-700 hover:bg-emerald-600'
+                      : 'bg-red-800 hover:bg-red-700'
+                  }`}
+                >
+                  {walletFrozenAt ? 'Unfreeze Wallet' : 'Freeze Wallet'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTogglePayoutHold}
+                  disabled={busy}
+                  className={`w-full px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
+                    payoutHeldAt
+                      ? 'bg-emerald-700 hover:bg-emerald-600'
+                      : 'bg-amber-800 hover:bg-amber-700'
+                  }`}
+                >
+                  {payoutHeldAt ? 'Release Payout Hold' : 'Hold Payouts'}
+                </button>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleTunebytesSubmit} className="space-y-4">

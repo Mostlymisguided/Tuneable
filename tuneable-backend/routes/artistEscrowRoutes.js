@@ -125,13 +125,25 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
     const userId = req.user._id;
     const { amount, payoutMethod, payoutDetails } = req.body;
     
-    const user = await User.findById(userId).select('artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned username email creatorProfile');
+    const user = await User.findById(userId).select(
+      'artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned username email uuid creatorProfile ' +
+      'walletFrozenAt walletFrozenReason payoutHeldAt payoutHeldReason isActive'
+    );
     
     if (!user) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
+    }
+
+    try {
+      const { assertPayoutAllowed } = require('../utils/welcomeCreditPolicy');
+      await assertPayoutAllowed(user);
+    } catch (policyErr) {
+      const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+      if (sendPolicyError(res, policyErr)) return;
+      throw policyErr;
     }
     
     const availableBalance = user.artistEscrowBalance || 0;

@@ -9,7 +9,11 @@ function handleError(res, error, fallback = 'Request failed') {
   if (status >= 500) {
     console.error('Conversation route error:', error);
   }
-  return res.status(status).json({ error: error.message || fallback });
+  return res.status(status).json({
+    error: error.message || fallback,
+    ...(error.code ? { code: error.code } : {}),
+    ...(error.details || {}),
+  });
 }
 
 // List public conversations

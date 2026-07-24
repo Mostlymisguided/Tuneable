@@ -3203,6 +3203,14 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       _id: globalParty._id,
       'media.mediaId': media._id
     });
+
+    const { assertWelcomeMediaSpend, sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    try {
+      await assertWelcomeMediaSpend({ user, amountPence: bidAmountPence, media });
+    } catch (policyErr) {
+      if (sendPolicyError(res, policyErr)) return;
+      throw policyErr;
+    }
     
     // Create bid using standard party bid flow
     const Bid = require('../models/Bid');
@@ -3429,7 +3437,9 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error placing global bid:', error);
-    res.status(500).json({ error: 'Failed to place global bid', details: error.message });
+    const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    if (sendPolicyError(res, error)) return;
+    res.status(error.status || 500).json({ error: error.message || 'Failed to place global bid', details: error.message });
   }
 });
 

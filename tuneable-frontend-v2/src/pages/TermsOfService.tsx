@@ -148,7 +148,9 @@ const TermsOfService: React.FC = () => {
                   <li>Wallet funds can be added through secure payment processing via Stripe</li>
                   <li>Wallet balances are non-refundable except as required by law</li>
                   <li>Unused wallet funds remain in your account for future use</li>
-                  <li>Promotional welcome credit may be offered to new users at Tuneable's discretion. Welcome credit is not cash, has no monetary value outside the platform, and any unused welcome credit may be revoked by Tuneable at any time. Spent welcome credit is not clawed back from tips already placed.</li>
+                  <li>Promotional welcome credit may be offered to new users at Tuneable's discretion. Welcome credit is not cash, has no monetary value outside the platform, and any unused welcome credit may be revoked by Tuneable at any time (including automatic expiry after 12 months from grant). Spent welcome credit is not clawed back from tips already placed.</li>
+                  <li>Welcome credit is subject to use limits designed to prevent abuse, including a maximum of £1.11 per tip, a maximum of £3.33 and three songs per artist, and a prohibition on using welcome credit to tip media you own or control.</li>
+                  <li>Tuneable may freeze wallets or place payout holds at its sole discretion where tipping or promotional-credit activity appears abusive, fraudulent, or otherwise harmful to the Service. Frozen wallets cannot tip, pledge, or request payouts until the hold is lifted.</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">4.2 Tipping Rules</h3>
@@ -671,6 +673,7 @@ const TermsOfService: React.FC = () => {
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Violation of these Terms</li>
+                  <li>Abuse of promotional welcome credit, synthetic tipping, multi-accounting, or other manipulation of tipping or payout systems</li>
                   <li>Fraudulent or illegal activity</li>
                   <li>Abuse of the Service or other users</li>
                   <li>Inappropriate behavior, harassment, or spam</li>

@@ -1239,6 +1239,27 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Freeze / unfreeze wallet (tips, pledges, payouts)
+  freezeWallet: async (userId: string, reason?: string) => {
+    const response = await api.post('/users/admin/freeze-wallet', { userId, reason });
+    return response.data;
+  },
+
+  unfreezeWallet: async (userId: string) => {
+    const response = await api.post('/users/admin/unfreeze-wallet', { userId });
+    return response.data;
+  },
+
+  holdPayout: async (userId: string, reason?: string) => {
+    const response = await api.post('/users/admin/hold-payout', { userId, reason });
+    return response.data;
+  },
+
+  releasePayoutHold: async (userId: string) => {
+    const response = await api.post('/users/admin/release-payout-hold', { userId });
+    return response.data;
+  },
+
   // Admin: Top up user tunebytes
   topUpTunebytes: async (userId: string, amount: number, description?: string) => {
     const response = await api.post('/users/admin/top-up-tunebytes', { userId, amount, description });

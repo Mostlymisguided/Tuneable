@@ -8,6 +8,7 @@
 const notificationService = require('../services/notificationService');
 const WalletTransaction = require('../models/WalletTransaction');
 const { WELCOME_CREDIT_PENCE } = require('./welcomeCreditHelper');
+const { stampWelcomeCreditGrant, WELCOME_CREDIT_EXPIRY_MONTHS } = require('./welcomeCreditPolicy');
 
 /**
  * Give beta signup credit to a new user
@@ -38,6 +39,7 @@ const giveBetaSignupCredit = async (user) => {
     // Add credit to user balance (stored in pence) and track remaining promo credit
     user.balance = balanceBefore + BETA_SIGNUP_CREDIT_PENCE;
     user.welcomeCreditRemainingPence = (user.welcomeCreditRemainingPence || 0) + BETA_SIGNUP_CREDIT_PENCE;
+    stampWelcomeCreditGrant(user);
     await user.save();
     console.log(`✅ Added £11.11 beta signup credit to user ${user.username}. New balance: £${(user.balance / 100).toFixed(2)}`);
     
@@ -67,7 +69,7 @@ const giveBetaSignupCredit = async (user) => {
         userId: user._id,
         type: 'admin_announcement',
         title: 'Welcome Credit Added',
-        message: "Thanks for joining early — we've added £11.11 to your wallet to get you started. Unused welcome credit may be revoked at Tuneable's discretion.",
+        message: `Thanks for joining early — we've added £11.11 to your wallet to get you started. Welcome tips are capped (max £1.11 per tip, £3.33 / 3 songs per artist). Unused credit expires after ${WELCOME_CREDIT_EXPIRY_MONTHS} months and may be revoked at Tuneable's discretion.`,
         link: '/wallet',
         linkText: 'View Wallet',
         groupKey: `beta_signup_credit_${user._id}`

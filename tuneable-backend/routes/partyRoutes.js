@@ -1814,7 +1814,15 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
         // Store in pence
         const userPartyAggregate = bidAmountPence; // First bid in this party
         const userGlobalAggregate = bidAmountPence; // First bid globally
-        
+
+        const { assertWelcomeMediaSpend, sendPolicyError } = require('../utils/welcomeCreditPolicy');
+        try {
+            await assertWelcomeMediaSpend({ user, amountPence: bidAmountPence, media });
+        } catch (policyErr) {
+            if (sendPolicyError(res, policyErr)) return;
+            throw policyErr;
+        }
+
         // Create bid record with denormalized fields and aggregate tracking
         // Store amount in pence (convert from pounds input)
         const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
@@ -2081,7 +2089,9 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
     } catch (err) {
         console.error('Error adding media to party:', err);
-        res.status(500).json({ error: 'Failed to add media to party', details: err.message });
+        const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+        if (sendPolicyError(res, err)) return;
+        res.status(err.status || 500).json({ error: err.message || 'Failed to add media to party', details: err.message });
     }
 });
 
@@ -2394,6 +2404,23 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 
         // Note: User aggregate bid values are now computed dynamically by BidMetricsEngine
         // No need to calculate them here as they're not stored in the Bid model
+
+        const { assertWelcomeMediaSpend, sendPolicyError } = require('../utils/welcomeCreditPolicy');
+        try {
+            const Media = require('../models/Media');
+            const mediaForPolicy =
+              populatedMedia?.mediaOwners != null
+                ? populatedMedia
+                : await Media.findById(actualMediaId);
+            await assertWelcomeMediaSpend({
+                user,
+                amountPence: bidAmountPence,
+                media: mediaForPolicy || populatedMedia,
+            });
+        } catch (policyErr) {
+            if (sendPolicyError(res, policyErr)) return;
+            throw policyErr;
+        }
         
         // Create bid record with denormalized fields and aggregate tracking
         const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
@@ -2687,7 +2714,9 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 
     } catch (err) {
         console.error('Error placing bid:', err);
-        res.status(500).json({ error: 'Failed to place bid', details: err.message });
+        const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+        if (sendPolicyError(res, err)) return;
+        res.status(err.status || 500).json({ error: err.message || 'Failed to place bid', details: err.message });
     }
 });
 

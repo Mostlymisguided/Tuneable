@@ -43,6 +43,17 @@ const userSchema = new mongoose.Schema({
   // Example: 1050 represents £10.50, 3300 represents £33.00
   // Unspent promotional welcome credit still in the wallet (pence). Spent promo-first; revocable by admin.
   welcomeCreditRemainingPence: { type: Number, default: 0, min: 0 },
+  // When welcome credit was granted / when unused remainder expires (auto-revoked on spend attempts).
+  welcomeCreditGrantedAt: { type: Date, default: null },
+  welcomeCreditExpiresAt: { type: Date, default: null },
+  // Soft freeze: blocks tipping / pledges / payouts without deactivating the account.
+  walletFrozenAt: { type: Date, default: null },
+  walletFrozenReason: { type: String, default: null },
+  walletFrozenBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // Manual payout hold (ops). Separate from automated welcome-origin risk gate.
+  payoutHeldAt: { type: Date, default: null },
+  payoutHeldReason: { type: String, default: null },
+  payoutHeldBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   inviteCredits: { type: Number, default: 10 }, // Invite credits for inviting new users
   tuneBytes: { 
     type: Number, 

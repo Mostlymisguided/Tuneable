@@ -56,6 +56,8 @@ interface User {
   inviteCredits?: number;
   tuneBytes?: number;
   welcomeCreditRemainingPence?: number;
+  walletFrozenAt?: string | null;
+  payoutHeldAt?: string | null;
   createdAt: string;
   lastLoginAt?: string;
   oauthVerified?: {
@@ -163,7 +165,15 @@ const Admin: React.FC = () => {
 
   // Top-up modal state
   const [topUpModalOpen, setTopUpModalOpen] = useState(false);
-  const [selectedUserForTopUp, setSelectedUserForTopUp] = useState<{ id: string; username: string; balance?: number; tuneBytes?: number; welcomeCreditRemainingPence?: number } | null>(null);
+  const [selectedUserForTopUp, setSelectedUserForTopUp] = useState<{
+    id: string;
+    username: string;
+    balance?: number;
+    tuneBytes?: number;
+    welcomeCreditRemainingPence?: number;
+    walletFrozenAt?: string | null;
+    payoutHeldAt?: string | null;
+  } | null>(null);
 
   // Payout management state
   const [payoutRequests, setPayoutRequests] = useState<any[]>([]);
@@ -1755,6 +1765,8 @@ const Admin: React.FC = () => {
                                       balance: user.balance,
                                       tuneBytes: user.tuneBytes,
                                       welcomeCreditRemainingPence: user.welcomeCreditRemainingPence || 0,
+                                      walletFrozenAt: user.walletFrozenAt || null,
+                                      payoutHeldAt: user.payoutHeldAt || null,
                                     });
                                     setTopUpModalOpen(true);
                                   }}
@@ -4332,6 +4344,8 @@ const Admin: React.FC = () => {
             currentBalance={selectedUserForTopUp.balance}
             currentTunebytes={selectedUserForTopUp.tuneBytes}
             welcomeCreditRemainingPence={selectedUserForTopUp.welcomeCreditRemainingPence || 0}
+            walletFrozenAt={selectedUserForTopUp.walletFrozenAt || null}
+            payoutHeldAt={selectedUserForTopUp.payoutHeldAt || null}
             onTopUpComplete={() => {
               // Refresh users list to show updated balances
               loadUsers();

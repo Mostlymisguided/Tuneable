@@ -41,25 +41,20 @@ function applyWalletSpend(user, amountPence) {
 }
 
 /**
- * Restore welcome credit remaining after a refund of spend that used it.
- * Mutates user in memory; caller must save.
+ * Historically restored welcome credit on refund. That enabled promo recycle /
+ * chart loops, so refunds now return as paid balance only.
+ * Kept as a no-op so existing callers remain safe.
  */
-function restoreWelcomeCredit(user, welcomeCreditAppliedPence) {
-  const amount = Math.max(0, Math.round(Number(welcomeCreditAppliedPence)) || 0);
-  if (amount <= 0) return;
-  user.welcomeCreditRemainingPence = getWelcomeCreditRemaining(user) + amount;
+function restoreWelcomeCredit(_user, _welcomeCreditAppliedPence) {
+  // Intentionally no-op — do not restore promotional credit on refund.
 }
 
 /**
- * Build Mongo $inc fields for a balance refund that also restores welcome credit.
+ * Build Mongo $inc fields for a balance refund.
+ * Refunded funds return as paid wallet balance; welcome credit is not restored.
  */
-function balanceRefundInc(balancePence, welcomeCreditAppliedPence = 0) {
-  const inc = { balance: balancePence };
-  const welcome = Math.max(0, Math.round(Number(welcomeCreditAppliedPence)) || 0);
-  if (welcome > 0) {
-    inc.welcomeCreditRemainingPence = welcome;
-  }
-  return inc;
+function balanceRefundInc(balancePence, _welcomeCreditAppliedPence = 0) {
+  return { balance: balancePence };
 }
 
 /**

@@ -263,6 +263,14 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     if (!episode) {
       return res.status(404).json({ error: 'Episode not found' });
     }
+
+    const { assertWelcomeMediaSpend, sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    try {
+      await assertWelcomeMediaSpend({ user, amountPence: bidAmountPence, media: episode });
+    } catch (policyErr) {
+      if (sendPolicyError(res, policyErr)) return;
+      throw policyErr;
+    }
     
     // Get Global Party for global bids
     const Party = require('../models/Party');
@@ -349,7 +357,9 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     res.json({ message: 'Episode boosted successfully!', episode: updatedEpisode || episode, updatedBalance: user.balance });
   } catch (error) {
     console.error('Error boosting episode:', error);
-    res.status(500).json({ error: 'Failed to boost episode' });
+    const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    if (sendPolicyError(res, error)) return;
+    res.status(error.status || 500).json({ error: error.message || 'Failed to boost episode' });
   }
 });
 
@@ -437,6 +447,14 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       };
       party.media.push(partyMediaEntry);
     }
+
+    const { assertWelcomeMediaSpend, sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    try {
+      await assertWelcomeMediaSpend({ user, amountPence: amountInPence, media: episode });
+    } catch (policyErr) {
+      if (sendPolicyError(res, policyErr)) return;
+      throw policyErr;
+    }
     
     // Capture PRE balances for ledger
     const userBalancePre = user.balance || 0;
@@ -521,7 +539,9 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     res.json({ message: 'Episode added to party and bid placed!', episode, updatedBalance: user.balance });
   } catch (error) {
     console.error('Error adding episode to party:', error);
-    res.status(500).json({ error: 'Failed to add episode to party' });
+    const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    if (sendPolicyError(res, error)) return;
+    res.status(error.status || 500).json({ error: error.message || 'Failed to add episode to party' });
   }
 });
 

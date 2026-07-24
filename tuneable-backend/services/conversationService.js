@@ -216,6 +216,9 @@ async function placePledge({ conversationId, user, amountPounds, message }) {
     throw Object.assign(new Error('Insufficient wallet balance'), { status: 400 });
   }
 
+  const { assertWelcomeGenericSpend } = require('../utils/welcomeCreditPolicy');
+  await assertWelcomeGenericSpend({ user: freshUser, amountPence });
+
   const balanceBefore = freshUser.balance;
   const { applyWalletSpend } = require('../utils/welcomeCreditHelper');
   const { welcomeCreditAppliedPence } = applyWalletSpend(freshUser, amountPence);

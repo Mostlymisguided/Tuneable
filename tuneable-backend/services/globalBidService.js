@@ -142,6 +142,9 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     throw err;
   }
 
+  const { assertWelcomeMediaSpend } = require('../utils/welcomeCreditPolicy');
+  await assertWelcomeMediaSpend({ user, amountPence: bidAmountPence, media });
+
   const globalParty = await Party.getGlobalPartyForBid();
   if (!globalParty) {
     const err = new Error('Global Party not found. Please contact support.');
