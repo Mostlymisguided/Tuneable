@@ -12,12 +12,18 @@ import {
 } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import Constants from 'expo-constants';
 import { Screen } from '@/src/components/Screen';
+import { LegalLinks } from '@/src/components/LegalLinks';
 import { authAPI } from '@/src/api/auth';
 import { API_ORIGIN } from '@/src/api/client';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
+import {
+  isAppleSignInAvailable,
+  signInWithApple,
+} from '@/src/lib/appleAuth';
 import {
   buildOAuthStartUrl,
   extractOAuthError,
@@ -42,6 +48,7 @@ export default function RegisterScreen() {
   const {
     register,
     handleOAuthCallback,
+    applySession,
     isAuthenticated,
     isLoading: authLoading,
   } = useAuth();
@@ -65,11 +72,16 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'facebook' | null>(
-    null
-  );
+  const [oauthLoading, setOauthLoading] = useState<
+    'google' | 'facebook' | 'apple' | null
+  >(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const validateSeq = useRef(0);
+
+  useEffect(() => {
+    void isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
 
   const validateInvite = useCallback(async (code: string) => {
     const trimmed = code.trim().toUpperCase();
@@ -202,6 +214,42 @@ export default function RegisterScreen() {
     }
   };
 
+  const onApple = async () => {
+    setError(null);
+    if (inviteCode.trim().length !== 5) {
+      setError('Enter a valid invite code before continuing with Apple.');
+      return;
+    }
+    if (inviteStatus === 'invalid') {
+      setError('Invalid invite code.');
+      return;
+    }
+    setOauthLoading('apple');
+    try {
+      if (inviteStatus !== 'valid') {
+        await validateInvite(inviteCode);
+      }
+      const { token, user } = await signInWithApple({
+        inviteCode: inviteCode.trim().toUpperCase(),
+      });
+      await applySession(token, user);
+      router.replace('/(tabs)');
+    } catch (err) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code?: string }).code === 'ERR_REQUEST_CANCELED'
+      ) {
+        setError(null);
+        return;
+      }
+      setError(getApiErrorMessage(err, 'Apple sign-up failed.'));
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   const busy = submitting || oauthLoading !== null;
 
   return (
@@ -319,6 +367,20 @@ export default function RegisterScreen() {
               <View style={styles.divider} />
             </View>
 
+            {appleAvailable ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={
+                  AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                }
+                buttonStyle={
+                  AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                }
+                cornerRadius={12}
+                style={styles.appleBtn}
+                onPress={() => void onApple()}
+              />
+            ) : null}
+
             <Pressable
               style={[styles.oauthBtn, busy && styles.buttonDisabled]}
               onPress={() => void onOAuth('google')}
@@ -350,7 +412,10 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
 
-            <Text style={styles.hint}>API: {API_ORIGIN}</Text>
+            <LegalLinks />
+            {__DEV__ ? (
+              <Text style={styles.hint}>API: {API_ORIGIN}</Text>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -441,6 +506,11 @@ const styles = StyleSheet.create({
   dividerText: {
     color: colors.textMuted,
     fontSize: 13,
+  },
+  appleBtn: {
+    width: '100%',
+    height: 52,
+    marginTop: 8,
   },
   oauthBtn: {
     marginTop: 8,

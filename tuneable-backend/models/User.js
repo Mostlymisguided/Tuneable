@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema({
   googleId: { type: String, unique: true, sparse: true },
   googleAccessToken: { type: String },
   googleRefreshToken: { type: String },
+  appleId: { type: String, unique: true, sparse: true },
   soundcloudId: { type: String, unique: true, sparse: true },
   soundcloudUsername: { type: String },
   soundcloudAccessToken: { type: String },
@@ -190,6 +191,7 @@ const userSchema = new mongoose.Schema({
     default: ['user'] 
   },
   isActive: { type: Boolean, default: true },
+  deletedAt: { type: Date, default: null },
   
   // Email verification
   emailVerified: { type: Boolean, default: false },
@@ -268,6 +270,7 @@ const userSchema = new mongoose.Schema({
     facebook: { type: Boolean, default: false },
     soundcloud: { type: Boolean, default: false },
     google: { type: Boolean, default: false },
+    apple: { type: Boolean, default: false },
     spotify: { type: Boolean, default: false }
   },
   

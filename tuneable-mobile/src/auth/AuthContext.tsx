@@ -9,6 +9,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { authAPI } from '@/src/api/auth';
+import { userAPI } from '@/src/api/user';
 import { setAuthTokenGetter, setUnauthorizedHandler } from '@/src/api/client';
 import type { User } from '@/src/types/user';
 import {
@@ -33,9 +34,11 @@ interface AuthContextValue {
     parentInviteCode: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
   handleOAuthCallback: (token: string) => Promise<void>;
+  applySession: (token: string, user: User) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -62,6 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await useMusicPlayerStore.getState().clear();
     await usePodcastPlayerStore.getState().clear();
   }, []);
+
+  const applySession = useCallback(async (newToken: string, newUser: User) => {
+    setToken(newToken);
+    setUser(newUser);
+    await saveSession(newToken, JSON.stringify(newUser));
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    await userAPI.deleteAccount();
+    await logout();
+  }, [logout]);
 
   useEffect(() => {
     setAuthTokenGetter(() => tokenRef.current);
@@ -104,10 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       identifier.trim(),
       password
     );
-    setToken(newToken);
-    setUser(newUser);
-    await saveSession(newToken, JSON.stringify(newUser));
-  }, []);
+    await applySession(newToken, newUser);
+  }, [applySession]);
 
   const register = useCallback(
     async (input: {
@@ -122,11 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: input.password,
         parentInviteCode: input.parentInviteCode.trim().toUpperCase(),
       });
-      setToken(newToken);
-      setUser(newUser);
-      await saveSession(newToken, JSON.stringify(newUser));
+      await applySession(newToken, newUser);
     },
-    []
+    [applySession]
   );
 
   const refreshUser = useCallback(async () => {
@@ -173,9 +183,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      deleteAccount,
       refreshUser,
       updateBalance,
       handleOAuthCallback,
+      applySession,
     }),
     [
       user,
@@ -184,9 +196,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      deleteAccount,
       refreshUser,
       updateBalance,
       handleOAuthCallback,
+      applySession,
     ]
   );
 

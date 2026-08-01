@@ -41,14 +41,15 @@ const DataDeletion: React.FC = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Method 1: Delete Account Through App</h2>
               <div className="space-y-4">
                 <ol className="list-decimal pl-6 space-y-3 text-gray-700">
-                  <li>Log in to your Tuneable account</li>
-                  <li>Go to your Profile page</li>
-                  <li>Click on "Account Settings" or "Privacy Settings"</li>
-                  <li>Scroll down to find "Delete Account" option</li>
-                  <li>Click "Delete Account" and confirm your decision</li>
-                  <li>Enter your password to confirm (if applicable)</li>
-                  <li>Your account and all data will be deleted within 24 hours</li>
+                  <li>Log in to your Tuneable account in the mobile app</li>
+                  <li>Open your Profile tab</li>
+                  <li>Tap the settings gear, then choose <strong>Delete account</strong></li>
+                  <li>Confirm deletion twice when prompted</li>
+                  <li>Your account is deactivated immediately and personal data is anonymized</li>
                 </ol>
+                <p className="text-gray-700">
+                  On the website, you can also request deletion via email (Method 2) until in-web deletion is available.
+                </p>
               </div>
             </section>
 

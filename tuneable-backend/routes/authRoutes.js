@@ -1047,4 +1047,208 @@ router.post('/refresh', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * Sign in with Apple (native identity token).
+ * Body: { identityToken, invite?, fullName?: { givenName, familyName }, email? }
+ * Existing Apple users log in. New users require a valid invite code.
+ */
+router.post('/apple', async (req, res) => {
+  try {
+    const { verifyAppleIdentityToken } = require('../services/appleSignInService');
+    const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
+    const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
+
+    const { identityToken, invite, fullName, email: clientEmail } = req.body || {};
+    const verified = await verifyAppleIdentityToken(identityToken);
+    const appleId = verified.appleId;
+    const email =
+      verified.email ||
+      (typeof clientEmail === 'string' && clientEmail.trim()
+        ? clientEmail.trim()
+        : null);
+
+    let user = await User.findOne({ appleId });
+
+    if (!user && email) {
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const byEmail = await User.findOne({
+        email: { $regex: new RegExp(`^${escapeRegex(email)}$`, 'i') },
+      });
+      if (byEmail) {
+        if (byEmail.appleId && byEmail.appleId !== appleId) {
+          return res.status(409).json({
+            error: 'This email is linked to a different Apple account',
+          });
+        }
+        byEmail.appleId = appleId;
+        byEmail.oauthVerified = byEmail.oauthVerified || {};
+        byEmail.oauthVerified.apple = true;
+        if (verified.emailVerified) byEmail.emailVerified = true;
+        byEmail.lastLoginAt = new Date();
+        await byEmail.save();
+        user = byEmail;
+      }
+    }
+
+    if (user) {
+      if (!user.isActive) {
+        return res.status(401).json({
+          error: 'Account is inactive. Please contact support.',
+        });
+      }
+      user.appleId = appleId;
+      user.oauthVerified = user.oauthVerified || {};
+      user.oauthVerified.apple = true;
+      if (fullName?.givenName && !user.givenName) {
+        user.givenName = fullName.givenName;
+      }
+      if (fullName?.familyName && !user.familyName) {
+        user.familyName = fullName.familyName;
+      }
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      const token = jwt.sign(
+        { userId: user.uuid, email: user.email, username: user.username },
+        SECRET_KEY,
+        { expiresIn: '24h' }
+      );
+      return res.json({ message: 'Login successful!', token, user });
+    }
+
+    // New user — invite required
+    const inviteCode = typeof invite === 'string' ? invite.trim().toUpperCase() : '';
+    if (!inviteCode) {
+      return res.status(400).json({
+        error: 'Valid invite code required to create account',
+        code: 'invite_required',
+      });
+    }
+
+    const inviter = await User.findByInviteCode(inviteCode);
+    if (!inviter) {
+      return res.status(400).json({ error: 'Invalid invite code' });
+    }
+    const inviteCodeObj = inviter.findInviteCodeObject(inviteCode);
+    if (inviteCodeObj && !inviteCodeObj.isActive) {
+      return res.status(400).json({ error: 'This invite code has been deactivated' });
+    }
+    const isInviterAdmin = inviter.role && inviter.role.includes('admin');
+    if (!isInviterAdmin && (!inviter.inviteCredits || inviter.inviteCredits <= 0)) {
+      return res.status(400).json({ error: 'This invite code has no remaining invites' });
+    }
+
+    const givenName = fullName?.givenName || null;
+    const familyName = fullName?.familyName || null;
+    const username = await generateUniqueOAuthUsername({
+      profile: {
+        id: appleId,
+        name: { givenName, familyName },
+        displayName: [givenName, familyName].filter(Boolean).join(' ') || null,
+      },
+      email,
+      provider: 'apple',
+    });
+
+    const generateInviteCode = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let result = '';
+      for (let i = 0; i < 5; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    };
+    const newInviteCode = generateInviteCode();
+
+    user = new User({
+      appleId,
+      email: email || undefined,
+      username,
+      givenName: givenName || '',
+      familyName: familyName || '',
+      isActive: true,
+      role: ['user'],
+      balance: 0,
+      personalInviteCode: newInviteCode,
+      personalInviteCodes: [
+        {
+          code: newInviteCode,
+          isActive: true,
+          label: 'Primary',
+          createdAt: new Date(),
+          usageCount: 0,
+        },
+      ],
+      parentInviteCode: inviteCode,
+      parentInviteCodeId:
+        inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : null,
+      oauthVerified: {
+        apple: true,
+        google: false,
+        facebook: false,
+        instagram: false,
+        soundcloud: false,
+        spotify: false,
+      },
+      emailVerified: Boolean(verified.emailVerified && email),
+      lastLoginAt: new Date(),
+    });
+    await user.save();
+
+    if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
+      const codeIndex = inviter.personalInviteCodes.findIndex(
+        (ic) => ic._id && ic._id.toString() === inviteCodeObj._id.toString()
+      );
+      if (codeIndex !== -1) {
+        inviter.personalInviteCodes[codeIndex].usageCount =
+          (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
+        await inviter.save();
+      }
+    }
+
+    try {
+      await giveBetaSignupCredit(user);
+    } catch (betaCreditError) {
+      console.error('Failed to give beta signup credit:', betaCreditError);
+    }
+
+    if (!isInviterAdmin && inviter.inviteCredits > 0) {
+      inviter.inviteCredits -= 1;
+      await inviter.save();
+    }
+
+    try {
+      const Party = require('../models/Party');
+      const globalParty = await Party.getGlobalParty();
+      if (globalParty && !globalParty.partiers.includes(user._id)) {
+        globalParty.partiers.push(user._id);
+        await globalParty.save();
+        user.joinedParties = user.joinedParties || [];
+        user.joinedParties.push({ partyId: globalParty._id, role: 'partier' });
+        await user.save();
+      }
+    } catch (globalPartyError) {
+      console.error('Failed to auto-join Apple user to Global Party:', globalPartyError);
+    }
+
+    const token = jwt.sign(
+      { userId: user.uuid, email: user.email, username: user.username },
+      SECRET_KEY,
+      { expiresIn: '24h' }
+    );
+
+    return res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error('Apple Sign In error:', error);
+    const status = error.status || 500;
+    return res.status(status).json({
+      error: error.message || 'Apple Sign In failed',
+    });
+  }
+});
+
 module.exports = router;

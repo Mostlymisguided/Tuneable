@@ -28,7 +28,7 @@ import type {
 } from '@/src/types/user';
 
 export default function ProfileScreen() {
-  const { user, logout, updateBalance } = useAuth();
+  const { user, logout, deleteAccount, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const canUpload = canUploadMedia(user);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -162,6 +162,10 @@ export default function ProfileScreen() {
           router.push('/upload');
         }}
         onSignOut={() => void onLogout()}
+        onDeleteAccount={async () => {
+          await deleteAccount();
+          router.replace('/login');
+        }}
       />
     </Screen>
   );

@@ -38,4 +38,14 @@ export const authAPI = {
     const response = await api.get<{ user: User }>('/users/profile');
     return response.data;
   },
+
+  appleSignIn: async (body: {
+    identityToken: string;
+    invite?: string;
+    email?: string;
+    fullName?: { givenName?: string; familyName?: string };
+  }): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/auth/apple', body);
+    return response.data;
+  },
 };

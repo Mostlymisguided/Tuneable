@@ -1114,6 +1114,98 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * @route   DELETE /api/users/me
+ * @desc    Permanently deactivate and anonymize the authenticated account (App Store / GDPR)
+ * @access  Private
+ */
+router.delete('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.deletedAt || !user.isActive) {
+      return res.json({ message: 'Account already deleted' });
+    }
+
+    const idSuffix = String(user._id).slice(-8);
+    const anonymizedUsername = `deleted_${idSuffix}`;
+
+    // Clear unique OAuth / contact identifiers so they can be reused
+    user.appleId = undefined;
+    user.googleId = undefined;
+    user.facebookId = undefined;
+    user.soundcloudId = undefined;
+    user.instagramId = undefined;
+    user.spotifyId = undefined;
+    user.googleAccessToken = undefined;
+    user.googleRefreshToken = undefined;
+    user.facebookAccessToken = undefined;
+    user.soundcloudAccessToken = undefined;
+    user.soundcloudRefreshToken = undefined;
+    user.instagramAccessToken = undefined;
+    user.spotifyAccessToken = undefined;
+    user.spotifyRefreshToken = undefined;
+
+    user.email = undefined;
+    user.password = undefined;
+    user.cellPhone = undefined;
+    user.givenName = '';
+    user.familyName = '';
+    user.profilePic =
+      'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
+    user.username = anonymizedUsername;
+    user.personalInviteCode = undefined;
+    if (Array.isArray(user.personalInviteCodes)) {
+      user.personalInviteCodes.forEach((ic) => {
+        ic.isActive = false;
+      });
+    }
+
+    user.isActive = false;
+    user.deletedAt = new Date();
+    user.balance = 0;
+    user.welcomeCreditRemainingPence = 0;
+    user.emailVerified = false;
+    user.emailVerificationToken = undefined;
+    user.passwordResetToken = undefined;
+    user.unsubscribeToken = undefined;
+    user.oauthVerified = {
+      apple: false,
+      google: false,
+      facebook: false,
+      instagram: false,
+      soundcloud: false,
+      spotify: false,
+    };
+
+    await user.save();
+
+    console.log(`🗑️ Account deleted/anonymized: ${anonymizedUsername}`);
+    return res.json({
+      message: 'Account deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    // Username collision on anonymized name is extremely unlikely; retry once
+    if (error?.code === 11000) {
+      try {
+        const user = await User.findById(req.user._id);
+        if (user) {
+          user.username = `deleted_${Date.now().toString(36)}`;
+          user.email = undefined;
+          user.isActive = false;
+          user.deletedAt = new Date();
+          await user.save();
+          return res.json({ message: 'Account deleted successfully' });
+        }
+      } catch (retryErr) {
+        console.error('Account delete retry failed:', retryErr);
+      }
+    }
+    return res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 // Get authenticated user's playback queue
 router.get('/me/queue', authMiddleware, async (req, res) => {
   try {

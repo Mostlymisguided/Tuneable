@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,10 +11,16 @@ import {
 } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import axios from 'axios';
 import { Screen } from '@/src/components/Screen';
+import { LegalLinks } from '@/src/components/LegalLinks';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
+import {
+  isAppleSignInAvailable,
+  signInWithApple,
+} from '@/src/lib/appleAuth';
 import { colors } from '@/src/theme/colors';
 import { API_ORIGIN } from '@/src/api/client';
 import {
@@ -27,15 +33,25 @@ import {
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
-  const { login, handleOAuthCallback, isAuthenticated, isLoading: authLoading } =
-    useAuth();
+  const {
+    login,
+    handleOAuthCallback,
+    applySession,
+    isAuthenticated,
+    isLoading: authLoading,
+  } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'facebook' | null>(
-    null
-  );
+  const [oauthLoading, setOauthLoading] = useState<
+    'google' | 'facebook' | 'apple' | null
+  >(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void isAppleSignInAvailable().then(setAppleAvailable);
+  }, []);
 
   if (!authLoading && isAuthenticated) {
     return <Redirect href="/(tabs)" />;
@@ -54,7 +70,9 @@ export default function LoginScreen() {
     } catch (err) {
       if (axios.isAxiosError(err) && !err.response) {
         setError(
-          `Cannot reach API at ${API_ORIGIN}. Is the backend running? On a device, use your Mac's LAN IP.`
+          __DEV__
+            ? `Cannot reach API at ${API_ORIGIN}. Is the backend running? On a device, use your Mac's LAN IP.`
+            : 'Cannot reach the server. Check your connection and try again.'
         );
       } else {
         setError(getApiErrorMessage(err, 'Login failed.'));
@@ -94,6 +112,29 @@ export default function LoginScreen() {
           ? err.message
           : `${provider} sign-in failed.`
       );
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  const onApple = async () => {
+    setError(null);
+    setOauthLoading('apple');
+    try {
+      const { token, user } = await signInWithApple();
+      await applySession(token, user);
+      router.replace('/(tabs)');
+    } catch (err) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code?: string }).code === 'ERR_REQUEST_CANCELED'
+      ) {
+        setError(null);
+        return;
+      }
+      setError(getApiErrorMessage(err, 'Apple Sign In failed.'));
     } finally {
       setOauthLoading(null);
     }
@@ -161,6 +202,20 @@ export default function LoginScreen() {
             <View style={styles.divider} />
           </View>
 
+          {appleAvailable ? (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={
+                AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+              }
+              buttonStyle={
+                AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+              }
+              cornerRadius={12}
+              style={styles.appleBtn}
+              onPress={() => void onApple()}
+            />
+          ) : null}
+
           <Pressable
             style={[styles.googleBtn, busy && styles.buttonDisabled]}
             onPress={() => void onOAuth('google')}
@@ -190,7 +245,8 @@ export default function LoginScreen() {
             <Text style={styles.linkText}>New here? Create an account</Text>
           </Pressable>
 
-          <Text style={styles.hint}>API: {API_ORIGIN}</Text>
+          <LegalLinks />
+          {__DEV__ ? <Text style={styles.hint}>API: {API_ORIGIN}</Text> : null}
         </View>
       </KeyboardAvoidingView>
     </Screen>
@@ -267,6 +323,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
   },
+  appleBtn: {
+    width: '100%',
+    height: 52,
+    marginTop: 8,
+  },
   googleBtn: {
     marginTop: 8,
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -296,7 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   hint: {
-    marginTop: 24,
+    marginTop: 16,
     textAlign: 'center',
     color: colors.textMuted,
     fontSize: 12,

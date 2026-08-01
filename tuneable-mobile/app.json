@@ -10,12 +10,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "stream.tuneable.app",
+      "buildNumber": "1",
+      "usesAppleSignIn": true,
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "stream.tuneable.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#1A1A2E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -32,6 +38,8 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-dev-client",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {
@@ -39,13 +47,15 @@
           "resizeMode": "contain",
           "backgroundColor": "#1A1A2E"
         }
-      ]
+      ],
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "apiUrl": "http://localhost:8000"
+      "apiUrl": "http://localhost:8000",
+      "defaultInviteCode": "PE856"
     }
   }
 }
