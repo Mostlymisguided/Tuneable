@@ -1,7 +1,7 @@
 const passport = require('passport');
 const FacebookStrategy = require('passport-facebook').Strategy;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const SoundCloudStrategy = require('passport-soundcloud').Strategy;
+const OAuth2Strategy = require('passport-oauth2');
 const InstagramStrategy = require('passport-instagram-graph').Strategy;
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
@@ -710,17 +710,24 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 // SoundCloud OAuth Strategy - only configure if environment variables are available
+// SoundCloud requires OAuth 2.1 with PKCE (secure.soundcloud.com). The old
+// passport-soundcloud package still hits deprecated OAuth 2.0 endpoints.
 if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
-  // Create strategy instance (don't use passport.use yet, we need to override userProfile first)
-  const strategy = new SoundCloudStrategy({
+  const strategy = new OAuth2Strategy({
+      authorizationURL: 'https://secure.soundcloud.com/authorize',
+      tokenURL: 'https://secure.soundcloud.com/oauth/token',
       clientID: process.env.SOUNDCLOUD_CLIENT_ID,
       clientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET,
       callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback",
-      passReqToCallback: true  // Enable passing req to callback for session access
+      passReqToCallback: true,
+      state: true,
+      pkce: true,
+      customHeaders: {
+        Accept: 'application/json; charset=utf-8',
+      },
     },
     async (req, accessToken, refreshToken, profileFromLibrary, done) => {
-      // The passport-soundcloud library fails due to SoundCloud's API security updates
-      // We'll manually fetch the profile using the access token with proper Authorization header
+      // Fetch profile with OAuth header if the default loader didn't populate it
       let profile = profileFromLibrary;
       
       try {
@@ -729,9 +736,10 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           console.log('🔄 Manually fetching SoundCloud profile due to library limitation');
           
           try {
-            const response = await axios.get('https://api.soundcloud.com/me.json', {
+            const response = await axios.get('https://api.soundcloud.com/me', {
               headers: {
-                'Authorization': `OAuth ${accessToken}`  // SoundCloud requires OAuth prefix
+                Authorization: `OAuth ${accessToken}`,
+                Accept: 'application/json; charset=utf-8',
               }
             });
             
@@ -1136,14 +1144,17 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
       }
     }
   );
-  
-  // Override the userProfile method to use manual fetch with proper Authorization header
+
+  strategy.name = 'soundcloud';
+
+  // SoundCloud requires Authorization: OAuth <token> (not Bearer)
   strategy.userProfile = async function(accessToken, done) {
     try {
       console.log('🔄 Fetching SoundCloud profile with proper Authorization header');
-      const response = await axios.get('https://api.soundcloud.com/me.json', {
+      const response = await axios.get('https://api.soundcloud.com/me', {
         headers: {
-          'Authorization': `OAuth ${accessToken}`  // SoundCloud requires OAuth prefix
+          Authorization: `OAuth ${accessToken}`,
+          Accept: 'application/json; charset=utf-8',
         }
       });
       
@@ -1164,7 +1175,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
       console.error('❌ Error fetching SoundCloud profile:', error);
       console.error('Error response:', error.response?.data);
       console.error('Error status:', error.response?.status);
-      return done(new Error('failed to fetch user profile', error), null);
+      return done(new Error('failed to fetch user profile'), null);
     }
   };
   
