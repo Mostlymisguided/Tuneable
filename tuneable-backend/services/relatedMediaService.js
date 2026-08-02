@@ -304,7 +304,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   }
 
   const candidateMedia = await Media.find(candidateQuery)
-    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay')
+    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay')
     .populate('globalMediaAggregateTopUser', 'username uuid _id')
     .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
     .limit(settings.candidatePoolSize)

@@ -1076,7 +1076,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay', // ✅ Updated to schema grammar field names
+                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay', // ✅ Updated to schema grammar field names
                 populate: [
                     {
                         path: 'bids',
@@ -1220,6 +1220,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 bpm: entry.mediaId.bpm ?? null,
                 releaseDate: entry.mediaId.releaseDate || null,
                 releaseYear: entry.mediaId.releaseYear ?? null,
+                primaryLocation: entry.mediaId.primaryLocation || null,
                 
                 // Party-media top bid metrics (schema grammar)
                 partyMediaBidTop: entry.partyMediaBidTop || 0,
@@ -1486,7 +1487,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                 ...GLOBAL_PARTY_TUNES_FILTER,
                 bids: { $exists: true, $ne: [] },
                 status: { $ne: 'vetoed' } // Exclude globally vetoed media
-            }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear');
+            }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear primaryLocation');
             
             // Convert to party format for consistent handling
             party = {
@@ -1515,7 +1516,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                     },
                     bids: { $exists: true, $ne: [] },
                     status: { $ne: 'vetoed' } // Exclude globally vetoed media
-                }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear');
+                }).select('title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear primaryLocation');
                 
                 // Convert to party format for consistent handling
                 party = {
@@ -1530,7 +1531,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear'
+                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear primaryLocation'
                 });
         }
 
@@ -3810,7 +3811,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear uuid featuring creatorDisplay',
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid featuring creatorDisplay',
                     populate: [
                         {
                             path: 'bids',
@@ -3927,6 +3928,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                         bpm: entry.mediaId.bpm ?? null,
                         releaseDate: entry.mediaId.releaseDate || null,
                         releaseYear: entry.mediaId.releaseYear ?? null,
+                        primaryLocation: entry.mediaId.primaryLocation || null,
                         addedBy: entry.mediaId.addedBy || entry.addedBy,
                         status: entry.status || 'active',
                         queuedAt: entry.queuedAt,

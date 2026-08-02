@@ -829,7 +829,7 @@ async function fetchTuneLibraryForUser(user) {
     
     // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm releaseDate releaseYear globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources')
+      .select('title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources')
       .populate('globalMediaAggregateTopUser', 'username uuid _id')
       .lean();
     
@@ -944,7 +944,7 @@ async function fetchTuneLibraryForUser(user) {
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, tags, globalMediaAggregate, mediaUuid, contentForm, sources;
+        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, contentForm, sources;
 
         if (media) {
           let artistName = 'Unknown Artist';
@@ -960,6 +960,7 @@ async function fetchTuneLibraryForUser(user) {
           bpm = media.bpm || null;
           releaseDate = media.releaseDate || null;
           releaseYear = media.releaseYear ?? null;
+          primaryLocation = media.primaryLocation || null;
           tags = media.tags || [];
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
@@ -975,6 +976,7 @@ async function fetchTuneLibraryForUser(user) {
           bpm = null;
           releaseDate = null;
           releaseYear = null;
+          primaryLocation = null;
           tags = [];
           globalMediaAggregate = aggregate.userBidTotal || 0; // Best we have without Media
           mediaUuid = aggregate.mediaId;
@@ -998,6 +1000,7 @@ async function fetchTuneLibraryForUser(user) {
             bpm,
             releaseDate,
             releaseYear,
+            primaryLocation,
             tags,
             contentForm: contentForm || [],
             sources,

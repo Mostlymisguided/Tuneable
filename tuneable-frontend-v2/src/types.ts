@@ -241,6 +241,30 @@ export interface Media {
   productionStack?: ProductionStack;
   aiUsage?: AiUsage;
   rightsHolder?: string;
+
+  // Origin location (Mapbox-aligned; same shape as User.homeLocation)
+  primaryLocation?: MapboxLocationFields & {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+    detectedFromIP?: boolean;
+  } | null;
+  secondaryLocation?: (MapboxLocationFields & {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  }) | null;
+  locationSource?: string | null;
   
   // Rights clearance (library import limbo vs cleared ownership)
   rightsCleared?: boolean;

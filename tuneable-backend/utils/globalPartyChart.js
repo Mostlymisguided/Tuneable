@@ -25,6 +25,7 @@ const MEDIA_CHART_SELECT = [
   'bpm',
   'releaseDate',
   'releaseYear',
+  'primaryLocation',
   'uuid',
   'globalMediaAggregate',
   'globalMediaBidTop',
@@ -527,6 +528,7 @@ async function fetchAllTimeGlobalChart({
       bpm: media.bpm ?? null,
       releaseDate: media.releaseDate || null,
       releaseYear: media.releaseYear ?? null,
+      primaryLocation: media.primaryLocation || null,
       partyMediaBidTop: media.globalMediaBidTop || 0,
       partyMediaBidTopUser: media.globalMediaBidTopUser,
       partyMediaAggregateTop: media.globalMediaAggregateTop || 0,
@@ -690,6 +692,7 @@ async function fetchPeriodGlobalChart({
       bpm: media.bpm ?? null,
       releaseDate: media.releaseDate || null,
       releaseYear: media.releaseYear ?? null,
+      primaryLocation: media.primaryLocation || null,
       addedBy: media.addedBy,
       // Keep champion fallbacks even when slim period bids omit a tipper
       partyMediaBidTop: media.globalMediaBidTop || 0,

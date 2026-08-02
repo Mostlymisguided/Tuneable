@@ -5,6 +5,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
+import { getCountryLabelFromLocation } from '../utils/locationHelpers';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
 export function normalizeQueueMediaData(rawMediaData: any) {
@@ -80,6 +81,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   const tags = mediaData.tags ?? [];
   const bpm = getBpm(mediaData);
   const releaseYear = getReleaseYear(mediaData);
+  const country = getCountryLabelFromLocation(mediaData.primaryLocation);
   const href =
     mediaHref ||
     (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
@@ -103,6 +105,13 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     metaParts.push(
       <span key="year" title={`Released ${releaseYear}`} className="tabular-nums">
         {releaseYear}
+      </span>
+    );
+  }
+  if (country) {
+    metaParts.push(
+      <span key="country" title={country} className="truncate max-w-[9rem] md:max-w-[12rem]">
+        {country}
       </span>
     );
   }

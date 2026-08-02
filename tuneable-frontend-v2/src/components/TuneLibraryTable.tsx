@@ -25,6 +25,21 @@ export interface LibraryItem {
   bpm?: number;
   releaseDate?: string | null;
   releaseYear?: number | null;
+  primaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    display?: string;
+    placeId?: string;
+    featureType?: string;
+    ancestors?: Array<{
+      placeId: string;
+      label: string;
+      placetype: string;
+      countryCode?: string;
+    }>;
+  } | null;
   tags?: string[];
   contentForm?: string[];
   sources?: Record<string, string>;

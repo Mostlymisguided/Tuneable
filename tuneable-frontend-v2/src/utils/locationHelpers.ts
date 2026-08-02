@@ -137,6 +137,18 @@ export function isLocationMatch(
 }
 
 /**
+ * Country name for compact UI (chips, meta rows). Prefers Mapbox country place,
+ * then falls back to legacy country string. Returns null when unknown.
+ */
+export function getCountryLabelFromLocation(location: Location | null | undefined): string | null {
+  if (!location) return null;
+  const pick = getCountryPickFromLocation(location);
+  if (pick?.country?.trim()) return pick.country.trim();
+  const country = location.country?.trim();
+  return country || null;
+}
+
+/**
  * Format location for display
  */
 export function formatLocation(location: Location | null | undefined): string {

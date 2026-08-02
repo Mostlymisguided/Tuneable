@@ -29,6 +29,21 @@ export interface TippedQueueItem {
   bpm?: number | null;
   releaseDate?: string | Date | null;
   releaseYear?: number | null;
+  primaryLocation?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    countryCode?: string;
+    display?: string;
+    placeId?: string;
+    featureType?: string;
+    ancestors?: Array<{
+      placeId: string;
+      label: string;
+      placetype: string;
+      countryCode?: string;
+    }>;
+  } | null;
   tags?: string[];
   bids?: Array<{
     amount?: number;
@@ -126,6 +141,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     bpm: item.bpm ?? null,
     releaseDate: item.releaseDate ?? null,
     releaseYear: item.releaseYear ?? null,
+    primaryLocation: item.primaryLocation ?? null,
     tags: item.tags || [],
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,
