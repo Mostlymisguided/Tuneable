@@ -7,6 +7,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
+const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
@@ -170,39 +171,15 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         return done(null, currentUser);
       }
       
-      // Create new user
-      // Check for invite code in session (passed from OAuth initiation)
-      let parentInviteCode = null;
-      let inviter = null;
-      let inviteCodeObj = null;
-      if (req && req.session && req.session.pendingInviteCode) {
-        const code = req.session.pendingInviteCode;
-        // Validate invite code using new helper method
-        inviter = await User.findByInviteCode(code);
-        if (inviter) {
-          parentInviteCode = code.toUpperCase();
-          inviteCodeObj = inviter.findInviteCodeObject(code);
-        }
+      // Create new user — invite optional (attribution when provided)
+      const invite = await resolveInviteForSignup(req?.session?.pendingInviteCode);
+      if (!invite.ok) {
+        return done(new Error(invite.error), null);
       }
-      
-      // Require invite code for new users
-      if (!parentInviteCode || !inviter) {
-        return done(new Error('Valid invite code required to create account'), null);
-      }
-      
-      // Check if code is active
-      if (inviteCodeObj && !inviteCodeObj.isActive) {
-        return done(new Error('This invite code has been deactivated'), null);
-      }
-      
-      // Check if inviter has invite credits (admins have unlimited credits)
-      const isInviterAdmin = inviter.role && inviter.role.includes('admin');
-      if (!isInviterAdmin) {
-        // Check if inviter has invite credits
-        if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
-          return done(new Error('This invite code has no remaining invites'), null);
-        }
-      }
+      const parentInviteCode = invite.code;
+      const inviter = invite.inviter;
+      const inviteCodeObj = invite.inviteCodeObj;
+      const isInviterAdmin = invite.isInviterAdmin;
       
       const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
       const givenName = profile.name ? profile.name.givenName : null;
@@ -263,32 +240,8 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       });
       
       await newUser.save();
-      
-      // Increment usage count for the invite code that was used
-      if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
-        const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic._id && ic._id.toString() === inviteCodeObj._id.toString());
-        if (codeIndex !== -1) {
-          inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-          await inviter.save();
-        }
-      } else if (inviter.personalInviteCode === parentInviteCode) {
-        // Legacy code handling
-        if (!inviter.personalInviteCodes || inviter.personalInviteCodes.length === 0) {
-          inviter.personalInviteCodes = [{
-            code: inviter.personalInviteCode,
-            isActive: true,
-            label: 'Primary',
-            createdAt: inviter.createdAt || new Date(),
-            usageCount: 1
-          }];
-        } else {
-          const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic.code === parentInviteCode);
-          if (codeIndex !== -1) {
-            inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-          }
-        }
-        await inviter.save();
-      }
+
+      await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
       
       // Give beta users £11.11 credit on sign up
       try {
@@ -297,13 +250,6 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       } catch (betaCreditError) {
         console.error('Failed to give beta signup credit:', betaCreditError);
         // Don't fail registration if beta credit fails
-      }
-      
-      // Decrement inviter's invite credits (unless admin - admins have unlimited)
-      if (!isInviterAdmin && inviter.inviteCredits > 0) {
-        inviter.inviteCredits -= 1;
-        await inviter.save();
-        console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
       }
       
       // Auto-join new OAuth user to Global Party
@@ -528,40 +474,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }
         }
         
-        // Create new user
-        // Check for invite code in session (passed from OAuth initiation)
-        // With passReqToCallback: true, req is available as first parameter
-        let parentInviteCode = null;
-        let inviter = null;
-        let inviteCodeObj = null;
-        if (req && req.session && req.session.pendingInviteCode) {
-          const code = req.session.pendingInviteCode;
-          // Validate invite code using new helper method
-          inviter = await User.findByInviteCode(code);
-          if (inviter) {
-            parentInviteCode = code.toUpperCase();
-            inviteCodeObj = inviter.findInviteCodeObject(code);
-          }
+        // Create new user — invite optional (attribution when provided)
+        const invite = await resolveInviteForSignup(req?.session?.pendingInviteCode);
+        if (!invite.ok) {
+          return done(new Error(invite.error), null);
         }
-        
-        // Require invite code for new users
-        if (!parentInviteCode || !inviter) {
-          return done(new Error('Valid invite code required to create account'), null);
-        }
-        
-        // Check if code is active
-        if (inviteCodeObj && !inviteCodeObj.isActive) {
-          return done(new Error('This invite code has been deactivated'), null);
-        }
-        
-        // Check if inviter has invite credits (admins have unlimited credits)
-        const isInviterAdmin = inviter.role && inviter.role.includes('admin');
-        if (!isInviterAdmin) {
-          // Check if inviter has invite credits
-          if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
-            return done(new Error('This invite code has no remaining invites'), null);
-          }
-        }
+        const parentInviteCode = invite.code;
+        const inviter = invite.inviter;
+        const inviteCodeObj = invite.inviteCodeObj;
+        const isInviterAdmin = invite.isInviterAdmin;
         
         const emailValue = profile.emails && profile.emails.length > 0 ? profile.emails[0].value : null;
         const givenName = profile.name ? profile.name.givenName : null;
@@ -631,32 +552,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         });
         
         await newUser.save();
-        
-        // Increment usage count for the invite code that was used
-        if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
-          const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic._id && ic._id.toString() === inviteCodeObj._id.toString());
-          if (codeIndex !== -1) {
-            inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-            await inviter.save();
-          }
-        } else if (inviter.personalInviteCode === parentInviteCode) {
-          // Legacy code handling
-          if (!inviter.personalInviteCodes || inviter.personalInviteCodes.length === 0) {
-            inviter.personalInviteCodes = [{
-              code: inviter.personalInviteCode,
-              isActive: true,
-              label: 'Primary',
-              createdAt: inviter.createdAt || new Date(),
-              usageCount: 1
-            }];
-          } else {
-            const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic.code === parentInviteCode);
-            if (codeIndex !== -1) {
-              inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-            }
-          }
-          await inviter.save();
-        }
+
+        await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
         
         // Give beta users £11.11 credit on sign up
         try {
@@ -665,13 +562,6 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         } catch (betaCreditError) {
           console.error('Failed to give beta signup credit:', betaCreditError);
           // Don't fail registration if beta credit fails
-        }
-        
-        // Decrement inviter's invite credits (unless admin - admins have unlimited)
-        if (!isInviterAdmin && inviter.inviteCredits > 0) {
-          inviter.inviteCredits -= 1;
-          await inviter.save();
-          console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
         }
         
         // Auto-join new Google OAuth user to Global Party
@@ -974,39 +864,15 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           return done(null, currentUser);
         }
         
-        // Create new user
-        // Check for invite code in session (passed from OAuth initiation)
-        let parentInviteCode = null;
-        let inviter = null;
-        let inviteCodeObj = null;
-        if (req && req.session && req.session.pendingInviteCode) {
-          const code = req.session.pendingInviteCode;
-          // Validate invite code using new helper method
-          inviter = await User.findByInviteCode(code);
-          if (inviter) {
-            parentInviteCode = code.toUpperCase();
-            inviteCodeObj = inviter.findInviteCodeObject(code);
-          }
+        // Create new user — invite optional (attribution when provided)
+        const invite = await resolveInviteForSignup(req?.session?.pendingInviteCode);
+        if (!invite.ok) {
+          return done(new Error(invite.error), null);
         }
-        
-        // Require invite code for new users
-        if (!parentInviteCode || !inviter) {
-          return done(new Error('Valid invite code required to create account'), null);
-        }
-        
-        // Check if code is active
-        if (inviteCodeObj && !inviteCodeObj.isActive) {
-          return done(new Error('This invite code has been deactivated'), null);
-        }
-        
-        // Check if inviter has invite credits (admins have unlimited credits)
-        const isInviterAdmin = inviter.role && inviter.role.includes('admin');
-        if (!isInviterAdmin) {
-          // Check if inviter has invite credits
-          if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
-            return done(new Error('This invite code has no remaining invites'), null);
-          }
-        }
+        const parentInviteCode = invite.code;
+        const inviter = invite.inviter;
+        const inviteCodeObj = invite.inviteCodeObj;
+        const isInviterAdmin = invite.isInviterAdmin;
         
         const usernameValue = profile.username || `soundcloud_${profile.id}`;
         
@@ -1070,32 +936,8 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         });
         
         await newUser.save();
-        
-        // Increment usage count for the invite code that was used
-        if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
-          const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic._id && ic._id.toString() === inviteCodeObj._id.toString());
-          if (codeIndex !== -1) {
-            inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-            await inviter.save();
-          }
-        } else if (inviter.personalInviteCode === parentInviteCode) {
-          // Legacy code handling
-          if (!inviter.personalInviteCodes || inviter.personalInviteCodes.length === 0) {
-            inviter.personalInviteCodes = [{
-              code: inviter.personalInviteCode,
-              isActive: true,
-              label: 'Primary',
-              createdAt: inviter.createdAt || new Date(),
-              usageCount: 1
-            }];
-          } else {
-            const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic.code === parentInviteCode);
-            if (codeIndex !== -1) {
-              inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-            }
-          }
-          await inviter.save();
-        }
+
+        await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
         
         // Give beta users £11.11 credit on sign up
         try {
@@ -1104,13 +946,6 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         } catch (betaCreditError) {
           console.error('Failed to give beta signup credit:', betaCreditError);
           // Don't fail registration if beta credit fails
-        }
-        
-        // Decrement inviter's invite credits (unless admin - admins have unlimited)
-        if (!isInviterAdmin && inviter.inviteCredits > 0) {
-          inviter.inviteCredits -= 1;
-          await inviter.save();
-          console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
         }
         
         // Auto-join new SoundCloud OAuth user to Global Party
@@ -1311,39 +1146,15 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           return done(null, currentUser);
         }
         
-        // Create new user
-        // Check for invite code in session (passed from OAuth initiation)
-        let parentInviteCode = null;
-        let inviter = null;
-        let inviteCodeObj = null;
-        if (req && req.session && req.session.pendingInviteCode) {
-          const code = req.session.pendingInviteCode;
-          // Validate invite code using new helper method
-          inviter = await User.findByInviteCode(code);
-          if (inviter) {
-            parentInviteCode = code.toUpperCase();
-            inviteCodeObj = inviter.findInviteCodeObject(code);
-          }
+        // Create new user — invite optional (attribution when provided)
+        const invite = await resolveInviteForSignup(req?.session?.pendingInviteCode);
+        if (!invite.ok) {
+          return done(new Error(invite.error), null);
         }
-        
-        // Require invite code for new users
-        if (!parentInviteCode || !inviter) {
-          return done(new Error('Valid invite code required to create account'), null);
-        }
-        
-        // Check if code is active
-        if (inviteCodeObj && !inviteCodeObj.isActive) {
-          return done(new Error('This invite code has been deactivated'), null);
-        }
-        
-        // Check if inviter has invite credits (admins have unlimited credits)
-        const isInviterAdmin = inviter.role && inviter.role.includes('admin');
-        if (!isInviterAdmin) {
-          // Check if inviter has invite credits
-          if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
-            return done(new Error('This invite code has no remaining invites'), null);
-          }
-        }
+        const parentInviteCode = invite.code;
+        const inviter = invite.inviter;
+        const inviteCodeObj = invite.inviteCodeObj;
+        const isInviterAdmin = invite.isInviterAdmin;
         
         const usernameValue = profile.username || `instagram_${profile.id}`;
         
@@ -1401,39 +1212,8 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
         });
         
         await newUser.save();
-        
-        // Increment usage count for the invite code that was used
-        if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
-          const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic._id && ic._id.toString() === inviteCodeObj._id.toString());
-          if (codeIndex !== -1) {
-            inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-            await inviter.save();
-          }
-        } else if (inviter.personalInviteCode === parentInviteCode) {
-          // Legacy code handling
-          if (!inviter.personalInviteCodes || inviter.personalInviteCodes.length === 0) {
-            inviter.personalInviteCodes = [{
-              code: inviter.personalInviteCode,
-              isActive: true,
-              label: 'Primary',
-              createdAt: inviter.createdAt || new Date(),
-              usageCount: 1
-            }];
-          } else {
-            const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic.code === parentInviteCode);
-            if (codeIndex !== -1) {
-              inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-            }
-          }
-          await inviter.save();
-        }
-        
-        // Decrement inviter's invite credits (unless admin - admins have unlimited)
-        if (!isInviterAdmin && inviter.inviteCredits > 0) {
-          inviter.inviteCredits -= 1;
-          await inviter.save();
-          console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
-        }
+
+        await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
         
         // Auto-join new Instagram OAuth user to Global Party
         try {

@@ -127,18 +127,22 @@ const RequestInvite: React.FC = () => {
               </div>
             </div>
             <h1 className="text-4xl font-bold text-white mb-3">
-              Request an Invite
+              Get in touch
             </h1>
             <p className="text-gray-300 text-lg">
-              Early access to Tuneable
+              Anyone can create a Tuneable account — or leave your details if you&apos;d like us to reach out.
             </p>
           </div>
 
           {/* Info Box */}
           <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6">
-            <h3 className="text-white font-semibold mb-2">Why invite-only?</h3>
+            <h3 className="text-white font-semibold mb-2">Ready to join?</h3>
             <p className="text-gray-300 text-sm">
-              Tuneable is invite-only with a growing community of music lovers & creators.
+              Signup is open. You can{' '}
+              <Link to="/register" className="text-purple-300 hover:underline">
+                create an account now
+              </Link>
+              , or use this form if you prefer an intro from the team.
             </p>
           </div>
 

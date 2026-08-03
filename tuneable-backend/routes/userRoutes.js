@@ -226,6 +226,7 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
+const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -332,32 +333,16 @@ router.post(
     }
     try {
       const { username, email, password, cellPhone, givenName, familyName, homeLocation, locations, parentInviteCode } = req.body;
-      
-      // Validate invite code (required)
-      if (!parentInviteCode || parentInviteCode.length !== 5) {
-        return res.status(400).json({ error: 'Valid invite code is required to register' });
+
+      // Invite is optional — if provided it must be valid (attribution / credits)
+      const invite = await resolveInviteForSignup(parentInviteCode);
+      if (!invite.ok) {
+        return res.status(400).json({ error: invite.error });
       }
-      
-      // Use new helper method that checks both old and new structure
-      const inviter = await User.findByInviteCode(parentInviteCode);
-      if (!inviter) {
-        return res.status(400).json({ error: 'Invalid invite code' });
-      }
-      
-      // Find the specific invite code object to track usage
-      const inviteCodeObj = inviter.findInviteCodeObject(parentInviteCode);
-      if (inviteCodeObj && !inviteCodeObj.isActive) {
-        return res.status(400).json({ error: 'This invite code has been deactivated' });
-      }
-      
-      // Check if inviter has invite credits (admins have unlimited credits)
-      const isInviterAdmin = inviter.role && inviter.role.includes('admin');
-      if (!isInviterAdmin) {
-        // Check if inviter has invite credits
-        if (!inviter.inviteCredits || inviter.inviteCredits <= 0) {
-          return res.status(400).json({ error: 'This invite code has no remaining invites' });
-        }
-      }
+      const inviter = invite.inviter;
+      const inviteCodeObj = invite.inviteCodeObj;
+      const isInviterAdmin = invite.isInviterAdmin;
+      const resolvedParentCode = invite.code;
       
       // Determine primary location from form data
       const defaultLocation = { 
@@ -449,8 +434,8 @@ router.post(
           createdAt: new Date(),
           usageCount: 0
         }],
-        parentInviteCode: parentInviteCode.toUpperCase(),
-        parentInviteCodeId: parentInviteCodeId, // Track which specific code was used
+        parentInviteCode: resolvedParentCode || undefined,
+        parentInviteCodeId: parentInviteCodeId || undefined, // Track which specific code was used
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
@@ -458,33 +443,13 @@ router.post(
         secondaryLocation: secondaryLocationData
       });
       await user.save();
-      
-      // Increment usage count for the invite code that was used
-      if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
-        const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic._id && ic._id.toString() === inviteCodeObj._id.toString());
-        if (codeIndex !== -1) {
-          inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-          await inviter.save();
-        }
-      } else if (inviter.personalInviteCode === parentInviteCode.toUpperCase()) {
-        // Legacy code - if array doesn't exist yet, create it
-        if (!inviter.personalInviteCodes || inviter.personalInviteCodes.length === 0) {
-          inviter.personalInviteCodes = [{
-            code: inviter.personalInviteCode,
-            isActive: true,
-            label: 'Primary',
-            createdAt: inviter.createdAt || new Date(),
-            usageCount: 1
-          }];
-        } else {
-          // Find and increment
-          const codeIndex = inviter.personalInviteCodes.findIndex(ic => ic.code === parentInviteCode.toUpperCase());
-          if (codeIndex !== -1) {
-            inviter.personalInviteCodes[codeIndex].usageCount = (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-          }
-        }
-        await inviter.save();
-      }
+
+      await applyInviteUsage({
+        inviter,
+        inviteCodeObj,
+        code: resolvedParentCode,
+        isInviterAdmin,
+      });
       
       // Set profile picture URL using custom domain (R2_PUBLIC_URL)
       // req.file.key contains the S3 key, use it with getPublicUrl for custom domain
@@ -503,13 +468,6 @@ router.post(
       } catch (betaCreditError) {
         console.error('Failed to give beta signup credit:', betaCreditError);
         // Don't fail registration if beta credit fails
-      }
-
-      // Decrement inviter's invite credits (unless admin - admins have unlimited)
-      if (!isInviterAdmin && inviter.inviteCredits > 0) {
-        inviter.inviteCredits -= 1;
-        await inviter.save();
-        console.log(`✅ Decremented invite credits for ${inviter.username}. Remaining: ${inviter.inviteCredits}`);
       }
 
       // Auto-join new user to Global Party

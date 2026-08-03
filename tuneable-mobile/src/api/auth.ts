@@ -5,7 +5,7 @@ export type RegisterBody = {
   username: string;
   email: string;
   password: string;
-  parentInviteCode: string;
+  parentInviteCode?: string;
 };
 
 export type ValidateInviteResponse = {

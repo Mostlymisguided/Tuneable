@@ -26,8 +26,9 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Creating an Account</h3>
             <p className="text-gray-300">
-              To get started, you'll need an invite code from an existing user. Once you have a code, 
-              register with your email or social media account. New users receive £11.11 in welcome credits.
+              Register with your email or a social account — no invite code required.
+              If a friend shares their invite link, you&apos;ll be attributed to them automatically.
+              New users receive £11.11 in welcome credits.
               Welcome credit is promotional: tips using it are capped at £1.11 each, £3.33 / 3 songs per artist,
               and cannot be used on media you own. Unused amounts expire after 12 months and may be revoked
               at Tuneable&apos;s discretion.

@@ -21,9 +21,6 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import type { ResolvedLocation } from '../utils/locationHelpers';
 import { buildRegisterUrl, buildLoginUrl, getPostAuthPath } from '../utils/authHelpers';
 
-// Default invite code for register page; set VITE_DEFAULT_INVITE_CODE to empty to require a code again
-const DEFAULT_INVITE_CODE = ((import.meta.env.VITE_DEFAULT_INVITE_CODE ?? 'PE856').trim() || null) as string | null;
-
 const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -32,7 +29,6 @@ const AuthPage: React.FC = () => {
   const [inviterUsername, setInviterUsername] = useState<string>('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
-  const [showInviteCodeError, setShowInviteCodeError] = useState(false);
   
   // Account lockout state
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -105,19 +101,16 @@ const AuthPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [accountLockedUntil]);
 
-  // Capture invite code and handle OAuth errors from URL on mount
+  // Capture optional invite from URL (referral attribution) and handle OAuth errors
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const inviteParam = params.get('invite');
 
-    if (isRegisterPage) {
-      if (inviteParam) {
-        const code = inviteParam.toUpperCase();
-        setFormData(prev => ({ ...prev, parentInviteCode: code }));
+    if (isRegisterPage && inviteParam) {
+      const code = inviteParam.toUpperCase().slice(0, 5);
+      setFormData(prev => ({ ...prev, parentInviteCode: code }));
+      if (code.length === 5) {
         validateInviteCode(code);
-      } else if (DEFAULT_INVITE_CODE) {
-        setFormData(prev => ({ ...prev, parentInviteCode: DEFAULT_INVITE_CODE }));
-        validateInviteCode(DEFAULT_INVITE_CODE);
       }
     }
 
@@ -242,25 +235,10 @@ const AuthPage: React.FC = () => {
     }
   };
 
-  // Trigger visual error on invite code input
-  const triggerInviteCodeError = () => {
-    setShowInviteCodeError(true);
-    // Focus on the invite code input and scroll into view
-    setTimeout(() => {
-      const inviteInput = document.getElementById('parentInviteCode');
-      if (inviteInput) {
-        inviteInput.focus();
-        inviteInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-    // Reset error state after animation
-    setTimeout(() => setShowInviteCodeError(false), 3000);
-  };
-
   const handleSocialAuth = async (provider: 'facebook' | 'google' | 'instagram' | 'soundcloud') => {
-    // Check if invite code is required for registration
-    if (isRegisterPage && !inviteCodeValid) {
-      triggerInviteCodeError();
+    // If a referral invite was provided but is invalid, block so attribution isn't wrong
+    if (isRegisterPage && formData.parentInviteCode.length === 5 && inviteCodeValid === false) {
+      toast.error('That invite code is invalid. Clear it or use a valid referral link.');
       return;
     }
 
@@ -293,11 +271,6 @@ const AuthPage: React.FC = () => {
         ...formData,
         [name]: upperCode,
       });
-      
-      // Reset error state when user starts typing
-      if (showInviteCodeError) {
-        setShowInviteCodeError(false);
-      }
       
       // Validate invite code if 5 characters
       if (upperCode.length === 5) {
@@ -398,10 +371,14 @@ const AuthPage: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check invite code is valid
-    if (!inviteCodeValid) {
-      toast.error('Please enter a valid invite code to sign up');
+
+    // Optional invite: if user typed one, it must be valid
+    if (formData.parentInviteCode.length === 5 && inviteCodeValid === false) {
+      toast.error('That invite code is invalid. Clear it or use a valid referral link.');
+      return;
+    }
+    if (formData.parentInviteCode.length > 0 && formData.parentInviteCode.length < 5) {
+      toast.error('Invite codes are 5 characters. Clear the field to continue without one.');
       return;
     }
 
@@ -419,6 +396,10 @@ const AuthPage: React.FC = () => {
 
     try {
       const { confirmPassword, ...registerData } = formData;
+      // Omit empty invite so backend treats signup as open
+      if (!registerData.parentInviteCode) {
+        delete (registerData as { parentInviteCode?: string }).parentInviteCode;
+      }
       const newUser = await register(registerData);
       toast.success('Registration successful!');
       navigate(getPostAuthPath(newUser, returnPathParam));
@@ -640,13 +621,7 @@ const AuthPage: React.FC = () => {
 
       <div className="flex flex-col p-4 flex items-center justify-center gap-3 items-center">
         <button 
-          onClick={() => {
-            if (!inviteCodeValid) {
-              triggerInviteCodeError();
-              return;
-            }
-            setShowEmailForm(!showEmailForm);
-          }} 
+          onClick={() => setShowEmailForm(!showEmailForm)} 
           type="button" 
           className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-gray-600 hover:bg-gray-700 focus:ring-gray-500 focus:ring-offset-gray-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg"
         >
@@ -688,25 +663,29 @@ const AuthPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Invite Code Field */}
+      {/* Optional referral invite — shown when present from URL or typed */}
+      {(formData.parentInviteCode || inviterUsername) && (
       <div className="flex flex-col flex items-center justify-center px-6 pb-4">
+        {inviterUsername && inviteCodeValid && (
+          <div className="flex items-center mb-2 text-sm text-green-600">
+            <Gift className="h-4 w-4 mr-1" />
+            <span>Invited by <strong>@{inviterUsername}</strong></span>
+          </div>
+        )}
         <div className="relative w-full">
           <input
             id="parentInviteCode"
             name="parentInviteCode"
             type="text"
-            required
             maxLength={5}
             className={`block w-full rounded-lg border-2 px-3 py-2 pr-10 shadow-sm outline-none text-gray-900 placeholder:text-gray-400 transition-all duration-300 ${
-              showInviteCodeError
-                ? 'border-red-500 focus:border-red-500 focus:ring-0 shadow-[0_0_20px_rgba(239,68,68,0.6)]'
-                : inviteCodeValid === true
+              inviteCodeValid === true
                 ? 'border-green-500 focus:ring-green-500 focus:ring-offset-1'
                 : inviteCodeValid === false
                 ? 'border-red-500 focus:ring-red-500 focus:ring-offset-1'
                 : 'border-gray-300 focus:ring-black focus:ring-offset-1'
             }`}
-            placeholder="Invite Code (Required)"
+            placeholder="Invite code (optional)"
             value={formData.parentInviteCode}
             onChange={handleChange}
           />
@@ -720,32 +699,11 @@ const AuthPage: React.FC = () => {
             <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-red-500" />
           ) : null}
         </div>
-        {inviterUsername && inviteCodeValid && (
-          <div className="flex items-center mt-2 text-sm text-green-600">
-            <Gift className="h-4 w-4 mr-1" />
-            <span>Invited by <strong>@{inviterUsername}</strong></span>
-          </div>
-        )}
         {inviteCodeValid === false && formData.parentInviteCode.length === 5 && (
           <p className="text-xs text-red-500 mt-1">Invalid invite code</p>
         )}
-        <p className={`text-xs mt-1 text-center transition-all duration-300 ${
-          showInviteCodeError
-            ? 'text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]'
-            : 'text-gray-500'
-        }`}>
-          Don't have a code? <Link 
-            to="/request-invite" 
-            className={`hover:underline transition-all duration-300 ${
-              showInviteCodeError
-                ? 'text-green-400 drop-shadow-[0_0_10px_rgba(34,197,94,1)] font-semibold'
-                : 'text-purple-600'
-            }`}
-          >
-            Request an invite
-          </Link>
-        </p>
       </div>
+      )}
 
       {/* Conditionally show OR divider and email form */}
       {showEmailForm && (

@@ -301,7 +301,6 @@ const CreatorRegister: React.FC = () => {
           email: accountData.email,
           password: accountData.password,
           username: accountData.username,
-          parentInviteCode: 'MAKER'
         });
         
         toast.success('Account created successfully!');

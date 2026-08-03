@@ -13,11 +13,9 @@ import {
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import Constants from 'expo-constants';
 import { Screen } from '@/src/components/Screen';
 import { LegalLinks } from '@/src/components/LegalLinks';
 import { authAPI } from '@/src/api/auth';
-import { API_ORIGIN } from '@/src/api/client';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import {
@@ -34,15 +32,6 @@ import { colors } from '@/src/theme/colors';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const DEFAULT_INVITE_CODE = (
-  process.env.EXPO_PUBLIC_DEFAULT_INVITE_CODE ||
-  Constants.expoConfig?.extra?.defaultInviteCode ||
-  'PE856'
-)
-  .toString()
-  .trim()
-  .toUpperCase();
-
 export default function RegisterScreen() {
   const { invite: inviteParam } = useLocalSearchParams<{ invite?: string }>();
   const {
@@ -54,9 +43,7 @@ export default function RegisterScreen() {
   } = useAuth();
 
   const initialInvite = (
-    (typeof inviteParam === 'string' && inviteParam) ||
-    DEFAULT_INVITE_CODE ||
-    ''
+    typeof inviteParam === 'string' && inviteParam ? inviteParam : ''
   )
     .trim()
     .toUpperCase()
@@ -130,16 +117,24 @@ export default function RegisterScreen() {
     }
   };
 
-  const onSubmit = async () => {
-    setError(null);
-    if (inviteCode.trim().length !== 5) {
-      setError('A valid 5-character invite code is required.');
-      return;
+  const optionalInvite =
+    inviteCode.trim().length === 5 ? inviteCode.trim().toUpperCase() : undefined;
+
+  const assertInviteOk = (): boolean => {
+    if (inviteCode.trim().length > 0 && inviteCode.trim().length < 5) {
+      setError('Invite codes are 5 characters. Clear the field to continue without one.');
+      return false;
     }
     if (inviteStatus === 'invalid') {
-      setError('Invalid invite code.');
-      return;
+      setError('Invalid invite code. Clear it or use a valid referral link.');
+      return false;
     }
+    return true;
+  };
+
+  const onSubmit = async () => {
+    setError(null);
+    if (!assertInviteOk()) return;
     if (!username.trim() || !email.trim() || !password) {
       setError('Fill in username, email, and password.');
       return;
@@ -155,14 +150,14 @@ export default function RegisterScreen() {
 
     setSubmitting(true);
     try {
-      if (inviteStatus !== 'valid') {
-        await validateInvite(inviteCode);
+      if (optionalInvite && inviteStatus !== 'valid') {
+        await validateInvite(optionalInvite);
       }
       await register({
         username,
         email,
         password,
-        parentInviteCode: inviteCode,
+        ...(optionalInvite ? { parentInviteCode: optionalInvite } : {}),
       });
       router.replace('/(tabs)');
     } catch (err) {
@@ -174,22 +169,15 @@ export default function RegisterScreen() {
 
   const onOAuth = async (provider: 'google' | 'facebook') => {
     setError(null);
-    if (inviteCode.trim().length !== 5) {
-      setError('Enter a valid invite code before continuing with social sign-up.');
-      return;
-    }
-    if (inviteStatus === 'invalid') {
-      setError('Invalid invite code.');
-      return;
-    }
+    if (!assertInviteOk()) return;
     setOauthLoading(provider);
     try {
-      if (inviteStatus !== 'valid') {
-        await validateInvite(inviteCode);
+      if (optionalInvite && inviteStatus !== 'valid') {
+        await validateInvite(optionalInvite);
       }
       const redirectUrl = getOAuthCallbackRedirect();
       const startUrl = buildOAuthStartUrl(provider, {
-        inviteCode: inviteCode.trim().toUpperCase(),
+        inviteCode: optionalInvite,
       });
       const result = await WebBrowser.openAuthSessionAsync(startUrl, redirectUrl);
 
@@ -216,21 +204,14 @@ export default function RegisterScreen() {
 
   const onApple = async () => {
     setError(null);
-    if (inviteCode.trim().length !== 5) {
-      setError('Enter a valid invite code before continuing with Apple.');
-      return;
-    }
-    if (inviteStatus === 'invalid') {
-      setError('Invalid invite code.');
-      return;
-    }
+    if (!assertInviteOk()) return;
     setOauthLoading('apple');
     try {
-      if (inviteStatus !== 'valid') {
-        await validateInvite(inviteCode);
+      if (optionalInvite && inviteStatus !== 'valid') {
+        await validateInvite(optionalInvite);
       }
       const { token, user } = await signInWithApple({
-        inviteCode: inviteCode.trim().toUpperCase(),
+        inviteCode: optionalInvite,
       });
       await applySession(token, user);
       router.replace('/(tabs)');
@@ -251,6 +232,7 @@ export default function RegisterScreen() {
   };
 
   const busy = submitting || oauthLoading !== null;
+  const showInviteField = Boolean(initialInvite) || inviteCode.length > 0 || inviteStatus !== 'idle';
 
   return (
     <Screen>
@@ -266,28 +248,32 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.label}>Invite code *</Text>
-            <TextInput
-              style={styles.input}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={5}
-              placeholder="XXXXX"
-              placeholderTextColor={colors.textMuted}
-              value={inviteCode}
-              onChangeText={onInviteChange}
-              editable={!busy}
-            />
-            {inviteStatus === 'checking' ? (
-              <Text style={styles.inviteHint}>Checking invite…</Text>
-            ) : inviteStatus === 'valid' ? (
-              <Text style={styles.inviteValid}>
-                {inviterUsername
-                  ? `Invited by @${inviterUsername}`
-                  : 'Invite code valid'}
-              </Text>
-            ) : inviteStatus === 'invalid' ? (
-              <Text style={styles.inviteInvalid}>Invalid invite code</Text>
+            {showInviteField ? (
+              <>
+                <Text style={styles.label}>Invite code (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={5}
+                  placeholder="XXXXX"
+                  placeholderTextColor={colors.textMuted}
+                  value={inviteCode}
+                  onChangeText={onInviteChange}
+                  editable={!busy}
+                />
+                {inviteStatus === 'checking' ? (
+                  <Text style={styles.inviteHint}>Checking invite…</Text>
+                ) : inviteStatus === 'valid' ? (
+                  <Text style={styles.inviteValid}>
+                    {inviterUsername
+                      ? `Invited by @${inviterUsername}`
+                      : 'Invite code valid'}
+                  </Text>
+                ) : inviteStatus === 'invalid' ? (
+                  <Text style={styles.inviteInvalid}>Invalid invite code</Text>
+                ) : null}
+              </>
             ) : null}
 
             <Text style={styles.label}>Username *</Text>
@@ -340,83 +326,70 @@ export default function RegisterScreen() {
               autoCapitalize="none"
               autoComplete="new-password"
               textContentType="newPassword"
-              placeholder="••••••••"
+              placeholder="Confirm password"
               placeholderTextColor={colors.textMuted}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               editable={!busy}
-              onSubmitEditing={() => void onSubmit()}
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              style={[styles.button, busy && styles.buttonDisabled]}
+              style={[styles.primaryBtn, busy && styles.btnDisabled]}
               onPress={() => void onSubmit()}
               disabled={busy}>
               {submitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Create account</Text>
+                <Text style={styles.primaryBtnText}>Create account</Text>
               )}
             </Pressable>
 
-            <View style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.divider} />
-            </View>
-
-            {appleAvailable ? (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={
-                  AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
-                }
-                buttonStyle={
-                  AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                }
-                cornerRadius={12}
-                style={styles.appleBtn}
-                onPress={() => void onApple()}
-              />
-            ) : null}
+            <Text style={styles.or}>or</Text>
 
             <Pressable
-              style={[styles.oauthBtn, busy && styles.buttonDisabled]}
+              style={[styles.oauthBtn, busy && styles.btnDisabled]}
               onPress={() => void onOAuth('google')}
               disabled={busy}>
               {oauthLoading === 'google' ? (
                 <ActivityIndicator color={colors.text} />
               ) : (
-                <Text style={styles.oauthText}>Continue with Google</Text>
+                <Text style={styles.oauthBtnText}>Continue with Google</Text>
               )}
             </Pressable>
 
             <Pressable
-              style={[styles.oauthBtn, busy && styles.buttonDisabled]}
+              style={[styles.oauthBtn, styles.facebookBtn, busy && styles.btnDisabled]}
               onPress={() => void onOAuth('facebook')}
               disabled={busy}>
               {oauthLoading === 'facebook' ? (
-                <ActivityIndicator color={colors.text} />
+                <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.oauthText}>Continue with Facebook</Text>
+                <Text style={[styles.oauthBtnText, styles.facebookBtnText]}>
+                  Continue with Facebook
+                </Text>
               )}
             </Pressable>
 
-            <Pressable
-              style={styles.linkBtn}
-              onPress={() => router.replace('/login')}
-              disabled={busy}>
-              <Text style={styles.linkText}>
-                Already have an account? Sign in
-              </Text>
-            </Pressable>
-
-            <LegalLinks />
-            {__DEV__ ? (
-              <Text style={styles.hint}>API: {API_ORIGIN}</Text>
+            {appleAvailable ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={10}
+                style={styles.appleBtn}
+                onPress={() => void onApple()}
+              />
             ) : null}
           </View>
+
+          <Pressable onPress={() => router.replace('/login')} disabled={busy}>
+            <Text style={styles.switchAuth}>
+              Already have an account? <Text style={styles.switchAuthLink}>Sign in</Text>
+            </Text>
+          </Pressable>
+
+          <LegalLinks />
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -426,124 +399,76 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: {
+    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 48,
     paddingBottom: 40,
   },
-  hero: {
-    marginBottom: 28,
-  },
+  hero: { marginBottom: 28 },
   brand: {
-    fontSize: 40,
-    fontWeight: '700',
+    fontSize: 36,
+    fontWeight: '800',
     color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
     marginTop: 8,
     fontSize: 16,
-    color: colors.textSecondary,
+    color: colors.textMuted,
   },
-  form: {
-    gap: 8,
-  },
+  form: { gap: 10 },
   label: {
-    marginTop: 12,
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   input: {
-    backgroundColor: colors.inputBg,
     borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: 10,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    fontSize: 16,
     color: colors.text,
-    fontSize: 16,
+    backgroundColor: colors.surface,
   },
-  inviteHint: {
-    color: colors.textMuted,
-    fontSize: 13,
-  },
-  inviteValid: {
-    color: '#86efac',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  inviteInvalid: {
-    color: '#fca5a5',
-    fontSize: 13,
-  },
-  button: {
-    marginTop: 20,
+  inviteHint: { fontSize: 13, color: colors.textMuted },
+  inviteValid: { fontSize: 13, color: '#22c55e' },
+  inviteInvalid: { fontSize: 13, color: '#ef4444' },
+  error: { marginTop: 4, color: '#ef4444', fontSize: 14 },
+  primaryBtn: {
+    marginTop: 12,
     backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 18,
-    marginBottom: 4,
-  },
-  divider: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.cardBorder,
-  },
-  dividerText: {
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  btnDisabled: { opacity: 0.6 },
+  or: {
+    textAlign: 'center',
+    marginVertical: 8,
     color: colors.textMuted,
     fontSize: 13,
-  },
-  appleBtn: {
-    width: '100%',
-    height: 52,
-    marginTop: 8,
   },
   oauthBtn: {
-    marginTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingVertical: 16,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: 'center',
+    backgroundColor: colors.surface,
   },
-  oauthText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  linkBtn: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: colors.accentLight,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  error: {
-    marginTop: 12,
-    color: '#fca5a5',
-    fontSize: 14,
-  },
-  hint: {
-    marginTop: 24,
+  oauthBtnText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+  facebookBtn: { backgroundColor: '#1877F2', borderColor: '#1877F2' },
+  facebookBtnText: { color: '#fff' },
+  appleBtn: { width: '100%', height: 48, marginTop: 4 },
+  switchAuth: {
+    marginTop: 28,
     textAlign: 'center',
     color: colors.textMuted,
-    fontSize: 12,
+    fontSize: 14,
   },
+  switchAuthLink: { color: colors.accent, fontWeight: '600' },
 });

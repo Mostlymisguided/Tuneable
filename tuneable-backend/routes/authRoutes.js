@@ -1050,13 +1050,14 @@ router.post('/refresh', authMiddleware, async (req, res) => {
 /**
  * Sign in with Apple (native identity token).
  * Body: { identityToken, invite?, fullName?: { givenName, familyName }, email? }
- * Existing Apple users log in. New users require a valid invite code.
+ * Existing Apple users log in. New users may optionally pass an invite for attribution.
  */
 router.post('/apple', async (req, res) => {
   try {
     const { verifyAppleIdentityToken } = require('../services/appleSignInService');
     const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
     const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
+    const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
 
     const { identityToken, invite, fullName, email: clientEmail } = req.body || {};
     const verified = await verifyAppleIdentityToken(identityToken);
@@ -1116,27 +1117,17 @@ router.post('/apple', async (req, res) => {
       return res.json({ message: 'Login successful!', token, user });
     }
 
-    // New user — invite required
-    const inviteCode = typeof invite === 'string' ? invite.trim().toUpperCase() : '';
-    if (!inviteCode) {
-      return res.status(400).json({
-        error: 'Valid invite code required to create account',
-        code: 'invite_required',
-      });
+    // New user — invite optional (attribution when provided)
+    const inviteResult = await resolveInviteForSignup(invite);
+    if (!inviteResult.ok) {
+      return res.status(400).json({ error: inviteResult.error });
     }
-
-    const inviter = await User.findByInviteCode(inviteCode);
-    if (!inviter) {
-      return res.status(400).json({ error: 'Invalid invite code' });
-    }
-    const inviteCodeObj = inviter.findInviteCodeObject(inviteCode);
-    if (inviteCodeObj && !inviteCodeObj.isActive) {
-      return res.status(400).json({ error: 'This invite code has been deactivated' });
-    }
-    const isInviterAdmin = inviter.role && inviter.role.includes('admin');
-    if (!isInviterAdmin && (!inviter.inviteCredits || inviter.inviteCredits <= 0)) {
-      return res.status(400).json({ error: 'This invite code has no remaining invites' });
-    }
+    const {
+      code: inviteCode,
+      inviter,
+      inviteCodeObj,
+      isInviterAdmin,
+    } = inviteResult;
 
     const givenName = fullName?.givenName || null;
     const familyName = fullName?.familyName || null;
@@ -1179,9 +1170,9 @@ router.post('/apple', async (req, res) => {
           usageCount: 0,
         },
       ],
-      parentInviteCode: inviteCode,
+      parentInviteCode: inviteCode || undefined,
       parentInviteCodeId:
-        inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : null,
+        inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : undefined,
       oauthVerified: {
         apple: true,
         google: false,
@@ -1195,26 +1186,17 @@ router.post('/apple', async (req, res) => {
     });
     await user.save();
 
-    if (inviteCodeObj && inviteCodeObj._id && inviter.personalInviteCodes) {
-      const codeIndex = inviter.personalInviteCodes.findIndex(
-        (ic) => ic._id && ic._id.toString() === inviteCodeObj._id.toString()
-      );
-      if (codeIndex !== -1) {
-        inviter.personalInviteCodes[codeIndex].usageCount =
-          (inviter.personalInviteCodes[codeIndex].usageCount || 0) + 1;
-        await inviter.save();
-      }
-    }
+    await applyInviteUsage({
+      inviter,
+      inviteCodeObj,
+      code: inviteCode,
+      isInviterAdmin,
+    });
 
     try {
       await giveBetaSignupCredit(user);
     } catch (betaCreditError) {
       console.error('Failed to give beta signup credit:', betaCreditError);
-    }
-
-    if (!isInviterAdmin && inviter.inviteCredits > 0) {
-      inviter.inviteCredits -= 1;
-      await inviter.save();
     }
 
     try {
