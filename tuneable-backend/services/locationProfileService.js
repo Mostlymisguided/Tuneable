@@ -1,0 +1,323 @@
+const Media = require('../models/Media');
+const {
+  getCanonicalTag,
+  normalizeTagForMatching,
+  normalizeTagForStorage,
+} = require('../utils/tagNormalizer');
+const { generateSlug } = require('./tagPartyService');
+const { loadBidsByMediaId } = require('./relatedMediaService');
+const mapboxGeocoding = require('./mapboxGeocodingService');
+const { applyResolvedLocation } = require('../utils/locationUtils');
+
+const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+
+const MEDIA_FIELDS =
+  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation';
+
+/**
+ * Normalize a Mapbox placeId from a URL/path segment.
+ */
+function normalizePlaceId(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const placeId = decodeURIComponent(raw).trim();
+  return placeId || null;
+}
+
+/**
+ * Build a place entity summary from stored media locations and/or Mapbox.
+ */
+function placeFromMediaLocations(matchedMedia, placeId) {
+  for (const item of matchedMedia) {
+    const loc = item.primaryLocation;
+    if (!loc) continue;
+
+    if (loc.placeId === placeId) {
+      return {
+        placeId,
+        name: loc.label || loc.display || loc.city || loc.country || placeId,
+        display: loc.display || loc.label || loc.city || loc.country || placeId,
+        featureType: loc.featureType || null,
+        country: loc.country || null,
+        countryCode: loc.countryCode || null,
+        city: loc.city || null,
+        region: loc.region || null,
+      };
+    }
+
+    const ancestor = Array.isArray(loc.ancestors)
+      ? loc.ancestors.find((a) => a && a.placeId === placeId)
+      : null;
+    if (ancestor) {
+      return {
+        placeId,
+        name: ancestor.label || loc.country || placeId,
+        display: ancestor.label || loc.country || placeId,
+        featureType: ancestor.placetype || null,
+        country: ancestor.placetype === 'country'
+          ? (ancestor.label || loc.country || null)
+          : (loc.country || null),
+        countryCode: ancestor.countryCode || loc.countryCode || null,
+        city: ancestor.placetype === 'place' || ancestor.placetype === 'locality'
+          ? ancestor.label
+          : null,
+        region: ancestor.placetype === 'region' ? ancestor.label : (loc.region || null),
+      };
+    }
+  }
+  return null;
+}
+
+async function resolvePlaceMeta(placeId, matchedMedia = []) {
+  const fromMedia = placeFromMediaLocations(matchedMedia, placeId);
+  if (fromMedia) return fromMedia;
+
+  try {
+    const resolved = await mapboxGeocoding.resolveByMapboxId(placeId);
+    if (resolved) {
+      const loc = applyResolvedLocation(resolved);
+      return {
+        placeId,
+        name: loc.label || loc.display || loc.city || loc.country || placeId,
+        display: loc.display || loc.label || loc.city || loc.country || placeId,
+        featureType: loc.featureType || null,
+        country: loc.country || null,
+        countryCode: loc.countryCode || null,
+        city: loc.city || null,
+        region: loc.region || null,
+      };
+    }
+  } catch (err) {
+    console.warn('locationProfile: Mapbox resolve failed for', placeId, err.message);
+  }
+
+  return {
+    placeId,
+    name: placeId,
+    display: placeId,
+    featureType: null,
+    country: null,
+    countryCode: null,
+    city: null,
+    region: null,
+  };
+}
+
+/**
+ * Mongo query: media whose origin is this place or a descendant of it.
+ */
+function mediaOriginQuery(placeId) {
+  return {
+    status: 'active',
+    contentType: 'music',
+    contentForm: { $nin: PODCAST_FORMS },
+    $or: [
+      { 'primaryLocation.placeId': placeId },
+      { 'primaryLocation.ancestorIds': placeId },
+    ],
+  };
+}
+
+/**
+ * Related places from matched media (children when viewing a country,
+ * siblings + parent country when viewing a finer place).
+ */
+function computeRelatedPlaces(matchedMedia, currentPlaceId, currentFeatureType, { limit = 8 } = {}) {
+  const byPlaceId = new Map();
+  const isCountry = currentFeatureType === 'country';
+
+  const add = (placeId, name, featureType, tipWeight) => {
+    if (!placeId || placeId === currentPlaceId || !name) return;
+    const existing = byPlaceId.get(placeId);
+    if (existing) {
+      existing.tipWeight += tipWeight;
+      existing.count += 1;
+      if (name.length > existing.name.length) existing.name = name;
+    } else {
+      byPlaceId.set(placeId, {
+        placeId,
+        name,
+        featureType: featureType || null,
+        tipWeight,
+        count: 1,
+      });
+    }
+  };
+
+  for (const item of matchedMedia) {
+    const loc = item.primaryLocation;
+    if (!loc) continue;
+    const tipWeight = typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0;
+
+    if (isCountry) {
+      // Prefer cities / places that sit under this country
+      if (
+        loc.placeId &&
+        loc.placeId !== currentPlaceId &&
+        Array.isArray(loc.ancestorIds) &&
+        loc.ancestorIds.includes(currentPlaceId)
+      ) {
+        const name = loc.label || loc.city || loc.display;
+        if (name) add(loc.placeId, name, loc.featureType, tipWeight);
+      }
+    } else {
+      // Parent country + other places sharing the same country ancestor
+      const countryAncestor = Array.isArray(loc.ancestors)
+        ? loc.ancestors.find((a) => a?.placetype === 'country')
+        : null;
+      if (countryAncestor?.placeId) {
+        add(
+          countryAncestor.placeId,
+          countryAncestor.label || loc.country,
+          'country',
+          tipWeight
+        );
+      }
+
+      if (
+        loc.placeId &&
+        loc.placeId !== currentPlaceId &&
+        loc.featureType !== 'country'
+      ) {
+        const name = loc.label || loc.city || loc.display;
+        if (name) add(loc.placeId, name, loc.featureType, tipWeight);
+      }
+    }
+  }
+
+  return [...byPlaceId.values()]
+    .sort((a, b) => b.tipWeight - a.tipWeight || b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map(({ placeId, name, featureType }) => ({ placeId, name, featureType }));
+}
+
+/**
+ * Co-occurring tags across matched media.
+ */
+function computeRelatedTags(matchedMedia, { limit = 8 } = {}) {
+  const byCanonical = new Map();
+
+  for (const item of matchedMedia) {
+    if (!item.tags || !Array.isArray(item.tags)) continue;
+    const tipWeight = typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0;
+    const seenOnTrack = new Set();
+
+    for (const raw of item.tags) {
+      if (typeof raw !== 'string' || !raw.trim()) continue;
+      const canonical = getCanonicalTag(raw) || normalizeTagForMatching(raw);
+      if (!canonical || seenOnTrack.has(canonical)) continue;
+      seenOnTrack.add(canonical);
+
+      const displayName = normalizeTagForStorage(raw) || raw.trim();
+      const existing = byCanonical.get(canonical);
+      if (existing) {
+        existing.tipWeight += tipWeight;
+        existing.count += 1;
+        if (displayName.length > existing.name.length || /^[A-Z]/.test(displayName)) {
+          existing.name = displayName;
+        }
+      } else {
+        byCanonical.set(canonical, {
+          name: displayName,
+          tipWeight,
+          count: 1,
+        });
+      }
+    }
+  }
+
+  return [...byCanonical.values()]
+    .sort((a, b) => b.tipWeight - a.tipWeight || b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, limit)
+    .map(({ name }) => ({
+      name,
+      slug: generateSlug(name),
+    }))
+    .filter((t) => t.slug);
+}
+
+/**
+ * Media IDs whose primaryLocation is this place or a descendant.
+ */
+async function resolveLocationMediaIds(rawPlaceId) {
+  const placeId = normalizePlaceId(rawPlaceId);
+  if (!placeId) return null;
+
+  const media = await Media.find(mediaOriginQuery(placeId))
+    .select('_id primaryLocation')
+    .lean();
+
+  return {
+    placeId,
+    mediaIds: media.map((m) => m._id),
+    sampleLocations: media.map((m) => m.primaryLocation).filter(Boolean),
+  };
+}
+
+/**
+ * Place profile: origin-scoped media ranked by tip aggregate.
+ */
+async function getLocationProfile(rawPlaceId, { page = 1, limit = 50 } = {}) {
+  const placeId = normalizePlaceId(rawPlaceId);
+  if (!placeId) {
+    const err = new Error('Place not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+  const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+  const skip = (pageNum - 1) * limitNum;
+
+  const matched = await Media.find(mediaOriginQuery(placeId))
+    .sort({ globalMediaAggregate: -1, createdAt: -1 })
+    .select(MEDIA_FIELDS)
+    .populate('addedBy', 'username profilePic uuid')
+    .lean();
+
+  const place = await resolvePlaceMeta(placeId, matched);
+
+  // Unknown placeId with no media and no Mapbox hit
+  if (matched.length === 0 && place.name === placeId && !place.featureType && !place.country) {
+    const err = new Error('Place not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const total = matched.length;
+  const pageSlice = matched.slice(skip, skip + limitNum);
+  const tipTotal = matched.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
+  const relatedPlaces = computeRelatedPlaces(matched, placeId, place.featureType, { limit: 8 });
+  const relatedTags = computeRelatedTags(matched, { limit: 8 });
+
+  const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
+  const media = pageSlice.map((m) => ({
+    ...m,
+    bids: bidsByMediaId.get(m._id.toString()) || [],
+  }));
+
+  return {
+    place,
+    stats: {
+      mediaCount: total,
+      globalPlaceAggregate: tipTotal,
+    },
+    relatedPlaces,
+    relatedTags,
+    media,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      pages: Math.ceil(total / limitNum) || 0,
+    },
+  };
+}
+
+module.exports = {
+  normalizePlaceId,
+  mediaOriginQuery,
+  resolveLocationMediaIds,
+  getLocationProfile,
+  computeRelatedPlaces,
+  computeRelatedTags,
+};

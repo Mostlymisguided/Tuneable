@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Crown, Loader2, MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
-import { mediaAPI, tagAPI, artistAPI } from '../lib/api';
+import { mediaAPI, tagAPI, artistAPI, locationAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import {
   championPickToResolvedLocation,
@@ -31,9 +31,10 @@ export interface MediaChampionRanking {
 }
 
 export interface MediaChampionsResponse {
-  entityType?: 'media' | 'tag' | 'artist';
+  entityType?: 'media' | 'tag' | 'artist' | 'place';
   tag?: { name: string; slug: string; canonicalTag?: string };
   artist?: { userId?: string | null; name?: string };
+  place?: { placeId: string; name: string; featureType?: string | null };
   scope: 'global' | 'place';
   locationPlaceId: string | null;
   tipperCount: number;
@@ -53,6 +54,8 @@ interface MediaChampionsProps {
   mediaId?: string;
   /** Tag profile slug for tag-scoped champions */
   tagSlug?: string;
+  /** Place profile Mapbox id — champions of media originating from this place */
+  originPlaceId?: string;
   /** Verified artist user id/uuid */
   artistUserId?: string;
   /** Artist display name when no userId */
@@ -123,6 +126,7 @@ function medalForRank(rank: number, isChampion: boolean, medal?: ChampionMedal |
 const MediaChampions: React.FC<MediaChampionsProps> = ({
   mediaId,
   tagSlug,
+  originPlaceId,
   artistUserId,
   artistName,
   maxDisplay = 10,
@@ -151,10 +155,10 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     setSelectedLocation(seedLocation ?? null);
   }, [seedLocation?.placeId]);
 
-  // Collapse strip when the subject track/tag/artist changes
+  // Collapse strip when the subject track/tag/artist/place changes
   useEffect(() => {
     setStripExpanded(false);
-  }, [mediaId, tagSlug, artistUserId, artistName]);
+  }, [mediaId, tagSlug, originPlaceId, artistUserId, artistName]);
 
   const scopeLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
@@ -164,17 +168,19 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     if (entityLabel) return entityLabel;
     if (mediaTitle) return mediaTitle;
     if (data?.tag?.name) return `#${data.tag.name}`;
+    if (data?.place?.name) return data.place.name;
     if (data?.artist?.name) return data.artist.name;
     if (tagSlug) return `#${tagSlug.replace(/-/g, ' ')}`;
+    if (originPlaceId) return originPlaceId;
     if (artistName) return artistName;
     return null;
-  }, [entityLabel, mediaTitle, data, tagSlug, artistName]);
+  }, [entityLabel, mediaTitle, data, tagSlug, originPlaceId, artistName]);
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      if (!mediaId && !tagSlug && !artistUserId && !artistName) {
+      if (!mediaId && !tagSlug && !originPlaceId && !artistUserId && !artistName) {
         setData(null);
         setLoading(false);
         setError('No champions target specified');
@@ -193,6 +199,8 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
           response = await mediaAPI.getChampions(mediaId, params);
         } else if (tagSlug) {
           response = await tagAPI.getChampions(tagSlug, params);
+        } else if (originPlaceId) {
+          response = await locationAPI.getChampions(originPlaceId, params);
         } else {
           response = await artistAPI.getChampions({
             userId: artistUserId,
@@ -219,7 +227,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [mediaId, tagSlug, artistUserId, artistName, selectedLocation?.placeId, maxDisplay]);
+  }, [mediaId, tagSlug, originPlaceId, artistUserId, artistName, selectedLocation?.placeId, maxDisplay]);
 
   const profilePath = (ranking: MediaChampionRanking) => {
     const id = ranking.user.uuid || ranking.user._id;

@@ -1,6 +1,7 @@
 const express = require('express');
 const mapboxGeocoding = require('../services/mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
+const { getLocationProfile } = require('../services/locationProfileService');
 
 const router = express.Router();
 
@@ -61,6 +62,58 @@ router.post('/resolve', async (req, res) => {
       error: status === 503 ? 'Location search is not configured' : 'Failed to resolve location',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+});
+
+/**
+ * GET /api/locations/:placeId/profile
+ * Place profile — media originating from this Mapbox place (or descendants).
+ */
+router.get('/:placeId/profile', async (req, res) => {
+  try {
+    const { placeId } = req.params;
+    const { page = 1, limit = 50 } = req.query;
+
+    if (!placeId || !String(placeId).trim()) {
+      return res.status(400).json({ error: 'Place id is required' });
+    }
+
+    const profile = await getLocationProfile(placeId, { page, limit });
+    res.json(profile);
+  } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ error: error.message || 'Place not found' });
+    }
+    console.error('Error fetching location profile:', error);
+    res.status(500).json({ error: 'Failed to fetch location profile' });
+  }
+});
+
+/**
+ * GET /api/locations/:placeId/champions
+ * Tip-aggregate champions for media originating from this place
+ * (optionally further filtered by tipper Mapbox place via locationPlaceId).
+ */
+router.get('/:placeId/champions', async (req, res) => {
+  try {
+    const { placeId } = req.params;
+    const { locationPlaceId, limit } = req.query;
+
+    if (!placeId || !String(placeId).trim()) {
+      return res.status(400).json({ error: 'Place id is required' });
+    }
+
+    const { getLocationChampions } = require('../services/mediaChampionsService');
+    const result = await getLocationChampions(placeId, { locationPlaceId, limit });
+
+    if (!result) {
+      return res.status(404).json({ error: 'Place not found' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching location champions:', error);
+    res.status(500).json({ error: 'Failed to fetch location champions' });
   }
 });
 

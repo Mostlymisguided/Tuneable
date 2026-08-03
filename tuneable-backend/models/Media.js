@@ -282,7 +282,7 @@ const mediaSchema = new mongoose.Schema({
   genres: { type: [String], default: [] }, // Multiple genres (was singular 'genre')
   category: { type: String, default: null }, // YouTube category name (mapped from categoryId)
   
-  // Location fields (similar to User model)
+  // Location fields (aligned with User homeLocation / Mapbox resolve)
   primaryLocation: {
     city: { type: String },
     region: { type: String }, // State, province, or region
@@ -292,7 +292,22 @@ const mediaSchema = new mongoose.Schema({
       lat: { type: Number },
       lng: { type: Number },
     },
-    detectedFromIP: { type: Boolean, default: false } // Track if auto-detected from IP
+    detectedFromIP: { type: Boolean, default: false }, // Track if auto-detected from IP
+    placeProvider: { type: String, enum: ['mapbox'] },
+    placeId: { type: String },
+    featureType: { type: String },
+    ancestorIds: [{ type: String }],
+    ancestors: [{
+      placeId: { type: String },
+      label: { type: String },
+      placetype: { type: String },
+      regionCode: { type: String },
+      countryCode: { type: String },
+      _id: false,
+    }],
+    label: { type: String },
+    display: { type: String },
+    resolvedAt: { type: Date },
   },
   secondaryLocation: {
     city: { type: String },
@@ -302,8 +317,25 @@ const mediaSchema = new mongoose.Schema({
     coordinates: {
       lat: { type: Number },
       lng: { type: Number },
-    }
+    },
+    placeProvider: { type: String, enum: ['mapbox'] },
+    placeId: { type: String },
+    featureType: { type: String },
+    ancestorIds: [{ type: String }],
+    ancestors: [{
+      placeId: { type: String },
+      label: { type: String },
+      placetype: { type: String },
+      regionCode: { type: String },
+      countryCode: { type: String },
+      _id: false,
+    }],
+    label: { type: String },
+    display: { type: String },
+    resolvedAt: { type: Date },
   },
+  /** Where primaryLocation came from: artist_home | musicbrainz | uploader | manual | … */
+  locationSource: { type: String, default: null },
   
   // Minimum bid/tip amount (media-level override, falls back to party minimumBid if not set)
   minimumBid: {
@@ -622,6 +654,8 @@ mediaSchema.index({ "featuring.collectiveId": 1 }); // Index for Collective refe
 mediaSchema.index({ album: 1 }); // Index for album searches
 mediaSchema.index({ genres: 1 }); // Multi-key index for genres (each genre indexed separately)
 mediaSchema.index({ tags: 1, globalMediaAggregate: -1 }); // Compound index for tag rankings
+mediaSchema.index({ 'primaryLocation.placeId': 1, globalMediaAggregate: -1 }); // Place profile origin
+mediaSchema.index({ 'primaryLocation.ancestorIds': 1, globalMediaAggregate: -1 }); // Place hierarchy
 mediaSchema.index({ releaseDate: -1 }); // Index for release date sorting
 mediaSchema.index({ releaseYear: -1 }); // Index for release year sorting/filtering
 mediaSchema.index({ episodeNumber: 1, seasonNumber: 1 }); // Index for episode/season queries

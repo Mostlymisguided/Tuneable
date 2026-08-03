@@ -1049,7 +1049,7 @@ export const topTunesAPI = {
   },
 };
 
-// Location API (Mapbox geocoding via backend)
+// Location API (Mapbox geocoding via backend + place profiles)
 export const locationAPI = {
   suggest: async (q: string, options?: { country?: string; worldview?: string; limit?: number }) => {
     const response = await api.get('/locations/suggest', {
@@ -1073,6 +1073,24 @@ export const locationAPI = {
   reverse: async (longitude: number, latitude: number) => {
     const response = await api.post('/locations/reverse', { longitude, latitude });
     return response.data as { location: Record<string, unknown> };
+  },
+
+  getProfile: async (placeId: string, params?: { page?: number; limit?: number }) => {
+    const response = await api.get(`/locations/${encodeURIComponent(placeId)}/profile`, { params });
+    return response.data;
+  },
+
+  getChampions: async (
+    placeId: string,
+    params?: { locationPlaceId?: string; limit?: number }
+  ) => {
+    const response = await api.get(`/locations/${encodeURIComponent(placeId)}/champions`, {
+      params: {
+        locationPlaceId: params?.locationPlaceId || undefined,
+        limit: params?.limit,
+      },
+    });
+    return response.data;
   },
 };
 

@@ -270,6 +270,68 @@ async function getTagChampions(tagSlug, options = {}) {
   );
 }
 
+function placeMetaFromSamples(placeId, sampleLocations = []) {
+  for (const loc of sampleLocations) {
+    if (loc?.placeId === placeId) {
+      return {
+        placeId,
+        name: loc.label || loc.display || loc.city || loc.country || placeId,
+        featureType: loc.featureType || null,
+      };
+    }
+    const ancestor = Array.isArray(loc?.ancestors)
+      ? loc.ancestors.find((a) => a?.placeId === placeId)
+      : null;
+    if (ancestor) {
+      return {
+        placeId,
+        name: ancestor.label || loc.country || placeId,
+        featureType: ancestor.placetype || null,
+      };
+    }
+  }
+  return { placeId, name: placeId, featureType: null };
+}
+
+/**
+ * Aggregate tip champions across media originating from a Mapbox place
+ * (primaryLocation.placeId or ancestorIds).
+ */
+async function getLocationChampions(rawPlaceId, options = {}) {
+  const { resolveLocationMediaIds, normalizePlaceId } = require('./locationProfileService');
+  const placeId = normalizePlaceId(rawPlaceId);
+  if (!placeId) return null;
+
+  const resolved = await resolveLocationMediaIds(placeId);
+  if (!resolved) return null;
+
+  const placeMeta = placeMetaFromSamples(placeId, resolved.sampleLocations);
+
+  if (resolved.mediaIds.length === 0) {
+    return {
+      entityType: 'place',
+      place: placeMeta,
+      scope: options.locationPlaceId ? 'place' : 'global',
+      locationPlaceId: options.locationPlaceId || null,
+      tipperCount: 0,
+      totalAmount: 0,
+      bidCount: 0,
+      hasChampions: false,
+      hasChampion: false,
+      champions: [],
+      champion: null,
+      rankings: [],
+      podiumSize: CHAMPION_PODIUM_SIZE,
+      minTippersForChampion: MIN_TIPPERS_FOR_CHAMPION,
+    };
+  }
+
+  return aggregateChampionsForMatch(
+    { mediaId: { $in: resolved.mediaIds } },
+    { ...options, meta: { entityType: 'place', place: placeMeta } }
+  );
+}
+
 /**
  * Aggregate tip champions across an artist's catalog.
  * Prefer verified userId; fall back to case-insensitive artist.name match.
@@ -516,6 +578,7 @@ async function getUserChampionTitles(userId, options = {}) {
 module.exports = {
   getMediaChampions,
   getTagChampions,
+  getLocationChampions,
   getArtistChampions,
   getUserChampionTitles,
   resolveMediaObjectId,

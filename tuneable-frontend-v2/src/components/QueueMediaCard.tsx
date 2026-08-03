@@ -5,7 +5,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
-import { getCountryLabelFromLocation } from '../utils/locationHelpers';
+import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
 export function normalizeQueueMediaData(rawMediaData: any) {
@@ -82,6 +82,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   const bpm = getBpm(mediaData);
   const releaseYear = getReleaseYear(mediaData);
   const country = getCountryLabelFromLocation(mediaData.primaryLocation);
+  const countryPath = getCountryPlaceProfilePath(mediaData.primaryLocation);
   const href =
     mediaHref ||
     (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
@@ -110,9 +111,21 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   }
   if (country) {
     metaParts.push(
-      <span key="country" title={country} className="truncate max-w-[9rem] md:max-w-[12rem]">
-        {country}
-      </span>
+      countryPath ? (
+        <Link
+          key="country"
+          to={countryPath}
+          title={country}
+          onClick={(e) => e.stopPropagation()}
+          className="truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline"
+        >
+          {country}
+        </Link>
+      ) : (
+        <span key="country" title={country} className="truncate max-w-[9rem] md:max-w-[12rem]">
+          {country}
+        </span>
+      )
     );
   }
 

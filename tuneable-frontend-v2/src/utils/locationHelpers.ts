@@ -148,6 +148,23 @@ export function getCountryLabelFromLocation(location: Location | null | undefine
   return country || null;
 }
 
+/** Profile path for a Mapbox placeId → `/place/{placeId}` */
+export function getPlaceProfilePath(placeId: string | null | undefined): string | null {
+  if (!placeId || typeof placeId !== 'string' || !placeId.trim()) return null;
+  return `/place/${encodeURIComponent(placeId.trim())}`;
+}
+
+/**
+ * Country-level place profile path from a media/user location.
+ * Returns null when there is no Mapbox country placeId to link.
+ */
+export function getCountryPlaceProfilePath(
+  location: (MapboxLocationFields & Location) | null | undefined
+): string | null {
+  const pick = getCountryPickFromLocation(location);
+  return getPlaceProfilePath(pick?.placeId);
+}
+
 /**
  * Format location for display
  */
