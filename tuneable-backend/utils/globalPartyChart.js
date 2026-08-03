@@ -565,7 +565,26 @@ async function fetchAllTimeGlobalChart({
 }
 
 /**
+ * Media whose primaryLocation is this Mapbox place or anywhere within it.
+ * Matches placeId itself or ancestorIds (hierarchical containment).
+ */
+function mediaOriginPlaceMatch(locationPlaceId) {
+  return {
+    $or: [
+      { 'primaryLocation.placeId': locationPlaceId },
+      { 'primaryLocation.ancestorIds': locationPlaceId },
+    ],
+  };
+}
+
+/**
  * Period / location Global Party chart.
+ *
+ * Location filter (when set) is an OR:
+ * - tips from tippers in that place (and below), and/or
+ * - media originating from that place (primaryLocation)
+ * Ranked by global tip aggregate within the filtered set (period tips when
+ * time-scoped; stored globalMediaAggregate for all-time). Champions stay tip-scoped.
  */
 async function fetchPeriodGlobalChart({
   timePeriod = 'today',
@@ -577,27 +596,41 @@ async function fetchPeriodGlobalChart({
 } = {}) {
   const startTime = Date.now();
   const startDate = getPeriodStartDate(timePeriod);
+  const placeId = typeof locationPlaceId === 'string' && locationPlaceId.trim()
+    ? locationPlaceId.trim()
+    : null;
 
-  const bidQuery = { status: 'active' };
-  if (startDate) {
-    bidQuery.createdAt = { $gte: startDate };
+  let matchingMediaIds;
+
+  if (placeId) {
+    // Tip side: media that received tips from tippers in this place (period-scoped)
+    const tipBidQuery = { status: 'active', bidderLocationAncestorIds: placeId };
+    if (startDate) {
+      tipBidQuery.createdAt = { $gte: startDate };
+    }
+    const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
+
+    // Origin side: media from this place (and below)
+    const originMatchedIds = await Media.distinct('_id', {
+      ...GLOBAL_PARTY_TUNES_FILTER,
+      status: { $ne: 'vetoed' },
+      ...mediaOriginPlaceMatch(placeId),
+    });
+
+    const idSet = new Set([
+      ...tipMatchedIds.map((id) => id.toString()),
+      ...originMatchedIds.map((id) => id.toString()),
+    ]);
+    matchingMediaIds = [...idSet];
+  } else {
+    const bidQuery = { status: 'active' };
+    if (startDate) {
+      bidQuery.createdAt = { $gte: startDate };
+    }
+    const periodMediaIds = await Bid.distinct('mediaId', bidQuery);
+    matchingMediaIds = periodMediaIds.map((id) => id.toString());
   }
-  if (locationPlaceId) {
-    bidQuery.bidderLocationAncestorIds = locationPlaceId;
-  }
 
-  const periodBids = await Bid.find(bidQuery)
-    .select('mediaId amount')
-    .lean();
-
-  const mediaBidValues = {};
-  for (const bid of periodBids) {
-    const mediaId = bid.mediaId?.toString();
-    if (!mediaId) continue;
-    mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
-  }
-
-  const matchingMediaIds = Object.keys(mediaBidValues);
   if (matchingMediaIds.length === 0) {
     return {
       media: [],
@@ -611,6 +644,29 @@ async function fetchPeriodGlobalChart({
       },
     };
   }
+
+  // Rank by global tip volume within the filtered set (not location-scoped tips)
+  const rankBidQuery = {
+    status: 'active',
+    mediaId: { $in: matchingMediaIds },
+  };
+  if (startDate) {
+    rankBidQuery.createdAt = { $gte: startDate };
+  }
+
+  const rankingBids = await Bid.find(rankBidQuery)
+    .select('mediaId amount')
+    .lean();
+
+  const mediaBidValues = {};
+  for (const bid of rankingBids) {
+    const mediaId = bid.mediaId?.toString();
+    if (!mediaId) continue;
+    mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
+  }
+
+  // All-time + location: prefer stored globalMediaAggregate for ranking
+  const useStoredGlobalAggregate = placeId && !startDate;
 
   let mediaList = await Media.find({
     ...GLOBAL_PARTY_TUNES_FILTER,
@@ -639,12 +695,20 @@ async function fetchPeriodGlobalChart({
     .lean();
 
   mediaList = mediaList
-    .map((media) => ({
-      media,
-      timePeriodBidValue: mediaBidValues[media._id.toString()] || 0,
-    }))
-    .filter((row) => row.timePeriodBidValue > 0)
-    .sort((a, b) => b.timePeriodBidValue - a.timePeriodBidValue);
+    .map((media) => {
+      const id = media._id.toString();
+      const timePeriodBidValue = useStoredGlobalAggregate
+        ? (media.globalMediaAggregate || 0)
+        : (mediaBidValues[id] || 0);
+      return { media, timePeriodBidValue };
+    })
+    // Keep origin-only rows even with zero tips in-period (they still match the place)
+    .filter((row) => placeId || row.timePeriodBidValue > 0)
+    .sort((a, b) => {
+      const diff = b.timePeriodBidValue - a.timePeriodBidValue;
+      if (diff !== 0) return diff;
+      return (b.media.globalMediaAggregate || 0) - (a.media.globalMediaAggregate || 0);
+    });
 
   if (typeof offset === 'number' && offset > 0) {
     mediaList = mediaList.slice(offset);
@@ -654,10 +718,11 @@ async function fetchPeriodGlobalChart({
   }
 
   const pageMediaIds = mediaList.map((row) => row.media._id);
+  // Supporters stay global (period-scoped only) so origin-matched rows still show tippers
   const supportersByMedia = await loadTopSupportersByMedia(pageMediaIds, {
     supportersLimit,
     userId,
-    locationPlaceId,
+    locationPlaceId: null,
     startDate,
   });
 

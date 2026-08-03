@@ -917,6 +917,9 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       secondaryLocation: user.secondaryLocation && Object.keys(user.secondaryLocation).length > 0 
         ? { ...user.secondaryLocation } 
         : undefined,
+      locationSource: user.homeLocation && Object.keys(user.homeLocation).length > 0
+        ? 'uploader'
+        : undefined,
       
       // Creators (parsed from artist string or use extracted metadata)
       artist: artistArray.length > 0 ? artistArray : (mappedMetadata.artist || toCreatorSubdocs([{
@@ -2467,6 +2470,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
           newValue: newPrimaryLocation
         });
         media.primaryLocation = newPrimaryLocation;
+        media.locationSource = newPrimaryLocation ? 'manual' : null;
       }
     }
     
@@ -3588,7 +3592,7 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 // @route   GET /api/media/:mediaId/champions
 // @desc    Tip-aggregate champions for a media item (global or Mapbox place scope)
 // @access  Public
-// @query   locationPlaceId — optional Mapbox place id; tippers whose home/current ancestor chain includes it
+// @query   locationPlaceId — optional Mapbox place id; tip-scoped champions (tippers in place and below)
 // @query   limit — max rankings (default 10, max 50)
 router.get('/:mediaId/champions', async (req, res) => {
   try {

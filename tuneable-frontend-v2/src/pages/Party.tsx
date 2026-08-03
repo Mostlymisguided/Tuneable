@@ -2496,7 +2496,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
               The World&apos;s Best Music
             </p>
             <p className="text-sm sm:text-base text-gray-300">
-              Voted From
+              In
             </p>
             <button
               type="button"
@@ -2561,7 +2561,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
               </div>
             </div>
             <p className="text-xs text-gray-400 mb-3">
-              Show tunes ranked by tips from supporters in this place and anywhere within it.
+              Show tunes connected to this place — music from here, or tipped from here and below.
             </p>
             <LocationAutocomplete
               value={selectedLocation}
@@ -2614,7 +2614,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
             )}
             {selectedLocation?.placeId && (
               <p className="text-xs text-purple-300 mt-2">
-                Showing tips from {formatLocation(selectedLocation)} and below
+                Music in {formatLocation(selectedLocation)} and below
               </p>
             )}
           </div>

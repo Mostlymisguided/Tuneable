@@ -128,7 +128,7 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
         {chartLabel}
       </p>
       <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
-        Voted From
+        In
       </p>
 
       {showLocationFilter ? (
@@ -184,7 +184,7 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
 
       {selectedLocation?.placeId && (
         <p className="text-xs text-purple-300 mt-3">
-          Showing tips from {formatLocation(selectedLocation)} and below
+          Music in {formatLocation(selectedLocation)} and below
         </p>
       )}
     </div>

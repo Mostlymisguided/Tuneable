@@ -1627,10 +1627,9 @@ router.get('/chart', async (req, res) => {
     const bidTimeStartDate = timeRange !== 'all' ? getTimeRangeStartDate(timeRange) : null;
     const useBidBasedRanking = !!locationPlaceId || timeRange !== 'all';
 
+    // Location filter is OR: tips from place and/or media originating from place.
+    // Ranking uses global tip volume (not location-scoped tip totals).
     const bidPopulateMatch = { status: 'active' };
-    if (locationPlaceId) {
-      bidPopulateMatch.bidderLocationAncestorIds = locationPlaceId;
-    }
     if (bidTimeStartDate) {
       bidPopulateMatch.createdAt = { $gte: bidTimeStartDate };
     }
@@ -1652,72 +1651,117 @@ router.get('/chart', async (req, res) => {
         return res.status(400).json({ error: 'Invalid time range' });
       }
 
-      const matchingMediaIds = await Media.find(query).distinct('_id');
-      if (matchingMediaIds.length === 0) {
+      const catalogMediaIds = await Media.find(query).distinct('_id');
+      if (catalogMediaIds.length === 0) {
         episodes = [];
       } else {
-        const bidQuery = {
-          status: 'active',
-          mediaId: { $in: matchingMediaIds },
-        };
+        let filteredMediaIds = catalogMediaIds.map((id) => id.toString());
+
         if (locationPlaceId) {
-          bidQuery.bidderLocationAncestorIds = locationPlaceId;
-        }
-        if (bidTimeStartDate) {
-          bidQuery.createdAt = { $gte: bidTimeStartDate };
-        }
-
-        const bids = await Bid.find(bidQuery).select('mediaId amount createdAt bidderLocationAncestorIds bidderLocationDisplay');
-
-        const mediaBidValues = {};
-        bids.forEach((bid) => {
-          const mediaId = bid.mediaId?.toString();
-          if (mediaId) {
-            mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
+          const tipBidQuery = {
+            status: 'active',
+            mediaId: { $in: catalogMediaIds },
+            bidderLocationAncestorIds: locationPlaceId,
+          };
+          if (bidTimeStartDate) {
+            tipBidQuery.createdAt = { $gte: bidTimeStartDate };
           }
-        });
+          const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
 
-        const rankedMediaIds = Object.entries(mediaBidValues)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, limitNum)
-          .map(([id]) => id);
+          const originMatchedIds = await Media.find({
+            ...query,
+            $or: [
+              { 'primaryLocation.placeId': locationPlaceId },
+              { 'primaryLocation.ancestorIds': locationPlaceId },
+            ],
+          }).distinct('_id');
 
-        if (rankedMediaIds.length === 0) {
+          const idSet = new Set([
+            ...tipMatchedIds.map((id) => id.toString()),
+            ...originMatchedIds.map((id) => id.toString()),
+          ]);
+          filteredMediaIds = [...idSet];
+        }
+
+        if (filteredMediaIds.length === 0) {
           episodes = [];
         } else {
-          const fetched = await Media.find({ _id: { $in: rankedMediaIds } })
-            .populate('addedBy', 'username')
-            .populate('podcastSeries', 'title coverArt genres tags')
-            .populate(populateEpisodeBids)
-            .lean();
+          const useStoredGlobalAggregate = !!locationPlaceId && !bidTimeStartDate;
+          let rankedMediaIds;
 
-          const byId = new Map(fetched.map((ep) => [ep._id.toString(), ep]));
-          episodes = rankedMediaIds
-            .map((id) => byId.get(id))
-            .filter(Boolean)
-            .map((episode) => {
-              const activeBids = (episode.bids || []).filter((bid) => {
-                if (bid.status !== 'active') return false;
-                if (locationPlaceId) {
-                  const ancestors = bid.bidderLocationAncestorIds || [];
-                  if (!ancestors.includes(locationPlaceId)) return false;
-                }
-                if (bidTimeStartDate) {
-                  const createdAt = bid.createdAt ? new Date(bid.createdAt) : null;
-                  if (!createdAt || createdAt < bidTimeStartDate) return false;
-                }
-                return true;
-              });
-              const locationFilteredAggregate = activeBids.reduce(
-                (sum, bid) => sum + (typeof bid.amount === 'number' ? bid.amount : 0),
-                0
-              );
-              return {
-                ...episode,
-                globalMediaAggregate: locationFilteredAggregate,
-                locationFilteredAggregate,
-              };
+          if (useStoredGlobalAggregate) {
+            const ranked = await Media.find({ _id: { $in: filteredMediaIds } })
+              .select('_id globalMediaAggregate')
+              .sort({ globalMediaAggregate: -1 })
+              .limit(limitNum)
+              .lean();
+            rankedMediaIds = ranked.map((m) => m._id.toString());
+          } else {
+            const rankBidQuery = {
+              status: 'active',
+              mediaId: { $in: filteredMediaIds },
+            };
+            if (bidTimeStartDate) {
+              rankBidQuery.createdAt = { $gte: bidTimeStartDate };
+            }
+
+            const bids = await Bid.find(rankBidQuery).select('mediaId amount');
+
+            const mediaBidValues = {};
+            for (const id of filteredMediaIds) {
+              mediaBidValues[id] = 0;
+            }
+            bids.forEach((bid) => {
+              const mediaId = bid.mediaId?.toString();
+              if (mediaId) {
+                mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
+              }
             });
+
+            rankedMediaIds = Object.entries(mediaBidValues)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, limitNum)
+              .map(([id]) => id)
+              // Drop zero-tip rows unless location filter included them via origin
+              .filter((id) => locationPlaceId || mediaBidValues[id] > 0);
+          }
+
+          if (rankedMediaIds.length === 0) {
+            episodes = [];
+          } else {
+            const fetched = await Media.find({ _id: { $in: rankedMediaIds } })
+              .populate('addedBy', 'username')
+              .populate('podcastSeries', 'title coverArt genres tags')
+              .populate(populateEpisodeBids)
+              .lean();
+
+            const byId = new Map(fetched.map((ep) => [ep._id.toString(), ep]));
+            episodes = rankedMediaIds
+              .map((id) => byId.get(id))
+              .filter(Boolean)
+              .map((episode) => {
+                const activeBids = (episode.bids || []).filter((bid) => {
+                  if (bid.status !== 'active') return false;
+                  if (bidTimeStartDate) {
+                    const createdAt = bid.createdAt ? new Date(bid.createdAt) : null;
+                    if (!createdAt || createdAt < bidTimeStartDate) return false;
+                  }
+                  return true;
+                });
+                const periodAggregate = activeBids.reduce(
+                  (sum, bid) => sum + (typeof bid.amount === 'number' ? bid.amount : 0),
+                  0
+                );
+                const displayAggregate = useStoredGlobalAggregate
+                  ? (episode.globalMediaAggregate || 0)
+                  : periodAggregate;
+                return {
+                  ...episode,
+                  globalMediaAggregate: displayAggregate,
+                  locationFilteredAggregate: displayAggregate,
+                };
+              });
+          }
         }
       }
     } else {

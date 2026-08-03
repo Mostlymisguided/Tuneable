@@ -202,6 +202,22 @@ const mediaSchema = new mongoose.Schema({
   }],
   explicit: { type: Boolean, default: false }, // Explicit content flag
   isrc: { type: String, default: null }, // International Standard Recording Code
+
+  /**
+   * Soft identity quality for discovery / admin review.
+   * verified = ISRC matched Spotify and/or MusicBrainz
+   * catalog = exact match to existing Tuneable row
+   * likely = fuzzy catalog match
+   * unverified = source-only (e.g. SoundCloud) with no external confirmation
+   */
+  identityConfidence: {
+    type: String,
+    enum: ['verified', 'catalog', 'likely', 'unverified', null],
+    default: null,
+    index: true,
+  },
+  /** How identityConfidence was set: isrc-spotify | isrc-musicbrainz | catalog-exact | catalog-fuzzy | none */
+  identityConfidenceSource: { type: String, default: null },
   upc: { type: String, default: null }, // Universal Product Code
   lyrics: { type: String }, // lyrics
   transcript: { type: String }, // Podcast/video transcript
@@ -625,6 +641,8 @@ mediaSchema.index({ globalMediaAggregate: -1 });
 mediaSchema.index({ globalMediaBidTop: -1 });
 mediaSchema.index({ globalMediaAggregateTop: -1 });
 mediaSchema.index({ contentType: 1, contentForm: 1, status: 1, globalMediaAggregate: -1 }); // Global Party chart
+mediaSchema.index({ 'primaryLocation.ancestorIds': 1, contentType: 1, contentForm: 1, status: 1 }); // Location filter: media from place
+mediaSchema.index({ 'primaryLocation.placeId': 1 }); // Location filter: exact place origin
 mediaSchema.index({ addedBy: 1 });
 mediaSchema.index({ "sources.youtube": 1 });
 mediaSchema.index({ contentType: 1 });
@@ -673,7 +691,6 @@ mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by ow
 mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
 mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user
 mediaSchema.index({ "editHistory.editedAt": -1 }); // Index for recent edits
-mediaSchema.index({ status: 1 }); // Index for global veto status
 mediaSchema.index(
   { title: 'text', description: 'text' },
   { default_language: 'english', language_override: 'none' }

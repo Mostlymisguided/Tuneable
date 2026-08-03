@@ -25,7 +25,7 @@ export function GlobalChartHero({
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>The World&apos;s Best Music</Text>
-      <Text style={styles.votedFrom}>Voted From</Text>
+      <Text style={styles.votedFrom}>In</Text>
       <Text style={styles.locationTitle}>{locationLabel}</Text>
 
       {locationQuickPicks.length > 0 ? (
@@ -65,7 +65,7 @@ export function GlobalChartHero({
 
       {selectedLocation?.placeId ? (
         <Text style={styles.filterNote}>
-          Tips from {formatLocation(selectedLocation)} and below
+          Music in {formatLocation(selectedLocation)} and below
         </Text>
       ) : null}
     </View>
