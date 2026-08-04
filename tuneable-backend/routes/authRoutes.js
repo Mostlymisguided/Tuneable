@@ -131,9 +131,15 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         if (err) {
           console.error('Facebook OAuth strategy error:', err.message);
           clearFacebookSession();
+          const raw = err.message || 'Facebook authentication failed';
+          const isCodeReuse =
+            /authorization code has been used/i.test(raw) ||
+            /code been used/i.test(raw);
           return res.redirect(appendQueryParams(baseRedirect, {
-            error: 'account_linking_failed',
-            message: err.message || 'Facebook authentication failed'
+            error: isCodeReuse ? 'facebook_auth_failed' : 'account_linking_failed',
+            message: isCodeReuse
+              ? 'Facebook sign-in was interrupted. Please try again.'
+              : raw
           }));
         }
 

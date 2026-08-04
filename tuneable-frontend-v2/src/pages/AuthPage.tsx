@@ -125,7 +125,9 @@ const AuthPage: React.FC = () => {
       // Map OAuth error codes to user-friendly messages
       switch (errorParam) {
         case 'facebook_auth_failed':
-          errorMessage = 'Facebook authentication failed. Please try again or use email/password to sign in.';
+          errorMessage = errorMessageParam
+            ? decodeURIComponent(errorMessageParam)
+            : 'Facebook authentication failed. Please try again or use email/password to sign in.';
           break;
         case 'google_auth_failed':
           errorMessage = 'Google authentication failed. Please try again or use email/password to sign in.';

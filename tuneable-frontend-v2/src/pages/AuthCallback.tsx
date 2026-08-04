@@ -30,6 +30,10 @@ const AuthCallback: React.FC = () => {
           errorMessage = 'Security verification failed. Please try signing in again.';
         } else if (error === 'oauth_session_missing') {
           errorMessage = 'Session expired. Please try signing in again.';
+        } else if (error === 'facebook_auth_failed' || error === 'google_auth_failed') {
+          errorMessage = errorMessageParam
+            ? decodeURIComponent(errorMessageParam)
+            : 'Authentication failed. Please try again.';
         } else if (error === 'account_already_linked' || error === 'account_linking_failed') {
           errorMessage = errorMessageParam
             ? decodeURIComponent(errorMessageParam)

@@ -18,6 +18,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
       clientSecret: process.env.FACEBOOK_APP_SECRET,
       callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
       profileFields: ['id', 'emails', 'name', 'picture.type(large)'],
+      enableProof: true,
       passReqToCallback: true  // Enable passing req to callback for session access
     },
   async (req, accessToken, refreshToken, profile, done) => {
