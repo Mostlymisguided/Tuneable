@@ -118,6 +118,7 @@ const AuthPage: React.FC = () => {
     const errorParam = params.get('error');
     const errorDetails = params.get('details');
     const errorReason = params.get('reason');
+    const errorMessageParam = params.get('message');
     
     if (errorParam) {
       let errorMessage = 'Authentication failed. Please try again.';
@@ -166,6 +167,7 @@ const AuthPage: React.FC = () => {
       newSearch.delete('error');
       newSearch.delete('details');
       newSearch.delete('reason');
+      newSearch.delete('message');
       const newUrl = location.pathname + (newSearch.toString() ? '?' + newSearch.toString() : '');
       window.history.replaceState({}, '', newUrl);
     }

@@ -2439,7 +2439,7 @@ const TuneProfile: React.FC = () => {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleAttachAudioClick();
+                                handleAttachAudioClick(e);
                               }}
                               className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-lg transition-all ${
                                 showClaimCta
