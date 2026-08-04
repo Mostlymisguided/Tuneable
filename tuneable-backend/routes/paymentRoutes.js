@@ -335,6 +335,99 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
   }
 });
 
+// List wallet IAP products (fixed packs for App Store / Play Billing)
+router.get('/iap/products', authMiddleware, async (_req, res) => {
+  try {
+    const { getWalletIapProducts } = require('../services/iapProducts');
+    res.json({ products: getWalletIapProducts() });
+  } catch (error) {
+    console.error('Error listing IAP products:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Verify Apple / Google purchase and credit wallet.
+ * Body: {
+ *   platform: 'ios' | 'android',
+ *   productId: string,
+ *   transactionId?: string,   // Apple
+ *   purchaseToken?: string,   // Apple JWS or Google purchase token
+ *   receiptData?: string,     // Apple legacy base64 receipt (optional)
+ *   packageName?: string      // Android override
+ * }
+ */
+router.post('/iap/verify', authMiddleware, async (req, res) => {
+  try {
+    const {
+      platform,
+      productId,
+      transactionId,
+      purchaseToken,
+      receiptData,
+      packageName,
+    } = req.body || {};
+
+    if (!platform || !['ios', 'android'].includes(platform)) {
+      return res.status(400).json({ error: 'platform must be ios or android' });
+    }
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required' });
+    }
+
+    const {
+      verifyApplePurchase,
+      verifyGooglePurchase,
+    } = require('../services/iapVerificationService');
+    const { creditIapTopUp } = require('../services/walletTopUpService');
+
+    let verified;
+    if (platform === 'ios') {
+      verified = await verifyApplePurchase({
+        productId,
+        transactionId,
+        purchaseToken,
+        receiptData,
+      });
+    } else {
+      verified = await verifyGooglePurchase({
+        productId,
+        purchaseToken,
+        packageName,
+      });
+    }
+
+    const paymentMethod = platform === 'ios' ? 'apple_iap' : 'google_play';
+    const result = await creditIapTopUp({
+      userId: req.user._id,
+      creditPence: verified.product.creditPence,
+      paymentMethod,
+      storeTransactionId: verified.storeTransactionId,
+      storeProductId: productId,
+      platform,
+      metadata: {
+        environment: verified.environment,
+      },
+    });
+
+    res.json({
+      message: result.alreadyProcessed
+        ? 'Purchase already credited'
+        : 'Purchase verified and wallet credited',
+      balance: result.balance,
+      creditPence: verified.product.creditPence,
+      creditPounds: verified.product.creditPounds,
+      alreadyProcessed: result.alreadyProcessed,
+      transactionId: result.transaction?._id,
+      storeTransactionId: verified.storeTransactionId,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    console.error('IAP verify error:', error.message);
+    res.status(status).json({ error: error.message || 'IAP verification failed' });
+  }
+});
+
 // Confirm Payment & Update User Balance
 router.post('/confirm-payment', authMiddleware, async (req, res) => {
   try {

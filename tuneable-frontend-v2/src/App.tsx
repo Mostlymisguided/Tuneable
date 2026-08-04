@@ -114,7 +114,7 @@ const PlayerRenderer = () => {
     return <MP3Player media={currentMedia} />;
   }
 
-  // Catalog entries awaiting upload — no audio engine (briefly, until ensureCurrentPlayable advances)
+  // Catalog entries awaiting rights/audio — no audio engine (briefly, until ensureCurrentPlayable advances)
   return <PersistentWebPlayer />;
 };
 

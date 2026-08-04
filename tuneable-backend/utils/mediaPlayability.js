@@ -85,6 +85,27 @@ function getSupportMode(media) {
   return 'tip';
 }
 
+/**
+ * Classify why a track cannot play. Prefer rights over missing audio when both apply.
+ * @returns {'rights'|'audio'|'disputed'|null}
+ */
+function getPlayabilityBlockReason(media) {
+  if (!media || isMediaPlayable(media) || isPodcastLike(media)) return null;
+
+  if (media.rightsStatus === 'disputed') return 'disputed';
+  if (media.rightsStatus === 'pending' && !media.rightsCleared) return 'rights';
+
+  const sources = normalizeSources(media.sources);
+  if (!hasDirectAudioSource(sources)) return 'audio';
+
+  return 'audio';
+}
+
+function isRightsPendingClaimable(media) {
+  if (!media) return false;
+  return media.rightsStatus === 'pending' && !media.rightsCleared;
+}
+
 function enrichMediaWithPlayability(media) {
   const playable = isMediaPlayable(media);
   return {
@@ -92,6 +113,7 @@ function enrichMediaWithPlayability(media) {
     supportMode: getSupportMode(media),
     isYouTubeOnly: isYouTubeOnly(media),
     awaitingUpload: !playable && !isPodcastLike(media),
+    playabilityBlockReason: getPlayabilityBlockReason(media),
   };
 }
 
@@ -102,5 +124,7 @@ module.exports = {
   isYouTubeOnly,
   isMediaPlayable,
   getSupportMode,
+  getPlayabilityBlockReason,
+  isRightsPendingClaimable,
   enrichMediaWithPlayability,
 };

@@ -365,8 +365,87 @@ function applyResolvedLocation(locationData, existingLocation = null) {
   return merged;
 }
 
+/**
+ * True when location has enough text/geo to be useful for display or geocoding.
+ */
 function hasUsableLocation(location) {
-  return !!(location?.placeId || location?.city || location?.country);
+  return !!(location?.placeId || location?.city || location?.country || location?.countryCode);
+}
+
+/**
+ * Prefer non-IP home locations when inferring media origin from a linked artist.
+ */
+function isStrongArtistHomeLocation(location) {
+  if (!hasUsableLocation(location)) return false;
+  if (location.detectedFromIP) return false;
+  return !!(location.placeId || location.city || location.country || location.countryCode);
+}
+
+/**
+ * Reverse lookup: ISO country code → display name (first match in countryCodeMap).
+ */
+function countryNameFromCode(code) {
+  if (!code) return null;
+  const upper = String(code).toUpperCase();
+  for (const [name, mapped] of Object.entries(countryCodeMap)) {
+    if (String(mapped).toUpperCase() === upper) return name;
+  }
+  return null;
+}
+
+/**
+ * Apply a resolved location onto media.primaryLocation + locationSource.
+ * Never overwrites locationSource === 'manual' unless forceManual.
+ *
+ * @returns {boolean} whether media was changed
+ */
+function applyLocationToMedia(media, location, source, { forceManual = false } = {}) {
+  if (!media || !hasUsableLocation(location)) return false;
+  if (media.locationSource === 'manual' && !forceManual) return false;
+
+  const incoming = { ...location };
+  if (!incoming.country && incoming.countryCode) {
+    incoming.country = countryNameFromCode(incoming.countryCode) || incoming.country;
+  }
+  // Avoid "Ireland, Ireland" when city was set to the country name
+  if (
+    incoming.city
+    && incoming.country
+    && String(incoming.city).toLowerCase() === String(incoming.country).toLowerCase()
+  ) {
+    incoming.city = null;
+  }
+
+  const merged = applyResolvedLocation(incoming, media.primaryLocation);
+  if (!hasUsableLocation(merged)) return false;
+
+  if (!merged.country && merged.countryCode) {
+    merged.country = countryNameFromCode(merged.countryCode) || merged.country;
+  }
+  if (
+    merged.city
+    && merged.country
+    && String(merged.city).toLowerCase() === String(merged.country).toLowerCase()
+  ) {
+    merged.city = null;
+  }
+  if (!merged.display) {
+    merged.display = formatLocationDisplay(merged);
+  } else if (
+    merged.city
+    && merged.country
+    && merged.display === `${merged.city}, ${merged.country}`
+    && merged.city.toLowerCase() === merged.country.toLowerCase()
+  ) {
+    merged.display = merged.country;
+  }
+
+  media.primaryLocation = merged;
+  media.locationSource = source || media.locationSource || null;
+  if (typeof media.markModified === 'function') {
+    media.markModified('primaryLocation');
+  }
+  return true;
 }
 
 /**
@@ -503,9 +582,13 @@ function buildBidLocationSnapshot(user, currentLocationInput = null) {
 
 module.exports = {
   countryCodeMap,
+  countryNameFromCode,
   processLocation,
   mergeLocation,
   applyResolvedLocation,
+  hasUsableLocation,
+  isStrongArtistHomeLocation,
+  applyLocationToMedia,
   getUserBidLocation,
   getBidLocationSnapshot,
   buildBidLocationSnapshot,

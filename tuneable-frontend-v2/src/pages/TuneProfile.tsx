@@ -58,7 +58,13 @@ import MiniSupportersBar from '../components/MiniSupportersBar';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
-import { isMediaPlayable, enrichMediaWithPlayability, isYouTubeOnly, normalizeSources } from '../utils/mediaPlayability';
+import {
+  isMediaPlayable,
+  enrichMediaWithPlayability,
+  isYouTubeOnly,
+  normalizeSources,
+  getPlayabilityBlockReason,
+} from '../utils/mediaPlayability';
 import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
@@ -364,7 +370,7 @@ const TuneProfile: React.FC = () => {
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
   const [isRemovingCoverArt, setIsRemovingCoverArt] = useState(false);
 
-  // Attach audio to catalog entry (awaiting upload)
+  // Attach audio to catalog entry (awaiting rights/audio)
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [showAttachAudioModal, setShowAttachAudioModal] = useState(false);
   const [attachAudioReplace, setAttachAudioReplace] = useState(false);
@@ -2366,7 +2372,7 @@ const TuneProfile: React.FC = () => {
                 alt={`${media.title} cover`}
                 className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
-              {/* Play / awaiting upload overlay */}
+              {/* Play / awaiting rights or upload overlay */}
               <div 
                 className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
                   isMediaPlayable(media)
@@ -2380,28 +2386,74 @@ const TuneProfile: React.FC = () => {
                     <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
                   </div>
                 ) : (
-                  <div className="text-center px-4">
-                    <Upload className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                    <p className="text-white text-sm font-semibold">Awaiting upload</p>
-                    {canAttachAudio() ? (
-                      <>
-                        <p className="text-gray-300 text-xs mt-1 mb-3">
-                          {isContributorAudioUpload()
-                            ? 'Upload audio on behalf of the rights holder'
-                            : 'Upload your audio to make this tune playable'}
+                  (() => {
+                    const blockReason = getPlayabilityBlockReason(media);
+                    const rightsBlocked = blockReason === 'rights';
+                    const disputed = blockReason === 'disputed';
+                    const showClaimCta = rightsBlocked && !canEditTune();
+
+                    return (
+                      <div className="text-center px-4">
+                        {rightsBlocked || disputed ? (
+                          <Award className="h-8 w-8 text-amber-400 mx-auto mb-2" />
+                        ) : (
+                          <Upload className="h-8 w-8 text-amber-400 mx-auto mb-2" />
+                        )}
+                        <p className="text-white text-sm font-semibold">
+                          {disputed
+                            ? 'Rights disputed'
+                            : rightsBlocked
+                              ? 'Awaiting rights'
+                              : 'Awaiting upload'}
                         </p>
-                        <button
-                          type="button"
-                          onClick={handleAttachAudioClick}
-                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-sm font-semibold rounded-lg shadow-lg transition-all"
-                        >
-                          {isContributorAudioUpload() ? 'Upload on behalf' : 'Upload audio'}
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-gray-300 text-xs mt-1">Tip to support this tune</p>
-                    )}
-                  </div>
+                        <p className="text-gray-300 text-xs mt-1 mb-3">
+                          {disputed
+                            ? 'Playback is paused while ownership is resolved'
+                            : rightsBlocked
+                              ? showClaimCta
+                                ? 'Claim ownership to receive tips held in escrow'
+                                : canAttachAudio()
+                                  ? 'Upload audio, or wait for the rights holder to claim'
+                                  : 'Tip to support — earnings are held for the rights holder'
+                              : canAttachAudio()
+                                ? isContributorAudioUpload()
+                                  ? 'Upload audio on behalf of the rights holder'
+                                  : 'Upload your audio to make this tune playable'
+                                : 'Tip to support this tune'}
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                          {showClaimCta && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClaimTune();
+                              }}
+                              className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
+                            >
+                              Claim this tune
+                            </button>
+                          )}
+                          {canAttachAudio() && !disputed && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAttachAudioClick();
+                              }}
+                              className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-lg transition-all ${
+                                showClaimCta
+                                  ? 'bg-white/15 hover:bg-white/25 text-white border border-white/30'
+                                  : 'bg-amber-500 hover:bg-amber-400 text-black'
+                              }`}
+                            >
+                              {isContributorAudioUpload() ? 'Upload on behalf' : 'Upload audio'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             </div>

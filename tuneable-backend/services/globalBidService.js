@@ -12,12 +12,19 @@ const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
 const { applyTipChipsToMedia } = require('../utils/elementNormalizer');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
+const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 
 /**
  * @param {string} userId
- * @param {{ mediaId?: string, amount: number, externalMedia?: object, currentLocation?: object }} options amount in pounds
+ * @param {{ mediaId?: string, amount: number, externalMedia?: object, currentLocation?: object, skipIfAlreadyTipped?: boolean }} options amount in pounds
  */
-async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMedia, currentLocation } = {}) {
+async function placeGlobalBid(userId, {
+  mediaId = 'external',
+  amount,
+  externalMedia,
+  currentLocation,
+  skipIfAlreadyTipped = false,
+} = {}) {
   if (!amount || amount < 0.01) {
     const err = new Error('Minimum bid is £0.01');
     err.status = 400;
@@ -63,6 +70,9 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     const {
       title, artist, sources, coverArt, duration, tags, genres, category,
       externalIds, album, releaseDate, releaseYear, releaseDatePrecision,
+      isrc: externalIsrc,
+      identityConfidence,
+      identityConfidenceSource,
     } = externalMedia;
 
     if (!title || !artist) {
@@ -108,6 +118,8 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
         Array.isArray(tags) ? tags : []
       );
 
+      const resolvedIsrc = normalizeIsrc(externalIsrc || externalIds?.isrc);
+
       media = new Media({
         title,
         artist: [{ name: artist, userId: null, verified: false }],
@@ -115,6 +127,9 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
         duration: duration || 0,
         sources: new Map(sourceEntries),
         externalIds: new Map(externalIdEntries),
+        isrc: resolvedIsrc || null,
+        identityConfidence: identityConfidence || null,
+        identityConfidenceSource: identityConfidenceSource || null,
         tags: seededChips.tags,
         elements: seededChips.elements,
         genres: Array.isArray(genres)
@@ -140,6 +155,26 @@ async function placeGlobalBid(userId, { mediaId = 'external', amount, externalMe
     const err = new Error('Media not found');
     err.status = 404;
     throw err;
+  }
+
+  // Import (and similar batch flows) may resolve several external rows onto one Media
+  // via ISRC / externalIds / title+artist. Skip a second tip on the same media.
+  if (skipIfAlreadyTipped) {
+    const existingBid = await Bid.findOne({
+      userId,
+      mediaId: media._id,
+      status: 'active',
+    }).select('_id').lean();
+    if (existingBid) {
+      return {
+        skipped: true,
+        reason: 'already_tipped',
+        bid: null,
+        media,
+        updatedBalance: user.balance,
+        globalPartyId: null,
+      };
+    }
   }
 
   const { assertWelcomeMediaSpend } = require('../utils/welcomeCreditPolicy');

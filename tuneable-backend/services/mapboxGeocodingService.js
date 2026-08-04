@@ -90,8 +90,22 @@ function featureToSuggestion(feature) {
 }
 
 function formatLocationDisplay(props, context) {
-  const parts = [];
+  const featureType = props.feature_type || null;
   const name = props.name || props.name_preferred;
+
+  // Country / region features: don't duplicate the place name as city + country
+  if (featureType === 'country') {
+    return name || props.place_formatted || props.full_address || '';
+  }
+  if (featureType === 'region') {
+    const parts = [name];
+    if (context.country?.name && context.country.name !== name) {
+      parts.push(context.country.name);
+    }
+    return parts.filter(Boolean).join(', ') || props.place_formatted || '';
+  }
+
+  const parts = [];
   if (name) parts.push(name);
   if (context.region?.name && context.region.name !== name) {
     parts.push(context.region.name);
@@ -112,6 +126,7 @@ function parseFeatureToLocation(feature) {
   const props = feature.properties || {};
   const context = props.context || {};
   const placeId = props.mapbox_id || feature.id || null;
+  const featureType = props.feature_type || null;
 
   const ancestorIdSet = new Set();
   if (placeId) ancestorIdSet.add(placeId);
@@ -131,17 +146,44 @@ function parseFeatureToLocation(feature) {
     });
   }
 
-  const city =
-    context.locality?.name ||
-    context.place?.name ||
-    context.neighborhood?.name ||
-    props.name ||
-    null;
-  const region = context.region?.name || context.district?.name || null;
-  const country = context.country?.name || null;
-  const countryCode = context.country?.country_code
+  let city = null;
+  let region = null;
+  let country = context.country?.name || null;
+  let countryCode = context.country?.country_code
     ? String(context.country.country_code).toUpperCase()
     : null;
+
+  if (featureType === 'country') {
+    city = null;
+    region = null;
+    country = props.name || props.name_preferred || country;
+    // Mapbox v6 may put iso on props or context for country features
+    countryCode = countryCode
+      || (props.country_code ? String(props.country_code).toUpperCase() : null)
+      || (context.country?.country_code ? String(context.country.country_code).toUpperCase() : null);
+  } else if (featureType === 'region' || featureType === 'district') {
+    city = null;
+    region = props.name || props.name_preferred || context.region?.name || null;
+  } else {
+    city =
+      context.locality?.name ||
+      context.place?.name ||
+      (featureType === 'place' || featureType === 'locality' || featureType === 'neighborhood'
+        ? (props.name || props.name_preferred)
+        : null) ||
+      context.neighborhood?.name ||
+      null;
+    // Only fall back to props.name as city for place-like features
+    if (!city && featureType !== 'country' && featureType !== 'region') {
+      city = props.name || props.name_preferred || null;
+    }
+    region = context.region?.name || context.district?.name || null;
+  }
+
+  // Guard: never keep city === country (produces "Ireland, Ireland")
+  if (city && country && city.toLowerCase() === country.toLowerCase()) {
+    city = null;
+  }
 
   const coords = props.coordinates || {};
   const lng = feature.geometry?.coordinates?.[0] ?? coords.longitude;
@@ -154,7 +196,7 @@ function parseFeatureToLocation(feature) {
   return {
     placeProvider: 'mapbox',
     placeId,
-    featureType: props.feature_type || null,
+    featureType,
     ancestorIds: Array.from(ancestorIdSet),
     ancestors,
     label: props.name || props.name_preferred || null,

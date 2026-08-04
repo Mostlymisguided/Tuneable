@@ -344,6 +344,16 @@ async function applySuggestionToMedia(media, suggestion, {
     media.externalIds.set('musicbrainzRelease', String(suggestion.musicbrainzReleaseId));
   }
 
+  // Soft identity upgrade when MusicBrainz confirms the recording
+  if (applyIdentity && suggestion.musicbrainzId) {
+    const rank = { unverified: 1, likely: 2, catalog: 3, verified: 4 };
+    const currentRank = rank[media.identityConfidence] || 0;
+    if (rank.verified > currentRank) {
+      media.identityConfidence = 'verified';
+      media.identityConfidenceSource = 'musicbrainz';
+    }
+  }
+
   if (applyTags) {
     const incomingTags = normalizeTagList(suggestion.tags || []);
     const incomingGenres = normalizeTagList(suggestion.genres || incomingTags, MAX_GENRES);

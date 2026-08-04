@@ -2164,7 +2164,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     });
     
     if (displayMedia.length === 0) {
-      toast.info('No playable tracks in this list — tip on tracks awaiting upload or wait for audio to be added.');
+      toast.info('No playable tracks in this list — tip on tracks awaiting rights or audio, or wait for audio to be added.');
       return;
     }
     
@@ -2239,7 +2239,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     });
     
     if (displayMedia.length === 0) {
-      toast.info('No playable tracks in this list — tip on tracks awaiting upload or wait for audio to be added.');
+      toast.info('No playable tracks in this list — tip on tracks awaiting rights or audio, or wait for audio to be added.');
       return;
     }
     

@@ -339,6 +339,64 @@ class ArtistEscrowService {
       throw error;
     }
   }
+
+  /**
+   * Claim all unclaimed escrow allocations for a specific media item.
+   * Called when a rights-pending claim is approved so tips held in limbo
+   * transfer to the verified owner without fuzzy artist-name matching.
+   *
+   * @param {string} mediaId
+   * @param {string} userId
+   * @returns {Promise<Object>}
+   */
+  async claimAllocationsForMedia(mediaId, userId) {
+    try {
+      if (!mediaId || !userId) {
+        throw new Error('mediaId and userId are required');
+      }
+
+      const allocations = await ArtistEscrowAllocation.find({
+        mediaId,
+        claimed: false,
+      });
+
+      if (allocations.length === 0) {
+        return {
+          claimed: false,
+          count: 0,
+          totalAmount: 0,
+        };
+      }
+
+      let totalAmount = 0;
+      for (const allocation of allocations) {
+        await allocation.claim(userId);
+        totalAmount += allocation.allocatedAmount;
+      }
+
+      console.log(
+        `✅ Claimed ${allocations.length} escrow allocation(s) for media ${mediaId} → user ${userId}, total: £${(totalAmount / 100).toFixed(2)}`
+      );
+
+      return {
+        claimed: true,
+        count: allocations.length,
+        totalAmount,
+        allocations: allocations.map((a) => ({
+          mediaId: a.mediaId,
+          bidId: a.bidId,
+          amount: a.allocatedAmount,
+          allocatedAt: a.allocatedAt,
+        })),
+      };
+    } catch (error) {
+      console.error(
+        `❌ Error claiming escrow allocations for media ${mediaId} → user ${userId}:`,
+        error
+      );
+      throw error;
+    }
+  }
   
   /**
    * Get escrow balance and history for a user

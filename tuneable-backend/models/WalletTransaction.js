@@ -46,12 +46,17 @@ const walletTransactionSchema = new mongoose.Schema({
   // ========================================
   paymentMethod: { 
     type: String, 
-    enum: ['stripe', 'manual', 'beta', 'gift'],
+    enum: ['stripe', 'manual', 'beta', 'gift', 'apple_iap', 'google_play'],
     default: 'stripe'
   },
   
   stripeSessionId: { type: String }, // Stripe checkout session ID
   stripePaymentIntentId: { type: String }, // Stripe payment intent ID
+
+  // Apple IAP / Google Play Billing
+  storeTransactionId: { type: String }, // Unique store transaction / order id
+  storeProductId: { type: String },
+  platform: { type: String, enum: ['ios', 'android', 'web'] },
   
   // ========================================
   // BALANCE TRACKING
@@ -87,6 +92,10 @@ const walletTransactionSchema = new mongoose.Schema({
 walletTransactionSchema.index({ userId: 1, createdAt: -1 }); // User's transaction history (most recent first)
 walletTransactionSchema.index({ stripeSessionId: 1 }); // Lookup by Stripe session
 walletTransactionSchema.index({ stripePaymentIntentId: 1 }); // Lookup by Stripe payment intent
+walletTransactionSchema.index(
+  { storeTransactionId: 1 },
+  { unique: true, sparse: true }
+); // Idempotent IAP credits
 walletTransactionSchema.index({ type: 1, status: 1 }); // Filter by type and status
 walletTransactionSchema.index({ userId: 1, type: 1, createdAt: -1 }); // User's transactions by type
 walletTransactionSchema.index({ transactionHash: 1 }); // Hash lookup for verification
@@ -113,6 +122,8 @@ walletTransactionSchema.methods.generateHash = function() {
     paymentMethod: this.paymentMethod,
     stripeSessionId: this.stripeSessionId,
     stripePaymentIntentId: this.stripePaymentIntentId,
+    storeTransactionId: this.storeTransactionId,
+    storeProductId: this.storeProductId,
     createdAt: this.createdAt?.toISOString() || this.createdAt
   });
   return crypto.createHash('sha256').update(data).digest('hex');

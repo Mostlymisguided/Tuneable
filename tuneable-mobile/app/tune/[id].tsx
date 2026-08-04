@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -20,10 +21,17 @@ import {
 import { Screen } from '@/src/components/Screen';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
+import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
-import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import {
+  formatArtist,
+  getPlayabilityBlockReason,
+  isRightsPendingClaimable,
+  isUploadPlayable,
+  mediaId,
+} from '@/src/lib/media';
 import { canUploadMedia } from '@/src/lib/permissions';
 import {
   buildTipStatChips,
@@ -73,6 +81,7 @@ export default function TuneProfileScreen() {
   const [tipping, setTipping] = useState(false);
   const [supportError, setSupportError] = useState<string | null>(null);
   const [showAboutMore, setShowAboutMore] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
 
   const load = useCallback(
@@ -117,6 +126,10 @@ export default function TuneProfileScreen() {
 
   const playable = isUploadPlayable(media);
   const canUpload = canUploadMedia(user);
+  const blockReason = getPlayabilityBlockReason(media);
+  const rightsBlocked = blockReason === 'rights';
+  const disputed = blockReason === 'disputed';
+  const showClaimCta = Boolean(media && isRightsPendingClaimable(media));
   const artist =
     media?.creatorDisplay ||
     (media ? formatArtist(media.artist) : 'Unknown artist');
@@ -338,22 +351,63 @@ export default function TuneProfileScreen() {
                   </View>
                 ) : (
                   <View style={styles.awaitingBox}>
-                    <Ionicons name="cloud-upload-outline" size={28} color="#fbbf24" />
-                    <Text style={styles.awaitingTitle}>Awaiting upload</Text>
-                    {canUpload ? (
-                      <Pressable
-                        style={styles.uploadOverlayBtn}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/upload',
-                            params: { attachTo: mediaId(media) || id },
-                          })
-                        }>
-                        <Text style={styles.uploadOverlayText}>Upload audio</Text>
-                      </Pressable>
-                    ) : (
-                      <Text style={styles.awaitingHint}>Tip to support this tune</Text>
-                    )}
+                    <Ionicons
+                      name={
+                        rightsBlocked || disputed
+                          ? 'ribbon-outline'
+                          : 'cloud-upload-outline'
+                      }
+                      size={28}
+                      color="#fbbf24"
+                    />
+                    <Text style={styles.awaitingTitle}>
+                      {disputed
+                        ? 'Rights disputed'
+                        : rightsBlocked
+                          ? 'Awaiting rights'
+                          : 'Awaiting upload'}
+                    </Text>
+                    <Text style={styles.awaitingHint}>
+                      {disputed
+                        ? 'Playback is paused while ownership is resolved'
+                        : rightsBlocked
+                          ? 'Claim ownership to receive tips held in escrow'
+                          : canUpload
+                            ? 'Upload audio to make this tune playable'
+                            : 'Tip to support this tune'}
+                    </Text>
+                    <View style={styles.awaitingActions}>
+                      {showClaimCta && !disputed ? (
+                        <Pressable
+                          style={styles.claimOverlayBtn}
+                          onPress={() => setClaimOpen(true)}>
+                          <Text style={styles.claimOverlayText}>Claim this tune</Text>
+                        </Pressable>
+                      ) : null}
+                      {canUpload && !disputed ? (
+                        <Pressable
+                          style={
+                            showClaimCta
+                              ? styles.uploadOverlayBtnSecondary
+                              : styles.uploadOverlayBtn
+                          }
+                          onPress={() =>
+                            router.push({
+                              pathname: '/upload',
+                              params: { attachTo: mediaId(media) || id },
+                            })
+                          }>
+                          <Text
+                            style={
+                              showClaimCta
+                                ? styles.uploadOverlayTextSecondary
+                                : styles.uploadOverlayText
+                            }>
+                            Upload audio
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
                 )}
               </View>
@@ -406,6 +460,14 @@ export default function TuneProfileScreen() {
                 <Pressable style={styles.playBtn} onPress={() => void onPlay()}>
                   <Ionicons name="play" size={16} color="#fff" />
                   <Text style={styles.playBtnText}>Play</Text>
+                </Pressable>
+              ) : null}
+              {showClaimCta ? (
+                <Pressable
+                  style={styles.claimBtn}
+                  onPress={() => setClaimOpen(true)}>
+                  <Ionicons name="ribbon-outline" size={16} color="#fff" />
+                  <Text style={styles.claimBtnText}>Claim</Text>
                 </Pressable>
               ) : null}
               <Pressable style={styles.shareBtn} onPress={() => void onShare()}>
@@ -602,6 +664,18 @@ export default function TuneProfileScreen() {
             }}
             onConfirm={onConfirmTip}
           />
+          <ClaimSheet
+            visible={claimOpen}
+            mediaId={mediaId(media) || id || ''}
+            mediaTitle={media.title || 'Untitled'}
+            onClose={() => setClaimOpen(false)}
+            onSubmitted={() => {
+              Alert.alert(
+                'Claim submitted',
+                "We'll notify you when it's reviewed. Approved claims receive tips held in escrow."
+              );
+            }}
+          />
         </>
       ) : null}
     </Screen>
@@ -668,10 +742,35 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  awaitingActions: {
+    marginTop: 10,
+    gap: 8,
+    alignItems: 'center',
+  },
+  claimOverlayBtn: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  claimOverlayText: {
+    color: '#111',
+    fontWeight: '700',
+    fontSize: 13,
   },
   uploadOverlayBtn: {
-    marginTop: 10,
     backgroundColor: '#f59e0b',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  uploadOverlayBtnSecondary: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
@@ -680,6 +779,25 @@ const styles = StyleSheet.create({
     color: '#111',
     fontWeight: '700',
     fontSize: 13,
+  },
+  uploadOverlayTextSecondary: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  claimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f59e0b',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  claimBtnText: {
+    color: '#111',
+    fontWeight: '700',
+    fontSize: 14,
   },
   title: {
     color: colors.text,

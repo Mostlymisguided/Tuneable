@@ -323,8 +323,9 @@ const notifyCreatorApplication = async (userId, status, reason = null) => {
  * @param {string} mediaId - Media ID
  * @param {string} mediaTitle - Media title
  * @param {string} reason - Optional reason for rejection
+ * @param {string} approvalExtra - Optional extra text appended on approval (e.g. escrow transfer note)
  */
-const notifyClaim = async (userId, status, mediaId, mediaTitle, reason = null) => {
+const notifyClaim = async (userId, status, mediaId, mediaTitle, reason = null, approvalExtra = null) => {
   try {
     const isApproved = status === 'approved';
     const Media = require('../models/Media');
@@ -338,7 +339,7 @@ const notifyClaim = async (userId, status, mediaId, mediaTitle, reason = null) =
       type: isApproved ? 'claim_approved' : 'claim_rejected',
       title: isApproved ? 'Tune Claim Approved!' : 'Tune Claim Rejected',
       message: isApproved
-        ? `Your claim for "${mediaTitle}" has been approved. You are now the verified owner.`
+        ? `Your claim for "${mediaTitle}" has been approved. You are now the verified owner.${approvalExtra || ''}`
         : `Your claim for "${mediaTitle}" was rejected.${reason ? ` Reason: ${reason}` : ''}`,
       link: `/tune/${mediaLinkId}`,
       linkText: 'View Media',

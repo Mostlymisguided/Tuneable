@@ -5,6 +5,41 @@ const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'TuneableLocal/1.0 ( https://tuneable.stream )';
 
+const MB_RETRYABLE = new Set([429, 500, 502, 503, 504]);
+const MB_MAX_RETRIES = 4;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * MusicBrainz GET with backoff on 429/5xx (common under the 1 req/s soft limit).
+ */
+async function mbGet(url, params = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= MB_MAX_RETRIES; attempt += 1) {
+    try {
+      return await axios.get(url, {
+        headers: {
+          'User-Agent': USER_AGENT,
+          Accept: 'application/json',
+        },
+        params,
+        timeout: 20000,
+      });
+    } catch (err) {
+      lastError = err;
+      const status = err.response?.status;
+      if (!MB_RETRYABLE.has(status) || attempt === MB_MAX_RETRIES) {
+        throw err;
+      }
+      const backoff = 1000 * (attempt + 1) * (attempt + 1);
+      await sleep(backoff);
+    }
+  }
+  throw lastError;
+}
+
 /** Folksonomy tags to ignore (not useful as genres). */
 const NOISE_TAGS = new Set([
   'seen live',
@@ -160,20 +195,13 @@ async function searchRecordings(query, offset = 0, limit = 20) {
   }
 
   const cappedLimit = Math.max(1, Math.min(limit, 100));
-  const response = await axios.get(`${MUSICBRAINZ_API}/recording`, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Accept: 'application/json',
-    },
-    params: {
+  const response = await mbGet(`${MUSICBRAINZ_API}/recording`, {
       query: trimmedQuery,
       dismax: true,
       fmt: 'json',
       limit: cappedLimit,
       offset: Math.max(0, Number(offset) || 0),
-    },
-    timeout: 15000,
-  });
+    });
 
   const recordings = Array.isArray(response.data?.recordings)
     ? response.data.recordings
@@ -226,23 +254,214 @@ async function searchRecordings(query, offset = 0, limit = 20) {
  * Lookup a recording by MBID with tags, ISRCs, and release data.
  */
 async function getRecording(mbid) {
+  const raw = await getRecordingRaw(mbid);
+  if (!raw) return null;
+  return mapRecordingToTrack(raw);
+}
+
+/**
+ * Raw recording lookup (keeps artist-credit MBIDs).
+ */
+async function getRecordingRaw(mbid) {
   const id = String(mbid || '').trim();
   if (!id) return null;
 
-  const response = await axios.get(`${MUSICBRAINZ_API}/recording/${encodeURIComponent(id)}`, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Accept: 'application/json',
-    },
-    params: {
-      fmt: 'json',
-      inc: 'tags+isrcs+releases+artist-credits',
-    },
-    timeout: 15000,
+  const response = await mbGet(`${MUSICBRAINZ_API}/recording/${encodeURIComponent(id)}`, {
+    fmt: 'json',
+    inc: 'tags+isrcs+releases+artist-credits',
   });
 
   if (!response.data?.id) return null;
-  return mapRecordingToTrack(response.data);
+  return response.data;
+}
+
+/**
+ * Primary artist MBIDs from a recording's artist-credit list (headline only).
+ */
+function extractPrimaryArtistMbids(recording) {
+  const credits = Array.isArray(recording?.['artist-credit'])
+    ? recording['artist-credit']
+    : [];
+  const ids = [];
+  for (const entry of credits) {
+    const id = entry?.artist?.id;
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * Lookup an artist by MBID (area / begin-area / country included by default).
+ */
+async function getArtist(mbid) {
+  const id = String(mbid || '').trim();
+  if (!id) return null;
+
+  const response = await mbGet(`${MUSICBRAINZ_API}/artist/${encodeURIComponent(id)}`, {
+    fmt: 'json',
+  });
+
+  if (!response.data?.id) return null;
+  return response.data;
+}
+
+/**
+ * Search artists by exact-ish name. Returns raw artist summaries (may include area/country).
+ */
+async function searchArtists(name, limit = 5) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return [];
+
+  const response = await mbGet(`${MUSICBRAINZ_API}/artist`, {
+    query: `artist:"${trimmed.replace(/"/g, '')}"`,
+    fmt: 'json',
+    limit: Math.max(1, Math.min(limit, 25)),
+  });
+
+  return Array.isArray(response.data?.artists) ? response.data.artists : [];
+}
+
+/**
+ * Pick the best origin area from a MusicBrainz artist.
+ * Prefer begin-area (formation / birthplace), fall back to main area + country.
+ *
+ * @returns {{
+ *   artistMbid: string,
+ *   artistName: string,
+ *   city: string|null,
+ *   region: string|null,
+ *   country: string|null,
+ *   countryCode: string|null,
+ *   areaName: string|null,
+ *   beginAreaName: string|null,
+ *   geocodeQuery: string|null,
+ * }|null}
+ */
+function mapArtistOrigin(artist) {
+  if (!artist?.id) return null;
+
+  // Browse/lookup returns area objects; search often returns area as a string name.
+  const beginArea = typeof artist['begin-area'] === 'object' && artist['begin-area']
+    ? artist['begin-area']
+    : (typeof artist.begin_area === 'object' && artist.begin_area ? artist.begin_area : null);
+  const beginAreaName = beginArea?.name
+    || (typeof artist['begin-area'] === 'string' ? artist['begin-area'] : null)
+    || (typeof artist.begin_area === 'string' ? artist.begin_area : null);
+
+  let area = null;
+  let areaName = null;
+  if (typeof artist.area === 'object' && artist.area) {
+    area = artist.area;
+    areaName = artist.area.name || null;
+  } else if (typeof artist.area === 'string' && artist.area.trim()) {
+    areaName = artist.area.trim();
+  }
+
+  const countryCode = (
+    artist.country
+    || area?.['iso-3166-1-codes']?.[0]
+    || beginArea?.['iso-3166-1-codes']?.[0]
+    || null
+  );
+
+  const beginType = (beginArea?.type || '').toLowerCase();
+  const areaType = (area?.type || '').toLowerCase();
+
+  const CITY_TYPES = new Set(['city', 'municipality', 'town', 'district', 'borough', 'neighborhood', 'locality']);
+  const REGION_TYPES = new Set(['subdivision', 'county', 'state', 'province', 'region']);
+
+  const areaLooksLikeCountry = areaType === 'country'
+    || !!(area?.['iso-3166-1-codes']?.length);
+  const beginLooksLikeCountry = beginType === 'country'
+    || !!(beginArea?.['iso-3166-1-codes']?.length);
+
+  let city = null;
+  let region = null;
+  let country = null;
+
+  if (beginAreaName) {
+    if (beginLooksLikeCountry) {
+      country = beginAreaName;
+    } else if (REGION_TYPES.has(beginType)) {
+      region = beginAreaName;
+    } else if (CITY_TYPES.has(beginType) || !beginType) {
+      // type often null on MB areas — treat as place unless it matches country area
+      if (areaLooksLikeCountry && areaName
+        && beginAreaName.toLowerCase() === areaName.toLowerCase()) {
+        country = beginAreaName;
+      } else {
+        city = beginAreaName;
+      }
+    } else {
+      city = beginAreaName;
+    }
+  }
+
+  if (areaName) {
+    if (areaLooksLikeCountry) {
+      country = country || areaName;
+    } else if (REGION_TYPES.has(areaType)) {
+      region = region || areaName;
+    } else if (CITY_TYPES.has(areaType) && !city) {
+      city = areaName;
+    } else if (!areaType && !city && !region && !country) {
+      // Search hit with string area — treat as place name for geocoding
+      city = areaName;
+    } else if (!country && !region && !city) {
+      city = areaName;
+    }
+  }
+
+  // Dedupe: begin-area country name mistakenly kept as city
+  if (city && country && city.toLowerCase() === country.toLowerCase()) {
+    city = null;
+  }
+  if (city && countryCode && city.toUpperCase() === String(countryCode).toUpperCase()) {
+    city = null;
+  }
+
+  if (!city && !region && !country && !countryCode) {
+    return null;
+  }
+
+  const geocodeParts = [
+    city,
+    region,
+    country || (countryCode ? String(countryCode).toUpperCase() : null),
+  ].filter(Boolean);
+
+  return {
+    artistMbid: artist.id,
+    artistName: artist.name || null,
+    city: city || null,
+    region: region || null,
+    country: country || null,
+    countryCode: countryCode ? String(countryCode).toUpperCase() : null,
+    areaName: areaName || null,
+    beginAreaName: beginAreaName || null,
+    geocodeQuery: geocodeParts.length > 0 ? geocodeParts.join(', ') : null,
+  };
+}
+
+/**
+ * Resolve origin for the first credited artist on a recording.
+ */
+async function getOriginFromRecordingMbid(recordingMbid) {
+  const recording = await getRecordingRaw(recordingMbid);
+  if (!recording) return null;
+
+  const artistMbids = extractPrimaryArtistMbids(recording);
+  for (const artistMbid of artistMbids) {
+    const artist = await getArtist(artistMbid);
+    const origin = mapArtistOrigin(artist);
+    if (origin) {
+      return {
+        ...origin,
+        recordingMbid: recording.id,
+      };
+    }
+  }
+  return null;
 }
 
 /**
@@ -252,17 +471,10 @@ async function searchByIsrc(isrc, limit = 5) {
   const code = String(isrc || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (code.length < 12) return [];
 
-  const response = await axios.get(`${MUSICBRAINZ_API}/recording`, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Accept: 'application/json',
-    },
-    params: {
-      query: `isrc:${code}`,
-      fmt: 'json',
-      limit: Math.max(1, Math.min(limit, 25)),
-    },
-    timeout: 15000,
+  const response = await mbGet(`${MUSICBRAINZ_API}/recording`, {
+    query: `isrc:${code}`,
+    fmt: 'json',
+    limit: Math.max(1, Math.min(limit, 25)),
   });
 
   const recordings = Array.isArray(response.data?.recordings)
@@ -272,9 +484,32 @@ async function searchByIsrc(isrc, limit = 5) {
   return recordings.map(mapRecordingToTrack);
 }
 
+/**
+ * Raw ISRC search (keeps artist-credit MBIDs on recordings).
+ */
+async function searchByIsrcRaw(isrc, limit = 5) {
+  const code = String(isrc || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (code.length < 12) return [];
+
+  const response = await mbGet(`${MUSICBRAINZ_API}/recording`, {
+    query: `isrc:${code}`,
+    fmt: 'json',
+    limit: Math.max(1, Math.min(limit, 25)),
+  });
+
+  return Array.isArray(response.data?.recordings) ? response.data.recordings : [];
+}
+
 module.exports = {
   searchRecordings,
   getRecording,
+  getRecordingRaw,
+  getArtist,
+  searchArtists,
   searchByIsrc,
+  searchByIsrcRaw,
+  extractPrimaryArtistMbids,
+  mapArtistOrigin,
+  getOriginFromRecordingMbid,
   mapMusicBrainzTags,
 };

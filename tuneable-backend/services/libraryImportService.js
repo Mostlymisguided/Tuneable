@@ -8,6 +8,7 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const spotifyService = require('./spotifyService');
 const soundcloudService = require('./soundcloudService');
+const importCrossRefService = require('./importCrossRefService');
 const { placeGlobalBid } = require('./globalBidService');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const {
@@ -22,13 +23,40 @@ const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 25000;
 
-function buildExternalMediaFromTrack(track) {
+function identityConfidenceSourceFrom({ matchStatus, matchType, crossRef }) {
+  if (crossRef?.status === 'isrc_verified') {
+    const sources = crossRef.sources || [];
+    if (sources.includes('spotify') && sources.includes('musicbrainz')) {
+      return 'isrc-spotify+musicbrainz';
+    }
+    if (sources.includes('spotify')) return 'isrc-spotify';
+    if (sources.includes('musicbrainz')) return 'isrc-musicbrainz';
+    return 'isrc';
+  }
+  if (crossRef?.status === 'spotify_catalog' || (
+    crossRef?.identityConfidence === 'verified' && (crossRef.sources || []).includes('spotify')
+  )) {
+    return 'spotify';
+  }
+  if (matchStatus === 'on_catalog' || matchStatus === 'in_library') {
+    return matchType === 'external-id' ? 'catalog-external-id' : 'catalog-exact';
+  }
+  if (matchStatus === 'possible_match') return 'catalog-fuzzy';
+  return 'none';
+}
+
+function buildExternalMediaFromTrack(track, {
+  identityConfidence = null,
+  identityConfidenceSource = null,
+} = {}) {
   const tags = Array.isArray(track.tags)
     ? track.tags.filter((t) => typeof t === 'string' && t.trim())
     : [];
   const genres = Array.isArray(track.genres)
     ? track.genres.filter((t) => typeof t === 'string' && t.trim())
     : (track.genre ? [String(track.genre).trim()].filter(Boolean) : []);
+
+  const isrc = normalizeIsrc(track.externalIds?.isrc);
 
   return {
     title: track.title,
@@ -39,10 +67,14 @@ function buildExternalMediaFromTrack(track) {
     album: track.album || null,
     releaseDate: track.releaseDate || null,
     releaseYear: track.releaseYear || null,
+    releaseDatePrecision: track.releaseDatePrecision || null,
     sources: track.sources || {},
     externalIds: track.externalIds || {},
+    isrc: isrc || null,
     tags,
     genres,
+    identityConfidence: identityConfidence || null,
+    identityConfidenceSource: identityConfidenceSource || null,
   };
 }
 
@@ -163,6 +195,22 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
     media.isrc = normalizeIsrc(externalMedia.externalIds.isrc);
     changed = true;
   }
+  if (externalMedia.isrc && !media.isrc) {
+    media.isrc = normalizeIsrc(externalMedia.isrc);
+    changed = true;
+  }
+
+  // Upgrade soft identity flags when a stronger signal arrives via import merge
+  const rank = { unverified: 1, likely: 2, catalog: 3, verified: 4 };
+  const incomingConfidence = externalMedia.identityConfidence;
+  if (incomingConfidence && rank[incomingConfidence]) {
+    const currentRank = rank[media.identityConfidence] || 0;
+    if (rank[incomingConfidence] > currentRank) {
+      media.identityConfidence = incomingConfidence;
+      media.identityConfidenceSource = externalMedia.identityConfidenceSource || media.identityConfidenceSource;
+      changed = true;
+    }
+  }
 
   // Seed tags/genres onto catalog rows that have none (SoundCloud genre pass-through)
   const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
@@ -234,6 +282,11 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
 
   const items = [];
   for (const track of tracks) {
+    const crossRef = track.crossRef || (
+      source === 'spotify' && (track.externalIds?.spotify || track.id)
+        ? { status: 'spotify_catalog', identityConfidence: 'verified', sources: ['spotify'] }
+        : null
+    );
     const exactHit = await findExactCatalogMedia(track);
     let catalogMedia = exactHit?.media || null;
     let matchConfidence = exactHit?.confidence || null;
@@ -260,6 +313,16 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
     // Fuzzy suggestions default to accepted (user can opt out in UI)
     const useSuggestedMatch = matchStatus === 'possible_match';
 
+    const identityConfidence = importCrossRefService.resolveIdentityConfidence({
+      matchStatus,
+      crossRef,
+    });
+    const identityConfidenceSource = identityConfidenceSourceFrom({
+      matchStatus,
+      matchType,
+      crossRef,
+    });
+
     items.push({
       key: trackKey(track, source),
       title: track.title,
@@ -269,6 +332,12 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       album: track.album,
       matchStatus,
       matchType: matchType || null,
+      identityConfidence,
+      identityConfidenceSource,
+      crossRefStatus: crossRef?.status || 'none',
+      crossRefSources: crossRef?.sources || [],
+      originalTitle: crossRef?.originalTitle || null,
+      originalArtist: crossRef?.originalArtist || null,
       mediaId: catalogId || null,
       mediaUuid: catalogMedia?.uuid || null,
       suggestedTitle: catalogMedia && matchStatus === 'possible_match' ? catalogMedia.title : null,
@@ -282,7 +351,10 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       defaultTip,
       minTip: MIN_TIP,
       selected: matchStatus !== 'in_library',
-      externalMedia: buildExternalMediaFromTrack(track),
+      externalMedia: buildExternalMediaFromTrack(track, {
+        identityConfidence,
+        identityConfidenceSource,
+      }),
     });
   }
 
@@ -298,6 +370,8 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       onCatalog: items.filter((i) => i.matchStatus === 'on_catalog').length,
       possibleMatches: items.filter((i) => i.matchStatus === 'possible_match').length,
       newTracks: items.filter((i) => i.matchStatus === 'new').length,
+      identityVerified: items.filter((i) => i.identityConfidence === 'verified').length,
+      identityUnverified: items.filter((i) => i.identityConfidence === 'unverified').length,
       selectedCount: selectable.length,
       estimatedTotal,
       userBalance: (user.balance || 0) / 100,
@@ -332,17 +406,28 @@ async function previewSoundCloudImport(userId, limit = 50) {
   }
 
   const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
-  const { tracks: likedTracks, skippedMixes, scanned } = await soundcloudService.getLikedTracks(
+  const {
+    tracks: likedTracks,
+    skippedMixes,
+    skippedUnplayable,
+    scanned,
+  } = await soundcloudService.getLikedTracks(
     userId,
     cappedLimit,
-    { excludeMixes: true }
+    { excludeMixes: true, excludeUnplayable: true }
   );
-  const tracks = likedTracks.map(soundcloudService.convertLikedTrackToTuneableFormat);
+  const converted = likedTracks.map(soundcloudService.convertLikedTrackToTuneableFormat);
+  // Soft ISRC cross-ref (Spotify / MusicBrainz) — never blocks import
+  const { tracks, stats: crossRefStats } = await importCrossRefService.enrichTracksViaIsrc(converted);
   // Reload balance/preferences in case token refresh mutated user elsewhere
   const freshUser = await User.findById(userId).select('preferences balance');
   return previewImportFromTracks(userId, 'soundcloud', tracks, freshUser || user, {
     skippedMixes,
+    skippedUnplayable,
     scanned,
+    crossRefVerified: crossRefStats.verified,
+    crossRefWithIsrc: crossRefStats.withIsrc,
+    crossRefNoIsrc: crossRefStats.noIsrc,
   });
 }
 
@@ -404,18 +489,37 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
     updatedBalance: user.balance,
   };
 
+  // Rows often look distinct (different Spotify/SC ids) but collapse onto one Media
+  // inside placeGlobalBid via ISRC / externalIds / title+artist.
+  const tippedMediaIds = new Set();
+  const skipIfInLibrary = (item) => item.skipIfInLibrary !== false;
+
   for (const item of selected) {
     const amount = Number(item.amount ?? fallbackTip);
     const label = item.title || item.key;
 
     try {
       if (item.mediaId && mongoose.Types.ObjectId.isValid(item.mediaId)) {
+        const mediaIdStr = String(item.mediaId);
+        if (skipIfInLibrary(item) && tippedMediaIds.has(mediaIdStr)) {
+          results.skipped++;
+          results.items.push({
+            key: item.key,
+            title: label,
+            status: 'skipped',
+            reason: 'already_tipped_in_batch',
+            mediaId: mediaIdStr,
+          });
+          continue;
+        }
+
         const existingBid = await Bid.findOne({
           userId,
           mediaId: item.mediaId,
           status: 'active',
         });
-        if (existingBid && item.skipIfInLibrary !== false) {
+        if (existingBid && skipIfInLibrary(item)) {
+          tippedMediaIds.add(mediaIdStr);
           results.skipped++;
           results.items.push({ key: item.key, title: label, status: 'skipped', reason: 'already_in_library' });
           continue;
@@ -429,14 +533,52 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
         ? item.mediaId
         : 'external';
 
-      const externalMedia = item.externalMedia || null;
+      let externalMedia = item.externalMedia || null;
+      if (externalMedia && rejectedFuzzy) {
+        // Creating as new — drop catalog "likely" unless ISRC already verified it
+        const stillVerified = externalMedia.identityConfidence === 'verified'
+          || item.crossRefStatus === 'isrc_verified';
+        externalMedia = {
+          ...externalMedia,
+          identityConfidence: stillVerified ? 'verified' : 'unverified',
+          identityConfidenceSource: stillVerified
+            ? (externalMedia.identityConfidenceSource || 'isrc')
+            : 'none',
+        };
+      }
 
       if (mediaId !== 'external' && externalMedia) {
         await mergeExternalIdsOntoMedia(mediaId, externalMedia);
       }
 
-      const out = await placeGlobalBid(userId, { mediaId, amount, externalMedia });
+      const out = await placeGlobalBid(userId, {
+        mediaId,
+        amount,
+        externalMedia,
+        skipIfAlreadyTipped: skipIfInLibrary(item),
+      });
 
+      const resolvedMediaId = out.media?._id?.toString();
+
+      if (out.skipped) {
+        if (resolvedMediaId) {
+          tippedMediaIds.add(resolvedMediaId);
+          if (externalMedia) {
+            await mergeExternalIdsOntoMedia(resolvedMediaId, externalMedia);
+          }
+        }
+        results.skipped++;
+        results.items.push({
+          key: item.key,
+          title: label,
+          status: 'skipped',
+          reason: out.reason || 'already_in_library',
+          mediaId: resolvedMediaId || null,
+        });
+        continue;
+      }
+
+      if (resolvedMediaId) tippedMediaIds.add(resolvedMediaId);
       results.tipped++;
       results.totalSpentPence += Math.round(amount * 100);
       results.updatedBalance = out.updatedBalance;
@@ -444,7 +586,7 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
         key: item.key,
         title: label,
         status: 'tipped',
-        mediaId: out.media._id.toString(),
+        mediaId: resolvedMediaId,
         mediaUuid: out.media.uuid,
         amount,
         bidId: out.bid._id.toString(),

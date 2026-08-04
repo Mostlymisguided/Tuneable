@@ -22,6 +22,7 @@ import { buildOAuthStartUrl } from '../utils/platform';
 type ImportSource = 'spotify' | 'soundcloud';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
 type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
+type IdentityConfidence = 'verified' | 'catalog' | 'likely' | 'unverified';
 
 interface ImportItem {
   key: string;
@@ -32,6 +33,12 @@ interface ImportItem {
   album?: string | null;
   matchStatus: MatchStatus;
   matchType?: string | null;
+  identityConfidence?: IdentityConfidence | null;
+  identityConfidenceSource?: string | null;
+  crossRefStatus?: string | null;
+  crossRefSources?: string[];
+  originalTitle?: string | null;
+  originalArtist?: string | null;
   mediaId?: string | null;
   mediaUuid?: string | null;
   suggestedTitle?: string | null;
@@ -52,12 +59,18 @@ interface ImportSummary {
   onCatalog: number;
   possibleMatches?: number;
   newTracks: number;
+  identityVerified?: number;
+  identityUnverified?: number;
   selectedCount: number;
   estimatedTotal: number;
   userBalance: number;
   defaultTip: number;
   skippedMixes?: number;
+  skippedUnplayable?: number;
   scanned?: number;
+  crossRefVerified?: number;
+  crossRefWithIsrc?: number;
+  crossRefNoIsrc?: number;
 }
 
 const DEFAULT_SCAN_LIMIT = 100;
@@ -75,6 +88,20 @@ const STATUS_COLORS: Record<MatchStatus, string> = {
   on_catalog: 'bg-blue-900/40 text-blue-300 border-blue-700',
   possible_match: 'bg-amber-900/40 text-amber-200 border-amber-700',
   new: 'bg-purple-900/40 text-purple-300 border-purple-700',
+};
+
+const IDENTITY_LABELS: Record<IdentityConfidence, string> = {
+  verified: 'Verified via catalog',
+  catalog: 'Exact catalog match',
+  likely: 'Likely match',
+  unverified: 'Unverified identity',
+};
+
+const IDENTITY_COLORS: Record<IdentityConfidence, string> = {
+  verified: 'bg-emerald-900/40 text-emerald-200 border-emerald-700',
+  catalog: 'bg-blue-900/40 text-blue-200 border-blue-700',
+  likely: 'bg-amber-900/40 text-amber-200 border-amber-700',
+  unverified: 'bg-gray-800 text-gray-300 border-gray-600',
 };
 
 const SOURCE_META: Record<ImportSource, {
@@ -413,6 +440,7 @@ const LibraryImport: React.FC = () => {
         mediaId: item.mediaId || undefined,
         matchStatus: item.matchStatus,
         useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
+        crossRefStatus: item.crossRefStatus || undefined,
         amount: parseFloat(tipAmounts[item.key] ?? bulkTip),
         externalMedia: item.externalMedia,
         skipIfInLibrary: true,
@@ -479,6 +507,7 @@ const LibraryImport: React.FC = () => {
         mediaId: item.mediaId || undefined,
         matchStatus: item.matchStatus,
         useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
+        crossRefStatus: item.crossRefStatus || undefined,
         amount: tip,
         externalMedia: item.externalMedia,
         skipIfInLibrary: true,
@@ -641,6 +670,21 @@ const LibraryImport: React.FC = () => {
               {typeof summary.skippedMixes === 'number' && summary.skippedMixes > 0 ? (
                 <span className="ml-1 text-amber-300/90">
                   · skipped {summary.skippedMixes} mix{summary.skippedMixes === 1 ? '' : 'es'}/set
+                </span>
+              ) : null}
+              {typeof summary.skippedUnplayable === 'number' && summary.skippedUnplayable > 0 ? (
+                <span className="ml-1 text-amber-300/90">
+                  · skipped {summary.skippedUnplayable} private/unplayable
+                </span>
+              ) : null}
+              {typeof summary.crossRefVerified === 'number' && summary.crossRefVerified > 0 ? (
+                <span className="ml-1 text-emerald-300/90">
+                  · {summary.crossRefVerified} verified via ISRC
+                </span>
+              ) : null}
+              {typeof summary.identityUnverified === 'number' && summary.identityUnverified > 0 && source === 'soundcloud' ? (
+                <span className="ml-1 text-gray-400">
+                  · {summary.identityUnverified} unverified (imported anyway)
                 </span>
               ) : null}
             </div>
@@ -903,6 +947,18 @@ const LibraryImport: React.FC = () => {
                       <span className={`text-xs px-2 py-0.5 rounded border ${STATUS_COLORS[item.matchStatus]}`}>
                         {STATUS_LABELS[item.matchStatus]}
                       </span>
+                      {item.identityConfidence && (
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded border ${IDENTITY_COLORS[item.identityConfidence]}`}
+                          title={item.identityConfidenceSource || undefined}
+                        >
+                          {item.crossRefStatus === 'isrc_verified'
+                            ? `ISRC · ${(item.crossRefSources || []).join('+') || 'verified'}`
+                            : item.crossRefStatus === 'spotify_catalog'
+                              ? 'Spotify catalog'
+                              : IDENTITY_LABELS[item.identityConfidence]}
+                        </span>
+                      )}
                       {!item.isPlayable && item.matchStatus !== 'in_library' && (
                         <span className="text-xs px-2 py-0.5 rounded border bg-amber-900/30 text-amber-200 border-amber-700">
                           Awaiting audio
@@ -914,6 +970,14 @@ const LibraryImport: React.FC = () => {
                         </span>
                       )}
                     </div>
+                    {item.crossRefStatus === 'isrc_verified'
+                      && item.originalTitle
+                      && (item.originalTitle !== item.title || item.originalArtist !== item.artist) && (
+                      <div className="mt-1 text-xs text-gray-500 truncate">
+                        SoundCloud: {item.originalTitle}
+                        {item.originalArtist ? ` · ${item.originalArtist}` : ''}
+                      </div>
+                    )}
                     {item.matchStatus === 'possible_match' && (
                       <div className="mt-2 text-xs text-amber-100/90 space-y-1.5">
                         <div>

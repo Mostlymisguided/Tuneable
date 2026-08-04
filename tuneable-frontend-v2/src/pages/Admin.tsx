@@ -571,7 +571,9 @@ const Admin: React.FC = () => {
         status === 'approved'
           ? result.takedown
             ? `Takedown approved — ${result.takedown.refundedBidsCount} tip(s) refunded`
-            : 'Claim approved — ownership assigned'
+            : result.escrowTransfer
+              ? `Claim approved — ownership assigned; £${result.escrowTransfer.totalAmountPounds.toFixed(2)} escrow transferred`
+              : 'Claim approved — ownership assigned'
           : 'Claim rejected!'
       );
       // Reload to update counts

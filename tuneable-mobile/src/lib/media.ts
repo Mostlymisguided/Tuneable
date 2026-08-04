@@ -41,6 +41,23 @@ export function isUploadPlayable(media: ChartMediaItem | null | undefined): bool
   return Boolean(getUploadUrl(media));
 }
 
+export function isRightsPendingClaimable(
+  media: ChartMediaItem | null | undefined
+): boolean {
+  if (!media) return false;
+  return media.rightsStatus === 'pending' && !media.rightsCleared;
+}
+
+/** Why a track cannot play on mobile (null when playable). */
+export function getPlayabilityBlockReason(
+  media: ChartMediaItem | null | undefined
+): 'rights' | 'audio' | 'disputed' | null {
+  if (!media || isUploadPlayable(media)) return null;
+  if (media.rightsStatus === 'disputed') return 'disputed';
+  if (isRightsPendingClaimable(media)) return 'rights';
+  return 'audio';
+}
+
 export function mediaId(media: ChartMediaItem): string {
   return media.id || media._id || media.uuid || '';
 }

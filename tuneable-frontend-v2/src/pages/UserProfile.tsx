@@ -1395,7 +1395,7 @@ const UserProfile: React.FC = () => {
         .filter((media) => isMediaPlayable(media)) as any[];
 
       if (allFormattedMedia.length === 0) {
-        toast.info('No playable tracks in this list — tip on tracks awaiting upload or wait for audio to be added.');
+        toast.info('No playable tracks in this list — tip on tracks awaiting rights or audio, or wait for audio to be added.');
         return;
       }
 
@@ -1606,7 +1606,7 @@ const UserProfile: React.FC = () => {
           .filter((media) => isMediaPlayable(media)) as any[];
 
         if (allFormattedMedia.length === 0) {
-          toast.info('No playable tracks in this queue — tip on tracks awaiting upload or wait for audio to be added.');
+          toast.info('No playable tracks in this queue — tip on tracks awaiting rights or audio, or wait for audio to be added.');
           return;
         }
 

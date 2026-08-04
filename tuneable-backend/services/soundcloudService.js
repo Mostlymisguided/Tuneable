@@ -87,6 +87,19 @@ function isLikelyMixOrSet(track) {
 }
 
 /**
+ * Skip private / non-streamable likes — they can't be verified or played later.
+ */
+function isImportableSoundCloudTrack(track) {
+  if (!track) return false;
+  if (track.sharing === 'private') return false;
+  if (track.streamable === false) return false;
+  // Some SC API responses use access / policy instead of streamable
+  if (track.access === 'blocked' || track.access === 'blocked_app') return false;
+  if (typeof track.policy === 'string' && /block/i.test(track.policy)) return false;
+  return true;
+}
+
+/**
  * Refresh an expired SoundCloud access token and persist on the user.
  * @param {import('mongoose').Document} user
  * @returns {Promise<string>} fresh access token
@@ -175,10 +188,11 @@ async function soundcloudGet(user, url, config = {}) {
  * @param {string|import('mongoose').Types.ObjectId} userId
  * @param {number} limit - Max tracks to return overall (after filtering)
  * @param {{ excludeMixes?: boolean }} [options]
- * @returns {Promise<{ tracks: Array, skippedMixes: number, scanned: number }>}
+ * @returns {Promise<{ tracks: Array, skippedMixes: number, skippedUnplayable: number, scanned: number }>}
  */
 async function getLikedTracks(userId, limit = 50, options = {}) {
   const excludeMixes = options.excludeMixes !== false;
+  const excludeUnplayable = options.excludeUnplayable !== false;
   const user = await User.findById(userId).select(
     'soundcloudAccessToken soundcloudRefreshToken soundcloudId'
   );
@@ -190,6 +204,7 @@ async function getLikedTracks(userId, limit = 50, options = {}) {
 
   const tracks = [];
   let skippedMixes = 0;
+  let skippedUnplayable = 0;
   let scanned = 0;
   // Scan extra pages so filtering still fills `limit` with real tunes
   const maxScan = Math.min(Math.max(limit * 3, limit), 400);
@@ -208,6 +223,11 @@ async function getLikedTracks(userId, limit = 50, options = {}) {
       if (!track?.id) continue;
       scanned += 1;
 
+      if (excludeUnplayable && !isImportableSoundCloudTrack(track)) {
+        skippedUnplayable += 1;
+        continue;
+      }
+
       if (excludeMixes && isLikelyMixOrSet(track)) {
         skippedMixes += 1;
         continue;
@@ -223,6 +243,7 @@ async function getLikedTracks(userId, limit = 50, options = {}) {
   return {
     tracks: tracks.slice(0, limit),
     skippedMixes,
+    skippedUnplayable,
     scanned,
   };
 }
@@ -322,6 +343,7 @@ module.exports = {
   convertLikedTrackToTuneableFormat,
   refreshAccessToken,
   isLikelyMixOrSet,
+  isImportableSoundCloudTrack,
   parseSoundCloudTagList,
   extractSoundCloudTags,
   MIX_DURATION_SEC,

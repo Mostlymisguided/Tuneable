@@ -196,7 +196,10 @@ artistEscrowAllocationSchema.methods.claim = async function(userId) {
   // Update user's escrow balance
   const User = require('./User');
   await User.findByIdAndUpdate(userId, {
-    $inc: { artistEscrowBalance: this.allocatedAmount },
+    $inc: {
+      artistEscrowBalance: this.allocatedAmount,
+      totalEscrowEarned: this.allocatedAmount,
+    },
     $push: {
       artistEscrowHistory: {
         mediaId: this.mediaId,

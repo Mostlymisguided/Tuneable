@@ -292,10 +292,4 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
 
 export default ClaimMediaModal;
 
-export function isRightsPendingClaimable(media: {
-  rightsStatus?: string;
-  rightsCleared?: boolean;
-} | null | undefined): boolean {
-  if (!media) return false;
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
-}
+export { isRightsPendingClaimable } from '../utils/mediaPlayability';

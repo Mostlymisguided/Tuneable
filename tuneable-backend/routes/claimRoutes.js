@@ -10,13 +10,11 @@ const { isValidObjectId } = require('../utils/validators');
 const { sendClaimNotification, sendOwnershipNotification, sendClaimStatusNotification } = require('../utils/emailService');
 const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
 const { softDeleteMedia } = require('../services/mediaLifecycleService');
+const artistEscrowService = require('../services/artistEscrowService');
+const { isRightsPendingClaimable: isRightsPendingLimbo } = require('../utils/mediaPlayability');
 
 // Configure upload using R2 or local fallback
 const upload = createClaimUpload();
-
-function isRightsPendingLimbo(media) {
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
-}
 
 function formatClaimant(userDoc) {
   if (!userDoc) return null;
@@ -221,6 +219,7 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 
     const intent = claim.intent || 'claim_keep';
     let takedownResult = null;
+    let escrowTransfer = null;
 
     if (status === 'approved') {
       if (intent === 'takedown') {
@@ -298,6 +297,17 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 
           await media.save();
 
+          // Transfer tip escrow held during rights limbo to the new owner
+          try {
+            escrowTransfer = await artistEscrowService.claimAllocationsForMedia(
+              media._id,
+              claim.userId
+            );
+          } catch (escrowError) {
+            console.error('Error transferring escrow on claim approval:', escrowError);
+            // Ownership is already saved — don't fail the claim review
+          }
+
           // Reject other pending claims for this media
           await Claim.updateMany(
             { mediaId: media._id, _id: { $ne: claim._id }, status: 'pending' },
@@ -333,12 +343,17 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
 
     try {
       const notificationService = require('../services/notificationService');
+      const escrowNote =
+        escrowTransfer && escrowTransfer.totalAmount > 0
+          ? ` £${(escrowTransfer.totalAmount / 100).toFixed(2)} in tip escrow has been added to your balance.`
+          : '';
       await notificationService.notifyClaim(
         claim.userId.toString(),
         status,
         claim.mediaId.toString(),
         media.title,
-        status === 'rejected' ? reviewNotes : null
+        status === 'rejected' ? reviewNotes : null,
+        status === 'approved' ? escrowNote : null
       ).catch(err => console.error('Error sending claim notification:', err));
     } catch (error) {
       console.error('Error setting up claim notification:', error);
@@ -356,6 +371,15 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
     res.json({
       message: `Claim ${status}`,
       claim,
+      ...(escrowTransfer && escrowTransfer.count > 0
+        ? {
+            escrowTransfer: {
+              count: escrowTransfer.count,
+              totalAmount: escrowTransfer.totalAmount,
+              totalAmountPounds: escrowTransfer.totalAmount / 100,
+            },
+          }
+        : {}),
       ...(takedownResult
         ? {
             takedown: {

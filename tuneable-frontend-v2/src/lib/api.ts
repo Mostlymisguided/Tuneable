@@ -1946,6 +1946,11 @@ export const claimAPI = {
     return response.data as {
       message: string;
       claim: any;
+      escrowTransfer?: {
+        count: number;
+        totalAmount: number;
+        totalAmountPounds: number;
+      };
       takedown?: {
         refundedBidsCount: number;
         refundedUsersCount: number;

@@ -4,11 +4,15 @@
 
 export type SupportMode = 'tip';
 
+/** Why a non-podcast track is not playable (null when playable). */
+export type PlayabilityBlockReason = 'rights' | 'audio' | 'disputed' | null;
+
 export interface PlayabilityFields {
   isPlayable?: boolean;
   supportMode?: SupportMode;
   isYouTubeOnly?: boolean;
   awaitingUpload?: boolean;
+  playabilityBlockReason?: PlayabilityBlockReason;
 }
 
 type MediaLike = PlayabilityFields & {
@@ -101,13 +105,39 @@ export function getSupportMode(media: MediaLike | null | undefined): SupportMode
   return 'tip';
 }
 
+/**
+ * Classify why a track cannot play. Prefer rights over missing audio when both apply.
+ */
+export function getPlayabilityBlockReason(
+  media: MediaLike | null | undefined
+): PlayabilityBlockReason {
+  if (!media || isMediaPlayable(media) || isPodcastLike(media)) return null;
+
+  if (media.rightsStatus === 'disputed') return 'disputed';
+  if (media.rightsStatus === 'pending' && !media.rightsCleared) return 'rights';
+
+  const sources = normalizeSources(media.sources);
+  if (!hasDirectAudioSource(sources)) return 'audio';
+
+  return 'audio';
+}
+
+export function isRightsPendingClaimable(
+  media: { rightsStatus?: string; rightsCleared?: boolean } | null | undefined
+): boolean {
+  if (!media) return false;
+  return media.rightsStatus === 'pending' && !media.rightsCleared;
+}
+
 export function enrichMediaWithPlayability<T extends MediaLike>(media: T): T & PlayabilityFields {
   const playable = isMediaPlayable(media);
+  const playabilityBlockReason = getPlayabilityBlockReason(media);
   return {
     ...media,
     isPlayable: playable,
     supportMode: getSupportMode(media),
     isYouTubeOnly: isYouTubeOnly(media),
     awaitingUpload: !playable && !isPodcastLike(media),
+    playabilityBlockReason,
   };
 }
