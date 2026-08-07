@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
+import MiniSupportersBar from '../components/MiniSupportersBar';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -2377,13 +2378,31 @@ const PodcastEpisodeProfile: React.FC = () => {
                 </div>
               )}
 
-              <p className="text-sm text-center md:text-left px-2 mb-3">
-                <span className="text-green-400 font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
-                <span className="text-gray-500 mx-2">·</span>
-                <span className="text-pink-300 font-medium">#{media.globalMediaAggregateTopRank || '—'} global</span>
-                <span className="text-gray-500 mx-2">·</span>
-                <span className="text-cyan-300">{media.bids?.length || 0} tips</span>
-              </p>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2 mb-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm">
+                  <Coins className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm">
+                  <Globe className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="font-medium">#{media.globalMediaAggregateTopRank || '—'} global</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm">
+                  <Heart className="h-3.5 w-3.5 text-gray-400" />
+                  <span>{media.bids?.length || 0} tips</span>
+                </span>
+              </div>
+
+              {media.bids && media.bids.length > 0 && (
+                <div className="px-2 mb-3">
+                  <MiniSupportersBar
+                    bids={media.bids}
+                    limit={3}
+                    scrollable={false}
+                    className="flex justify-center md:justify-start"
+                  />
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2" ref={shareDropdownRef}>
                 <button
