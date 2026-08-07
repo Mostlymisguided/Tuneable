@@ -10,6 +10,17 @@ const candidateSchema = new mongoose.Schema({
   musicbrainzReleaseId: { type: String, default: null },
   title: String,
   artist: String,
+  artists: [{
+    name: { type: String, required: true },
+    relationToNext: { type: String, default: null },
+    musicbrainzId: { type: String, default: null },
+    _id: false,
+  }],
+  featuring: [{
+    name: { type: String, required: true },
+    musicbrainzId: { type: String, default: null },
+    _id: false,
+  }],
   album: { type: String, default: null },
   duration: { type: Number, default: 0 },
   releaseDate: { type: String, default: null },
@@ -29,6 +40,17 @@ const candidateSchema = new mongoose.Schema({
 const suggestionSchema = new mongoose.Schema({
   title: String,
   artist: String,
+  artists: [{
+    name: { type: String, required: true },
+    relationToNext: { type: String, default: null },
+    musicbrainzId: { type: String, default: null },
+    _id: false,
+  }],
+  featuring: [{
+    name: { type: String, required: true },
+    musicbrainzId: { type: String, default: null },
+    _id: false,
+  }],
   album: { type: String, default: null },
   duration: { type: Number, default: 0 },
   isrc: { type: String, default: null },

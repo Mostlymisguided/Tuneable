@@ -3722,6 +3722,41 @@ router.post('/admin/enrichment/backfill', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/media/admin/enrichment/drip
+// @desc    Run one tags + location enrichment drip tick (bounded batches)
+// @access  Private (Admin)
+router.post('/admin/enrichment/drip', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { runEnrichmentDrip, isDripRunning } = require('../services/enrichmentDripService');
+    if (isDripRunning()) {
+      return res.status(409).json({ error: 'Enrichment drip already running' });
+    }
+    const body = req.body || {};
+    const result = await runEnrichmentDrip({
+      dryRun: body.dryRun === true,
+      skipTags: body.skipTags === true || body.locationsOnly === true,
+      skipLocations: body.skipLocations === true || body.tagsOnly === true,
+      tagLimit: parseInt(body.tagLimit, 10) || 25,
+      locationLimit: parseInt(body.locationLimit, 10) || 25,
+      unlinkedTagLimit: parseInt(body.unlinkedTagLimit, 10) || 10,
+      tagMode: body.tagMode === 'supplement' ? 'supplement' : 'untagged',
+      tagLinkage: ['linked', 'unlinked', 'any'].includes(body.tagLinkage)
+        ? body.tagLinkage
+        : 'linked',
+      nameSearch: body.nameSearch === true,
+      upgradeInferred: body.upgradeInferred === true,
+      includeCoverage: body.includeCoverage !== false,
+    });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error running enrichment drip:', error);
+    res.status(500).json({ error: error.message || 'Failed to run enrichment drip' });
+  }
+});
+
 // @route   POST /api/media/admin/enrichment/batch-apply
 // @desc    Apply multiple enrichment suggestions
 // @access  Private (Admin)

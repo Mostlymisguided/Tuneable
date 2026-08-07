@@ -50,6 +50,14 @@ db.connectDB()
         console.error('Failed to recover pending bid background work:', error);
       });
     });
+
+    // Optional ongoing tags + location drip (ENRICHMENT_DRIP_ENABLED=true)
+    try {
+      const { startEnrichmentDripCron } = require('./services/enrichmentDripService');
+      startEnrichmentDripCron();
+    } catch (error) {
+      console.error('Failed to start enrichment drip cron:', error);
+    }
   })
   .catch((err) => {
     console.error('Error connecting to the database:', err);

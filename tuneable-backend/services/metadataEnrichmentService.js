@@ -7,7 +7,10 @@
 const Media = require('../models/Media');
 const MetadataEnrichment = require('../models/MetadataEnrichment');
 const musicbrainzService = require('./musicbrainzService');
-const { formatCreatorDisplay } = require('../utils/artistParser');
+const {
+  formatCreatorDisplay,
+  parseArtistString,
+} = require('../utils/artistParser');
 const {
   normalizeTagForStorage,
   tagsMatch,
@@ -232,6 +235,8 @@ async function enrichCandidateDetails(candidate) {
       ...candidate,
       title: details.title || candidate.title,
       artist: details.artist || candidate.artist,
+      artists: details.artists || candidate.artists || [],
+      featuring: details.featuring || candidate.featuring || [],
       album: details.album || candidate.album,
       duration: details.duration || candidate.duration,
       releaseDate: details.releaseDate ?? candidate.releaseDate ?? null,
@@ -252,6 +257,8 @@ function suggestionFromCandidate(candidate, extras = {}) {
   return {
     title: candidate.title,
     artist: candidate.artist,
+    artists: Array.isArray(candidate.artists) ? candidate.artists : [],
+    featuring: Array.isArray(candidate.featuring) ? candidate.featuring : [],
     album: candidate.album || null,
     duration: candidate.duration || 0,
     isrc: candidate.isrc || null,
@@ -266,6 +273,68 @@ function suggestionFromCandidate(candidate, extras = {}) {
     matchType: candidate.matchType,
     ...extras,
   };
+}
+
+function findExistingCreatorByName(existing, name) {
+  const want = normalize(name);
+  if (!want || !Array.isArray(existing)) return null;
+  return existing.find((entry) => normalize(entry?.name) === want) || null;
+}
+
+/**
+ * Resolve suggestion → Media.artist[] / featuring[] arrays.
+ * Prefers structured MB credits; falls back to parseArtistString on display string.
+ * Preserves existing userId / collectiveId / verified by name match.
+ */
+function resolveArtistArraysFromSuggestion(suggestion, media) {
+  let artistsIn = Array.isArray(suggestion.artists) ? suggestion.artists : [];
+  let featuringIn = Array.isArray(suggestion.featuring) ? suggestion.featuring : [];
+
+  if (artistsIn.length === 0 && suggestion.artist) {
+    const parsed = parseArtistString(suggestion.artist);
+    artistsIn = (parsed.artists || []).map((name) => ({ name, relationToNext: null }));
+    featuringIn = (parsed.featuring || []).map((name) => ({ name }));
+    // Co-headliners from string parse: default & between primaries
+    artistsIn = artistsIn.map((entry, index, arr) => ({
+      ...entry,
+      relationToNext: index < arr.length - 1 ? (entry.relationToNext || '&') : null,
+    }));
+  }
+
+  if (artistsIn.length === 0) {
+    return null;
+  }
+
+  const existingArtists = Array.isArray(media.artist) ? media.artist : [];
+  const existingFeaturing = Array.isArray(media.featuring) ? media.featuring : [];
+
+  const artists = artistsIn.map((entry, index, arr) => {
+    const name = String(entry.name || '').trim();
+    const prev = findExistingCreatorByName(existingArtists, name)
+      || findExistingCreatorByName(existingFeaturing, name);
+    const isLast = index === arr.length - 1;
+    return {
+      name,
+      userId: prev?.userId || null,
+      collectiveId: prev?.collectiveId || null,
+      verified: Boolean(prev?.verified),
+      relationToNext: isLast ? null : (entry.relationToNext || '&'),
+    };
+  }).filter((a) => a.name);
+
+  const featuring = featuringIn.map((entry) => {
+    const name = String(entry?.name || entry || '').trim();
+    const prev = findExistingCreatorByName(existingFeaturing, name)
+      || findExistingCreatorByName(existingArtists, name);
+    return {
+      name,
+      userId: prev?.userId || null,
+      collectiveId: prev?.collectiveId || null,
+      verified: Boolean(prev?.verified),
+    };
+  }).filter((f) => f.name);
+
+  return { artists, featuring };
 }
 
 /**
@@ -316,12 +385,20 @@ async function applySuggestionToMedia(media, suggestion, {
     // Original snapshot lives on the enrichment record.
   }
 
-  if (applyIdentity && suggestion.title && suggestion.artist) {
+  if (applyIdentity && suggestion.title && (suggestion.artist || suggestion.artists?.length)) {
     media.title = suggestion.title;
-    if (Array.isArray(media.artist) && media.artist.length > 0) {
-      media.artist[0].name = suggestion.artist;
-    } else {
-      media.artist = [{ name: suggestion.artist, userId: null, verified: false }];
+    const resolved = resolveArtistArraysFromSuggestion(suggestion, media);
+    if (resolved?.artists?.length) {
+      media.artist = resolved.artists;
+      media.featuring = resolved.featuring || [];
+    } else if (suggestion.artist) {
+      // Last-resort single blob (should be rare after parse)
+      if (Array.isArray(media.artist) && media.artist.length > 0) {
+        media.artist[0].name = suggestion.artist;
+        media.artist = [media.artist[0]];
+      } else {
+        media.artist = [{ name: suggestion.artist, userId: null, verified: false }];
+      }
     }
     if (suggestion.album) media.album = suggestion.album;
   }
@@ -525,6 +602,8 @@ async function processEnrichmentItem(itemOrId) {
         musicbrainzId: track.id || track.externalIds?.musicbrainz,
         title: track.title,
         artist: track.artist,
+        artists: track.artists || [],
+        featuring: track.featuring || [],
         album: track.album || null,
         duration: track.duration || 0,
         releaseDate: track.releaseDate || null,
@@ -558,6 +637,8 @@ async function processEnrichmentItem(itemOrId) {
         musicbrainzReleaseId: detailed.musicbrainzReleaseId || null,
         title: detailed.title,
         artist: detailed.artist,
+        artists: detailed.artists || [],
+        featuring: detailed.featuring || [],
         album: detailed.album || null,
         duration: detailed.duration || 0,
         releaseDate: detailed.releaseDate || null,
@@ -734,6 +815,8 @@ async function applyEnrichment(itemId, actorId, overrides = {}) {
   const suggestion = {
     title: overrides.title || item.suggestion.title,
     artist: overrides.artist || item.suggestion.artist,
+    artists: overrides.artists ?? item.suggestion.artists ?? [],
+    featuring: overrides.featuring ?? item.suggestion.featuring ?? [],
     album: overrides.album ?? item.suggestion.album,
     duration: overrides.duration ?? item.suggestion.duration,
     isrc: overrides.isrc ?? item.suggestion.isrc,
@@ -747,6 +830,13 @@ async function applyEnrichment(itemId, actorId, overrides = {}) {
       || item.suggestion.musicbrainzReleaseId
       || null,
   };
+
+  // If admin overrides the display artist string without structured arrays, clear arrays
+  // so resolveArtistArraysFromSuggestion re-parses from the string.
+  if (overrides.artist && overrides.artists == null) {
+    suggestion.artists = [];
+    suggestion.featuring = overrides.featuring ?? [];
+  }
 
   // Tag-only / backfill rows should not rewrite title/artist unless asked
   const applyIdentity = overrides.applyIdentity != null

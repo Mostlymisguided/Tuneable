@@ -842,6 +842,25 @@ export const mediaAPI = {
     return response.data;
   },
 
+  runEnrichmentDrip: async (params?: {
+    dryRun?: boolean;
+    skipTags?: boolean;
+    skipLocations?: boolean;
+    tagsOnly?: boolean;
+    locationsOnly?: boolean;
+    tagLimit?: number;
+    locationLimit?: number;
+    unlinkedTagLimit?: number;
+    tagMode?: 'supplement' | 'untagged';
+    tagLinkage?: 'linked' | 'unlinked' | 'any';
+    nameSearch?: boolean;
+    upgradeInferred?: boolean;
+    includeCoverage?: boolean;
+  }) => {
+    const response = await api.post('/media/admin/enrichment/drip', params || {});
+    return response.data;
+  },
+
   batchApplyEnrichments: async (ids: string[], overrides?: Record<string, unknown>) => {
     const response = await api.post('/media/admin/enrichment/batch-apply', {
       ids,

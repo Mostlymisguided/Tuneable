@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
+const { parseMusicBrainzArtistCredit } = require('../utils/artistParser');
 
 const MUSICBRAINZ_API = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'TuneableLocal/1.0 ( https://tuneable.stream )';
@@ -61,18 +62,12 @@ function normalizeDuration(ms) {
 }
 
 function getArtistCredit(recording) {
-  if (!Array.isArray(recording?.['artist-credit'])) {
-    return 'Unknown Artist';
-  }
+  const parsed = parseMusicBrainzArtistCredit(recording?.['artist-credit']);
+  return parsed.display || 'Unknown Artist';
+}
 
-  const parts = recording['artist-credit']
-    .map((entry) => {
-      if (typeof entry === 'string') return entry;
-      return entry?.name || entry?.artist?.name || '';
-    })
-    .filter(Boolean);
-
-  return parts.join('') || 'Unknown Artist';
+function getArtistCreditStructured(recording) {
+  return parseMusicBrainzArtistCredit(recording?.['artist-credit']);
 }
 
 function buildReleaseLabel(recording, release = null) {
@@ -156,11 +151,14 @@ function mapRecordingToTrack(recording) {
     ? recording.isrcs.filter((c) => typeof c === 'string' && c.trim())
     : [];
   const tags = mapMusicBrainzTags(recording.tags);
+  const credit = getArtistCreditStructured(recording);
 
   return {
     id: recording.id,
     title: recording.title || 'Unknown Title',
-    artist: getArtistCredit(recording),
+    artist: credit.display,
+    artists: credit.artists,
+    featuring: credit.featuring,
     duration: normalizeDuration(recording.length),
     coverArt: null,
     category: 'Music',
@@ -210,11 +208,14 @@ async function searchRecordings(query, offset = 0, limit = 20) {
   const tracks = recordings.map((recording) => {
     const { release, dateRaw } = pickRelease(recording);
     const parsed = parseReleaseDate(dateRaw);
+    const credit = getArtistCreditStructured(recording);
 
     return {
       id: recording.id,
       title: recording.title || 'Unknown Title',
-      artist: getArtistCredit(recording),
+      artist: credit.display,
+      artists: credit.artists,
+      featuring: credit.featuring,
       duration: normalizeDuration(recording.length),
       coverArt: null,
       category: 'Music',
@@ -277,14 +278,13 @@ async function getRecordingRaw(mbid) {
 
 /**
  * Primary artist MBIDs from a recording's artist-credit list (headline only).
+ * Featuring credits are excluded when joinphrases mark a feat. split.
  */
 function extractPrimaryArtistMbids(recording) {
-  const credits = Array.isArray(recording?.['artist-credit'])
-    ? recording['artist-credit']
-    : [];
+  const { artists } = parseMusicBrainzArtistCredit(recording?.['artist-credit']);
   const ids = [];
-  for (const entry of credits) {
-    const id = entry?.artist?.id;
+  for (const entry of artists) {
+    const id = entry?.musicbrainzId;
     if (id && !ids.includes(id)) ids.push(id);
   }
   return ids;
@@ -512,4 +512,6 @@ module.exports = {
   mapArtistOrigin,
   getOriginFromRecordingMbid,
   mapMusicBrainzTags,
+  getArtistCredit,
+  getArtistCreditStructured,
 };
