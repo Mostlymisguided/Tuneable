@@ -45,7 +45,7 @@ import {
 export default function MusicScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
-  const [period, setPeriod] = useState<TimePeriodKey>('today');
+  const [period, setPeriod] = useState<TimePeriodKey>('all-time');
   const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
     null
