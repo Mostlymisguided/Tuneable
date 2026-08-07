@@ -3788,6 +3788,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
 
         if (isRequestingGlobalParty) {
             // Location filter: tips from place OR media originating from place; ranked by global tip aggregate
+            // All-time (no location) uses the slim chart — period path materializes every active bid.
             console.log('🌍 Time-based sorting for Global Party (slim chart)...');
             const { getPeriodStartDate } = require('../utils/globalPartyChart');
             const chart = await fetchPeriodGlobalChart({

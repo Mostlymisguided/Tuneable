@@ -505,6 +505,10 @@ async function fetchAllTimeGlobalChart({
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
     const aggregate = media.globalMediaAggregate || 0;
     const sourcesObj = sourcesToObject(media.sources);
+    const availablePlatforms = Object.entries(sourcesObj).map(([platform, url]) => ({
+      platform,
+      url,
+    }));
 
     return {
       _id: media._id,
@@ -518,8 +522,10 @@ async function fetchAllTimeGlobalChart({
       duration: media.duration || '666',
       coverArt: media.coverArt || DEFAULT_COVER_ART,
       sources: sourcesObj,
+      availablePlatforms,
       globalMediaAggregate: aggregate,
       partyMediaAggregate: aggregate,
+      timePeriodBidValue: aggregate,
       totalBidValue: aggregate,
       bids: activeBids,
       addedBy: media.addedBy,
@@ -600,6 +606,12 @@ async function fetchPeriodGlobalChart({
     ? locationPlaceId.trim()
     : null;
 
+  // All-time with no location filter must use the slim chart path — loading every
+  // active bid into memory for ranking OOMs / 500s on production-sized datasets.
+  if (!startDate && !placeId) {
+    return fetchAllTimeGlobalChart({ userId, supportersLimit, limit, offset });
+  }
+
   let matchingMediaIds;
 
   if (placeId) {
@@ -618,8 +630,8 @@ async function fetchPeriodGlobalChart({
     });
 
     const idSet = new Set([
-      ...tipMatchedIds.map((id) => id.toString()),
-      ...originMatchedIds.map((id) => id.toString()),
+      ...tipMatchedIds.filter(Boolean).map((id) => id.toString()),
+      ...originMatchedIds.filter(Boolean).map((id) => id.toString()),
     ]);
     matchingMediaIds = [...idSet];
   } else {
@@ -628,7 +640,7 @@ async function fetchPeriodGlobalChart({
       bidQuery.createdAt = { $gte: startDate };
     }
     const periodMediaIds = await Bid.distinct('mediaId', bidQuery);
-    matchingMediaIds = periodMediaIds.map((id) => id.toString());
+    matchingMediaIds = periodMediaIds.filter(Boolean).map((id) => id.toString());
   }
 
   if (matchingMediaIds.length === 0) {
@@ -645,28 +657,30 @@ async function fetchPeriodGlobalChart({
     };
   }
 
-  // Rank by global tip volume within the filtered set (not location-scoped tips)
-  const rankBidQuery = {
-    status: 'active',
-    mediaId: { $in: matchingMediaIds },
-  };
-  if (startDate) {
-    rankBidQuery.createdAt = { $gte: startDate };
-  }
-
-  const rankingBids = await Bid.find(rankBidQuery)
-    .select('mediaId amount')
-    .lean();
-
-  const mediaBidValues = {};
-  for (const bid of rankingBids) {
-    const mediaId = bid.mediaId?.toString();
-    if (!mediaId) continue;
-    mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
-  }
-
   // All-time + location: prefer stored globalMediaAggregate for ranking
   const useStoredGlobalAggregate = placeId && !startDate;
+
+  // Rank by tip volume within the filtered set (skip full bid scan when using stored aggregates)
+  const mediaBidValues = {};
+  if (!useStoredGlobalAggregate) {
+    const rankBidQuery = {
+      status: 'active',
+      mediaId: { $in: matchingMediaIds },
+    };
+    if (startDate) {
+      rankBidQuery.createdAt = { $gte: startDate };
+    }
+
+    const rankingBids = await Bid.find(rankBidQuery)
+      .select('mediaId amount')
+      .lean();
+
+    for (const bid of rankingBids) {
+      const mediaId = bid.mediaId?.toString();
+      if (!mediaId) continue;
+      mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
+    }
+  }
 
   let mediaList = await Media.find({
     ...GLOBAL_PARTY_TUNES_FILTER,
