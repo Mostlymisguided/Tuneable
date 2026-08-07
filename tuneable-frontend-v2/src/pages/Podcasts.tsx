@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI, locationAPI } from '../lib/api';
-import BidModal from '../components/BidModal';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 import MediaChampions from '../components/MediaChampions';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import PodcastQueueMediaCard from '../components/PodcastQueueMediaCard';
@@ -33,6 +33,7 @@ import {
   getCountryPickFromLocation,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
+import { resolveTipStatInputs } from '../utils/tipStats';
 
 interface PodcastEpisode {
   _id?: string;
@@ -76,7 +77,11 @@ interface PodcastEpisode {
   sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
+  minimumBid?: number;
   globalMediaBidTop?: number;
+  globalMediaAggregateAvg?: number;
+  globalMediaAggregateTop?: number;
+  globalMediaAggregateTopUser?: { _id?: string; uuid?: string; id?: string } | string | null;
   // Bids for top supporters
   bids?: Array<{
     _id?: string;
@@ -181,9 +186,18 @@ const Podcasts: React.FC = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Tipping state
-  const [bidModalOpen, setBidModalOpen] = useState(false);
+  const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<PodcastEpisode | null>(null);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
+  const selectedEpisodeTipStats = useMemo(
+    () => resolveTipStatInputs(selectedEpisode, user),
+    [selectedEpisode, user]
+  );
+  const selectedEpisodeMinTip = selectedEpisode?.minimumBid ?? 0.01;
+  const selectedEpisodeDefaultTip = Math.max(
+    selectedEpisodeMinTip,
+    user?.preferences?.defaultTip || 1.11
+  );
 
   // Share state
   const [isMobile, setIsMobile] = useState(false);
@@ -732,7 +746,7 @@ const Podcasts: React.FC = () => {
     // If already in database, just open tip modal
     if (!episode.isExternal && episode._id) {
       setSelectedEpisode(episode);
-      setBidModalOpen(true);
+      setShowBidConfirmationModal(true);
       return;
     }
 
@@ -887,7 +901,7 @@ const Podcasts: React.FC = () => {
       ));
 
       setSelectedEpisode(updatedEpisode);
-      setBidModalOpen(true);
+      setShowBidConfirmationModal(true);
     } catch (error: any) {
       console.error('Error importing episode:', error);
       toast.error(error.message || 'Failed to import episode');
@@ -904,11 +918,17 @@ const Podcasts: React.FC = () => {
       return;
     }
     setSelectedEpisode(episode);
-    setBidModalOpen(true);
+    setShowBidConfirmationModal(true);
   };
 
-  const handlePlaceBid = async (amount: number) => {
+  const handlePlaceBid = async (tags: string[], amount: number) => {
     if (!selectedEpisode || !user) return;
+
+    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : selectedEpisodeDefaultTip;
+    if (tipAmount < selectedEpisodeMinTip) {
+      toast.error(`Minimum tip is £${selectedEpisodeMinTip.toFixed(2)}`);
+      return;
+    }
 
     setIsPlacingBid(true);
     try {
@@ -917,10 +937,10 @@ const Podcasts: React.FC = () => {
         toast.error('Episode ID not found');
         return;
       }
-      await mediaAPI.placeGlobalBid(episodeId, amount);
+      await mediaAPI.placeGlobalBid(episodeId, tipAmount, undefined, tags);
       
-      toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
-      setBidModalOpen(false);
+      toast.success(`Tip of £${tipAmount.toFixed(2)} placed successfully!`);
+      setShowBidConfirmationModal(false);
       setSelectedEpisode(null);
       
       // Refresh chart
@@ -1727,20 +1747,30 @@ const Podcasts: React.FC = () => {
         )}
       </div>
 
-      {/* Bid Modal */}
-      <BidModal
-        isOpen={bidModalOpen}
+      {/* Bid Confirmation Modal */}
+      <BidConfirmationModal
+        isOpen={showBidConfirmationModal}
         onClose={() => {
-          setBidModalOpen(false);
+          setShowBidConfirmationModal(false);
           setSelectedEpisode(null);
         }}
         onConfirm={handlePlaceBid}
-        songTitle={selectedEpisode?.title || ''}
-        songArtist={selectedEpisode?.creatorDisplay || selectedEpisode?.podcastSeries?.title || selectedEpisode?.podcastTitle || 'Unknown'}
-        currentBid={selectedEpisode ? penceToPoundsNumber(selectedEpisode.globalMediaAggregate) : 0}
-        minimumBid={(selectedEpisode as any)?.minimumBid ?? 0.01}
+        bidAmount={selectedEpisodeDefaultTip}
+        minTip={selectedEpisodeMinTip}
+        avgTip={selectedEpisodeTipStats.avgTip}
+        championAggregate={selectedEpisodeTipStats.championAggregate}
+        viewerAggregate={selectedEpisodeTipStats.viewerAggregate}
+        viewerIsChampion={selectedEpisodeTipStats.viewerIsChampion}
+        mediaTitle={selectedEpisode?.title || ''}
+        mediaArtist={
+          selectedEpisode?.creatorDisplay
+          || selectedEpisode?.podcastSeries?.title
+          || selectedEpisode?.podcastTitle
+          || 'Unknown'
+        }
         userBalance={user ? penceToPoundsNumber((user as any).balance) : 0}
         isLoading={isPlacingBid}
+        user={user}
       />
     </div>
   );

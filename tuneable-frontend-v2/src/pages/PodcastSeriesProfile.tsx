@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI } from '../lib/api';
-import BidModal from '../components/BidModal';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 import { 
   ArrowLeft,
   Music,
@@ -27,6 +27,7 @@ import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { stripHtml } from '../utils/stripHtml';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { resolveTipStatInputs } from '../utils/tipStats';
 
 interface PodcastSeries {
   _id: string;
@@ -52,6 +53,10 @@ interface Episode {
   coverArt?: string;
   duration?: number;
   globalMediaAggregate: number;
+  globalMediaAggregateAvg?: number;
+  globalMediaAggregateTop?: number;
+  globalMediaAggregateTopUser?: { _id?: string; uuid?: string; id?: string } | string | null;
+  minimumBid?: number;
   releaseDate?: string;
   episodeNumber?: number;
   seasonNumber?: number;
@@ -61,6 +66,10 @@ interface Episode {
   sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
+  bids?: Array<{
+    amount?: number;
+    userId?: string | { _id?: string; uuid?: string; id?: string } | null;
+  }>;
 }
 
 interface SeriesStats {
@@ -99,9 +108,18 @@ const PodcastSeriesProfile: React.FC = () => {
   const episodesPerPage = 20;
   
   // Tipping state
-  const [bidModalOpen, setBidModalOpen] = useState(false);
+  const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [isPlacingBid, setIsPlacingBid] = useState(false);
+  const selectedEpisodeTipStats = useMemo(
+    () => resolveTipStatInputs(selectedEpisode, user),
+    [selectedEpisode, user]
+  );
+  const selectedEpisodeMinTip = selectedEpisode?.minimumBid ?? 0.01;
+  const selectedEpisodeDefaultTip = Math.max(
+    selectedEpisodeMinTip,
+    user?.preferences?.defaultTip || 1.11
+  );
 
   // Share state
   const [isMobile, setIsMobile] = useState(false);
@@ -493,19 +511,25 @@ const PodcastSeriesProfile: React.FC = () => {
       return;
     }
     setSelectedEpisode(episode);
-    setBidModalOpen(true);
+    setShowBidConfirmationModal(true);
   };
 
-  const handlePlaceBid = async (amount: number) => {
+  const handlePlaceBid = async (tags: string[], amount: number) => {
     if (!selectedEpisode || !user) return;
+
+    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : selectedEpisodeDefaultTip;
+    if (tipAmount < selectedEpisodeMinTip) {
+      toast.error(`Minimum tip is £${selectedEpisodeMinTip.toFixed(2)}`);
+      return;
+    }
 
     setIsPlacingBid(true);
     try {
       const episodeId = selectedEpisode._id;
-      await mediaAPI.placeGlobalBid(episodeId, amount);
+      await mediaAPI.placeGlobalBid(episodeId, tipAmount, undefined, tags);
       
-      toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
-      setBidModalOpen(false);
+      toast.success(`Tip of £${tipAmount.toFixed(2)} placed successfully!`);
+      setShowBidConfirmationModal(false);
       setSelectedEpisode(null);
       
       // Refresh series data
@@ -1345,20 +1369,25 @@ const PodcastSeriesProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* Bid Modal */}
-      <BidModal
-        isOpen={bidModalOpen}
+      {/* Bid Confirmation Modal */}
+      <BidConfirmationModal
+        isOpen={showBidConfirmationModal}
         onClose={() => {
-          setBidModalOpen(false);
+          setShowBidConfirmationModal(false);
           setSelectedEpisode(null);
         }}
         onConfirm={handlePlaceBid}
-        songTitle={selectedEpisode?.title || ''}
-        songArtist={series.host && series.host.length > 0 ? series.host[0].name : series.title}
-        currentBid={selectedEpisode ? penceToPoundsNumber(selectedEpisode.globalMediaAggregate) : 0}
-        minimumBid={(selectedEpisode as any)?.minimumBid ?? 0.01}
+        bidAmount={selectedEpisodeDefaultTip}
+        minTip={selectedEpisodeMinTip}
+        avgTip={selectedEpisodeTipStats.avgTip}
+        championAggregate={selectedEpisodeTipStats.championAggregate}
+        viewerAggregate={selectedEpisodeTipStats.viewerAggregate}
+        viewerIsChampion={selectedEpisodeTipStats.viewerIsChampion}
+        mediaTitle={selectedEpisode?.title || ''}
+        mediaArtist={series.host && series.host.length > 0 ? series.host[0].name : series.title}
         userBalance={user ? penceToPoundsNumber((user as any).balance) : 0}
         isLoading={isPlacingBid}
+        user={user}
       />
     </div>
   );
