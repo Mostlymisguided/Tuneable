@@ -22,14 +22,12 @@ import type {
   TuneBytesTagRanking,
   User,
   UserLibraryItem,
-  UserStats,
 } from '@/src/types/user';
 
 export default function PublicUserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user: authUser, updateBalance } = useAuth();
   const [user, setUser] = useState<User | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
   const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
@@ -60,7 +58,6 @@ export default function PublicUserProfileScreen() {
               .catch(() => ({ tags: [], media: [] })),
           ]);
         setUser(profileRes.user);
-        setStats(profileRes.stats);
         setLibrary(libraryRes.library ?? []);
         setRankings(rankingsRes.tuneBytesTagRankings ?? []);
         setTipTagChampions(championsRes.tags ?? []);
@@ -126,7 +123,6 @@ export default function PublicUserProfileScreen() {
           contentContainerStyle={styles.content}>
           <UserProfileHero
             user={user}
-            stats={stats}
             rankings={rankings}
             tipTagChampions={tipTagChampions}
             mediaChampions={mediaChampions}

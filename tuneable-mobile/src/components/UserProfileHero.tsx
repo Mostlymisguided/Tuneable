@@ -1,17 +1,20 @@
-import type { ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Children, useState, type ReactNode } from 'react';
+import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors } from '@/src/theme/colors';
-import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
+import { formatPoundsFromPence } from '@/src/lib/format';
+import type { ResolvedLocation } from '@/src/types/user';
 import {
   DEFAULT_PROFILE_PIC,
   type MediaChampionTitle,
   type TipTagChampion,
   type TuneBytesTagRanking,
   type User,
-  type UserStats,
 } from '@/src/types/user';
+
+const DEFAULT_BADGE_VISIBLE = 3;
+const MAX_BADGES = 8;
 
 function formatJoinDate(date: string | undefined): string {
   if (!date) return 'Recently joined';
@@ -33,6 +36,18 @@ function roleLabel(role: string[] | undefined): string {
   return 'Member';
 }
 
+function locationLabel(location: ResolvedLocation | null | undefined): string | null {
+  if (!location) return null;
+  if (location.display) return location.display;
+  if (location.city && location.country) {
+    return `${location.city}, ${location.country}`;
+  }
+  if (location.city && location.countryCode) {
+    return `${location.city}, ${location.countryCode}`;
+  }
+  return location.city || location.region || location.country || null;
+}
+
 function badgeColors(rank: number) {
   if (rank === 1) return { border: '#f59e0b', bg: '#fcd34d', text: '#fde68a' };
   if (rank === 2) return { border: '#94a3b8', bg: '#cbd5e1', text: '#e2e8f0' };
@@ -40,9 +55,21 @@ function badgeColors(rank: number) {
   return { border: '#7c3aed', bg: '#a855f7', text: '#ddd6fe' };
 }
 
+function normalizeSocialUrl(url: string): string {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+type SocialLink = {
+  name: string;
+  url: string;
+  color: string;
+  icon: ReactNode;
+};
+
 type Props = {
   user: User;
-  stats: UserStats | null;
   rankings: TuneBytesTagRanking[];
   tipTagChampions?: TipTagChampion[];
   mediaChampions?: MediaChampionTitle[];
@@ -52,21 +79,48 @@ type Props = {
 
 export function UserProfileHero({
   user,
-  stats,
   rankings,
   tipTagChampions = [],
   mediaChampions = [],
   isOwnProfile = false,
   onWalletPress,
 }: Props) {
-  const location =
-    user.homeLocation?.display ||
-    user.homeLocation?.city ||
-    user.homeLocation?.country;
-
-  const tipTags = tipTagChampions.slice(0, 8);
-  const mediaTitles = mediaChampions.slice(0, 8);
+  const homeLabel = locationLabel(user.homeLocation);
+  const secondaryLabel = locationLabel(user.secondaryLocation);
+  const tipTags = tipTagChampions.slice(0, MAX_BADGES);
+  const mediaTitles = mediaChampions.slice(0, MAX_BADGES);
   const discovery = rankings.slice(0, 5);
+
+  const socialLinks: SocialLink[] = [];
+  const sm = user.socialMedia;
+  if (sm?.facebook) {
+    socialLinks.push({
+      name: 'Facebook',
+      url: normalizeSocialUrl(sm.facebook),
+      color: '#60a5fa',
+      icon: <Ionicons name="logo-facebook" size={20} color="#60a5fa" />,
+    });
+  }
+  if (sm?.soundcloud) {
+    socialLinks.push({
+      name: 'SoundCloud',
+      url: normalizeSocialUrl(sm.soundcloud),
+      color: '#fb923c',
+      icon: <FontAwesome name="soundcloud" size={18} color="#fb923c" />,
+    });
+  }
+  if (sm?.instagram) {
+    socialLinks.push({
+      name: 'Instagram',
+      url: normalizeSocialUrl(sm.instagram),
+      color: '#f472b6',
+      icon: <Ionicons name="logo-instagram" size={20} color="#f472b6" />,
+    });
+  }
+
+  const openSocial = (url: string) => {
+    void Linking.openURL(url);
+  };
 
   return (
     <View style={styles.wrap}>
@@ -79,14 +133,24 @@ export function UserProfileHero({
           <View style={styles.identity}>
             <Text style={styles.name}>{user.username}</Text>
             <Text style={styles.memberSince}>{formatJoinDate(user.createdAt)}</Text>
-            {location ? (
+            {homeLabel ? (
               <View style={styles.metaPill}>
                 <Ionicons
                   name="location-outline"
                   size={14}
                   color={colors.textMuted}
                 />
-                <Text style={styles.metaText}>{location}</Text>
+                <Text style={styles.metaText}>{homeLabel}</Text>
+              </View>
+            ) : null}
+            {secondaryLabel ? (
+              <View style={styles.metaPill}>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.metaText}>{secondaryLabel}</Text>
               </View>
             ) : null}
             <View style={styles.metaPill}>
@@ -98,15 +162,6 @@ export function UserProfileHero({
               <Text style={styles.metaText}>{roleLabel(user.role)}</Text>
             </View>
           </View>
-        </View>
-
-        <View style={styles.metrics}>
-          <Metric label="Tips" value={String(stats?.totalBids ?? 0)} />
-          <Metric
-            label="TuneBytes"
-            value={formatTuneBytes(user.tuneBytes)}
-          />
-          <Metric label="Tunes" value={String(stats?.uniqueSongsCount ?? 0)} />
         </View>
 
         {isOwnProfile ? (
@@ -131,26 +186,28 @@ export function UserProfileHero({
           icon="trophy"
           iconColor="#fbbf24"
           title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}>
-          {tipTags.map((ranking) => {
-            const palette = badgeColors(ranking.rank);
-            return (
-              <View
-                key={`tip-${ranking.tag}-${ranking.rank}`}
-                style={[
-                  styles.badge,
-                  {
-                    borderColor: palette.border,
-                    backgroundColor: `${palette.bg}22`,
-                  },
-                ]}>
-                <Ionicons name="trophy" size={12} color={palette.border} />
-                <Text style={styles.badgeText}>#{ranking.rank}</Text>
-                <Text style={[styles.badgeMeta, { color: palette.text }]}>
-                  #{ranking.tag}
-                </Text>
-              </View>
-            );
-          })}
+          <CollapsibleBadgeWrap>
+            {tipTags.map((ranking) => {
+              const palette = badgeColors(ranking.rank);
+              return (
+                <View
+                  key={`tip-${ranking.tag}-${ranking.rank}`}
+                  style={[
+                    styles.badge,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: `${palette.bg}22`,
+                    },
+                  ]}>
+                  <Ionicons name="trophy" size={12} color={palette.border} />
+                  <Text style={styles.badgeText}>#{ranking.rank}</Text>
+                  <Text style={[styles.badgeMeta, { color: palette.text }]}>
+                    #{ranking.tag}
+                  </Text>
+                </View>
+              );
+            })}
+          </CollapsibleBadgeWrap>
         </BadgeSection>
       ) : null}
 
@@ -159,33 +216,35 @@ export function UserProfileHero({
           icon="musical-notes"
           iconColor="#fbbf24"
           title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}>
-          {mediaTitles.map((title) => {
-            const palette = badgeColors(title.rank);
-            const id = title.uuid || title.mediaId;
-            return (
-              <Pressable
-                key={`media-${title.mediaId}-${title.rank}`}
-                onPress={() => {
-                  if (id) router.push(`/tune/${id}`);
-                }}
-                style={[
-                  styles.badge,
-                  {
-                    borderColor: palette.border,
-                    backgroundColor: `${palette.bg}22`,
-                    maxWidth: '100%',
-                  },
-                ]}>
-                <Ionicons name="trophy" size={12} color={palette.border} />
-                <Text style={styles.badgeText}>#{title.rank}</Text>
-                <Text
-                  style={[styles.badgeMeta, { color: palette.text, flexShrink: 1 }]}
-                  numberOfLines={1}>
-                  {title.title}
-                </Text>
-              </Pressable>
-            );
-          })}
+          <CollapsibleBadgeWrap>
+            {mediaTitles.map((title) => {
+              const palette = badgeColors(title.rank);
+              const id = title.uuid || title.mediaId;
+              return (
+                <Pressable
+                  key={`media-${title.mediaId}-${title.rank}`}
+                  onPress={() => {
+                    if (id) router.push(`/tune/${id}`);
+                  }}
+                  style={[
+                    styles.badge,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: `${palette.bg}22`,
+                      maxWidth: '100%',
+                    },
+                  ]}>
+                  <Ionicons name="trophy" size={12} color={palette.border} />
+                  <Text style={styles.badgeText}>#{title.rank}</Text>
+                  <Text
+                    style={[styles.badgeMeta, { color: palette.text, flexShrink: 1 }]}
+                    numberOfLines={1}>
+                    {title.title}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </CollapsibleBadgeWrap>
         </BadgeSection>
       ) : null}
 
@@ -194,25 +253,67 @@ export function UserProfileHero({
           icon="ribbon-outline"
           iconColor={colors.accentLight}
           title={isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}>
-          {discovery.map((ranking) => {
-            const palette = badgeColors(ranking.rank);
-            return (
-              <View
-                key={`disc-${ranking.tag}-${ranking.rank}`}
-                style={[
-                  styles.badge,
-                  {
-                    borderColor: palette.border,
-                    backgroundColor: `${palette.bg}22`,
-                  },
-                ]}>
-                <Ionicons name="sparkles-outline" size={12} color={palette.border} />
-                <Text style={styles.badgeText}>{ranking.tag}</Text>
-                <Text style={styles.badgeMeta}>#{ranking.rank}</Text>
-              </View>
-            );
-          })}
+          <CollapsibleBadgeWrap>
+            {discovery.map((ranking) => {
+              const palette = badgeColors(ranking.rank);
+              return (
+                <View
+                  key={`disc-${ranking.tag}-${ranking.rank}`}
+                  style={[
+                    styles.badge,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: `${palette.bg}22`,
+                    },
+                  ]}>
+                  <Ionicons name="sparkles-outline" size={12} color={palette.border} />
+                  <Text style={styles.badgeText}>{ranking.tag}</Text>
+                  <Text style={styles.badgeMeta}>#{ranking.rank}</Text>
+                </View>
+              );
+            })}
+          </CollapsibleBadgeWrap>
         </BadgeSection>
+      ) : null}
+
+      {socialLinks.length > 0 ? (
+        <View style={styles.socialRow}>
+          {socialLinks.map((social) => (
+            <Pressable
+              key={social.name}
+              accessibilityLabel={social.name}
+              onPress={() => openSocial(social.url)}
+              style={[styles.socialBtn, { borderColor: `${social.color}55` }]}>
+              {social.icon}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function CollapsibleBadgeWrap({
+  children,
+  defaultVisible = DEFAULT_BADGE_VISIBLE,
+}: {
+  children: ReactNode;
+  defaultVisible?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const items = Children.toArray(children);
+  const hiddenCount = Math.max(0, items.length - defaultVisible);
+  const visible = expanded || hiddenCount === 0 ? items : items.slice(0, defaultVisible);
+
+  return (
+    <View>
+      <View style={styles.badgesWrap}>{visible}</View>
+      {hiddenCount > 0 ? (
+        <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={8}>
+          <Text style={styles.showMore}>
+            {expanded ? 'Show less' : `Show all (${hiddenCount} more)`}
+          </Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -235,16 +336,7 @@ function BadgeSection({
         <Ionicons name={icon} size={16} color={iconColor} />
         <Text style={styles.badgesTitle}>{title}</Text>
       </View>
-      <View style={styles.badgesWrap}>{children}</View>
-    </View>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
+      {children}
     </View>
   );
 }
@@ -298,29 +390,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '500',
-  },
-  metrics: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
-  },
-  metric: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.14)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  metricValue: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  metricLabel: {
-    marginTop: 3,
-    color: colors.textMuted,
-    fontSize: 11,
+    flexShrink: 1,
   },
   balanceRow: {
     marginTop: 16,
@@ -389,5 +459,25 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  showMore: {
+    marginTop: 10,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  socialBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

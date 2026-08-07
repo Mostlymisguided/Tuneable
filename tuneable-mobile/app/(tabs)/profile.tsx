@@ -23,15 +23,15 @@ import type {
   MediaChampionTitle,
   TipTagChampion,
   TuneBytesTagRanking,
+  User,
   UserLibraryItem,
-  UserStats,
 } from '@/src/types/user';
 
 export default function ProfileScreen() {
   const { user, logout, deleteAccount, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const canUpload = canUploadMedia(user);
-  const [stats, setStats] = useState<UserStats | null>(null);
+  const [profileUser, setProfileUser] = useState<User | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
   const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
               })
               .catch(() => ({ tags: [], media: [] })),
           ]);
-        setStats(profileRes.stats);
+        setProfileUser(profileRes.user);
         setLibrary(libraryRes.library ?? []);
         setRankings(rankingsRes.tuneBytesTagRankings ?? []);
         setTipTagChampions(championsRes.tags ?? []);
@@ -77,6 +77,18 @@ export default function ProfileScreen() {
     },
     [user?.id, user?.uuid]
   );
+
+  const heroUser: User | null = user
+    ? {
+        ...user,
+        ...(profileUser ?? {}),
+        // Prefer live auth wallet balance over profile snapshot.
+        balance: user.balance,
+        id: user.id,
+        uuid: user.uuid ?? profileUser?.uuid,
+        _id: user._id ?? profileUser?._id,
+      }
+    : null;
 
   useFocusEffect(
     useCallback(() => {
@@ -117,10 +129,9 @@ export default function ProfileScreen() {
         }
         ListHeaderComponent={
           <View>
-            {user ? (
+            {heroUser ? (
               <UserProfileHero
-                user={user}
-                stats={stats}
+                user={heroUser}
                 rankings={rankings}
                 tipTagChampions={tipTagChampions}
                 mediaChampions={mediaChampions}

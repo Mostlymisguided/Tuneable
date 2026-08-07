@@ -17,6 +17,14 @@ export interface User {
   lastLoginAt?: string;
   homeLocation?: ResolvedLocation | null;
   secondaryLocation?: ResolvedLocation | null;
+  socialMedia?: {
+    facebook?: string | null;
+    instagram?: string | null;
+    soundcloud?: string | null;
+    spotify?: string | null;
+    youtube?: string | null;
+    twitter?: string | null;
+  };
   preferences?: {
     defaultTip?: number; // pounds
     anonymousMode?: boolean;
