@@ -1,11 +1,16 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Play, X, Clock, Heart } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
+import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
+
+const META_LINK_CLASS =
+  'truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
+const META_LOCATION_CLASS = 'truncate max-w-[9rem] md:max-w-[12rem]';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
 export function normalizeQueueMediaData(rawMediaData: any) {
@@ -78,11 +83,15 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   onTip,
   mediaHref,
 }) => {
+  const routeLocation = useLocation();
   const tags = mediaData.tags ?? [];
   const bpm = getBpm(mediaData);
   const releaseYear = getReleaseYear(mediaData);
   const country = getCountryLabelFromLocation(mediaData.primaryLocation);
   const countryPath = getCountryPlaceProfilePath(mediaData.primaryLocation);
+  const isOnGlobalEarth =
+    routeLocation.pathname === '/party/global' &&
+    !new URLSearchParams(routeLocation.search).get('location');
   const href =
     mediaHref ||
     (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
@@ -117,15 +126,33 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
           to={countryPath}
           title={country}
           onClick={(e) => e.stopPropagation()}
-          className="truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline"
+          className={META_LINK_CLASS}
         >
           {country}
         </Link>
       ) : (
-        <span key="country" title={country} className="truncate max-w-[9rem] md:max-w-[12rem]">
+        <span key="country" title={country} className={META_LOCATION_CLASS}>
           {country}
         </span>
       )
+    );
+  } else if (isOnGlobalEarth) {
+    metaParts.push(
+      <span key="earth" title="Origin unknown" className={META_LOCATION_CLASS}>
+        Earth
+      </span>
+    );
+  } else {
+    metaParts.push(
+      <Link
+        key="earth"
+        to={DEFAULT_POST_AUTH_PATH}
+        title="Origin unknown — view Global Party"
+        onClick={(e) => e.stopPropagation()}
+        className={META_LINK_CLASS}
+      >
+        Earth
+      </Link>
     );
   }
 
