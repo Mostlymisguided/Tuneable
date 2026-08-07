@@ -472,6 +472,13 @@ function collectAncestorIds(location) {
   return [...new Set(ancestorIds)];
 }
 
+/**
+ * True when a location can produce Mapbox ancestor IDs for bid/chart stamps.
+ */
+function isStampableLocation(location) {
+  return collectAncestorIds(location).length > 0;
+}
+
 function formatLocationDisplay(location) {
   if (!location) return null;
   return (
@@ -592,6 +599,8 @@ module.exports = {
   getUserBidLocation,
   getBidLocationSnapshot,
   buildBidLocationSnapshot,
+  collectAncestorIds,
+  isStampableLocation,
   extractCountryFromLocation,
   extractPlaceLabel,
   formatLocationDisplay,

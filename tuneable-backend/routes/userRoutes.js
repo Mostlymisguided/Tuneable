@@ -2516,12 +2516,23 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     // Handle location updates
     // Support both new format (homeLocation/secondaryLocation) and legacy (locations)
+    let shouldBackfillBidLocations = false;
     const homeLocationChanged = homeLocation !== undefined || (locations && locations.primary !== undefined);
     if (homeLocationChanged) {
       const locationData = homeLocation || locations?.primary;
       if (locationData) {
-        const { applyResolvedLocation } = require('../utils/locationUtils');
+        const {
+          applyResolvedLocation,
+          getUserBidLocation,
+          isStampableLocation,
+        } = require('../utils/locationUtils');
         const oldHomeLocation = user.homeLocation ? { ...user.homeLocation } : null;
+        const hadStampableBidLocation = isStampableLocation(
+          getUserBidLocation({
+            homeLocation: oldHomeLocation,
+            secondaryLocation: user.secondaryLocation,
+          })
+        );
         user.homeLocation = applyResolvedLocation(locationData, user.homeLocation);
         
         // Check if location actually changed (for auto-join logic)
@@ -2531,6 +2542,10 @@ router.put('/profile', authMiddleware, async (req, res) => {
           oldHomeLocation.country !== user.homeLocation.country ||
           oldHomeLocation.countryCode !== user.homeLocation.countryCode ||
           oldHomeLocation.placeId !== user.homeLocation.placeId;
+
+        // First Mapbox-resolvable home (and no stampable secondary): backfill prior tips
+        shouldBackfillBidLocations =
+          !hadStampableBidLocation && isStampableLocation(user.homeLocation);
         
         // Auto-join location parties if location changed and has countryCode
         if (locationChanged && user.homeLocation.countryCode) {
@@ -2677,6 +2692,22 @@ router.put('/profile', authMiddleware, async (req, res) => {
         }
       }
       throw saveError;
+    }
+
+    // Backfill prior tips with first home (async — don't block profile response)
+    if (shouldBackfillBidLocations) {
+      const { backfillUserBidLocationSnapshots } = require('../services/bidLocationBackfillService');
+      backfillUserBidLocationSnapshots(user)
+        .then(({ matched, modified }) => {
+          if (matched > 0) {
+            console.log(
+              `Backfilled bid locations for user ${user._id}: ${modified}/${matched} tips updated`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error('Error backfilling bid location snapshots:', error);
+        });
     }
 
     const updatedUser = await User.findById(user._id).select('-password');
