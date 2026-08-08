@@ -1,4 +1,4 @@
-const { createRemoteJWKSet, jwtVerify } = require('jose');
+const { createRemoteJWKSet, decodeJwt, jwtVerify } = require('jose');
 
 const APPLE_ISSUER = 'https://appleid.apple.com';
 const APPLE_JWKS = createRemoteJWKSet(
@@ -11,7 +11,48 @@ function resolveAudiences() {
     .map((s) => s.trim())
     .filter(Boolean);
   if (fromEnv.length > 0) return fromEnv;
-  return [process.env.APPLE_BUNDLE_ID || 'stream.tuneable.app'];
+
+  const audiences = [
+    process.env.APPLE_BUNDLE_ID || 'stream.tuneable.app',
+    process.env.APPLE_SERVICES_ID,
+    process.env.APPLE_WEB_CLIENT_ID,
+  ]
+    .map((s) => (typeof s === 'string' ? s.trim() : ''))
+    .filter(Boolean);
+
+  return [...new Set(audiences)];
+}
+
+function describeVerifyFailure(identityToken, error, audiences) {
+  let aud;
+  try {
+    aud = decodeJwt(identityToken).aud;
+  } catch {
+    return error.message;
+  }
+
+  const audList = Array.isArray(aud) ? aud : aud != null ? [String(aud)] : [];
+  const expoGoAud = audList.some(
+    (a) => a === 'host.exp.Exponent' || a === 'host.expo.Exponent'
+  );
+  if (expoGoAud) {
+    return (
+      'Apple token was issued for Expo Go (host.exp.Exponent). ' +
+      'Use a development or TestFlight build so the token audience is the app bundle ID.'
+    );
+  }
+
+  if (
+    error.code === 'ERR_JWT_CLAIM_VALIDATION_FAILED' &&
+    error.claim === 'aud'
+  ) {
+    return (
+      `Apple token audience mismatch (got ${audList.join(', ') || 'none'}; ` +
+      `expected ${audiences.join(', ')}).`
+    );
+  }
+
+  return error.message;
 }
 
 /**
@@ -26,10 +67,13 @@ async function verifyAppleIdentityToken(identityToken) {
     throw err;
   }
 
+  const audiences = resolveAudiences();
+
   try {
     const { payload } = await jwtVerify(identityToken, APPLE_JWKS, {
       issuer: APPLE_ISSUER,
-      audience: resolveAudiences(),
+      audience: audiences,
+      clockTolerance: 60,
     });
 
     if (!payload.sub) {
@@ -48,8 +92,13 @@ async function verifyAppleIdentityToken(identityToken) {
     };
   } catch (error) {
     if (error.status) throw error;
-    console.error('Apple identity token verification failed:', error.message);
-    const err = new Error('Invalid Apple identity token');
+    const detail = describeVerifyFailure(identityToken, error, audiences);
+    console.error('Apple identity token verification failed:', detail);
+    const err = new Error(
+      detail.startsWith('Apple token')
+        ? detail
+        : 'Invalid Apple identity token'
+    );
     err.status = 401;
     throw err;
   }

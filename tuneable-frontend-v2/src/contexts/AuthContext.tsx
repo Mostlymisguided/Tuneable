@@ -46,6 +46,8 @@ export interface User {
     soundcloud?: boolean;
     google?: boolean;
     instagram?: boolean;
+    apple?: boolean;
+    spotify?: boolean;
   };
   preferences?: {
     theme?: string;

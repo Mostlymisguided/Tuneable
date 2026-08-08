@@ -59,6 +59,8 @@ interface User {
     soundcloud?: boolean;
     google?: boolean;
     instagram?: boolean;
+    apple?: boolean;
+    spotify?: boolean;
   };
   preferences?: {
     theme?: string;
@@ -224,6 +226,16 @@ export const authAPI = {
   refreshToken: async () => {
     const response = await api.post('/auth/refresh');
     return response.data;
+  },
+
+  appleSignIn: async (body: {
+    identityToken: string;
+    invite?: string;
+    email?: string;
+    fullName?: { givenName?: string; familyName?: string };
+  }) => {
+    const response = await api.post('/auth/apple', body);
+    return response.data as { message: string; token: string; user: User };
   },
   
   getReferrals: async (code?: string) => {

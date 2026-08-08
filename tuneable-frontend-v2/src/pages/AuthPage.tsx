@@ -15,8 +15,12 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { Browser } from '@capacitor/browser';
-import { userAPI } from '../lib/api';
+import { authAPI, userAPI } from '../lib/api';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
+import {
+  isAppleWebSignInConfigured,
+  signInWithAppleWeb,
+} from '../utils/appleSignIn';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import type { ResolvedLocation } from '../utils/locationHelpers';
 import { buildRegisterUrl, buildLoginUrl, getPostAuthPath } from '../utils/authHelpers';
@@ -68,9 +72,10 @@ const AuthPage: React.FC = () => {
     } | null,
   });
 
-  const { login, register } = useAuth();
+  const { login, register, handleOAuthCallback } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const appleConfigured = isAppleWebSignInConfigured();
 
   // Check if we're on the register page
   const isRegisterPage = location.pathname === '/register';
@@ -144,6 +149,11 @@ const AuthPage: React.FC = () => {
           break;
         case 'instagram_auth_failed':
           errorMessage = 'Instagram authentication failed. Please try again or use email/password to sign in.';
+          break;
+        case 'apple_auth_failed':
+          errorMessage = errorMessageParam
+            ? decodeURIComponent(errorMessageParam)
+            : 'Apple authentication failed. Please try again or use email/password to sign in.';
           break;
         case 'oauth_state_mismatch':
           errorMessage = 'Security verification failed. Please try signing in again.';
@@ -254,6 +264,52 @@ const AuthPage: React.FC = () => {
       await Browser.open({ url: oauthUrl });
     } else {
       window.location.href = oauthUrl;
+    }
+  };
+
+  const handleAppleAuth = async () => {
+    if (isRegisterPage && formData.parentInviteCode.length === 5 && inviteCodeValid === false) {
+      toast.error('That invite code is invalid. Clear it or use a valid referral link.');
+      return;
+    }
+
+    if (!appleConfigured) {
+      toast.error(
+        'Apple Sign In is not configured yet. Set VITE_APPLE_CLIENT_ID to your Apple Services ID.'
+      );
+      return;
+    }
+
+    if (isNativeApp()) {
+      toast.info('Use Sign in with Apple in the Tuneable iOS app.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const credential = await signInWithAppleWeb();
+      const response = await authAPI.appleSignIn({
+        identityToken: credential.identityToken,
+        invite: formData.parentInviteCode || undefined,
+        email: credential.email,
+        fullName: credential.fullName,
+      });
+      const user = await handleOAuthCallback(response.token);
+      toast.success('Login successful!');
+      navigate(getPostAuthPath(user, returnPathParam), { replace: true });
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'cancelled' in err && (err as { cancelled?: boolean }).cancelled) {
+        return;
+      }
+      const message =
+        axios.isAxiosError(err) && err.response?.data?.error
+          ? String(err.response.data.error)
+          : err instanceof Error
+            ? err.message
+            : 'Apple Sign In failed.';
+      toast.error(message, { autoClose: 10000, pauseOnHover: true });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -487,6 +543,22 @@ const AuthPage: React.FC = () => {
           Sign in with Google
         </button>
         <br></br>
+        {appleConfigured && (
+          <>
+            <button
+              onClick={() => void handleAppleAuth()}
+              type="button"
+              disabled={isLoading}
+              className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-black hover:bg-gray-900 focus:ring-gray-500 focus:ring-offset-gray-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg disabled:opacity-60"
+            >
+              <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                <path d="M16.365 1.43c0 1.14-.422 2.21-1.18 3.03-.792.86-2.1 1.52-3.216 1.43-.144-1.1.406-2.26 1.17-3.05.79-.83 2.16-1.43 3.226-1.41zM20.69 17.2c-.54 1.24-.79 1.79-1.48 2.89-.96 1.53-2.31 3.44-4 3.47-1.5.03-1.89-.98-3.94-.96-2.04.01-2.48 1-3.98.97-1.69-.04-2.98-1.74-3.94-3.27C1.7 17.4.5 12.7 2.4 9.53c.95-1.58 2.47-2.58 4.18-2.61 1.55-.03 3.02 1.05 3.94 1.05.91 0 2.62-1.3 4.42-1.11.75.03 2.86.3 4.21 2.27-3.61 1.98-3.03 7.14.54 8.07z" />
+              </svg>
+              Sign in with Apple
+            </button>
+            <br></br>
+          </>
+        )}
         <button onClick={() => handleSocialAuth('facebook')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
           <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
             <path d="M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759h-306v-759h-255v-296h255v-218q0-186 104-288.5t277-102.5q147 0 228 12z"></path>
@@ -642,6 +714,20 @@ const AuthPage: React.FC = () => {
           </svg>
           Sign up with Google
         </button>
+
+        {appleConfigured && (
+          <button
+            onClick={() => void handleAppleAuth()}
+            type="button"
+            disabled={isLoading}
+            className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-black hover:bg-gray-900 focus:ring-gray-500 focus:ring-offset-gray-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg disabled:opacity-60"
+          >
+            <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+              <path d="M16.365 1.43c0 1.14-.422 2.21-1.18 3.03-.792.86-2.1 1.52-3.216 1.43-.144-1.1.406-2.26 1.17-3.05.79-.83 2.16-1.43 3.226-1.41zM20.69 17.2c-.54 1.24-.79 1.79-1.48 2.89-.96 1.53-2.31 3.44-4 3.47-1.5.03-1.89-.98-3.94-.96-2.04.01-2.48 1-3.98.97-1.69-.04-2.98-1.74-3.94-3.27C1.7 17.4.5 12.7 2.4 9.53c.95-1.58 2.47-2.58 4.18-2.61 1.55-.03 3.02 1.05 3.94 1.05.91 0 2.62-1.3 4.42-1.11.75.03 2.86.3 4.21 2.27-3.61 1.98-3.03 7.14.54 8.07z" />
+            </svg>
+            Sign up with Apple
+          </button>
+        )}
         
         <button onClick={() => handleSocialAuth('facebook')} type="button" className="py-2 px-4 w-auto max-w-md flex justify-center items-center bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 focus:ring-offset-blue-200 text-white transition ease-in duration-200 text-center text-base font-semibold shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 rounded-lg">
           <svg width="20" height="20" fill="currentColor" className="mr-2" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">

@@ -65,6 +65,8 @@ interface User {
     facebook?: boolean;
     soundcloud?: boolean;
     google?: boolean;
+    apple?: boolean;
+    spotify?: boolean;
   };
 }
 
@@ -1674,6 +1676,14 @@ const Admin: React.FC = () => {
                                 G
                               </span>
                             )}
+                            {user.oauthVerified?.apple && (
+                              <span 
+                                className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-100"
+                                title="Apple verified"
+                              >
+                                AP
+                              </span>
+                            )}
                             {user.oauthVerified?.instagram && (
                               <span 
                                 className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-pink-900 text-pink-200"
@@ -1691,7 +1701,8 @@ const Admin: React.FC = () => {
                               </span>
                             )}
                             {(!user.oauthVerified?.facebook && !user.oauthVerified?.google && 
-                              !user.oauthVerified?.instagram && !user.oauthVerified?.soundcloud) && (
+                              !user.oauthVerified?.instagram && !user.oauthVerified?.soundcloud &&
+                              !user.oauthVerified?.apple) && (
                               <span className="text-xs text-gray-500">None</span>
                             )}
                           </div>
