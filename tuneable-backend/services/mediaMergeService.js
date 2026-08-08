@@ -366,12 +366,14 @@ async function mergeMedia(sourceId, keepId, actorId, { dryRun = false } = {}) {
   source.deletedReason = `Merged into ${keep.uuid || keepOid.toString()}`;
   await source.save();
 
-  // 4) Recompute metrics on keeper
+  // 4) Recompute metrics on keeper + sync Media.bids from reassigned active tips
   try {
     await bidMetricsEngine.recomputeMediaMetrics(keepOid);
   } catch (err) {
     console.error('mergeMedia: failed to recompute metrics', err);
   }
+  // Source should not retain tip refs after merge
+  await Media.findByIdAndUpdate(sourceOid, { $set: { bids: [] } });
 
   return {
     success: true,

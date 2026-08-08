@@ -18,6 +18,7 @@ export interface ChartMediaItem {
   globalMediaAggregate?: number;
   globalMediaAggregateTop?: number;
   globalMediaAggregateTopRank?: number;
+  tipCount?: number;
   globalMediaAggregateTopUser?: {
     _id?: string;
     uuid?: string;

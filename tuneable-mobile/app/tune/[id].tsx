@@ -134,7 +134,7 @@ export default function TuneProfileScreen() {
     media?.creatorDisplay ||
     (media ? formatArtist(media.artist) : 'Unknown artist');
   const tipTotal = media?.globalMediaAggregate ?? 0;
-  const tipCount = media?.bids?.length ?? 0;
+  const tipCount = media?.tipCount ?? media?.bids?.length ?? 0;
   const durationLabel = formatDuration(media?.duration);
 
   const heroMetadata = useMemo(() => {

@@ -294,6 +294,7 @@ export interface Media {
   
   // Bidding metrics (aligned with schema grammar)
   globalMediaAggregate: number; // Total bid value across all parties/users
+  tipCount?: number; // Active tip count from Bid collection
   bids?: Array<{
     userId: {
       username: string;

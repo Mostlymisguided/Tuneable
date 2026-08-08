@@ -1675,17 +1675,8 @@ router.get('/:mediaId/profile', async (req, res) => {
     
     console.log('✅ Media found:', media.title);
 
-    // Populate media with bids and user data
+    // Populate media with user/creator data (active tips loaded from Bid collection below)
     const populatedMedia = await Media.findById(media._id)
-      .populate({
-        path: 'bids',
-        model: 'Bid',
-        populate: {
-          path: 'userId',
-          model: 'User',
-          select: 'username profilePic uuid',
-        },
-      })
       .populate({
         path: 'addedBy',
         model: 'User',
@@ -1740,28 +1731,44 @@ router.get('/:mediaId/profile', async (req, res) => {
     // Add comments to the response
     populatedMedia.comments = recentComments;
 
-    // Calculate accurate globalMediaAggregate from all active bids
-    // This ensures the displayed total matches the sum of all bids, even if stored value is stale
+    // Authoritative tip list + total from active Bid docs (not denormalized Media.bids)
     const Bid = require('../models/Bid');
     const allBids = await Bid.find({
       mediaId: media._id,
       status: 'active'
+    }).populate({
+      path: 'userId',
+      model: 'User',
+      select: 'username profilePic uuid',
     });
     
     const calculatedGlobalMediaAggregate = allBids.reduce((sum, bid) => sum + bid.amount, 0);
+    const activeBidIds = allBids.map((bid) => bid._id);
+    const storedBidIds = (populatedMedia.bids || []).map((id) => id.toString()).sort();
+    const actualBidIds = activeBidIds.map((id) => id.toString()).sort();
+    const bidsOutOfSync =
+      storedBidIds.length !== actualBidIds.length ||
+      storedBidIds.some((id, i) => id !== actualBidIds[i]);
     
-    console.log(`📊 Calculated globalMediaAggregate: ${calculatedGlobalMediaAggregate} (from ${allBids.length} bids) vs stored: ${populatedMedia.globalMediaAggregate || 0}`);
+    console.log(`📊 Calculated globalMediaAggregate: ${calculatedGlobalMediaAggregate} (from ${allBids.length} bids) vs stored: ${populatedMedia.globalMediaAggregate || 0}; Media.bids length: ${(populatedMedia.bids || []).length}`);
 
-    // Update stored value if it's incorrect (self-healing mechanism)
+    // Self-heal stored aggregate and denormalized bids array when they drift
     const storedValue = populatedMedia.globalMediaAggregate || 0;
     const tolerance = 0.01; // Allow small floating point differences
-    if (Math.abs(calculatedGlobalMediaAggregate - storedValue) > tolerance) {
-      console.log(`⚠️  Stored globalMediaAggregate is incorrect, updating from ${storedValue} to ${calculatedGlobalMediaAggregate}`);
-      await Media.findByIdAndUpdate(media._id, { 
-        globalMediaAggregate: calculatedGlobalMediaAggregate 
+    const aggregateOutOfSync = Math.abs(calculatedGlobalMediaAggregate - storedValue) > tolerance;
+    if (aggregateOutOfSync || bidsOutOfSync) {
+      if (aggregateOutOfSync) {
+        console.log(`⚠️  Stored globalMediaAggregate is incorrect, updating from ${storedValue} to ${calculatedGlobalMediaAggregate}`);
+      }
+      if (bidsOutOfSync) {
+        console.log(`⚠️  Media.bids out of sync (${storedBidIds.length} vs ${actualBidIds.length} active), healing`);
+      }
+      await Media.findByIdAndUpdate(media._id, {
+        ...(aggregateOutOfSync ? { globalMediaAggregate: calculatedGlobalMediaAggregate } : {}),
+        ...(bidsOutOfSync ? { bids: activeBidIds } : {}),
       });
-      // Update the populatedMedia object so we use the corrected value below
       populatedMedia.globalMediaAggregate = calculatedGlobalMediaAggregate;
+      populatedMedia.bids = activeBidIds;
     }
 
     // Compute GlobalMediaAggregateRank (rank by total bid value) - use calculated value
@@ -1804,6 +1811,9 @@ router.get('/:mediaId/profile', async (req, res) => {
       globalMediaAggregateTopRank: rank, // Add computed rank
       globalMediaAggregate: calculatedGlobalMediaAggregate, // Override with calculated value from all bids
       ...enrichMediaWithPlayability({ ...mediaObj, sources: sourcesObj }),
+      // Tip count/supporters must match Bid collection (Media.bids can be stale)
+      bids: allBids.map((bid) => (typeof bid.toObject === 'function' ? bid.toObject() : bid)),
+      tipCount: allBids.length,
     };
 
     console.log('📤 Sending media profile response:', {

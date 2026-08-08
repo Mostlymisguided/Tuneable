@@ -94,12 +94,21 @@ class BidMetricsEngine {
 
     // Update stored metrics that are affected
     const storedMetrics = BidMetricsSchema.getStoredMetrics();
-    
+
     for (const [metricName, config] of Object.entries(storedMetrics)) {
       try {
         await this._updateStoredMetric(metricName, bidData, operation);
       } catch (error) {
         console.error(`Error updating stored metric ${metricName}:`, error);
+      }
+    }
+
+    // Keep denormalized Media.bids in sync with active Bid docs (tip count source)
+    if (bidData.mediaId) {
+      try {
+        await this.syncMediaBidsArray(bidData.mediaId);
+      } catch (error) {
+        console.error(`Error syncing Media.bids for media ${bidData.mediaId}:`, error);
       }
     }
 
@@ -127,7 +136,26 @@ class BidMetricsEngine {
       }
     }
 
+    try {
+      await this.syncMediaBidsArray(mediaId);
+    } catch (error) {
+      console.error(`Error syncing Media.bids during recompute for ${mediaId}:`, error);
+    }
+
     console.log(`✅ Media metrics recomputation complete for: ${mediaId}`);
+  }
+
+  /**
+   * Replace Media.bids with the set of active Bid ObjectIds for this media.
+   * Tip count UIs use media.bids.length; aggregates use Bid docs — keep them aligned.
+   * @param {string|ObjectId} mediaId
+   * @returns {Promise<ObjectId[]>}
+   */
+  async syncMediaBidsArray(mediaId) {
+    if (!mediaId) return [];
+    const bidIds = await Bid.find({ mediaId, status: 'active' }).distinct('_id');
+    await Media.findByIdAndUpdate(mediaId, { $set: { bids: bidIds } });
+    return bidIds;
   }
 
   /**

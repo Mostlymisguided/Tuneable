@@ -306,6 +306,9 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     
     await bid.save();
     
+    // Keep tip-count array in sync immediately (metrics engine also syncs async)
+    await Media.findByIdAndUpdate(episode._id, { $addToSet: { bids: bid._id } });
+    
     // Create ledger entry
     try {
       const tuneableLedgerService = require('../services/tuneableLedgerService');
@@ -481,6 +484,9 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     });
     
     await bid.save();
+    
+    // Keep tip-count array in sync immediately (metrics engine also syncs async)
+    await Media.findByIdAndUpdate(episode._id, { $addToSet: { bids: bid._id } });
     
     // Create ledger entry
     try {

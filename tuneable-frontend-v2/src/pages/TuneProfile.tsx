@@ -118,6 +118,7 @@ interface Media {
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  tipCount?: number;
   bids?: Bid[];
   comments?: Comment[];
   addedBy?: {
@@ -2505,7 +2506,7 @@ const TuneProfile: React.FC = () => {
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm">
                   <Heart className="h-3.5 w-3.5 text-gray-400" />
-                  <span>{media.bids?.length || 0} tips</span>
+                  <span>{media.tipCount ?? media.bids?.length ?? 0} tips</span>
                 </span>
               </div>
 
