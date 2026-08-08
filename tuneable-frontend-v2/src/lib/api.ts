@@ -1113,6 +1113,29 @@ export const locationAPI = {
   },
 };
 
+export type ImportJobStatus = {
+  id: string;
+  type: 'preview' | 'execute';
+  source: 'spotify' | 'soundcloud';
+  status: 'queued' | 'running' | 'complete' | 'error';
+  stage: string;
+  current: number;
+  total: number;
+  message: string;
+  partial?: {
+    tipped?: number;
+    skipped?: number;
+    failed?: number;
+    totalSpentPence?: number;
+  } | null;
+  result?: any;
+  error?: string | null;
+  errorCode?: string | null;
+  details?: any;
+  startedAt?: string;
+  updatedAt?: string;
+};
+
 export const userAPI = {
   getProfile: async (userId: string) => {
     const response = await api.get(`/users/${userId}/profile`);
@@ -1401,6 +1424,11 @@ export const userAPI = {
     return response.data;
   },
 
+  startSpotifyImportPreview: async (limit = 50) => {
+    const response = await api.post('/users/me/import/spotify/preview/start', { limit });
+    return response.data as { jobId: string; status: string };
+  },
+
   executeSpotifyImport: async (
     items: Array<{
       key: string;
@@ -1410,6 +1438,9 @@ export const userAPI = {
       amount: number;
       externalMedia?: Record<string, unknown>;
       skipIfInLibrary?: boolean;
+      matchStatus?: string;
+      useSuggestedMatch?: boolean;
+      crossRefStatus?: string;
     }>,
     defaultTip?: number
   ) => {
@@ -1425,14 +1456,35 @@ export const userAPI = {
     };
   },
 
+  startSpotifyImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/spotify/execute/start', { items, defaultTip });
+    return response.data as { jobId: string; status: string };
+  },
+
   getSoundCloudStatus: async () => {
     const response = await api.get('/users/me/soundcloud-status');
     return response.data as { connected: boolean };
   },
 
-  previewSoundCloudImport: async (limit = 50) => {
-    const response = await api.get('/users/me/import/soundcloud/preview', { params: { limit } });
+  previewSoundCloudImport: async (limit = 50, crossRefMode: 'spotify_only' | 'full' | 'none' = 'spotify_only') => {
+    const response = await api.get('/users/me/import/soundcloud/preview', {
+      params: { limit, crossRefMode },
+    });
     return response.data;
+  },
+
+  startSoundCloudImportPreview: async (
+    limit = 50,
+    crossRefMode: 'spotify_only' | 'full' | 'none' = 'spotify_only'
+  ) => {
+    const response = await api.post('/users/me/import/soundcloud/preview/start', {
+      limit,
+      crossRefMode,
+    });
+    return response.data as { jobId: string; status: string };
   },
 
   executeSoundCloudImport: async (
@@ -1444,6 +1496,9 @@ export const userAPI = {
       amount: number;
       externalMedia?: Record<string, unknown>;
       skipIfInLibrary?: boolean;
+      matchStatus?: string;
+      useSuggestedMatch?: boolean;
+      crossRefStatus?: string;
     }>,
     defaultTip?: number
   ) => {
@@ -1457,6 +1512,61 @@ export const userAPI = {
       updatedBalance: number;
       items: Array<{ key: string; title: string; status: string; error?: string }>;
     };
+  },
+
+  startSoundCloudImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/soundcloud/execute/start', { items, defaultTip });
+    return response.data as { jobId: string; status: string };
+  },
+
+  getImportJob: async (jobId: string) => {
+    const response = await api.get(`/users/me/import/jobs/${jobId}`);
+    return response.data as ImportJobStatus;
+  },
+
+  /**
+   * Poll an async import job until complete/error.
+   * Calls onProgress on each poll tick.
+   */
+  waitForImportJob: async <T = any>(
+    jobId: string,
+    onProgress?: (job: ImportJobStatus) => void,
+    options?: { intervalMs?: number; timeoutMs?: number }
+  ): Promise<T> => {
+    const intervalMs = options?.intervalMs ?? 500;
+    const timeoutMs = options?.timeoutMs ?? 10 * 60 * 1000;
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+      const job = await userAPI.getImportJob(jobId);
+      onProgress?.(job);
+      if (job.status === 'complete') {
+        return job.result as T;
+      }
+      if (job.status === 'error') {
+        const err = new Error(job.error || 'Import job failed') as Error & {
+          code?: string | null;
+          details?: unknown;
+          response?: { data: { error?: string; code?: string | null; details?: unknown } };
+        };
+        err.code = job.errorCode;
+        err.details = job.details;
+        err.response = {
+          data: {
+            error: job.error || 'Import job failed',
+            code: job.errorCode,
+            details: job.details,
+          },
+        };
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error('Import job timed out — please try again with fewer tracks');
   },
 
   // Get user's tip history (all individual bids/tips)

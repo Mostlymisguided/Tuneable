@@ -73,7 +73,8 @@ interface ImportSummary {
   crossRefNoIsrc?: number;
 }
 
-const DEFAULT_SCAN_LIMIT = 100;
+const DEFAULT_SCAN_LIMIT = 50;
+const SCAN_STEP = 50;
 const MAX_SCAN_LIMIT = 200;
 
 const STATUS_LABELS: Record<MatchStatus, string> = {
@@ -144,6 +145,9 @@ const LibraryImport: React.FC = () => {
   const [showAdvancedLimit, setShowAdvancedLimit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
+  const [progressCurrent, setProgressCurrent] = useState(0);
+  const [progressTotal, setProgressTotal] = useState(0);
   const [items, setItems] = useState<ImportItem[]>([]);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [bulkTip, setBulkTip] = useState('1.11');
@@ -225,7 +229,26 @@ const LibraryImport: React.FC = () => {
     setSummary(null);
     setExecuteResult(null);
     setTipAmounts({});
+    setProgressMessage(null);
+    setProgressCurrent(0);
+    setProgressTotal(0);
   };
+
+  const applyJobProgress = useCallback((job: {
+    message?: string;
+    current?: number;
+    total?: number;
+    partial?: {
+      tipped?: number;
+      skipped?: number;
+      failed?: number;
+      totalSpentPence?: number;
+    } | null;
+  }) => {
+    setProgressMessage(job.message || null);
+    setProgressCurrent(job.current || 0);
+    setProgressTotal(job.total || 0);
+  }, []);
 
   const selectSource = (next: ImportSource) => {
     setSource(next);
@@ -263,11 +286,16 @@ const LibraryImport: React.FC = () => {
       return;
     }
     setIsLoading(true);
+    setProgressMessage('Starting scan…');
+    setProgressCurrent(0);
+    setProgressTotal(0);
     try {
       const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
-      const data = source === 'soundcloud'
-        ? await userAPI.previewSoundCloudImport(capped)
-        : await userAPI.previewSpotifyImport(capped);
+      setLimit(capped);
+      const started = source === 'soundcloud'
+        ? await userAPI.startSoundCloudImportPreview(capped, 'spotify_only')
+        : await userAPI.startSpotifyImportPreview(capped);
+      const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress);
       setItems(data.items || []);
       setSummary(data.summary || null);
       setTipAmounts({});
@@ -288,6 +316,45 @@ const LibraryImport: React.FC = () => {
       }
     } finally {
       setIsLoading(false);
+      setProgressMessage(null);
+      setProgressCurrent(0);
+      setProgressTotal(0);
+    }
+  };
+
+  const runExecuteJob = async (payload: Array<Record<string, unknown>>, tip: number) => {
+    setIsExecuting(true);
+    setProgressMessage('Starting import…');
+    setProgressCurrent(0);
+    setProgressTotal(payload.length);
+    try {
+      const started = source === 'soundcloud'
+        ? await userAPI.startSoundCloudImportExecute(payload, tip)
+        : await userAPI.startSpotifyImportExecute(payload, tip);
+      const result = await userAPI.waitForImportJob<{
+        tipped: number;
+        skipped: number;
+        failed: number;
+        totalSpent: number;
+        updatedBalance: number;
+      }>(started.jobId, applyJobProgress);
+      setExecuteResult({
+        tipped: result.tipped,
+        skipped: result.skipped,
+        failed: result.failed,
+        totalSpent: result.totalSpent,
+        updatedBalance: result.updatedBalance,
+      });
+      setStep('done');
+      if (refreshUser) await refreshUser();
+      toast.success(`Imported ${result.tipped} track(s) — £${Number(result.totalSpent).toFixed(2)} spent`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || error?.message || 'Import failed');
+    } finally {
+      setIsExecuting(false);
+      setProgressMessage(null);
+      setProgressCurrent(0);
+      setProgressTotal(0);
     }
   };
 
@@ -431,39 +498,20 @@ const LibraryImport: React.FC = () => {
       return;
     }
 
-    setIsExecuting(true);
-    try {
-      const payload = selectedItems.map((item) => ({
-        key: item.key,
-        title: item.title,
-        selected: true,
-        mediaId: item.mediaId || undefined,
-        matchStatus: item.matchStatus,
-        useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
-        crossRefStatus: item.crossRefStatus || undefined,
-        amount: parseFloat(tipAmounts[item.key] ?? bulkTip),
-        externalMedia: item.externalMedia,
-        skipIfInLibrary: true,
-      }));
+    const payload = selectedItems.map((item) => ({
+      key: item.key,
+      title: item.title,
+      selected: true,
+      mediaId: item.mediaId || undefined,
+      matchStatus: item.matchStatus,
+      useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
+      crossRefStatus: item.crossRefStatus || undefined,
+      amount: parseFloat(tipAmounts[item.key] ?? bulkTip),
+      externalMedia: item.externalMedia,
+      skipIfInLibrary: true,
+    }));
 
-      const result = source === 'soundcloud'
-        ? await userAPI.executeSoundCloudImport(payload, parseFloat(bulkTip))
-        : await userAPI.executeSpotifyImport(payload, parseFloat(bulkTip));
-      setExecuteResult({
-        tipped: result.tipped,
-        skipped: result.skipped,
-        failed: result.failed,
-        totalSpent: result.totalSpent,
-        updatedBalance: result.updatedBalance,
-      });
-      setStep('done');
-      if (refreshUser) await refreshUser();
-      toast.success(`Imported ${result.tipped} track(s) — £${result.totalSpent.toFixed(2)} spent`);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Import failed');
-    } finally {
-      setIsExecuting(false);
-    }
+    await runExecuteJob(payload, parseFloat(bulkTip));
   };
 
   const importFromSummary = async (mode: 'all' | 'affordable') => {
@@ -518,26 +566,7 @@ const LibraryImport: React.FC = () => {
       return;
     }
 
-    setIsExecuting(true);
-    try {
-      const result = source === 'soundcloud'
-        ? await userAPI.executeSoundCloudImport(payloadItems, tip)
-        : await userAPI.executeSpotifyImport(payloadItems, tip);
-      setExecuteResult({
-        tipped: result.tipped,
-        skipped: result.skipped,
-        failed: result.failed,
-        totalSpent: result.totalSpent,
-        updatedBalance: result.updatedBalance,
-      });
-      setStep('done');
-      if (refreshUser) await refreshUser();
-      toast.success(`Imported ${result.tipped} track(s) — £${result.totalSpent.toFixed(2)} spent`);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Import failed');
-    } finally {
-      setIsExecuting(false);
-    }
+    await runExecuteJob(payloadItems, tip);
   };
 
   const formatDuration = (sec?: number) => {
@@ -649,9 +678,32 @@ const LibraryImport: React.FC = () => {
                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
                     {isLoading ? 'Scanning…' : `Scan ${meta.label} likes`}
                   </button>
-                  <p className="text-xs text-gray-500 text-center">
-                    Scans your latest {DEFAULT_SCAN_LIMIT} likes by default
-                  </p>
+                  {isLoading && progressMessage ? (
+                    <div className="rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 text-xs text-gray-300">
+                        <span>{progressMessage}</span>
+                        {progressTotal > 0 ? (
+                          <span className="text-gray-500 tabular-nums">
+                            {progressCurrent}/{progressTotal}
+                          </span>
+                        ) : null}
+                      </div>
+                      {progressTotal > 0 ? (
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-700">
+                          <div
+                            className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                            style={{
+                              width: `${Math.min(100, Math.round((progressCurrent / progressTotal) * 100))}%`,
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center">
+                      Scans your latest {DEFAULT_SCAN_LIMIT} likes by default — you can load more after
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -766,7 +818,7 @@ const LibraryImport: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => void importFromSummary(canAffordAll ? 'all' : 'affordable')}
-                      disabled={isExecuting || (!canAffordAll && affordableCount === 0)}
+                      disabled={isExecuting || isLoading || (!canAffordAll && affordableCount === 0)}
                       className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
                     >
                       {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Coins className="w-5 h-5" />}
@@ -781,7 +833,8 @@ const LibraryImport: React.FC = () => {
                         else toggleAll(true);
                         setStep('review');
                       }}
-                      className="px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium"
+                      disabled={isExecuting || isLoading}
+                      className="px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded-lg font-medium"
                     >
                       Review tracks
                       {possibleMatchCount > 0 ? ` (${possibleMatchCount} possible)` : ''}
@@ -789,16 +842,50 @@ const LibraryImport: React.FC = () => {
                   </>
                 )}
               </div>
+              {(isExecuting || isLoading) && progressMessage ? (
+                <div className="rounded-lg border border-purple-800/60 bg-purple-950/30 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 text-xs text-purple-100">
+                    <span>{progressMessage}</span>
+                    {progressTotal > 0 ? (
+                      <span className="tabular-nums text-purple-300/80">
+                        {progressCurrent}/{progressTotal}
+                      </span>
+                    ) : null}
+                  </div>
+                  {progressTotal > 0 ? (
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-purple-950">
+                      <div
+                        className="h-full rounded-full bg-purple-400 transition-all duration-300"
+                        style={{
+                          width: `${Math.min(100, Math.round((progressCurrent / progressTotal) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <button
-                type="button"
-                onClick={() => setShowAdvancedLimit((v) => !v)}
-                className="text-gray-400 hover:text-white underline"
-              >
-                {showAdvancedLimit ? 'Hide scan options' : 'Scan more / change limit'}
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {limit < MAX_SCAN_LIMIT ? (
+                  <button
+                    type="button"
+                    onClick={() => void scanLikes(Math.min(MAX_SCAN_LIMIT, limit + SCAN_STEP))}
+                    disabled={isLoading || isExecuting}
+                    className="text-purple-300 hover:text-purple-200 underline disabled:opacity-50"
+                  >
+                    {isLoading ? 'Scanning…' : `Load ${Math.min(SCAN_STEP, MAX_SCAN_LIMIT - limit)} more likes`}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedLimit((v) => !v)}
+                  className="text-gray-400 hover:text-white underline"
+                >
+                  {showAdvancedLimit ? 'Hide scan options' : 'Custom scan limit'}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setStep('connect')}
@@ -907,9 +994,23 @@ const LibraryImport: React.FC = () => {
                   className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center gap-2"
                 >
                   {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                  Import &amp; tip £{totalCost.toFixed(2)}
+                  {isExecuting && progressMessage
+                    ? progressMessage
+                    : `Import & tip £${totalCost.toFixed(2)}`}
                 </button>
               </div>
+              {isExecuting && progressTotal > 0 ? (
+                <div className="pt-2">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-700">
+                    <div
+                      className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, Math.round((progressCurrent / progressTotal) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-2 mb-8 max-h-[45vh] overflow-y-auto pr-1">
@@ -1089,10 +1190,15 @@ const LibraryImport: React.FC = () => {
                     className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center gap-2"
                   >
                     {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
-                    Import &amp; tip £{totalCost.toFixed(2)}
+                    {isExecuting && progressTotal > 0
+                      ? `${progressCurrent}/${progressTotal}`
+                      : `Import & tip £${totalCost.toFixed(2)}`}
                   </button>
                 </div>
               </div>
+              {isExecuting && progressMessage ? (
+                <p className="mt-2 text-xs text-gray-400">{progressMessage}</p>
+              ) : null}
             </div>
           </>
         )}

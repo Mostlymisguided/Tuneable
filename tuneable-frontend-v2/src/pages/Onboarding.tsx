@@ -49,6 +49,7 @@ const Onboarding: React.FC = () => {
     userBalance: number;
   } | null>(null);
   const [isImportLoading, setIsImportLoading] = useState(false);
+  const [importProgressMessage, setImportProgressMessage] = useState<string | null>(null);
   const [importDone, setImportDone] = useState(false);
 
   const stepIndex = STEP_ORDER.indexOf(step);
@@ -97,10 +98,14 @@ const Onboarding: React.FC = () => {
 
   const loadImportPreview = useCallback(async (source: ImportSource) => {
     setIsImportLoading(true);
+    setImportProgressMessage('Scanning your likes…');
     try {
-      const data = source === 'soundcloud'
-        ? await userAPI.previewSoundCloudImport(ONBOARDING_IMPORT_LIMIT)
-        : await userAPI.previewSpotifyImport(ONBOARDING_IMPORT_LIMIT);
+      const started = source === 'soundcloud'
+        ? await userAPI.startSoundCloudImportPreview(ONBOARDING_IMPORT_LIMIT, 'spotify_only')
+        : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
+      const data = await userAPI.waitForImportJob(started.jobId, (job) => {
+        setImportProgressMessage(job.message || 'Scanning your likes…');
+      });
 
       const items = data.items || [];
       const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
@@ -120,6 +125,7 @@ const Onboarding: React.FC = () => {
       setImportPreview(null);
     } finally {
       setIsImportLoading(false);
+      setImportProgressMessage(null);
     }
   }, [defaultTip, user?.balance, user?.preferences?.defaultTip]);
 
@@ -214,11 +220,15 @@ const Onboarding: React.FC = () => {
 
   const runQuickImport = async () => {
     setIsImportLoading(true);
+    setImportProgressMessage('Preparing import…');
     try {
       const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
-      const data = importSource === 'soundcloud'
-        ? await userAPI.previewSoundCloudImport(ONBOARDING_IMPORT_LIMIT)
-        : await userAPI.previewSpotifyImport(ONBOARDING_IMPORT_LIMIT);
+      const previewStarted = importSource === 'soundcloud'
+        ? await userAPI.startSoundCloudImportPreview(ONBOARDING_IMPORT_LIMIT, 'spotify_only')
+        : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
+      const data = await userAPI.waitForImportJob(previewStarted.jobId, (job) => {
+        setImportProgressMessage(job.message || 'Scanning your likes…');
+      });
 
       const items = (data.items || [])
         .filter((i: { matchStatus: string }) => i.matchStatus !== 'in_library')
@@ -227,12 +237,18 @@ const Onboarding: React.FC = () => {
           key: string;
           title?: string;
           mediaId?: string;
+          matchStatus?: string;
+          useSuggestedMatch?: boolean;
+          crossRefStatus?: string;
           externalMedia?: Record<string, unknown>;
         }) => ({
           key: i.key,
           title: i.title,
           selected: true,
           mediaId: i.mediaId,
+          matchStatus: i.matchStatus,
+          useSuggestedMatch: i.useSuggestedMatch,
+          crossRefStatus: i.crossRefStatus,
           amount: tip,
           externalMedia: i.externalMedia,
           skipIfInLibrary: true,
@@ -244,9 +260,16 @@ const Onboarding: React.FC = () => {
         return;
       }
 
-      const result = importSource === 'soundcloud'
-        ? await userAPI.executeSoundCloudImport(items, tip)
-        : await userAPI.executeSpotifyImport(items, tip);
+      setImportProgressMessage(`Importing ${items.length} track${items.length === 1 ? '' : 's'}…`);
+      const executeStarted = importSource === 'soundcloud'
+        ? await userAPI.startSoundCloudImportExecute(items, tip)
+        : await userAPI.startSpotifyImportExecute(items, tip);
+      const result = await userAPI.waitForImportJob<{
+        tipped: number;
+        updatedBalance: number;
+      }>(executeStarted.jobId, (job) => {
+        setImportProgressMessage(job.message || 'Importing…');
+      });
 
       if (result.updatedBalance != null) {
         updateBalance(Math.round(result.updatedBalance * 100));
@@ -261,6 +284,7 @@ const Onboarding: React.FC = () => {
       toast.error(message);
     } finally {
       setIsImportLoading(false);
+      setImportProgressMessage(null);
     }
   };
 
@@ -433,7 +457,8 @@ const Onboarding: React.FC = () => {
                 {isImportLoading && !importPreview ? (
                   <div className="flex items-center gap-2 text-gray-400">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Scanning your {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} likes…
+                    {importProgressMessage
+                      || `Scanning your ${importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} likes…`}
                   </div>
                 ) : importPreview ? (
                   <div className="space-y-4">
@@ -448,6 +473,12 @@ const Onboarding: React.FC = () => {
                         Your balance is £{importPreview.userBalance.toFixed(2)} — we&apos;ll import as many as you can afford.
                       </p>
                     )}
+                    {isImportLoading && importProgressMessage ? (
+                      <p className="flex items-center gap-2 text-sm text-gray-400">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {importProgressMessage}
+                      </p>
+                    ) : null}
                     <button
                       type="button"
                       onClick={runQuickImport}

@@ -27,13 +27,15 @@ async function throttleMusicBrainz() {
  */
 
 /**
- * Resolve a single track via ISRC against Spotify then MusicBrainz.
+ * Resolve a single track via ISRC against Spotify then (optionally) MusicBrainz.
  * Prefers cleaner Spotify/MB metadata when an ISRC hit exists; keeps SC permalink.
  *
  * @param {object} track Tuneable import track shape
+ * @param {{ skipMusicBrainz?: boolean }} [opts]
  * @returns {Promise<{ track: object, crossRef: object }>}
  */
-async function enrichTrackViaIsrc(track) {
+async function enrichTrackViaIsrc(track, opts = {}) {
+  const skipMusicBrainz = opts.skipMusicBrainz === true;
   const isrc = normalizeIsrc(track?.externalIds?.isrc);
   if (!isrc) {
     return {
@@ -53,9 +55,9 @@ async function enrichTrackViaIsrc(track) {
     console.warn('ISRC Spotify lookup failed:', err.message);
   }
 
-  // MusicBrainz is rate-limited (~1 req/s) — only hit when Spotify misses
+  // MusicBrainz is rate-limited (~1 req/s) — only hit when Spotify misses and allowed
   let mbTrack = null;
-  if (!spotifyTrack) {
+  if (!spotifyTrack && !skipMusicBrainz) {
     try {
       await throttleMusicBrainz();
       const mbHits = await musicbrainzService.searchByIsrc(isrc, 3);
@@ -156,9 +158,14 @@ async function enrichTrackViaIsrc(track) {
 /**
  * Batch-enrich tracks that carry an ISRC. Tracks without ISRC pass through unverified.
  * @param {object[]} tracks
+ * @param {{
+ *   skipMusicBrainz?: boolean,
+ *   onProgress?: (update: { current: number, total: number, message?: string }) => void,
+ * }} [opts]
  * @returns {Promise<{ tracks: object[], stats: object }>}
  */
-async function enrichTracksViaIsrc(tracks) {
+async function enrichTracksViaIsrc(tracks, opts = {}) {
+  const list = tracks || [];
   const out = [];
   const stats = {
     withIsrc: 0,
@@ -166,8 +173,12 @@ async function enrichTracksViaIsrc(tracks) {
     isrcUnmatched: 0,
     noIsrc: 0,
   };
+  const total = list.length;
+  const skipMusicBrainz = opts.skipMusicBrainz === true;
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
 
-  for (const track of tracks || []) {
+  for (let i = 0; i < list.length; i += 1) {
+    const track = list[i];
     const isrc = normalizeIsrc(track?.externalIds?.isrc);
     if (!isrc) {
       stats.noIsrc += 1;
@@ -179,15 +190,21 @@ async function enrichTracksViaIsrc(tracks) {
           sources: [],
         },
       });
-      continue;
+    } else {
+      stats.withIsrc += 1;
+      const { track: enriched, crossRef } = await enrichTrackViaIsrc(track, { skipMusicBrainz });
+      if (crossRef.status === 'isrc_verified') stats.verified += 1;
+      else if (crossRef.status === 'isrc_unmatched') stats.isrcUnmatched += 1;
+      out.push({ ...enriched, crossRef });
     }
 
-    stats.withIsrc += 1;
-    const { track: enriched, crossRef } = await enrichTrackViaIsrc(track);
-    if (crossRef.status === 'isrc_verified') stats.verified += 1;
-    else if (crossRef.status === 'isrc_unmatched') stats.isrcUnmatched += 1;
-
-    out.push({ ...enriched, crossRef });
+    if (onProgress) {
+      onProgress({
+        current: i + 1,
+        total,
+        message: `Cross-referencing identities (${i + 1}/${total})…`,
+      });
+    }
   }
 
   return { tracks: out, stats };

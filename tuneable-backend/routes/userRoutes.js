@@ -1523,6 +1523,21 @@ router.get('/me/import/spotify/preview', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/me/import/spotify/preview/start
+// @desc    Start async Spotify likes preview (poll GET /me/import/jobs/:jobId)
+// @access  Private
+router.post('/me/import/spotify/preview/start', authMiddleware, async (req, res) => {
+  try {
+    const limit = req.body?.limit ?? req.query.limit;
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'spotify', { limit });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('Spotify import preview start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start preview' });
+  }
+});
+
 // @route   POST /api/users/me/import/spotify/execute
 // @desc    Batch tip + import selected Spotify likes
 // @access  Private
@@ -1547,6 +1562,21 @@ router.post('/me/import/spotify/execute', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/me/import/spotify/execute/start
+// @desc    Start async Spotify import/tip job (poll GET /me/import/jobs/:jobId)
+// @access  Private
+router.post('/me/import/spotify/execute/start', authMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startExecuteJob(req.user._id, 'spotify', { items, defaultTip });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('Spotify import execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start import' });
+  }
+});
+
 // Check whether the authenticated user has SoundCloud connected
 router.get('/me/soundcloud-status', authMiddleware, async (req, res) => {
   try {
@@ -1564,8 +1594,11 @@ router.get('/me/soundcloud-status', authMiddleware, async (req, res) => {
 router.get('/me/import/soundcloud/preview', authMiddleware, async (req, res) => {
   try {
     const limit = req.query.limit;
+    const crossRefMode = req.query.crossRefMode || 'spotify_only';
     const libraryImportService = require('../services/libraryImportService');
-    const preview = await libraryImportService.previewSoundCloudImport(req.user._id, limit);
+    const preview = await libraryImportService.previewSoundCloudImport(req.user._id, limit, {
+      crossRefMode,
+    });
     res.json(preview);
   } catch (error) {
     const status = error.status || (error.response?.status === 401 ? 400 : 500);
@@ -1580,6 +1613,25 @@ router.get('/me/import/soundcloud/preview', authMiddleware, async (req, res) => 
       error: error.message || 'Failed to preview import',
       details: error.details,
     });
+  }
+});
+
+// @route   POST /api/users/me/import/soundcloud/preview/start
+// @desc    Start async SoundCloud likes preview (poll GET /me/import/jobs/:jobId)
+// @access  Private
+router.post('/me/import/soundcloud/preview/start', authMiddleware, async (req, res) => {
+  try {
+    const limit = req.body?.limit ?? req.query.limit;
+    const crossRefMode = req.body?.crossRefMode || 'spotify_only';
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'soundcloud', {
+      limit,
+      crossRefMode,
+    });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('SoundCloud import preview start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start preview' });
   }
 });
 
@@ -1604,6 +1656,38 @@ router.post('/me/import/soundcloud/execute', authMiddleware, async (req, res) =>
       error: error.message || 'Failed to execute import',
       details: error.details,
     });
+  }
+});
+
+// @route   POST /api/users/me/import/soundcloud/execute/start
+// @desc    Start async SoundCloud import/tip job (poll GET /me/import/jobs/:jobId)
+// @access  Private
+router.post('/me/import/soundcloud/execute/start', authMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startExecuteJob(req.user._id, 'soundcloud', { items, defaultTip });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('SoundCloud import execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start import' });
+  }
+});
+
+// @route   GET /api/users/me/import/jobs/:jobId
+// @desc    Poll library import preview/execute job progress
+// @access  Private
+router.get('/me/import/jobs/:jobId', authMiddleware, async (req, res) => {
+  try {
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const job = libraryImportJobService.getJobForUser(req.params.jobId, req.user._id);
+    if (!job) {
+      return res.status(404).json({ error: 'Import job not found or expired' });
+    }
+    res.json(job);
+  } catch (error) {
+    console.error('Import job poll error:', error);
+    res.status(500).json({ error: 'Failed to get import job status' });
   }
 });
 

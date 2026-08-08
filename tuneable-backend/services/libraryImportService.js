@@ -22,6 +22,25 @@ const DEFAULT_TIP = 1.11;
 const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 25000;
+const MATCH_CONCURRENCY = 8;
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const list = items || [];
+  const results = new Array(list.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < list.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(list[index], index);
+    }
+  }
+
+  const workerCount = Math.min(Math.max(concurrency, 1), Math.max(list.length, 1));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
 
 function identityConfidenceSourceFrom({ matchStatus, matchType, crossRef }) {
   if (crossRef?.status === 'isrc_verified') {
@@ -267,7 +286,10 @@ function trackKey(track, source) {
   return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
 }
 
-async function previewImportFromTracks(userId, source, tracks, user, extraSummary = {}) {
+async function previewImportFromTracks(userId, source, tracks, user, extraSummary = {}, onProgress = null) {
+  const report = typeof onProgress === 'function' ? onProgress : () => {};
+
+  report({ stage: 'loading_bids', message: 'Loading your library…', current: 0, total: tracks.length });
   const userBids = await Bid.find({ userId, status: 'active' }).select('mediaId amount').lean();
   const tippedMediaIds = new Set(userBids.map((b) => b.mediaId?.toString()).filter(Boolean));
   const userBidTotals = {};
@@ -278,10 +300,23 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
   });
 
   const defaultTip = user.preferences?.defaultTip || DEFAULT_TIP;
+  report({
+    stage: 'loading_catalog',
+    message: 'Loading Tuneable catalog…',
+    current: 0,
+    total: tracks.length,
+  });
   const fuzzyIndexes = await loadFuzzyCatalogIndexes();
 
-  const items = [];
-  for (const track of tracks) {
+  report({
+    stage: 'matching',
+    message: `Matching tracks (0/${tracks.length})…`,
+    current: 0,
+    total: tracks.length,
+  });
+
+  let matched = 0;
+  const items = await mapWithConcurrency(tracks, MATCH_CONCURRENCY, async (track) => {
     const crossRef = track.crossRef || (
       source === 'spotify' && (track.externalIds?.spotify || track.id)
         ? { status: 'spotify_catalog', identityConfidence: 'verified', sources: ['spotify'] }
@@ -323,7 +358,17 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       crossRef,
     });
 
-    items.push({
+    matched += 1;
+    if (matched === tracks.length || matched % 5 === 0) {
+      report({
+        stage: 'matching',
+        message: `Matching tracks (${matched}/${tracks.length})…`,
+        current: matched,
+        total: tracks.length,
+      });
+    }
+
+    return {
       key: trackKey(track, source),
       title: track.title,
       artist: track.artist,
@@ -355,11 +400,18 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
         identityConfidence,
         identityConfidenceSource,
       }),
-    });
-  }
+    };
+  });
 
   const selectable = items.filter((i) => i.matchStatus !== 'in_library');
   const estimatedTotal = selectable.reduce((sum, i) => sum + i.defaultTip, 0);
+
+  report({
+    stage: 'matching',
+    message: `Matched ${items.length} track${items.length === 1 ? '' : 's'}`,
+    current: items.length,
+    total: items.length,
+  });
 
   return {
     source,
@@ -381,7 +433,10 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
   };
 }
 
-async function previewSpotifyImport(userId, limit = 50) {
+async function previewSpotifyImport(userId, limit = 50, opts = {}) {
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+  const report = onProgress || (() => {});
+
   const user = await User.findById(userId).select('spotifyAccessToken preferences balance');
   if (!user?.spotifyAccessToken) {
     const err = new Error('Spotify not connected. Please connect your Spotify account first.');
@@ -390,12 +445,29 @@ async function previewSpotifyImport(userId, limit = 50) {
   }
 
   const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  report({
+    stage: 'fetching',
+    message: `Fetching Spotify likes (up to ${cappedLimit})…`,
+    current: 0,
+    total: cappedLimit,
+  });
   const savedTracks = await spotifyService.getSavedTracks(user.spotifyAccessToken, cappedLimit);
   const tracks = savedTracks.map(spotifyService.convertSavedTrackToTuneableFormat);
-  return previewImportFromTracks(userId, 'spotify', tracks, user);
+  report({
+    stage: 'fetching',
+    message: `Fetched ${tracks.length} Spotify like${tracks.length === 1 ? '' : 's'}`,
+    current: tracks.length,
+    total: tracks.length,
+  });
+  return previewImportFromTracks(userId, 'spotify', tracks, user, {}, onProgress);
 }
 
-async function previewSoundCloudImport(userId, limit = 50) {
+async function previewSoundCloudImport(userId, limit = 50, opts = {}) {
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+  const report = onProgress || (() => {});
+  // spotify_only (default): skip MusicBrainz throttle. full: include MB. none: skip ISRC entirely.
+  const crossRefMode = opts.crossRefMode || 'spotify_only';
+
   const user = await User.findById(userId).select(
     'soundcloudAccessToken soundcloudRefreshToken preferences balance'
   );
@@ -406,6 +478,12 @@ async function previewSoundCloudImport(userId, limit = 50) {
   }
 
   const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  report({
+    stage: 'fetching',
+    message: `Fetching SoundCloud likes (up to ${cappedLimit})…`,
+    current: 0,
+    total: cappedLimit,
+  });
   const {
     tracks: likedTracks,
     skippedMixes,
@@ -417,8 +495,36 @@ async function previewSoundCloudImport(userId, limit = 50) {
     { excludeMixes: true, excludeUnplayable: true }
   );
   const converted = likedTracks.map(soundcloudService.convertLikedTrackToTuneableFormat);
-  // Soft ISRC cross-ref (Spotify / MusicBrainz) — never blocks import
-  const { tracks, stats: crossRefStats } = await importCrossRefService.enrichTracksViaIsrc(converted);
+  report({
+    stage: 'fetching',
+    message: `Fetched ${converted.length} playable like${converted.length === 1 ? '' : 's'}`,
+    current: converted.length,
+    total: converted.length,
+  });
+
+  let tracks = converted;
+  let crossRefStats = { verified: 0, withIsrc: 0, noIsrc: converted.length };
+
+  if (crossRefMode !== 'none') {
+    report({
+      stage: 'cross_ref',
+      message: 'Cross-referencing identities…',
+      current: 0,
+      total: converted.length,
+    });
+    const enriched = await importCrossRefService.enrichTracksViaIsrc(converted, {
+      skipMusicBrainz: crossRefMode !== 'full',
+      onProgress: (update) => report({
+        stage: 'cross_ref',
+        current: update.current,
+        total: update.total,
+        message: update.message,
+      }),
+    });
+    tracks = enriched.tracks;
+    crossRefStats = enriched.stats;
+  }
+
   // Reload balance/preferences in case token refresh mutated user elsewhere
   const freshUser = await User.findById(userId).select('preferences balance');
   return previewImportFromTracks(userId, 'soundcloud', tracks, freshUser || user, {
@@ -428,10 +534,13 @@ async function previewSoundCloudImport(userId, limit = 50) {
     crossRefVerified: crossRefStats.verified,
     crossRefWithIsrc: crossRefStats.withIsrc,
     crossRefNoIsrc: crossRefStats.noIsrc,
-  });
+    crossRefMode,
+  }, onProgress);
 }
 
-async function executeLibraryImport(userId, { items, defaultTip, importSource = 'library_import' } = {}) {
+async function executeLibraryImport(userId, { items, defaultTip, importSource = 'library_import', onProgress } = {}) {
+  const report = typeof onProgress === 'function' ? onProgress : () => {};
+
   if (!Array.isArray(items) || items.length === 0) {
     const err = new Error('No items to import');
     err.status = 400;
@@ -493,8 +602,18 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
   // inside placeGlobalBid via ISRC / externalIds / title+artist.
   const tippedMediaIds = new Set();
   const skipIfInLibrary = (item) => item.skipIfInLibrary !== false;
+  const total = selected.length;
 
-  for (const item of selected) {
+  report({
+    stage: 'tipping',
+    message: `Importing track 0 of ${total}…`,
+    current: 0,
+    total,
+    partial: { tipped: 0, skipped: 0, failed: 0, totalSpentPence: 0 },
+  });
+
+  for (let index = 0; index < selected.length; index += 1) {
+    const item = selected[index];
     const amount = Number(item.amount ?? fallbackTip);
     const label = item.title || item.key;
 
@@ -510,6 +629,18 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
             reason: 'already_tipped_in_batch',
             mediaId: mediaIdStr,
           });
+          report({
+            stage: 'tipping',
+            message: `Importing track ${index + 1} of ${total}…`,
+            current: index + 1,
+            total,
+            partial: {
+              tipped: results.tipped,
+              skipped: results.skipped,
+              failed: results.failed,
+              totalSpentPence: results.totalSpentPence,
+            },
+          });
           continue;
         }
 
@@ -522,6 +653,18 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
           tippedMediaIds.add(mediaIdStr);
           results.skipped++;
           results.items.push({ key: item.key, title: label, status: 'skipped', reason: 'already_in_library' });
+          report({
+            stage: 'tipping',
+            message: `Importing track ${index + 1} of ${total}…`,
+            current: index + 1,
+            total,
+            partial: {
+              tipped: results.tipped,
+              skipped: results.skipped,
+              failed: results.failed,
+              totalSpentPence: results.totalSpentPence,
+            },
+          });
           continue;
         }
       }
@@ -575,22 +718,21 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
           reason: out.reason || 'already_in_library',
           mediaId: resolvedMediaId || null,
         });
-        continue;
+      } else {
+        if (resolvedMediaId) tippedMediaIds.add(resolvedMediaId);
+        results.tipped++;
+        results.totalSpentPence += Math.round(amount * 100);
+        results.updatedBalance = out.updatedBalance;
+        results.items.push({
+          key: item.key,
+          title: label,
+          status: 'tipped',
+          mediaId: resolvedMediaId,
+          mediaUuid: out.media.uuid,
+          amount,
+          bidId: out.bid._id.toString(),
+        });
       }
-
-      if (resolvedMediaId) tippedMediaIds.add(resolvedMediaId);
-      results.tipped++;
-      results.totalSpentPence += Math.round(amount * 100);
-      results.updatedBalance = out.updatedBalance;
-      results.items.push({
-        key: item.key,
-        title: label,
-        status: 'tipped',
-        mediaId: resolvedMediaId,
-        mediaUuid: out.media.uuid,
-        amount,
-        bidId: out.bid._id.toString(),
-      });
     } catch (error) {
       results.failed++;
       results.items.push({
@@ -600,13 +742,50 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
         error: error.message,
       });
       if (error.status === 400 && error.message.includes('Insufficient balance')) {
+        report({
+          stage: 'tipping',
+          message: `Stopped early — insufficient balance (${index + 1}/${total})`,
+          current: index + 1,
+          total,
+          partial: {
+            tipped: results.tipped,
+            skipped: results.skipped,
+            failed: results.failed,
+            totalSpentPence: results.totalSpentPence,
+          },
+        });
         break;
       }
     }
+
+    report({
+      stage: 'tipping',
+      message: `Importing track ${index + 1} of ${total}…`,
+      current: index + 1,
+      total,
+      partial: {
+        tipped: results.tipped,
+        skipped: results.skipped,
+        failed: results.failed,
+        totalSpentPence: results.totalSpentPence,
+      },
+    });
   }
 
   // Queue MusicBrainz enrichment for tipped tracks (non-blocking)
   try {
+    report({
+      stage: 'enriching',
+      message: 'Queueing metadata enrichment…',
+      current: total,
+      total,
+      partial: {
+        tipped: results.tipped,
+        skipped: results.skipped,
+        failed: results.failed,
+        totalSpentPence: results.totalSpentPence,
+      },
+    });
     const metadataEnrichmentService = require('./metadataEnrichmentService');
     await metadataEnrichmentService.enqueueAfterLibraryImport(results.items, {
       importSource,
