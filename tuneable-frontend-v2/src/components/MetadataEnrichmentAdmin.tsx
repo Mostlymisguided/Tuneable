@@ -35,6 +35,8 @@ interface EnrichmentItem {
   suggestion?: {
     title?: string;
     artist?: string;
+    artists?: Array<{ name?: string; relationToNext?: string | null }>;
+    featuring?: Array<{ name?: string }>;
     album?: string | null;
     duration?: number;
     releaseYear?: number | null;
@@ -49,6 +51,8 @@ interface EnrichmentItem {
     musicbrainzId?: string;
     title?: string;
     artist?: string;
+    artists?: Array<{ name?: string; relationToNext?: string | null }>;
+    featuring?: Array<{ name?: string }>;
     album?: string | null;
     duration?: number;
     releaseYear?: number | null;
@@ -83,6 +87,39 @@ function formatDuration(sec?: number) {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/** Prefer structured MB artists/featuring; fall back to legacy artist string. */
+function formatSuggestionArtist(
+  suggestion?: {
+    artist?: string;
+    artists?: Array<{ name?: string; relationToNext?: string | null }>;
+    featuring?: Array<{ name?: string }>;
+  } | null
+): string {
+  if (!suggestion) return '—';
+  const artists = Array.isArray(suggestion.artists) ? suggestion.artists : [];
+  const featuring = Array.isArray(suggestion.featuring) ? suggestion.featuring : [];
+
+  if (artists.length > 0) {
+    let display = '';
+    artists.forEach((artist, index) => {
+      const name = artist?.name?.trim();
+      if (!name) return;
+      display += name;
+      if (index < artists.length - 1) {
+        const relation = artist.relationToNext || '&';
+        display += relation === ',' ? ', ' : ` ${String(relation).trim()} `;
+      }
+    });
+    const featNames = featuring.map((f) => f?.name?.trim()).filter(Boolean);
+    if (featNames.length > 0) {
+      display += ` ft. ${featNames.join(', ')}`;
+    }
+    if (display.trim()) return display.trim();
+  }
+
+  return suggestion.artist?.trim() || '—';
 }
 
 function importSourceLinkLabel(url: string, importSource?: string) {
@@ -570,7 +607,7 @@ const MetadataEnrichmentAdmin: React.FC = () => {
                     {item.suggestion?.title ? (
                       <>
                         <div className="font-medium text-white">{item.suggestion.title}</div>
-                        <div className="text-gray-400">{item.suggestion.artist}</div>
+                        <div className="text-gray-400">{formatSuggestionArtist(item.suggestion)}</div>
                         <div className="text-xs text-gray-500 mt-1">
                           {item.suggestion.album || 'No album'} · {formatDuration(item.suggestion.duration)}
                           {item.suggestion.releaseYear ? ` · ${item.suggestion.releaseYear}` : ''}
@@ -620,7 +657,7 @@ const MetadataEnrichmentAdmin: React.FC = () => {
                       >
                         <div className="min-w-0">
                           <span className="text-white">{c.title}</span>
-                          <span className="text-gray-400"> — {c.artist}</span>
+                          <span className="text-gray-400"> — {formatSuggestionArtist(c)}</span>
                           <span className="text-gray-500 text-xs ml-2">
                             {(c.score != null ? `${(c.score * 100).toFixed(0)}%` : '')}
                             {c.matchType ? ` · ${c.matchType}` : ''}

@@ -27,6 +27,32 @@ function appendQueryParams(url, params) {
   }
 }
 
+/**
+ * Dedupe Facebook authorization-code exchanges.
+ * Browsers/proxies sometimes hit the callback twice; the second exchange fails with
+ * "This authorization code has been used" and surfaces as an interrupted sign-in.
+ */
+const facebookAuthCodeCache = new Map(); // code -> { promise, redirectUrl?, expires }
+const FACEBOOK_AUTH_CODE_TTL_MS = 2 * 60 * 1000;
+
+function getFacebookAuthCodeEntry(code) {
+  const entry = facebookAuthCodeCache.get(code);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    facebookAuthCodeCache.delete(code);
+    return null;
+  }
+  return entry;
+}
+
+function rememberFacebookAuthRedirect(code, redirectUrl) {
+  if (!code) return;
+  const existing = facebookAuthCodeCache.get(code) || {};
+  existing.redirectUrl = redirectUrl;
+  existing.expires = Date.now() + FACEBOOK_AUTH_CODE_TTL_MS;
+  facebookAuthCodeCache.set(code, existing);
+}
+
 // Helper function to optionally extract user from JWT token (for account linking)
 // Can extract from Authorization header or query parameter (for OAuth redirects)
 async function extractUserFromToken(req) {
@@ -112,115 +138,135 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
     });
   });
 
-  router.get('/facebook/callback',
-    (req, res, next) => {
-      passport.authenticate('facebook', {
-        session: false // We're using JWT, not sessions for auth
-      }, (err, user) => {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        // oauthRedirect already includes ?oauth_success=true — always use appendQueryParams
-        const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
-        const clearFacebookSession = () => {
-          if (!req.session) return;
-          delete req.session.oauthRedirect;
-          delete req.session.linkAccount;
-          delete req.session.linkingUserId;
-          delete req.session.linkingUserUuid;
-        };
+  router.get('/facebook/callback', async (req, res, next) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const authCode = typeof req.query.code === 'string' ? req.query.code : null;
 
-        if (err) {
-          console.error('Facebook OAuth strategy error:', err.message);
-          clearFacebookSession();
-          const raw = err.message || 'Facebook authentication failed';
-          const isCodeReuse =
-            /authorization code has been used/i.test(raw) ||
-            /code been used/i.test(raw);
-          return res.redirect(appendQueryParams(baseRedirect, {
-            error: isCodeReuse ? 'facebook_auth_failed' : 'account_linking_failed',
-            message: isCodeReuse
-              ? 'Facebook sign-in was interrupted. Please try again.'
-              : raw
-          }));
+    // Duplicate callback hits: reuse the first exchange's redirect instead of
+    // asking Facebook to redeem the one-time code again.
+    if (authCode) {
+      const cached = getFacebookAuthCodeEntry(authCode);
+      if (cached?.redirectUrl) {
+        console.warn('Facebook OAuth: reusing cached redirect for duplicate auth code');
+        return res.redirect(cached.redirectUrl);
+      }
+      if (cached?.promise) {
+        const redirectUrl = await cached.promise;
+        return res.redirect(redirectUrl);
+      }
+    }
+
+    let resolveCodeRedirect;
+    if (authCode) {
+      const promise = new Promise((resolve) => {
+        resolveCodeRedirect = resolve;
+      });
+      facebookAuthCodeCache.set(authCode, {
+        promise,
+        expires: Date.now() + FACEBOOK_AUTH_CODE_TTL_MS
+      });
+    }
+
+    const finishRedirect = (url) => {
+      if (authCode) {
+        rememberFacebookAuthRedirect(authCode, url);
+        if (resolveCodeRedirect) resolveCodeRedirect(url);
+      }
+      return res.redirect(url);
+    };
+
+    passport.authenticate('facebook', {
+      session: false // We're using JWT, not sessions for auth
+    }, async (err, user) => {
+      // oauthRedirect already includes ?oauth_success=true — always use appendQueryParams
+      const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
+      const clearFacebookSession = () => {
+        if (!req.session) return;
+        delete req.session.oauthRedirect;
+        delete req.session.linkAccount;
+        delete req.session.linkingUserId;
+        delete req.session.linkingUserUuid;
+      };
+
+      if (err) {
+        console.error('Facebook OAuth strategy error:', err.message);
+        clearFacebookSession();
+        const raw = err.message || 'Facebook authentication failed';
+        const isCodeReuse =
+          /authorization code has been used/i.test(raw) ||
+          /code been used/i.test(raw);
+
+        // Late duplicate: another request may have already finished successfully
+        if (isCodeReuse && authCode) {
+          const cached = getFacebookAuthCodeEntry(authCode);
+          if (cached?.redirectUrl && !/[?&]error=/.test(cached.redirectUrl)) {
+            console.warn('Facebook OAuth: code reuse after successful sibling request — using cached redirect');
+            return res.redirect(cached.redirectUrl);
+          }
         }
 
-        if (!user) {
-          console.error('Facebook OAuth authentication failed - no user returned');
-          clearFacebookSession();
-          return res.redirect(appendQueryParams(baseRedirect, {
-            error: 'facebook_auth_failed',
-            message: 'Facebook authentication failed'
-          }));
-        }
+        return finishRedirect(appendQueryParams(baseRedirect, {
+          error: isCodeReuse ? 'facebook_auth_failed' : 'account_linking_failed',
+          message: isCodeReuse
+            ? 'Facebook sign-in was interrupted. Please try again.'
+            : raw
+        }));
+      }
 
-        req.user = user;
-        next();
-      })(req, res, next);
-    },
-    async (req, res) => {
+      if (!user) {
+        console.error('Facebook OAuth authentication failed - no user returned');
+        clearFacebookSession();
+        return finishRedirect(appendQueryParams(baseRedirect, {
+          error: 'facebook_auth_failed',
+          message: 'Facebook authentication failed'
+        }));
+      }
+
       try {
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
         const isLinkingAccount = req.session?.linkAccount === true;
         const linkingUserId = req.session?.linkingUserId;
 
         // If this is an account linking request, verify the user matches
         if (isLinkingAccount && linkingUserId) {
-          const authenticatedUserId = req.user._id.toString();
+          const authenticatedUserId = user._id.toString();
 
           if (authenticatedUserId !== linkingUserId) {
-            if (req.session) {
-              delete req.session.oauthRedirect;
-              delete req.session.linkAccount;
-              delete req.session.linkingUserId;
-              delete req.session.linkingUserUuid;
-            }
-            return res.redirect(appendQueryParams(baseRedirect, {
+            clearFacebookSession();
+            return finishRedirect(appendQueryParams(baseRedirect, {
               error: 'account_already_linked',
               message: 'This Facebook account is already linked to another user account. Please use a different account.'
             }));
           }
 
-          console.log('✅ Account linking successful for user:', req.user.uuid);
+          console.log('✅ Account linking successful for user:', user.uuid);
         }
 
         const token = jwt.sign(
           {
-            userId: req.user.uuid,
-            email: req.user.email,
-            username: req.user.username
+            userId: user.uuid,
+            email: user.email,
+            username: user.username
           },
           SECRET_KEY,
           { expiresIn: '24h' }
         );
 
-        if (req.session) {
-          delete req.session.oauthRedirect;
-          delete req.session.linkAccount;
-          delete req.session.linkingUserId;
-          delete req.session.linkingUserUuid;
-        }
+        clearFacebookSession();
 
-        res.redirect(appendQueryParams(baseRedirect, {
+        return finishRedirect(appendQueryParams(baseRedirect, {
           token,
           oauth_success: 'true'
         }));
       } catch (error) {
         console.error('Facebook callback error:', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
-        if (req.session) {
-          delete req.session.oauthRedirect;
-          delete req.session.linkAccount;
-          delete req.session.linkingUserId;
-          delete req.session.linkingUserUuid;
-        }
-        res.redirect(appendQueryParams(baseRedirect, {
+        clearFacebookSession();
+        return finishRedirect(appendQueryParams(baseRedirect, {
           error: 'facebook_auth_failed',
           message: error.message || 'Facebook authentication failed'
         }));
       }
-    }
-  );
+    })(req, res, next);
+  });
 } else {
   // Facebook OAuth not configured - return 503 Service Unavailable
   router.get('/facebook', (req, res) => {

@@ -11,12 +11,33 @@ const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSig
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
+/** OAuth callback must use the same public host as /api/auth/* (session cookie). */
+function resolveOAuthCallbackURL(envKey, provider) {
+  if (process.env[envKey]) return process.env[envKey];
+  // Prefer FRONTEND_URL in production so callbacks stay on tuneable.stream (CF proxy),
+  // not the Render origin — matching Spotify's same-host requirement.
+  const frontend = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+  if (frontend && !/localhost|127\.0\.0\.1/.test(frontend)) {
+    return `${frontend}/api/auth/${provider}/callback`;
+  }
+  return `http://localhost:8000/api/auth/${provider}/callback`;
+}
+
 // Facebook OAuth Strategy - only configure if environment variables are available
 if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+  const facebookCallbackURL = resolveOAuthCallbackURL('FACEBOOK_CALLBACK_URL', 'facebook');
+  console.log('Facebook OAuth callbackURL:', facebookCallbackURL);
+  if (/onrender\.com/i.test(facebookCallbackURL) && /tuneable\.stream/i.test(process.env.FRONTEND_URL || '')) {
+    console.warn(
+      '⚠️  FACEBOOK_CALLBACK_URL points at onrender.com while FRONTEND_URL is tuneable.stream. ' +
+      'OAuth start and callback hosts differ — set FACEBOOK_CALLBACK_URL=https://tuneable.stream/api/auth/facebook/callback'
+    );
+  }
   passport.use(new FacebookStrategy({
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
-      callbackURL: process.env.FACEBOOK_CALLBACK_URL || "http://localhost:8000/api/auth/facebook/callback",
+      callbackURL: facebookCallbackURL,
+      graphAPIVersion: process.env.FACEBOOK_GRAPH_API_VERSION || 'v21.0',
       profileFields: ['id', 'emails', 'name', 'picture.type(large)'],
       enableProof: true,
       passReqToCallback: true  // Enable passing req to callback for session access
@@ -290,10 +311,12 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 
 // Google OAuth Strategy - only configure if environment variables are available
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  const googleCallbackURL = resolveOAuthCallbackURL('GOOGLE_CALLBACK_URL', 'google');
+  console.log('Google OAuth callbackURL:', googleCallbackURL);
   passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:8000/api/auth/google/callback",
+      callbackURL: googleCallbackURL,
       passReqToCallback: true  // Required to access req object in callback for state validation
     },
     async (req, accessToken, refreshToken, profile, done) => {

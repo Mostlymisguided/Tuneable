@@ -192,6 +192,7 @@ const formatMediaEntry = (record) => {
     bpm: typeof media.bpm === 'number' && media.bpm > 0 ? media.bpm : null,
     releaseDate: media.releaseDate || null,
     releaseYear: typeof media.releaseYear === 'number' ? media.releaseYear : null,
+    primaryLocation: media.primaryLocation || null,
     globalMediaAggregate: media.globalMediaAggregate || 0,
     globalMediaAggregateTop: media.globalMediaAggregateTop || 0,
     globalMediaAggregateTopUser: media.globalMediaAggregateTopUser || null,

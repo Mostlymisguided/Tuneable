@@ -2603,7 +2603,7 @@ const TuneProfile: React.FC = () => {
         {/* Related Tunes — discovery rail directly below header */}
         {!isEditMode && (isLoadingRelatedPlaylists || relatedMedia.length > 0) && (
           <div className="mb-8 px-2 md:px-0">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-center gap-3 mb-3">
               <h2 className="text-lg md:text-xl font-bold text-white">
                 Related
               </h2>

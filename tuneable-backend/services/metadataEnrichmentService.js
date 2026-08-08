@@ -254,11 +254,17 @@ async function enrichCandidateDetails(candidate) {
 }
 
 function suggestionFromCandidate(candidate, extras = {}) {
+  const artists = Array.isArray(candidate.artists) ? candidate.artists : [];
+  const featuring = Array.isArray(candidate.featuring) ? candidate.featuring : [];
+  const displayArtist = artists.length > 0
+    ? (formatCreatorDisplay(artists, featuring) || candidate.artist)
+    : candidate.artist;
+
   return {
     title: candidate.title,
-    artist: candidate.artist,
-    artists: Array.isArray(candidate.artists) ? candidate.artists : [],
-    featuring: Array.isArray(candidate.featuring) ? candidate.featuring : [],
+    artist: displayArtist,
+    artists,
+    featuring,
     album: candidate.album || null,
     duration: candidate.duration || 0,
     isrc: candidate.isrc || null,

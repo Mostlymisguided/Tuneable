@@ -43,6 +43,8 @@ function normalizeRelationToNext(joinphrase) {
 /**
  * Parse MusicBrainz `artist-credit` into Tuneable artist + featuring arrays.
  * Preserves MB joinphrases via relationToNext / featuring split.
+ * Display is always built from the structured arrays so missing joinphrases
+ * still render as "A & B" instead of "AB".
  *
  * @param {Array|null|undefined} artistCredit
  * @returns {{ artists: Array<{name: string, relationToNext: string|null, musicbrainzId: string|null}>, featuring: Array<{name: string, musicbrainzId: string|null}>, display: string }}
@@ -55,17 +57,6 @@ function parseMusicBrainzArtistCredit(artistCredit) {
   if (credits.length === 0) {
     return { artists: [], featuring: [], display: 'Unknown Artist' };
   }
-
-  // Display string: MB-faithful name + joinphrase concatenation
-  const display = credits
-    .map((entry) => {
-      if (typeof entry === 'string') return entry;
-      const name = entry?.name || entry?.artist?.name || '';
-      const join = entry?.joinphrase || '';
-      return `${name}${join}`;
-    })
-    .join('')
-    .trim() || 'Unknown Artist';
 
   let mode = 'primary'; // primary | featuring
   for (let i = 0; i < credits.length; i += 1) {
@@ -95,26 +86,29 @@ function parseMusicBrainzArtistCredit(artistCredit) {
 
     if (isFeaturingJoinphrase(joinphrase)) {
       mode = 'featuring';
-      // Last primary has no relationToNext — featuring is rendered via featuring[]
     } else if (i < credits.length - 1) {
+      // Missing joinphrase → default co-headline connector (avoids "ArtistAArtistB")
       artists[artists.length - 1].relationToNext = normalizeRelationToNext(joinphrase) || '&';
     }
   }
 
-  // Clear relation on final primary artist
-  if (artists.length > 0) {
-    const lastPrimaryIdx = artists.length - 1;
-    // relationToNext only meaningful between primaries; if we switched to featuring,
-    // the last primary's relation should already be null.
-    if (mode === 'featuring') {
-      artists[lastPrimaryIdx].relationToNext = null;
-    }
+  if (artists.length > 0 && mode === 'featuring') {
+    artists[artists.length - 1].relationToNext = null;
   }
 
+  const structuredArtists = artists.length > 0
+    ? artists
+    : [{
+        name: String(credits[0]?.name || credits[0]?.artist?.name || 'Unknown Artist').trim()
+          || 'Unknown Artist',
+        relationToNext: null,
+        musicbrainzId: credits[0]?.artist?.id ? String(credits[0].artist.id) : null,
+      }];
+
   return {
-    artists: artists.length > 0 ? artists : [{ name: display, relationToNext: null, musicbrainzId: null }],
+    artists: structuredArtists,
     featuring,
-    display,
+    display: formatCreatorDisplay(structuredArtists, featuring) || 'Unknown Artist',
   };
 }
 
