@@ -70,6 +70,7 @@ import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
 import AiToolsEditor from '../components/AiToolsEditor';
 import AiToolsDisplay from '../components/AiToolsDisplay';
+import AiAssistedBadge from '../components/AiAssistedBadge';
 import DeleteMediaSection from '../components/DeleteMediaSection';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
@@ -2463,12 +2464,7 @@ const TuneProfile: React.FC = () => {
             <div className="flex-1 w-full text-white">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2">
                 <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left">{media.title}</h1>
-                {hasAiUsage(media.aiUsage) && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 text-xs font-medium">
-                    <Bot className="h-3.5 w-3.5" />
-                    AI-assisted
-                  </span>
-                )}
+                <AiAssistedBadge aiUsage={media.aiUsage} />
               </div>
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
                 <ClickableArtistDisplay media={media} />

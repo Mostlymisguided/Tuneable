@@ -4,6 +4,7 @@ import { Play, X, Clock, Heart } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
+import AiAssistedBadge from './AiAssistedBadge';
 import { DEFAULT_COVER_ART } from '../constants';
 import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
@@ -240,18 +241,21 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
 
           <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
             <div className="flex items-center gap-2 min-w-0">
-              <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
-                {href ? (
-                  <Link
-                    to={href}
-                    className="cursor-pointer hover:text-purple-300 transition-colors"
-                  >
-                    {mediaData.title || 'Unknown Media'}
-                  </Link>
-                ) : (
-                  mediaData.title || 'Unknown Media'
-                )}
-              </h4>
+              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                <h4 className="min-w-0 flex-1 font-medium text-white text-sm truncate">
+                  {href ? (
+                    <Link
+                      to={href}
+                      className="cursor-pointer hover:text-purple-300 transition-colors"
+                    >
+                      {mediaData.title || 'Unknown Media'}
+                    </Link>
+                  ) : (
+                    mediaData.title || 'Unknown Media'
+                  )}
+                </h4>
+                <AiAssistedBadge aiUsage={mediaData.aiUsage} size="sm" />
+              </div>
               <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
                 {metaParts.flatMap((part, i) =>
                   i === 0

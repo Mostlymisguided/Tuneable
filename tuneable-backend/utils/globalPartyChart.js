@@ -38,6 +38,7 @@ const MEDIA_CHART_SELECT = [
   'creatorDisplay',
   'contentType',
   'contentForm',
+  'aiUsage',
 ].join(' ');
 
 const USER_PUBLIC_SELECT = 'username profilePic uuid homeLocation secondaryLocation';
