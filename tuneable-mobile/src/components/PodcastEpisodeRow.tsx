@@ -25,6 +25,7 @@ type Props = {
   tipPence?: number;
   onPlay: () => void;
   onTip: () => void;
+  onOpenProfile?: () => void;
 };
 
 export function PodcastEpisodeRow({
@@ -33,6 +34,7 @@ export function PodcastEpisodeRow({
   tipPence,
   onPlay,
   onTip,
+  onOpenProfile,
 }: Props) {
   const [footerExpanded, setFooterExpanded] = useState(false);
   const playable = isEpisodePlayable(episode);
@@ -50,6 +52,7 @@ export function PodcastEpisodeRow({
     DEFAULT_PODCAST_COVER;
   const collapsedTags = allTags.slice(0, COLLAPSED_TAG_COUNT);
   const toggleFooter = () => setFooterExpanded((open) => !open);
+  const openProfile = onOpenProfile ?? onPlay;
 
   return (
     <View style={[styles.richCard, !playable && styles.rowMuted]}>
@@ -89,7 +92,11 @@ export function PodcastEpisodeRow({
           )}
         </Pressable>
 
-        <Pressable style={styles.richMeta} onPress={onPlay}>
+        <Pressable
+          style={styles.richMeta}
+          onPress={openProfile}
+          accessibilityRole="button"
+          accessibilityLabel={`Open episode profile for ${episode.title || 'episode'}`}>
           <View style={styles.titleRow}>
             <Text style={styles.richTitle} numberOfLines={1}>
               {episode.title || 'Untitled episode'}

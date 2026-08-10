@@ -50,6 +50,11 @@ export interface PodcastChartResponse {
   };
 }
 
+export interface PodcastSeriesResponse {
+  series?: PodcastSeriesRef & { _id?: string; title?: string };
+  episodes?: PodcastEpisode[];
+}
+
 export const PODCAST_CHART_PAGE_SIZE = 20;
 
 export const PODCAST_TIME_RANGES = [

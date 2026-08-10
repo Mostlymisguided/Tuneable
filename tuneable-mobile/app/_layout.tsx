@@ -80,6 +80,7 @@ function RootNavigator() {
         <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="upload" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tune/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="podcast/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="user/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tag/[slug]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="place/[placeId]" options={{ animation: 'slide_from_right' }} />

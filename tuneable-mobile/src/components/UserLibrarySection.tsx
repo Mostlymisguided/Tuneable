@@ -61,6 +61,7 @@ function toChartMediaItem(item: UserLibraryItem): ChartMediaItem {
     sources: item.sources ?? {},
     partyMediaAggregate: item.globalUserMediaAggregate ?? 0,
     globalMediaAggregate: item.globalMediaAggregate ?? 0,
+    contentForm: item.contentForm,
     bids: (item.bids ?? []).map((bid) => ({
       amount: bid.amount,
       status: bid.status,
@@ -75,6 +76,17 @@ function toChartMediaItem(item: UserLibraryItem): ChartMediaItem {
         : undefined,
     })),
   };
+}
+
+function isPodcastLibraryItem(item: UserLibraryItem | ChartMediaItem): boolean {
+  const forms = Array.isArray((item as UserLibraryItem).contentForm)
+    ? (item as UserLibraryItem).contentForm
+    : Array.isArray((item as ChartMediaItem).contentForm)
+      ? (item as ChartMediaItem).contentForm
+      : [];
+  return (forms || []).some((f) =>
+    ['podcast', 'podcastseries', 'episode', 'podcastepisode'].includes(f)
+  );
 }
 
 type Props = {
@@ -257,7 +269,17 @@ export function UserLibrarySection({
             tipPence={item.partyMediaAggregate ?? 0}
             onOpen={() => {
               const id = mediaId(item);
-              if (id) router.push(`/tune/${id}`);
+              if (!id) return;
+              const lib = findLibraryItem(item);
+              if (lib && isPodcastLibraryItem(lib)) {
+                router.push(`/podcast/${id}`);
+                return;
+              }
+              if (isPodcastLibraryItem(item)) {
+                router.push(`/podcast/${id}`);
+                return;
+              }
+              router.push(`/tune/${id}`);
             }}
             onPlay={() => playItem(item)}
             onTip={() => {

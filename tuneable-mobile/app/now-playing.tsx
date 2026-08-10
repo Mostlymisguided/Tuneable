@@ -13,7 +13,7 @@ import { Screen } from '@/src/components/Screen';
 import { SeekBar } from '@/src/components/SeekBar';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatArtist, mediaId } from '@/src/lib/media';
-import { seriesTitle } from '@/src/lib/podcast';
+import { episodeId, seriesTitle } from '@/src/lib/podcast';
 import {
   useCurrentTrack,
   useMusicPlayerStore,
@@ -106,6 +106,12 @@ export default function NowPlayingScreen() {
   };
 
   const tuneId = track && !episode ? mediaId(track) : '';
+  const podcastId = episode ? episodeId(episode) : '';
+  const profileHref = podcastId
+    ? (`/podcast/${podcastId}` as const)
+    : tuneId
+      ? (`/tune/${tuneId}` as const)
+      : null;
 
   return (
     <Screen>
@@ -114,9 +120,9 @@ export default function NowPlayingScreen() {
           <Ionicons name="chevron-down" size={28} color={colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Now playing</Text>
-        {tuneId ? (
+        {profileHref ? (
           <Pressable
-            onPress={() => router.push(`/tune/${tuneId}`)}
+            onPress={() => router.push(profileHref)}
             hitSlop={12}
             style={styles.infoBtn}>
             <Ionicons

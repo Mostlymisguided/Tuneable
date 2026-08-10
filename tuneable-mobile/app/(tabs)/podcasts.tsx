@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
@@ -269,6 +269,10 @@ export default function PodcastsScreen() {
             tipPence={item.globalMediaAggregate ?? 0}
             onPlay={() => onPlayItem(item)}
             onTip={() => setTipTarget(item)}
+            onOpenProfile={() => {
+              const tid = episodeId(item);
+              if (tid) router.push(`/podcast/${tid}`);
+            }}
           />
         )}
       />

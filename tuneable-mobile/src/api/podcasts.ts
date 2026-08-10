@@ -1,5 +1,8 @@
 import { api } from './client';
-import type { PodcastChartResponse } from '@/src/types/podcast';
+import type {
+  PodcastChartResponse,
+  PodcastSeriesResponse,
+} from '@/src/types/podcast';
 
 export const podcastsAPI = {
   getChart: async (params?: {
@@ -22,6 +25,23 @@ export const podcastsAPI = {
         locationPlaceId: params?.locationPlaceId,
       },
     });
+    return response.data;
+  },
+
+  /** Series + episodes. Prefer autoImport=false for profile rails. */
+  getSeries: async (
+    seriesId: string,
+    params?: { autoImport?: boolean; limit?: number }
+  ): Promise<PodcastSeriesResponse> => {
+    const response = await api.get<PodcastSeriesResponse>(
+      `/podcasts/series/${seriesId}`,
+      {
+        params: {
+          autoImport: params?.autoImport === true ? 'true' : 'false',
+          limit: params?.limit ?? 12,
+        },
+      }
+    );
     return response.data;
   },
 };

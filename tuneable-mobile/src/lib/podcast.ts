@@ -17,6 +17,65 @@ export function seriesTitle(episode: PodcastEpisode): string {
   );
 }
 
+/** Map a media profile payload into a PodcastEpisode for the player / rails. */
+export function mediaToPodcastEpisode(
+  media: {
+    id?: string;
+    _id?: string;
+    uuid?: string;
+    title?: string;
+    description?: string | null;
+    coverArt?: string;
+    duration?: number;
+    globalMediaAggregate?: number;
+    releaseDate?: string | null;
+    podcastSeries?:
+      | string
+      | {
+          _id?: string;
+          title?: string;
+          coverArt?: string;
+          genres?: string[];
+          tags?: string[];
+        }
+      | null;
+    podcastTitle?: string;
+    genres?: string[];
+    tags?: string[];
+    category?: string;
+    sources?: MediaSources;
+    audioUrl?: string;
+    enclosure?: { url?: string; type?: string };
+    bids?: PodcastEpisode['bids'];
+  }
+): PodcastEpisode {
+  const series =
+    media.podcastSeries && typeof media.podcastSeries === 'object'
+      ? media.podcastSeries
+      : undefined;
+
+  return {
+    id: media.id,
+    _id: media._id,
+    uuid: media.uuid,
+    title: media.title,
+    description: media.description ?? undefined,
+    coverArt: media.coverArt,
+    duration: media.duration,
+    globalMediaAggregate: media.globalMediaAggregate,
+    releaseDate: media.releaseDate ?? undefined,
+    podcastSeries: series,
+    podcastTitle: media.podcastTitle || series?.title,
+    genres: media.genres,
+    tags: media.tags,
+    category: media.category,
+    sources: media.sources as PodcastEpisode['sources'],
+    audioUrl: media.audioUrl,
+    enclosure: media.enclosure,
+    bids: media.bids,
+  };
+}
+
 /** Category/genre tags first, then tip tags — deduped. */
 export function getEpisodeDisplayTags(episode: PodcastEpisode): string[] {
   const candidates = [

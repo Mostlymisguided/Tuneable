@@ -34,6 +34,20 @@ export interface ChartMediaItem {
   category?: string;
   status?: string;
   sources?: MediaSources;
+  audioUrl?: string;
+  enclosure?: { url?: string; type?: string };
+  podcastTitle?: string;
+  podcastSeries?:
+    | string
+    | {
+        _id?: string;
+        title?: string;
+        coverArt?: string;
+        genres?: string[];
+        tags?: string[];
+      }
+    | null;
+  contentForm?: string[];
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
   isPlayable?: boolean;
