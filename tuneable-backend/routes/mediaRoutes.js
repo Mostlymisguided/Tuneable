@@ -3583,6 +3583,52 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/:mediaId/location-rankings
+// @desc    Get primaryLocation place rankings for a media item (city / region / country chips)
+// @access  Public
+// @query   limit — max rankings to return (default 3, max 5)
+router.get('/:mediaId/location-rankings', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { limit } = req.query;
+
+    console.log('📍 Location rankings request for media:', mediaId);
+
+    let actualMediaId = mediaId;
+    if (!isValidObjectId(mediaId)) {
+      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
+      if (!mediaByUuid) {
+        return res.status(404).json({ error: 'Media not found' });
+      }
+      actualMediaId = mediaByUuid._id;
+    }
+
+    const media = await Media.findById(actualMediaId)
+      .select('_id primaryLocation globalMediaAggregate contentType contentForm status')
+      .lean();
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (!media.primaryLocation?.placeId) {
+      return res.json({ locationRankings: [] });
+    }
+
+    const { getMediaLocationRankings } = require('../services/locationProfileService');
+    const locationRankings = await getMediaLocationRankings(media, {
+      limit: limit != null ? parseInt(limit, 10) : 3,
+      minTotal: 2,
+    });
+
+    console.log('✅ Returning', locationRankings.length, 'location rankings');
+
+    res.json({ locationRankings });
+  } catch (error) {
+    console.error('Error fetching location rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch location rankings' });
+  }
+});
+
 // @route   GET /api/media/:mediaId/champions
 // @desc    Tip-aggregate champions for a media item (global or Mapbox place scope)
 // @access  Public

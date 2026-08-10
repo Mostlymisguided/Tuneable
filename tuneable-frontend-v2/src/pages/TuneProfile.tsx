@@ -39,7 +39,8 @@ import {
   Instagram,
   SlidersHorizontal,
   Bot,
-  Info
+  Info,
+  MapPin
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import ReportModal from '../components/ReportModal';
@@ -77,7 +78,7 @@ import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import type { ResolvedLocation } from '../utils/locationHelpers';
+import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 
 interface Media {
   _id: string;
@@ -342,6 +343,15 @@ const TuneProfile: React.FC = () => {
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
+  const [locationRankings, setLocationRankings] = useState<Array<{
+    placeId: string;
+    name: string;
+    featureType?: string | null;
+    rank: number;
+    total: number;
+    percentile?: number;
+    aggregate?: number;
+  }>>([]);
   const [relatedMedia, setRelatedMedia] = useState<RecommendedMediaItem[]>([]);
   const [isLoadingRelatedPlaylists, setIsLoadingRelatedPlaylists] = useState(false);
   const [recommendedItemToTip, setRecommendedItemToTip] = useState<RecommendedMediaItem | null>(null);
@@ -385,6 +395,7 @@ const TuneProfile: React.FC = () => {
       console.log('✅ mediaId exists, calling fetchMediaProfile');
       fetchMediaProfile().then(() => {
         loadTagRankings();
+        loadLocationRankings();
         loadRelatedPlaylists();
       });
     } else {
@@ -1530,6 +1541,16 @@ const TuneProfile: React.FC = () => {
     }
   };
 
+  const loadLocationRankings = async () => {
+    if (!media && !mediaId) return;
+    try {
+      const response = await mediaAPI.getLocationRankings(media?._id || mediaId!, 3);
+      setLocationRankings(response.locationRankings || []);
+    } catch (err: any) {
+      console.error('❌ Error loading location rankings:', err);
+    }
+  };
+
   const loadRelatedPlaylists = async () => {
     if (!mediaId) return;
 
@@ -2104,6 +2125,7 @@ const TuneProfile: React.FC = () => {
   ].filter((part): part is string => Boolean(part));
 
   const topTagRankings = tagRankings.slice(0, 3);
+  const topLocationRankings = locationRankings.slice(0, 3);
 
   const avgTipPounds = media ? calculateGlobalMediaBidAvg(media) || undefined : undefined;
 
@@ -2466,18 +2488,46 @@ const TuneProfile: React.FC = () => {
                 </p>
               )}
 
-              {topTagRankings.length > 0 && (
-                <div className="flex flex-wrap justify-center md:justify-start gap-1.5 px-2 mb-3">
-                  {topTagRankings.map((ranking, index) => (
-                    <Link
-                      key={`${ranking.tag}-${index}`}
-                      to={getTagProfilePath(ranking.tag)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
-                    >
-                      <Tag className="h-3 w-3 text-purple-400" />
-                      #{ranking.rank} {ranking.tag}
-                    </Link>
-                  ))}
+              {(topTagRankings.length > 0 || topLocationRankings.length > 0) && (
+                <div className="flex flex-col gap-1.5 px-2 mb-3">
+                  {topTagRankings.length > 0 && (
+                    <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
+                      {topTagRankings.map((ranking, index) => (
+                        <Link
+                          key={`${ranking.tag}-${index}`}
+                          to={getTagProfilePath(ranking.tag)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
+                        >
+                          <Tag className="h-3 w-3 text-purple-400" />
+                          #{ranking.rank} {ranking.tag}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  {topLocationRankings.length > 0 && (
+                    <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
+                      {topLocationRankings.map((ranking) => {
+                        const placePath = getPlaceProfilePath(ranking.placeId);
+                        const chipClass =
+                          'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-200 text-xs font-medium hover:bg-sky-500/25 hover:border-sky-400/50 transition-colors no-underline';
+                        const chipBody = (
+                          <>
+                            <MapPin className="h-3 w-3 text-sky-400" />
+                            #{ranking.rank} {ranking.name}
+                          </>
+                        );
+                        return placePath ? (
+                          <Link key={ranking.placeId} to={placePath} className={chipClass}>
+                            {chipBody}
+                          </Link>
+                        ) : (
+                          <span key={ranking.placeId} className={chipClass}>
+                            {chipBody}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 

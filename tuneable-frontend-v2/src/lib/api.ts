@@ -961,6 +961,14 @@ export const mediaAPI = {
     return response.data;
   },
 
+  // Get primaryLocation place rankings for media (city + country)
+  getLocationRankings: async (mediaId: string, limit?: number) => {
+    const response = await api.get(`/media/${mediaId}/location-rankings`, {
+      params: limit != null ? { limit } : undefined,
+    });
+    return response.data;
+  },
+
   // Tip-aggregate champions (global or place-scoped via Mapbox place id)
   getChampions: async (
     mediaId: string,
@@ -1054,7 +1062,16 @@ export const tagAPI = {
   },
   getProfile: async (slug: string, params?: { page?: number; limit?: number }) => {
     const response = await api.get(`/tags/${encodeURIComponent(slug)}/profile`, { params });
-    return response.data;
+    return response.data as {
+      tag: { name: string; slug: string; canonicalTag?: string };
+      stats?: { mediaCount?: number; globalTagAggregate?: number };
+      relatedTags?: Array<{ name: string; slug: string }>;
+      topOriginPlaces?: Array<{ placeId: string; name: string; featureType?: string | null }>;
+      topSupportPlaces?: Array<{ placeId: string; name: string; featureType?: string | null }>;
+      media?: unknown[];
+      pagination?: { page: number; limit: number; total: number; pages: number };
+      relatedParty?: unknown;
+    };
   },
   getChampions: async (
     slug: string,

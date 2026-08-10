@@ -41,7 +41,8 @@ import {
   Facebook,
   Linkedin,
   Instagram,
-  Info
+  Info,
+  MapPin
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
@@ -62,7 +63,7 @@ import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import DeleteMediaSection from '../components/DeleteMediaSection';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import type { ResolvedLocation } from '../utils/locationHelpers';
+import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 
 interface Media {
   _id: string;
@@ -290,6 +291,15 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
+  const [locationRankings, setLocationRankings] = useState<Array<{
+    placeId: string;
+    name: string;
+    featureType?: string | null;
+    rank: number;
+    total: number;
+    percentile?: number;
+    aggregate?: number;
+  }>>([]);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
   const [seriesEpisodes, setSeriesEpisodes] = useState<any[]>([]);
   const [isLoadingSeriesEpisodes, setIsLoadingSeriesEpisodes] = useState(false);
@@ -338,6 +348,7 @@ const PodcastEpisodeProfile: React.FC = () => {
       console.log('✅ mediaId exists, calling fetchMediaProfile');
       fetchMediaProfile().then((loadedMedia) => {
         loadTagRankings();
+        loadLocationRankings();
         if (loadedMedia) {
           loadSeriesEpisodes(loadedMedia);
         }
@@ -1502,6 +1513,16 @@ const PodcastEpisodeProfile: React.FC = () => {
     }
   };
 
+  const loadLocationRankings = async () => {
+    if (!media && !mediaId) return;
+    try {
+      const response = await mediaAPI.getLocationRankings(media?._id || mediaId!, 3);
+      setLocationRankings(response.locationRankings || []);
+    } catch (err: any) {
+      console.error('❌ Error loading location rankings:', err);
+    }
+  };
+
   // Handle play button click – use podcast player (not music web player)
   const handlePlaySong = () => {
     if (!media) return;
@@ -1989,6 +2010,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   ].filter((part): part is string => Boolean(part));
 
   const topTagRankings = tagRankings.slice(0, 3);
+  const topLocationRankings = locationRankings.slice(0, 3);
 
   const avgTipPounds = media ? calculateGlobalMediaBidAvg(media) || undefined : undefined;
 
@@ -2355,17 +2377,45 @@ const PodcastEpisodeProfile: React.FC = () => {
                 </p>
               )}
 
-              {topTagRankings.length > 0 && (
-                <div className="flex flex-wrap justify-center md:justify-start gap-1.5 px-2 mb-3">
-                  {topTagRankings.map((ranking, index) => (
-                    <span
-                      key={`${ranking.tag}-${index}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium"
-                    >
-                      <Tag className="h-3 w-3 text-purple-400" />
-                      #{ranking.rank} {ranking.tag}
-                    </span>
-                  ))}
+              {(topTagRankings.length > 0 || topLocationRankings.length > 0) && (
+                <div className="flex flex-col gap-1.5 px-2 mb-3">
+                  {topTagRankings.length > 0 && (
+                    <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
+                      {topTagRankings.map((ranking, index) => (
+                        <span
+                          key={`${ranking.tag}-${index}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium"
+                        >
+                          <Tag className="h-3 w-3 text-purple-400" />
+                          #{ranking.rank} {ranking.tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {topLocationRankings.length > 0 && (
+                    <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
+                      {topLocationRankings.map((ranking) => {
+                        const placePath = getPlaceProfilePath(ranking.placeId);
+                        const chipClass =
+                          'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-200 text-xs font-medium hover:bg-sky-500/25 hover:border-sky-400/50 transition-colors no-underline';
+                        const chipBody = (
+                          <>
+                            <MapPin className="h-3 w-3 text-sky-400" />
+                            #{ranking.rank} {ranking.name}
+                          </>
+                        );
+                        return placePath ? (
+                          <Link key={ranking.placeId} to={placePath} className={chipClass}>
+                            {chipBody}
+                          </Link>
+                        ) : (
+                          <span key={ranking.placeId} className={chipClass}>
+                            {chipBody}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 

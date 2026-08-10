@@ -313,6 +313,152 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50 } = {}) {
   };
 }
 
+const SKIP_RANKING_FEATURE_TYPES = new Set(['continent', 'world']);
+
+/**
+ * Pick place candidates for media profile location-rank chips:
+ * most specific place + region (if distinct) + country. Skips Earth/continent.
+ */
+function pickLocationRankingCandidates(primaryLocation) {
+  if (!primaryLocation?.placeId) return [];
+
+  const out = [];
+  const seen = new Set();
+
+  const add = (placeId, name, featureType) => {
+    if (!placeId || seen.has(placeId)) return;
+    const label = typeof name === 'string' ? name.trim() : '';
+    if (!label) return;
+    if (featureType && SKIP_RANKING_FEATURE_TYPES.has(featureType)) return;
+    seen.add(placeId);
+    out.push({
+      placeId,
+      name: label,
+      featureType: featureType || null,
+    });
+  };
+
+  const ft = primaryLocation.featureType || null;
+  const ancestors = Array.isArray(primaryLocation.ancestors)
+    ? primaryLocation.ancestors.filter(Boolean)
+    : [];
+
+  // Most specific place (anything that isn't country / continent / world)
+  if (ft !== 'country' && !SKIP_RANKING_FEATURE_TYPES.has(ft)) {
+    add(
+      primaryLocation.placeId,
+      primaryLocation.label
+        || primaryLocation.city
+        || primaryLocation.display
+        || primaryLocation.region,
+      ft
+    );
+  }
+
+  // Region ancestor when primary is finer than region
+  if (ft !== 'region' && ft !== 'country') {
+    const regionAncestor = ancestors.find((a) => a.placetype === 'region');
+    if (regionAncestor?.placeId) {
+      add(
+        regionAncestor.placeId,
+        regionAncestor.label || primaryLocation.region,
+        'region'
+      );
+    }
+  }
+
+  // Country — self or ancestor
+  if (ft === 'country') {
+    add(
+      primaryLocation.placeId,
+      primaryLocation.country || primaryLocation.label || primaryLocation.display,
+      'country'
+    );
+  } else {
+    const countryAncestor = ancestors.find((a) => a.placetype === 'country');
+    if (countryAncestor?.placeId) {
+      add(
+        countryAncestor.placeId,
+        countryAncestor.label || primaryLocation.country,
+        'country'
+      );
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Origin-scoped query matching the media's content family (music vs podcast).
+ */
+function originQueryForMedia(placeId, media) {
+  const forms = Array.isArray(media.contentForm)
+    ? media.contentForm
+    : [media.contentForm].filter(Boolean);
+  const isPodcast = forms.some((f) => PODCAST_FORMS.includes(f));
+
+  if (isPodcast) {
+    return {
+      status: 'active',
+      contentForm: { $in: PODCAST_FORMS },
+      $or: [
+        { 'primaryLocation.placeId': placeId },
+        { 'primaryLocation.ancestorIds': placeId },
+      ],
+    };
+  }
+
+  return mediaOriginQuery(placeId);
+}
+
+/**
+ * Rank a media item within its primaryLocation place(s) by globalMediaAggregate.
+ * Returns best ranks first, capped for hero chips.
+ *
+ * @param {Object} media - Media document (needs _id, primaryLocation, globalMediaAggregate, contentForm)
+ * @param {{ minTotal?: number, limit?: number }} opts
+ */
+async function getMediaLocationRankings(media, { minTotal = 2, limit = 3 } = {}) {
+  if (!media) return [];
+
+  const candidates = pickLocationRankingCandidates(media.primaryLocation);
+  if (candidates.length === 0) return [];
+
+  const aggregate = media.globalMediaAggregate || 0;
+  const maxResults = Math.min(Math.max(parseInt(limit, 10) || 2, 1), 5);
+  const minPool = Math.max(parseInt(minTotal, 10) || 2, 1);
+
+  const rankings = [];
+
+  for (const candidate of candidates) {
+    const query = originQueryForMedia(candidate.placeId, media);
+    const [higherCount, total] = await Promise.all([
+      Media.countDocuments({ ...query, globalMediaAggregate: { $gt: aggregate } }),
+      Media.countDocuments(query),
+    ]);
+
+    if (total < minPool) continue;
+
+    const rank = higherCount + 1;
+    const percentile = total > 0
+      ? parseFloat((((total - rank) / total) * 100).toFixed(1))
+      : 0;
+
+    rankings.push({
+      placeId: candidate.placeId,
+      name: candidate.name,
+      featureType: candidate.featureType,
+      rank,
+      total,
+      percentile,
+      aggregate,
+    });
+  }
+
+  rankings.sort((a, b) => a.rank - b.rank || b.total - a.total);
+  return rankings.slice(0, maxResults);
+}
+
 module.exports = {
   normalizePlaceId,
   mediaOriginQuery,
@@ -320,4 +466,6 @@ module.exports = {
   getLocationProfile,
   computeRelatedPlaces,
   computeRelatedTags,
+  pickLocationRankingCandidates,
+  getMediaLocationRankings,
 };
