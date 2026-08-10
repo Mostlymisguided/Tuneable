@@ -83,6 +83,32 @@ export interface MediaProfileResponse {
   media: ChartMediaItem;
 }
 
+export interface MediaTagRanking {
+  tag: string;
+  rank: number;
+  total: number;
+  percentile?: number;
+  aggregate?: number;
+}
+
+export interface MediaTagRankingsResponse {
+  tagRankings: MediaTagRanking[];
+}
+
+export interface MediaLocationRanking {
+  placeId: string;
+  name: string;
+  featureType?: string | null;
+  rank: number;
+  total: number;
+  percentile?: number;
+  aggregate?: number;
+}
+
+export interface MediaLocationRankingsResponse {
+  locationRankings: MediaLocationRanking[];
+}
+
 export interface SortedMediaResponse {
   timePeriod: string;
   media: ChartMediaItem[];

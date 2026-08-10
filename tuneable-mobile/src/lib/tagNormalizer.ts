@@ -135,4 +135,27 @@ export function tagsMatch(tag1: string, tag2: string): boolean {
   return normalizeTagForMatching(canon1) === normalizeTagForMatching(canon2);
 }
 
+export function generateTagSlug(tag: string): string {
+  if (!tag || typeof tag !== 'string') return '';
+
+  return tag
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Expo Router href for a tag, e.g. "Hip Hop" → `/tag/hip-hop` */
+export function getTagProfileHref(tag: string): `/tag/${string}` | '/tag' {
+  const slug = generateTagSlug(normalizeTagForStorage(tag) || tag);
+  return slug ? `/tag/${encodeURIComponent(slug)}` : '/tag';
+}
+
+/** @deprecated Prefer getTagProfileHref for typed router.push */
+export function getTagProfilePath(tag: string): string {
+  return getTagProfileHref(tag);
+}
+
 export { normalizeTagForMatching, TAG_ALIASES };

@@ -1,9 +1,10 @@
 import { Children, useState, type ReactNode } from 'react';
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { colors } from '@/src/theme/colors';
 import { formatPoundsFromPence } from '@/src/lib/format';
+import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import type { ResolvedLocation } from '@/src/types/user';
 import {
   DEFAULT_PROFILE_PIC,
@@ -164,6 +165,128 @@ export function UserProfileHero({
           </View>
         </View>
 
+        {tipTags.length > 0 ? (
+          <BadgeSection
+            icon="trophy"
+            iconColor="#fbbf24"
+            title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}>
+            <CollapsibleBadgeWrap>
+              {tipTags.map((ranking) => {
+                const palette = badgeColors(ranking.rank);
+                return (
+                  <Pressable
+                    key={`tip-${ranking.tag}-${ranking.rank}`}
+                    onPress={() =>
+                      router.push(getTagProfileHref(ranking.tag) as Href)
+                    }
+                    style={[
+                      styles.badge,
+                      {
+                        borderColor: palette.border,
+                        backgroundColor: `${palette.bg}22`,
+                      },
+                    ]}>
+                    <Ionicons name="trophy" size={12} color={palette.border} />
+                    <Text style={styles.badgeText}>#{ranking.rank}</Text>
+                    <Text style={[styles.badgeMeta, { color: palette.text }]}>
+                      #{ranking.tag}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </CollapsibleBadgeWrap>
+          </BadgeSection>
+        ) : null}
+
+        {mediaTitles.length > 0 ? (
+          <BadgeSection
+            icon="musical-notes"
+            iconColor="#fbbf24"
+            title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}>
+            <CollapsibleBadgeWrap>
+              {mediaTitles.map((title) => {
+                const palette = badgeColors(title.rank);
+                const id = title.uuid || title.mediaId;
+                return (
+                  <Pressable
+                    key={`media-${title.mediaId}-${title.rank}`}
+                    onPress={() => {
+                      if (id) router.push(`/tune/${id}`);
+                    }}
+                    style={[
+                      styles.badge,
+                      {
+                        borderColor: palette.border,
+                        backgroundColor: `${palette.bg}22`,
+                        maxWidth: '100%',
+                      },
+                    ]}>
+                    <Ionicons name="trophy" size={12} color={palette.border} />
+                    <Text style={styles.badgeText}>#{title.rank}</Text>
+                    <Text
+                      style={[
+                        styles.badgeMeta,
+                        { color: palette.text, flexShrink: 1 },
+                      ]}
+                      numberOfLines={1}>
+                      {title.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </CollapsibleBadgeWrap>
+          </BadgeSection>
+        ) : null}
+
+        {discovery.length > 0 ? (
+          <BadgeSection
+            icon="ribbon-outline"
+            iconColor={colors.accentLight}
+            title={isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}>
+            <CollapsibleBadgeWrap>
+              {discovery.map((ranking) => {
+                const palette = badgeColors(ranking.rank);
+                return (
+                  <Pressable
+                    key={`disc-${ranking.tag}-${ranking.rank}`}
+                    onPress={() =>
+                      router.push(getTagProfileHref(ranking.tag) as Href)
+                    }
+                    style={[
+                      styles.badge,
+                      {
+                        borderColor: palette.border,
+                        backgroundColor: `${palette.bg}22`,
+                      },
+                    ]}>
+                    <Ionicons
+                      name="sparkles-outline"
+                      size={12}
+                      color={palette.border}
+                    />
+                    <Text style={styles.badgeText}>{ranking.tag}</Text>
+                    <Text style={styles.badgeMeta}>#{ranking.rank}</Text>
+                  </Pressable>
+                );
+              })}
+            </CollapsibleBadgeWrap>
+          </BadgeSection>
+        ) : null}
+
+        {socialLinks.length > 0 ? (
+          <View style={styles.socialRow}>
+            {socialLinks.map((social) => (
+              <Pressable
+                key={social.name}
+                accessibilityLabel={social.name}
+                onPress={() => openSocial(social.url)}
+                style={[styles.socialBtn, { borderColor: `${social.color}55` }]}>
+                {social.icon}
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
         {isOwnProfile ? (
           <View style={styles.balanceRow}>
             <View>
@@ -180,115 +303,6 @@ export function UserProfileHero({
           </View>
         ) : null}
       </View>
-
-      {tipTags.length > 0 ? (
-        <BadgeSection
-          icon="trophy"
-          iconColor="#fbbf24"
-          title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}>
-          <CollapsibleBadgeWrap>
-            {tipTags.map((ranking) => {
-              const palette = badgeColors(ranking.rank);
-              return (
-                <View
-                  key={`tip-${ranking.tag}-${ranking.rank}`}
-                  style={[
-                    styles.badge,
-                    {
-                      borderColor: palette.border,
-                      backgroundColor: `${palette.bg}22`,
-                    },
-                  ]}>
-                  <Ionicons name="trophy" size={12} color={palette.border} />
-                  <Text style={styles.badgeText}>#{ranking.rank}</Text>
-                  <Text style={[styles.badgeMeta, { color: palette.text }]}>
-                    #{ranking.tag}
-                  </Text>
-                </View>
-              );
-            })}
-          </CollapsibleBadgeWrap>
-        </BadgeSection>
-      ) : null}
-
-      {mediaTitles.length > 0 ? (
-        <BadgeSection
-          icon="musical-notes"
-          iconColor="#fbbf24"
-          title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}>
-          <CollapsibleBadgeWrap>
-            {mediaTitles.map((title) => {
-              const palette = badgeColors(title.rank);
-              const id = title.uuid || title.mediaId;
-              return (
-                <Pressable
-                  key={`media-${title.mediaId}-${title.rank}`}
-                  onPress={() => {
-                    if (id) router.push(`/tune/${id}`);
-                  }}
-                  style={[
-                    styles.badge,
-                    {
-                      borderColor: palette.border,
-                      backgroundColor: `${palette.bg}22`,
-                      maxWidth: '100%',
-                    },
-                  ]}>
-                  <Ionicons name="trophy" size={12} color={palette.border} />
-                  <Text style={styles.badgeText}>#{title.rank}</Text>
-                  <Text
-                    style={[styles.badgeMeta, { color: palette.text, flexShrink: 1 }]}
-                    numberOfLines={1}>
-                    {title.title}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </CollapsibleBadgeWrap>
-        </BadgeSection>
-      ) : null}
-
-      {discovery.length > 0 ? (
-        <BadgeSection
-          icon="ribbon-outline"
-          iconColor={colors.accentLight}
-          title={isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}>
-          <CollapsibleBadgeWrap>
-            {discovery.map((ranking) => {
-              const palette = badgeColors(ranking.rank);
-              return (
-                <View
-                  key={`disc-${ranking.tag}-${ranking.rank}`}
-                  style={[
-                    styles.badge,
-                    {
-                      borderColor: palette.border,
-                      backgroundColor: `${palette.bg}22`,
-                    },
-                  ]}>
-                  <Ionicons name="sparkles-outline" size={12} color={palette.border} />
-                  <Text style={styles.badgeText}>{ranking.tag}</Text>
-                  <Text style={styles.badgeMeta}>#{ranking.rank}</Text>
-                </View>
-              );
-            })}
-          </CollapsibleBadgeWrap>
-        </BadgeSection>
-      ) : null}
-
-      {socialLinks.length > 0 ? (
-        <View style={styles.socialRow}>
-          {socialLinks.map((social) => (
-            <Pressable
-              key={social.name}
-              accessibilityLabel={social.name}
-              onPress={() => openSocial(social.url)}
-              style={[styles.socialBtn, { borderColor: `${social.color}55` }]}>
-              {social.icon}
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -303,7 +317,8 @@ function CollapsibleBadgeWrap({
   const [expanded, setExpanded] = useState(false);
   const items = Children.toArray(children);
   const hiddenCount = Math.max(0, items.length - defaultVisible);
-  const visible = expanded || hiddenCount === 0 ? items : items.slice(0, defaultVisible);
+  const visible =
+    expanded || hiddenCount === 0 ? items : items.slice(0, defaultVisible);
 
   return (
     <View>
@@ -331,7 +346,7 @@ function BadgeSection({
   children: ReactNode;
 }) {
   return (
-    <View style={styles.badgesCard}>
+    <View style={styles.badgeSection}>
       <View style={styles.badgesHeader}>
         <Ionicons name={icon} size={16} color={iconColor} />
         <Text style={styles.badgesTitle}>{title}</Text>
@@ -343,7 +358,6 @@ function BadgeSection({
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 12,
     marginBottom: 16,
   },
   card: {
@@ -394,6 +408,9 @@ const styles = StyleSheet.create({
   },
   balanceRow: {
     marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.cardBorder,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -418,12 +435,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  badgesCard: {
-    backgroundColor: colors.card,
-    borderColor: colors.cardBorder,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
+  badgeSection: {
+    marginTop: 16,
   },
   badgesHeader: {
     flexDirection: 'row',
@@ -470,6 +483,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 16,
   },
   socialBtn: {
     width: 42,

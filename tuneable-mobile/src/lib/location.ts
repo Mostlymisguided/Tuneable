@@ -28,6 +28,19 @@ export function formatLocation(location: ResolvedLocation | null | undefined): s
   return location.label || 'Earth';
 }
 
+/** Expo Router href for a Mapbox placeId → `/place/{placeId}` */
+export function getPlaceProfileHref(
+  placeId: string | null | undefined
+): `/place/${string}` | null {
+  if (!placeId || typeof placeId !== 'string' || !placeId.trim()) return null;
+  return `/place/${encodeURIComponent(placeId.trim())}`;
+}
+
+/** @deprecated Prefer getPlaceProfileHref for typed router.push */
+export function getPlaceProfilePath(placeId: string | null | undefined): string | null {
+  return getPlaceProfileHref(placeId);
+}
+
 /** Tip / profile labels — prefer "Not set" over chart fallback "Earth". */
 export function formatLocationLabel(
   location: ResolvedLocation | null | undefined

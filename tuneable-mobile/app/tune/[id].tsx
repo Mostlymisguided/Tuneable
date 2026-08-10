@@ -17,6 +17,7 @@ import {
   router,
   useFocusEffect,
   useLocalSearchParams,
+  type Href,
 } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
@@ -25,6 +26,8 @@ import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { getPlaceProfileHref } from '@/src/lib/location';
+import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import {
   formatArtist,
   getPlayabilityBlockReason,
@@ -42,6 +45,8 @@ import { colors } from '@/src/theme/colors';
 import {
   DEFAULT_COVER_ART,
   type ChartMediaItem,
+  type MediaLocationRanking,
+  type MediaTagRanking,
   type RelatedMediaItem,
 } from '@/src/types/media';
 
@@ -72,6 +77,8 @@ export default function TuneProfileScreen() {
   const { user, updateBalance } = useAuth();
   const [media, setMedia] = useState<ChartMediaItem | null>(null);
   const [related, setRelated] = useState<RelatedMediaItem[]>([]);
+  const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
+  const [locationRankings, setLocationRankings] = useState<MediaLocationRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,17 +98,25 @@ export default function TuneProfileScreen() {
       else setLoading(true);
       setError(null);
       try {
-        const [profileRes, relatedRes] = await Promise.all([
+        const [profileRes, relatedRes, tagRes, locationRes] = await Promise.all([
           mediaAPI.getProfile(id),
           mediaAPI
             .getRelatedPlaylists(id, { relatedLimit: 8, fansLimit: 0 })
-            .catch(() => ({ relatedMedia: [] })),
+            .catch(() => ({ relatedMedia: [] as RelatedMediaItem[] })),
+          mediaAPI.getTagRankings(id).catch(() => ({ tagRankings: [] as MediaTagRanking[] })),
+          mediaAPI
+            .getLocationRankings(id, 3)
+            .catch(() => ({ locationRankings: [] as MediaLocationRanking[] })),
         ]);
         setMedia(profileRes.media ?? null);
         setRelated(relatedRes.relatedMedia ?? []);
+        setTagRankings(tagRes.tagRankings ?? []);
+        setLocationRankings(locationRes.locationRankings ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load tune');
         setMedia(null);
+        setTagRankings([]);
+        setLocationRankings([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -168,6 +183,12 @@ export default function TuneProfileScreen() {
         viewerIsChampion: tipStats.viewerIsChampion,
       }),
     [tipStats]
+  );
+
+  const topTagRankings = useMemo(() => tagRankings.slice(0, 3), [tagRankings]);
+  const topLocationRankings = useMemo(
+    () => locationRankings.slice(0, 3),
+    [locationRankings]
   );
 
   const aboutFields = useMemo(() => {
@@ -416,12 +437,65 @@ export default function TuneProfileScreen() {
               <Text style={styles.metaLine}>{heroMetadata.join(' · ')}</Text>
             ) : null}
 
-            {media.tags && media.tags.length > 0 ? (
+            {(topTagRankings.length > 0 || topLocationRankings.length > 0) ? (
+              <View style={styles.rankingBlock}>
+                {topTagRankings.length > 0 ? (
+                  <View style={styles.rankingRow}>
+                    {topTagRankings.map((ranking) => (
+                      <Pressable
+                        key={`tag-${ranking.tag}-${ranking.rank}`}
+                        onPress={() =>
+                          router.push(getTagProfileHref(ranking.tag) as Href)
+                        }
+                        style={styles.tagRankChip}>
+                        <Ionicons name="pricetag" size={12} color="#c084fc" />
+                        <Text style={styles.tagRankText}>
+                          #{ranking.rank} {ranking.tag}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {topLocationRankings.length > 0 ? (
+                  <View style={styles.rankingRow}>
+                    {topLocationRankings.map((ranking) => {
+                      const href = getPlaceProfileHref(ranking.placeId);
+                      if (!href) {
+                        return (
+                          <View
+                            key={`loc-${ranking.placeId}`}
+                            style={styles.locationRankChip}>
+                            <Ionicons name="location" size={12} color="#38bdf8" />
+                            <Text style={styles.locationRankText}>
+                              #{ranking.rank} {ranking.name}
+                            </Text>
+                          </View>
+                        );
+                      }
+                      return (
+                        <Pressable
+                          key={`loc-${ranking.placeId}`}
+                          onPress={() => router.push(href as Href)}
+                          style={styles.locationRankChip}>
+                          <Ionicons name="location" size={12} color="#38bdf8" />
+                          <Text style={styles.locationRankText}>
+                            #{ranking.rank} {ranking.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            ) : media.tags && media.tags.length > 0 ? (
               <View style={styles.tags}>
                 {media.tags.slice(0, 8).map((tag) => (
-                  <View key={tag} style={styles.tag}>
+                  <Pressable
+                    key={tag}
+                    onPress={() => router.push(getTagProfileHref(tag) as Href)}
+                    style={styles.tag}>
                     <Text style={styles.tagText}>#{tag}</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             ) : null}
@@ -815,6 +889,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     paddingHorizontal: 12,
+  },
+  rankingBlock: {
+    width: '100%',
+    marginTop: 12,
+    gap: 6,
+  },
+  rankingRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  tagRankChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  tagRankText: {
+    color: '#e9d5ff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  locationRankChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  locationRankText: {
+    color: '#bae6fd',
+    fontSize: 12,
+    fontWeight: '600',
   },
   tags: {
     flexDirection: 'row',

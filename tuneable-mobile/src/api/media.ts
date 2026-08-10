@@ -1,7 +1,9 @@
 import { api } from './client';
 import type {
   ChartMediaItem,
+  MediaLocationRankingsResponse,
   MediaProfileResponse,
+  MediaTagRankingsResponse,
   RelatedPlaylistsResponse,
 } from '@/src/types/media';
 
@@ -63,6 +65,24 @@ export const mediaAPI = {
     const response = await api.get<RelatedPlaylistsResponse>(
       `/media/${mediaId}/related-playlists`,
       { params }
+    );
+    return response.data;
+  },
+
+  getTagRankings: async (mediaId: string): Promise<MediaTagRankingsResponse> => {
+    const response = await api.get<MediaTagRankingsResponse>(
+      `/media/${mediaId}/tag-rankings`
+    );
+    return response.data;
+  },
+
+  getLocationRankings: async (
+    mediaId: string,
+    limit = 3
+  ): Promise<MediaLocationRankingsResponse> => {
+    const response = await api.get<MediaLocationRankingsResponse>(
+      `/media/${mediaId}/location-rankings`,
+      { params: { limit } }
     );
     return response.data;
   },
