@@ -16,7 +16,8 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Tuneable uses your location so tips can influence charts where you are."
       }
     },
     "android": {
@@ -28,6 +29,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -48,7 +53,13 @@
           "backgroundColor": "#1A1A2E"
         }
       ],
-      "expo-iap"
+      "expo-iap",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Tuneable uses your location so tips can influence charts where you are."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

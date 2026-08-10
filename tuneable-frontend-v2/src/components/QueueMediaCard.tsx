@@ -157,12 +157,6 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     );
   }
 
-  const chartBadge = (
-    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center">
-      <span className="text-white font-bold text-[10px] md:text-sm">{index + 1}</span>
-    </div>
-  );
-
   const tipButton = (
     <button
       type="button"
@@ -179,45 +173,27 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     </button>
   );
 
+  const rank = index + 1;
+
   return (
-    <div className="flex items-stretch gap-1.5 md:contents">
-      {/* Chart number — left gutter on mobile */}
-      <div className="flex-shrink-0 w-5 flex items-center justify-center md:hidden">
-        {chartBadge}
-      </div>
+    <div className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">
+      {showActions && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onActionClick(item);
+          }}
+          className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white transition-colors"
+          title="Actions"
+        >
+          <X className="h-3 w-3 md:h-4 md:w-4" />
+        </button>
+      )}
 
-      <div className="flex-1 min-w-0 rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">
-        {showActions && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onActionClick(item);
-            }}
-            className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white transition-colors"
-            title="Actions"
-          >
-            <X className="h-3 w-3 md:h-4 md:w-4" />
-          </button>
-        )}
-
-        {/* Chart number — inside card on desktop */}
-        <div className="hidden md:flex items-center justify-center md:mr-3 flex-shrink-0">
-          {chartBadge}
-        </div>
-
-        <div className="flex flex-row items-start gap-2 md:contents">
-          <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0">
-            {href ? (
-              <Link to={href} className="block w-full h-full">
-                <img
-                  src={mediaData.coverArt || DEFAULT_COVER_ART}
-                  alt={mediaData.title || 'Unknown Media'}
-                  className="w-full h-full object-cover"
-                  width="96"
-                  height="96"
-                />
-              </Link>
-            ) : (
+      <div className="flex flex-row items-start gap-2 md:contents">
+        <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0">
+          {href ? (
+            <Link to={href} className="block w-full h-full" tabIndex={-1}>
               <img
                 src={mediaData.coverArt || DEFAULT_COVER_ART}
                 alt={mediaData.title || 'Unknown Media'}
@@ -225,83 +201,103 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
                 width="96"
                 height="96"
               />
-            )}
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlay(item, index);
-              }}
+            </Link>
+          ) : (
+            <img
+              src={mediaData.coverArt || DEFAULT_COVER_ART}
+              alt={mediaData.title || 'Unknown Media'}
+              className="w-full h-full object-cover"
+              width="96"
+              height="96"
+            />
+          )}
+          <button
+            type="button"
+            className="absolute inset-0 flex items-center justify-center bg-black/35 rounded cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPlay(item, index);
+            }}
+            aria-label={`Play chart position ${rank}`}
+          >
+            <span
+              className={`pointer-events-none text-white font-bold tabular-nums leading-none transition-all duration-150 group-hover:opacity-0 group-hover:scale-90 ${
+                rank >= 100 ? 'text-xs md:text-sm' : 'text-sm md:text-lg'
+              }`}
             >
-              <div className="w-7 h-7 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
+              {rank}
+            </span>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <div className="w-7 h-7 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600">
                 <Play className="h-3.5 w-3.5 md:h-6 md:w-6 text-white" />
               </div>
             </div>
-          </div>
+          </button>
+        </div>
 
-          <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                <h4 className="min-w-0 flex-1 font-medium text-white text-sm truncate">
-                  {href ? (
-                    <Link
-                      to={href}
-                      className="cursor-pointer hover:text-purple-300 transition-colors"
-                    >
-                      {mediaData.title || 'Unknown Media'}
-                    </Link>
-                  ) : (
-                    mediaData.title || 'Unknown Media'
-                  )}
-                </h4>
-                <AiAssistedBadge aiUsage={mediaData.aiUsage} size="sm" />
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
-                {metaParts.flatMap((part, i) =>
-                  i === 0
-                    ? [part]
-                    : [
-                        <span key={`sep-${i}`} className="text-gray-600" aria-hidden>
-                          ·
-                        </span>,
-                        part,
-                      ]
+        <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+              <h4 className="min-w-0 flex-1 font-medium text-white text-sm truncate">
+                {href ? (
+                  <Link
+                    to={href}
+                    className="cursor-pointer hover:text-purple-300 transition-colors"
+                  >
+                    {mediaData.title || 'Unknown Media'}
+                  </Link>
+                ) : (
+                  mediaData.title || 'Unknown Media'
                 )}
-              </div>
+              </h4>
+              <AiAssistedBadge aiUsage={mediaData.aiUsage} size="sm" />
             </div>
-            <p className="text-gray-400 text-xs truncate">
-              <ClickableArtistDisplay media={mediaData} />
-            </p>
-            {tags.length > 0 && (
-              <div className="hidden md:block mt-1">
-                <TagList
-                  tags={tags}
-                  mediaId={mediaData.uuid || mediaData._id || mediaData.id}
-                  limit={5}
-                />
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
+              {metaParts.flatMap((part, i) =>
+                i === 0
+                  ? [part]
+                  : [
+                      <span key={`sep-${i}`} className="text-gray-600" aria-hidden>
+                        ·
+                      </span>,
+                      part,
+                    ]
+              )}
+            </div>
           </div>
+          <p className="text-gray-400 text-xs truncate">
+            <ClickableArtistDisplay media={mediaData} />
+          </p>
+          {tags.length > 0 && (
+            <div className="hidden md:block mt-1">
+              <TagList
+                tags={tags}
+                mediaId={mediaData.uuid || mediaData._id || mediaData.id}
+                limit={5}
+              />
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Tags — own line on mobile, aligned with supporters bar */}
-        {tags.length > 0 && (
-          <div className="md:hidden mt-1">
-            <TagList
-              tags={tags}
-              mediaId={mediaData.uuid || mediaData._id || mediaData.id}
-              limit={3}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
-          <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} limit={5} scrollable={false} />
+      {/* Tags — own line on mobile, aligned with supporters bar */}
+      {tags.length > 0 && (
+        <div className="md:hidden mt-1">
+          <TagList
+            tags={tags}
+            mediaId={mediaData.uuid || mediaData._id || mediaData.id}
+            limit={3}
+          />
         </div>
+      )}
 
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
-          {tipButton}
-        </div>
+      <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
+        <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} limit={5} scrollable={false} />
+      </div>
+
+      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
+        {tipButton}
       </div>
     </div>
   );

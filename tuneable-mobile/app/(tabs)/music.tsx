@@ -150,11 +150,11 @@ export default function MusicScreen() {
     void setQueueAndPlay(playableQueue, 0);
   };
 
-  const onConfirmTip = async (amountPounds: number) => {
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
     if (!tipTarget) return;
     const id = mediaId(tipTarget);
     if (!id) throw new Error('Missing media id');
-    const res = await mediaAPI.placeGlobalBid(id, amountPounds);
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
     const tipPence = Math.round(amountPounds * 100);
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
@@ -206,8 +206,11 @@ export default function MusicScreen() {
 
             <Pressable
               style={styles.addTunesBtn}
-              onPress={() => router.push('/music-search')}>
-              <Text style={styles.addTunesText}>Add music</Text>
+              onPress={() => router.push('/music-search')}
+              accessibilityRole="button"
+              accessibilityLabel="Add music">
+              <Ionicons name="add" size={18} color={colors.text} />
+              <Text style={styles.addTunesText}>Add</Text>
             </Pressable>
 
             <ChartFilterToolbar
@@ -290,6 +293,7 @@ export default function MusicScreen() {
         subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
+        tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={onConfirmTip}
       />
@@ -306,6 +310,9 @@ const styles = StyleSheet.create({
   },
   addTunesBtn: {
     alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
     borderColor: colors.cardBorder,

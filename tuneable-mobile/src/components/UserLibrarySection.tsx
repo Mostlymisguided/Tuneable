@@ -173,9 +173,11 @@ export function UserLibrarySection({
     void setQueueAndPlay(playableQueue, 0);
   };
 
-  const confirmTip = async (amountPounds: number) => {
+  const confirmTip = async (amountPounds: number, tags: string[]) => {
     if (!tipTarget) return;
-    const res = await mediaAPI.placeGlobalBid(tipTarget.mediaId, amountPounds);
+    const res = await mediaAPI.placeGlobalBid(tipTarget.mediaId, amountPounds, {
+      tags,
+    });
     if (typeof res.updatedBalance === 'number') {
       onBalanceUpdate?.(res.updatedBalance);
     }
@@ -204,7 +206,7 @@ export function UserLibrarySection({
 
       <ChartFilterToolbar
         period={period}
-        onPeriodChange={setPeriod}
+        onPeriodChange={(next) => setPeriod(next as TimePeriodKey)}
         selectedTagTerms={selectedTagTerms}
         onTagTermsChange={setSelectedTagTerms}
         searchQuery={searchQuery}
@@ -277,6 +279,7 @@ export function UserLibrarySection({
         subtitle={tipTarget?.artist}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
+        tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={confirmTip}
       />

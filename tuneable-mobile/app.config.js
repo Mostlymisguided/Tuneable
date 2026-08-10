@@ -11,6 +11,9 @@ export default ({ config }) => ({
     infoPlist: {
       ...(config.ios?.infoPlist || {}),
       ITSAppUsesNonExemptEncryption: false,
+      NSLocationWhenInUseUsageDescription:
+        config.ios?.infoPlist?.NSLocationWhenInUseUsageDescription ||
+        'Tuneable uses your location so tips can influence charts where you are.',
     },
   },
   android: {

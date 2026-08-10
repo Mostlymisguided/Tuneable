@@ -8,68 +8,153 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
+import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
-import { episodeId, isEpisodePlayable, seriesTitle } from '@/src/lib/podcast';
+import { computeLocationQuickPicks } from '@/src/lib/location';
+import {
+  computePodcastTopTags,
+  episodeId,
+  filterPodcastEpisodes,
+  hasActivePodcastFilters,
+  isEpisodePlayable,
+  seriesTitle,
+} from '@/src/lib/podcast';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
-import type { PodcastEpisode } from '@/src/types/podcast';
+import type { ResolvedLocation } from '@/src/types/user';
+import {
+  PODCAST_CHART_PAGE_SIZE,
+  PODCAST_TIME_RANGES,
+  type PodcastEpisode,
+  type PodcastTimeRangeKey,
+} from '@/src/types/podcast';
 
 export default function PodcastsScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
+  const [period, setPeriod] = useState<PodcastTimeRangeKey>('all');
+  const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
+    null
+  );
+  const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showTagPanel, setShowTagPanel] = useState(false);
+  const [showTimePanel, setShowTimePanel] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
+  const [visibleCount, setVisibleCount] = useState(PODCAST_CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tipTarget, setTipTarget] = useState<PodcastEpisode | null>(null);
   const setQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-    try {
-      const res = await podcastsAPI.getChart({ limit: 50, timeRange: 'all' });
-      setEpisodes(res.episodes ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load podcasts');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const filterState = useMemo(
+    () => ({ selectedTagTerms, searchQuery }),
+    [selectedTagTerms, searchQuery]
+  );
+
+  const filtersActive = hasActivePodcastFilters(filterState);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setVisibleCount(PODCAST_CHART_PAGE_SIZE);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery]);
 
-  const playableCount = useMemo(
-    () => episodes.filter(isEpisodePlayable).length,
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const res = await podcastsAPI.getChart({
+          limit: 50,
+          timeRange: period,
+          locationPlaceId: locationPlaceId ?? undefined,
+        });
+        setEpisodes(res.episodes ?? []);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to load podcasts'
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [period, locationPlaceId]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
+
+  const locationQuickPicks = useMemo(
+    () => computeLocationQuickPicks(episodes, user?.homeLocation, 5),
+    [episodes, user?.homeLocation]
+  );
+
+  const topTags = useMemo(
+    () => computePodcastTopTags(episodes),
     [episodes]
   );
 
+  const filteredEpisodes = useMemo(
+    () => filterPodcastEpisodes(episodes, filterState),
+    [episodes, filterState]
+  );
+
+  const visibleEpisodes = useMemo(
+    () => filteredEpisodes.slice(0, visibleCount),
+    [filteredEpisodes, visibleCount]
+  );
+
+  const playableCount = useMemo(
+    () => filteredEpisodes.filter(isEpisodePlayable).length,
+    [filteredEpisodes]
+  );
+
+  const handleLocationChange = (location: ResolvedLocation | null) => {
+    setSelectedLocation(location);
+    setLocationPlaceId(location?.placeId ?? null);
+  };
+
+  const clearClientFilters = () => {
+    setSelectedTagTerms([]);
+    setSearchQuery('');
+  };
+
   const onPlayItem = (episode: PodcastEpisode) => {
-    const index = episodes.findIndex((e) => episodeId(e) === episodeId(episode));
-    void setQueueAndPlay(episodes, Math.max(0, index));
+    const playableQueue = filteredEpisodes.filter(isEpisodePlayable);
+    const index = playableQueue.findIndex(
+      (e) => episodeId(e) === episodeId(episode)
+    );
+    if (index < 0) return;
+    void setQueueAndPlay(playableQueue, index);
   };
 
   const onPlayQueue = () => {
-    const first = episodes.findIndex(isEpisodePlayable);
-    if (first < 0) return;
-    void setQueueAndPlay(episodes, first);
+    const playableQueue = filteredEpisodes.filter(isEpisodePlayable);
+    if (playableQueue.length === 0) return;
+    void setQueueAndPlay(playableQueue, 0);
   };
 
-  const onConfirmTip = async (amountPounds: number) => {
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
     if (!tipTarget) return;
     const id = episodeId(tipTarget);
     if (!id) throw new Error('Missing episode id');
-    const res = await mediaAPI.placeGlobalBid(id, amountPounds);
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
     const tipPence = Math.round(amountPounds * 100);
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
@@ -91,10 +176,15 @@ export default function PodcastsScreen() {
     );
   };
 
+  const hasMore = visibleCount < filteredEpisodes.length;
+  const emptyMessage = filtersActive
+    ? 'No episodes match these filters.'
+    : 'No podcast episodes in this period yet.';
+
   return (
     <Screen>
       <FlatList
-        data={episodes}
+        data={visibleEpisodes}
         keyExtractor={(item, index) => episodeId(item) || String(index)}
         contentContainerStyle={[
           styles.listContent,
@@ -109,43 +199,77 @@ export default function PodcastsScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>Podcasts</Text>
-            <Text style={styles.subtitle}>Top tipped episodes</Text>
+            <GlobalChartHero
+              chartLabel="The World's Best Podcasts"
+              contentNoun="Podcasts"
+              selectedLocation={selectedLocation}
+              onLocationChange={handleLocationChange}
+              locationQuickPicks={locationQuickPicks}
+            />
 
-            <View style={styles.metrics}>
-              <View style={[styles.metric, { borderColor: colors.accent }]}>
-                <Text style={styles.metricValue}>{episodes.length}</Text>
-                <Text style={styles.metricLabel}>Episodes</Text>
-              </View>
-              <View style={[styles.metric, { borderColor: colors.success }]}>
-                <Text style={styles.metricValue}>{playableCount}</Text>
-                <Text style={styles.metricLabel}>Playable</Text>
-              </View>
-            </View>
+            <ChartFilterToolbar
+              period={period}
+              onPeriodChange={(next) => setPeriod(next as PodcastTimeRangeKey)}
+              periods={PODCAST_TIME_RANGES}
+              selectedTagTerms={selectedTagTerms}
+              onTagTermsChange={setSelectedTagTerms}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              showBpm={false}
+              topTags={topTags}
+              showTagPanel={showTagPanel}
+              showTimePanel={showTimePanel}
+              showSearchPanel={showSearchPanel}
+              onToggleTagPanel={() => setShowTagPanel((open) => !open)}
+              onToggleTimePanel={() => setShowTimePanel((open) => !open)}
+              onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
+              onClearFilters={clearClientFilters}
+              hasActiveFilters={filtersActive}
+              searchPlaceholder="Title, series, or tag…"
+              searchHint="Filters the current podcast chart."
+            />
 
             {playableCount > 0 ? (
-              <Pressable style={styles.playBtn} onPress={onPlayQueue}>
-                <Text style={styles.playBtnText}>Play chart</Text>
+              <Pressable
+                style={styles.playBtn}
+                onPress={onPlayQueue}
+                accessibilityRole="button"
+                accessibilityLabel={`Play ${playableCount} episode${playableCount !== 1 ? 's' : ''}`}>
+                <Ionicons name="play" size={22} color="#fff" />
               </Pressable>
             ) : null}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            {loading && episodes.length === 0 ? (
+              <ActivityIndicator
+                color={colors.accentLight}
+                style={styles.loader}
+              />
+            ) : null}
           </View>
         }
         ListEmptyComponent={
-          loading ? (
-            <ActivityIndicator
-              color={colors.accentLight}
-              style={{ marginTop: 40 }}
-            />
-          ) : (
-            <Text style={styles.empty}>No podcast episodes yet.</Text>
-          )
+          !loading ? <Text style={styles.empty}>{emptyMessage}</Text> : null
+        }
+        ListFooterComponent={
+          hasMore ? (
+            <Pressable
+              style={styles.showMoreBtn}
+              onPress={() =>
+                setVisibleCount((n) => n + PODCAST_CHART_PAGE_SIZE)
+              }>
+              <Text style={styles.showMoreText}>
+                Show more ({filteredEpisodes.length - visibleCount} remaining)
+              </Text>
+            </Pressable>
+          ) : null
         }
         renderItem={({ item, index }) => (
           <PodcastEpisodeRow
             rank={index + 1}
             episode={item}
+            tipPence={item.globalMediaAggregate ?? 0}
             onPlay={() => onPlayItem(item)}
             onTip={() => setTipTarget(item)}
           />
@@ -158,6 +282,7 @@ export default function PodcastsScreen() {
         subtitle={tipTarget ? seriesTitle(tipTarget) : undefined}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
+        tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={onConfirmTip}
       />
@@ -170,63 +295,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   header: {
-    paddingTop: 8,
     marginBottom: 8,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  subtitle: {
-    marginTop: 4,
-    marginBottom: 14,
-    color: colors.textSecondary,
-    fontSize: 15,
-  },
-  metrics: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  metric: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: colors.card,
-  },
-  metricValue: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  metricLabel: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 11,
   },
   playBtn: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  playBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   error: {
     color: '#fca5a5',
     marginTop: 8,
+    marginBottom: 4,
+  },
+  loader: {
+    marginVertical: 24,
   },
   empty: {
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
+  },
+  showMoreBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  showMoreText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

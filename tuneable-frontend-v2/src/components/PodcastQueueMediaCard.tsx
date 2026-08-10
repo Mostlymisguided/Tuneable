@@ -103,12 +103,6 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   const durationLabel = formatDuration(episode.duration);
   const tagListPath = mediaId ? `/podcasts/${mediaId}` : undefined;
 
-  const chartBadge = showRank ? (
-    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full flex items-center justify-center">
-      <span className="text-white font-bold text-[10px] md:text-sm">{index + 1}</span>
-    </div>
-  ) : null;
-
   const tipButton = (
     <button
       type="button"
@@ -126,33 +120,18 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
     </button>
   );
 
+  const rank = index + 1;
+  const showArtOverlay = showRank || canPlay;
+
   return (
-    <div className="flex items-stretch gap-1.5 md:contents">
-      {chartBadge && (
-        <div className="flex-shrink-0 w-5 flex items-center justify-center md:hidden">{chartBadge}</div>
-      )}
-
-      <div className="flex-1 min-w-0 rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">
-        {chartBadge && (
-          <div className="hidden md:flex items-center justify-center md:mr-3 flex-shrink-0">{chartBadge}</div>
-        )}
-
-        <div className="flex flex-row items-start gap-2 md:contents">
-          <div
-            className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
-            onClick={episodePath ? undefined : () => onEpisodeClick(episode)}
-          >
-            {episodePath ? (
-              <Link to={episodePath} className="block w-full h-full">
-                <img
-                  src={coverArt}
-                  alt={episode.title}
-                  className="w-full h-full object-cover"
-                  width="96"
-                  height="96"
-                />
-              </Link>
-            ) : (
+    <div className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">
+      <div className="flex flex-row items-start gap-2 md:contents">
+        <div
+          className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
+          onClick={episodePath ? undefined : () => onEpisodeClick(episode)}
+        >
+          {episodePath ? (
+            <Link to={episodePath} className="block w-full h-full" tabIndex={-1}>
               <img
                 src={coverArt}
                 alt={episode.title}
@@ -160,107 +139,148 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
                 width="96"
                 height="96"
               />
-            )}
-            {canPlay && (
-              <div
-                className="absolute inset-0 flex items-center justify-center bg-black/30 md:bg-black/40 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPlay(episode, e);
-                }}
-              >
-                <div className="w-7 h-7 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600 md:hover:bg-purple-700 transition-all">
-                  {isPlayLoading ? (
-                    <Loader className="h-3.5 w-3.5 md:h-6 md:w-6 text-white animate-spin" />
-                  ) : (
-                    <Play className="h-3.5 w-3.5 md:h-6 md:w-6 text-white" />
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
-                {episodePath ? (
-                  <Link
-                    to={episodePath}
-                    className="cursor-pointer hover:text-purple-300 transition-colors"
-                  >
-                    {episode.title}
-                  </Link>
-                ) : (
-                  <span
-                    className="cursor-pointer hover:text-purple-300 transition-colors"
-                    onClick={() => onEpisodeClick(episode)}
-                  >
-                    {episode.title}
-                  </span>
-                )}
-              </h4>
-              {durationLabel && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Clock className="h-3 w-3 text-gray-500" />
-                  <span className="text-xs text-gray-400">{durationLabel}</span>
+            </Link>
+          ) : (
+            <img
+              src={coverArt}
+              alt={episode.title}
+              className="w-full h-full object-cover"
+              width="96"
+              height="96"
+            />
+          )}
+          {showArtOverlay && (
+            <button
+              type="button"
+              className={`absolute inset-0 flex items-center justify-center bg-black/35 rounded ${
+                canPlay ? 'cursor-pointer' : 'cursor-default'
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (canPlay) onPlay(episode, e);
+              }}
+              disabled={!canPlay}
+              aria-label={
+                canPlay
+                  ? showRank
+                    ? `Play chart position ${rank}`
+                    : `Play ${episode.title}`
+                  : showRank
+                    ? `Chart position ${rank}`
+                    : undefined
+              }
+            >
+              {showRank && (
+                <span
+                  className={`pointer-events-none text-white font-bold tabular-nums leading-none transition-all duration-150 ${
+                    canPlay ? 'group-hover:opacity-0 group-hover:scale-90' : ''
+                  } ${rank >= 100 ? 'text-xs md:text-sm' : 'text-sm md:text-lg'}`}
+                >
+                  {rank}
+                </span>
+              )}
+              {canPlay && (
+                <div
+                  className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-150 ${
+                    showRank
+                      ? 'opacity-0 group-hover:opacity-100'
+                      : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
+                  }`}
+                >
+                  <div className="w-7 h-7 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600">
+                    {isPlayLoading ? (
+                      <Loader className="h-3.5 w-3.5 md:h-6 md:w-6 text-white animate-spin" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5 md:h-6 md:w-6 text-white" />
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
-            {seriesTitle && (
-              <p
-                className={`text-gray-400 text-xs truncate ${onSeriesClick ? 'cursor-pointer hover:text-purple-300 transition-colors' : ''}`}
-                onClick={onSeriesClick ? (e) => onSeriesClick(episode, e) : undefined}
-              >
-                {seriesTitle}
-              </p>
-            )}
-            {tags.length > 0 && (
-              <div className="hidden md:block mt-1">
-                <TagList
-                  tags={tags}
-                  mediaId={mediaId ?? ''}
-                  limit={5}
-                  linkPath={tagListPath}
-                />
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
+              {episodePath ? (
+                <Link
+                  to={episodePath}
+                  className="cursor-pointer hover:text-purple-300 transition-colors"
+                >
+                  {episode.title}
+                </Link>
+              ) : (
+                <span
+                  className="cursor-pointer hover:text-purple-300 transition-colors"
+                  onClick={() => onEpisodeClick(episode)}
+                >
+                  {episode.title}
+                </span>
+              )}
+            </h4>
+            {durationLabel && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Clock className="h-3 w-3 text-gray-500" />
+                <span className="text-xs text-gray-400">{durationLabel}</span>
               </div>
             )}
-            {episode.isExternal && episode.source && (
-              <span
-                className={`inline-block mt-1 px-2 py-0.5 text-[10px] rounded-full ${
-                  episode.source === 'taddy'
-                    ? 'bg-green-600/30 text-green-300'
-                    : episode.source === 'apple'
-                      ? 'bg-pink-600/30 text-pink-300'
-                    : episode.source === 'podcastindex'
-                      ? 'bg-blue-600/30 text-blue-300'
-                      : 'bg-gray-600/30 text-gray-300'
-                }`}
-              >
-                {episode.source}
-              </span>
-            )}
           </div>
+          {seriesTitle && (
+            <p
+              className={`text-gray-400 text-xs truncate ${onSeriesClick ? 'cursor-pointer hover:text-purple-300 transition-colors' : ''}`}
+              onClick={onSeriesClick ? (e) => onSeriesClick(episode, e) : undefined}
+            >
+              {seriesTitle}
+            </p>
+          )}
+          {tags.length > 0 && (
+            <div className="hidden md:block mt-1">
+              <TagList
+                tags={tags}
+                mediaId={mediaId ?? ''}
+                limit={5}
+                linkPath={tagListPath}
+              />
+            </div>
+          )}
+          {episode.isExternal && episode.source && (
+            <span
+              className={`inline-block mt-1 px-2 py-0.5 text-[10px] rounded-full ${
+                episode.source === 'taddy'
+                  ? 'bg-green-600/30 text-green-300'
+                  : episode.source === 'apple'
+                    ? 'bg-pink-600/30 text-pink-300'
+                  : episode.source === 'podcastindex'
+                    ? 'bg-blue-600/30 text-blue-300'
+                    : 'bg-gray-600/30 text-gray-300'
+              }`}
+            >
+              {episode.source}
+            </span>
+          )}
         </div>
+      </div>
 
-        {/* Tags — own line on mobile, aligned with supporters bar (same as global party) */}
-        {tags.length > 0 && (
-          <div className="md:hidden mt-1">
-            <TagList
-              tags={tags}
-              mediaId={mediaId ?? ''}
-              limit={3}
-              linkPath={tagListPath}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
-          <MiniSupportersBar bids={episode.bids || []} maxVisible={5} scrollable={true} />
+      {/* Tags — own line on mobile, aligned with supporters bar (same as global party) */}
+      {tags.length > 0 && (
+        <div className="md:hidden mt-1">
+          <TagList
+            tags={tags}
+            mediaId={mediaId ?? ''}
+            limit={3}
+            linkPath={tagListPath}
+          />
         </div>
+      )}
 
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
-          {tipButton}
-        </div>
+      <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
+        <MiniSupportersBar bids={episode.bids || []} maxVisible={5} scrollable={true} />
+      </div>
+
+      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
+        {tipButton}
       </div>
     </div>
   );

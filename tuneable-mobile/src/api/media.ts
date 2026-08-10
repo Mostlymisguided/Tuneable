@@ -70,11 +70,25 @@ export const mediaAPI = {
   /** Tip a chart item. `amount` is in pounds (e.g. 0.50). */
   placeGlobalBid: async (
     mediaId: string,
-    amount: number
+    amount: number,
+    options?: {
+      tags?: string[];
+      currentLocation?: import('@/src/types/user').ResolvedLocation | null;
+    }
   ): Promise<PlaceGlobalBidResponse> => {
+    const { getTipCurrentLocation } = await import('@/src/lib/currentLocation');
+    const tags = options?.tags?.filter(Boolean) ?? [];
+    const currentLocation =
+      options?.currentLocation === undefined
+        ? getTipCurrentLocation()
+        : options.currentLocation;
     const response = await api.post<PlaceGlobalBidResponse>(
       `/media/${mediaId}/global-bid`,
-      { amount }
+      {
+        amount,
+        ...(tags.length > 0 ? { tags } : {}),
+        ...(currentLocation ? { currentLocation } : {}),
+      }
     );
     return response.data;
   },

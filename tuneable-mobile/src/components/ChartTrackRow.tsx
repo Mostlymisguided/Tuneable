@@ -59,16 +59,48 @@ export function ChartTrackRow({
   const showHint = !playable && !hideCatalogHint;
   const toggleFooter = () => setFooterExpanded((open) => !open);
 
+  const coverArt = (
+    <Pressable
+      onPress={handlePlay}
+      style={styles.coverWrap}
+      accessibilityRole="button"
+      accessibilityLabel={
+        playable ? `Play chart position ${rank}` : `Chart position ${rank}`
+      }>
+      {({ pressed }) => (
+        <>
+          <Image
+            source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
+            style={variant === 'compact' ? styles.cover : styles.richCover}
+          />
+          <View style={styles.rankPlayOverlay}>
+            <View
+              style={[
+                styles.rankPlayCircle,
+                !playable && styles.rankPlayCircleMuted,
+              ]}>
+              {pressed && playable ? (
+                <Ionicons name="play" size={16} color="#fff" />
+              ) : (
+                <Text
+                  style={[
+                    styles.rankOnArt,
+                    rank >= 100 && styles.rankOnArtSmall,
+                  ]}>
+                  {rank}
+                </Text>
+              )}
+            </View>
+          </View>
+        </>
+      )}
+    </Pressable>
+  );
+
   if (variant === 'compact') {
     return (
       <View style={[styles.row, !playable && styles.rowMuted]}>
-        <Text style={styles.rank}>{rank}</Text>
-        <Pressable onPress={onOpen}>
-          <Image
-            source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
-            style={styles.cover}
-          />
-        </Pressable>
+        {coverArt}
         <Pressable style={styles.meta} onPress={onOpen}>
           <Text style={styles.title} numberOfLines={1}>
             {item.title || 'Untitled'}
@@ -82,18 +114,9 @@ export function ChartTrackRow({
         </Pressable>
         <View style={styles.right}>
           <Text style={styles.tips}>{formatPoundsFromPence(displayTip)}</Text>
-          <View style={styles.actions}>
-            <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn}>
-              <Ionicons name="heart" size={22} color="#f472b6" />
-            </Pressable>
-            <Pressable onPress={handlePlay} hitSlop={8} style={styles.actionBtn}>
-              <Ionicons
-                name={playable ? 'play-circle' : 'musical-note'}
-                size={playable ? 28 : 22}
-                color={playable ? colors.accentLight : colors.textMuted}
-              />
-            </Pressable>
-          </View>
+          <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn}>
+            <Ionicons name="heart" size={22} color="#f472b6" />
+          </Pressable>
         </View>
       </View>
     );
@@ -104,25 +127,7 @@ export function ChartTrackRow({
   return (
     <View style={[styles.richCard, !playable && styles.rowMuted]}>
       <View style={styles.richTop}>
-        <View style={styles.rankBadge}>
-          <Text style={styles.rankBadgeText}>{rank}</Text>
-        </View>
-
-        <Pressable onPress={onOpen} style={styles.coverWrap}>
-          <Image
-            source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
-            style={styles.richCover}
-          />
-          <Pressable style={styles.playOverlay} onPress={handlePlay} hitSlop={4}>
-            <View style={[styles.playCircle, !playable && styles.playCircleMuted]}>
-              <Ionicons
-                name={playable ? 'play' : 'musical-note'}
-                size={playable ? 16 : 14}
-                color="#fff"
-              />
-            </View>
-          </Pressable>
-        </Pressable>
+        {coverArt}
 
         <Pressable style={styles.richMeta} onPress={onOpen}>
           <View style={styles.titleRow}>
@@ -216,12 +221,8 @@ const styles = StyleSheet.create({
   rowMuted: {
     opacity: 0.85,
   },
-  rank: {
-    width: 28,
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+  coverWrap: {
+    position: 'relative',
   },
   cover: {
     width: 52,
@@ -257,11 +258,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
   actionBtn: {
     padding: 2,
   },
@@ -276,23 +272,7 @@ const styles = StyleSheet.create({
   richTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  rankBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(126, 34, 206, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rankBadgeText: {
-    color: '#e9d5ff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  coverWrap: {
-    position: 'relative',
+    gap: 10,
   },
   richCover: {
     width: 56,
@@ -300,25 +280,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.card,
   },
-  playOverlay: {
+  rankPlayOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.32)',
     borderRadius: 8,
   },
-  playCircle: {
-    width: 28,
+  rankPlayCircle: {
+    minWidth: 28,
     height: 28,
+    paddingHorizontal: 4,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playCircleMuted: {
+  rankPlayCircleMuted: {
     borderColor: 'rgba(255,255,255,0.45)',
-    opacity: 0.85,
+    opacity: 0.9,
+  },
+  rankOnArt: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  rankOnArtSmall: {
+    fontSize: 11,
   },
   richMeta: {
     flex: 1,

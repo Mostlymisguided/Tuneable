@@ -114,11 +114,11 @@ export default function HomeScreen() {
     void setQueueAndPlay(queue, Math.max(0, index));
   };
 
-  const onConfirmTip = async (amountPounds: number) => {
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
     if (!tipTarget) return;
     const id = mediaId(tipTarget);
     if (!id) throw new Error('Missing media id');
-    const res = await mediaAPI.placeGlobalBid(id, amountPounds);
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
     const tipPence = Math.round(amountPounds * 100);
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
@@ -277,6 +277,7 @@ export default function HomeScreen() {
         subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
+        tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={onConfirmTip}
       />

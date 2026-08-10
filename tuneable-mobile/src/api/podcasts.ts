@@ -9,6 +9,7 @@ export const podcastsAPI = {
     category?: string;
     genre?: string;
     tag?: string;
+    locationPlaceId?: string;
   }): Promise<PodcastChartResponse> => {
     const response = await api.get<PodcastChartResponse>('/podcasts/chart', {
       params: {
@@ -18,6 +19,7 @@ export const podcastsAPI = {
         category: params?.category,
         genre: params?.genre,
         tag: params?.tag,
+        locationPlaceId: params?.locationPlaceId,
       },
     });
     return response.data;

@@ -13,11 +13,18 @@ export function formatTuneBytes(value: number | undefined | null): string {
   });
 }
 
-/** Format duration in seconds as m:ss */
+/** Format duration in seconds as m:ss or h:mm:ss */
 export function formatDuration(seconds: number | undefined | null): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
+  const total = Math.floor(seconds);
+  const hours = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
+  }
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 

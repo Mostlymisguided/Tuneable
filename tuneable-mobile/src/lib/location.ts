@@ -15,7 +15,26 @@ export type LocationQuickPick = CountryLocationPick & {
 
 export function formatLocation(location: ResolvedLocation | null | undefined): string {
   if (!location) return 'Earth';
-  return location.display || location.country || location.city || 'Earth';
+  if (location.display) return location.display;
+  if (location.city && location.country) {
+    return `${location.city}, ${location.country}`;
+  }
+  if (location.city && location.countryCode) {
+    return `${location.city}, ${location.countryCode}`;
+  }
+  if (location.city) return location.city;
+  if (location.country) return location.country;
+  if (location.countryCode) return location.countryCode;
+  return location.label || 'Earth';
+}
+
+/** Tip / profile labels — prefer "Not set" over chart fallback "Earth". */
+export function formatLocationLabel(
+  location: ResolvedLocation | null | undefined
+): string | null {
+  if (!location) return null;
+  const label = formatLocation(location);
+  return label === 'Earth' ? null : label;
 }
 
 export function getCountryPickFromLocation(
@@ -48,7 +67,7 @@ export function getCountryPickFromLocation(
 }
 
 export function computeLocationQuickPicks(
-  media: ChartMediaItem[],
+  media: Array<{ bids?: ChartMediaItem['bids'] }>,
   userHomeLocation?: ResolvedLocation | null,
   maxPicks = 5
 ): LocationQuickPick[] {

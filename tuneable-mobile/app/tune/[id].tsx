@@ -218,11 +218,11 @@ export default function TuneProfileScreen() {
     void setQueueAndPlay(playableQueue, index);
   };
 
-  const placeTip = async (amountPounds: number) => {
+  const placeTip = async (amountPounds: number, tags: string[] = []) => {
     if (!media) return;
     const mid = mediaId(media);
     if (!mid) throw new Error('Missing media id');
-    const res = await mediaAPI.placeGlobalBid(mid, amountPounds);
+    const res = await mediaAPI.placeGlobalBid(mid, amountPounds, { tags });
     const tipPence = Math.round(amountPounds * 100);
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
@@ -249,8 +249,8 @@ export default function TuneProfileScreen() {
     );
   };
 
-  const onConfirmTip = async (amountPounds: number) => {
-    await placeTip(amountPounds);
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
+    await placeTip(amountPounds, tags);
   };
 
   const onSupportTip = async () => {
@@ -658,6 +658,7 @@ export default function TuneProfileScreen() {
             balancePence={user.balance ?? 0}
             defaultTipPounds={defaultTip}
             initialAmountPounds={tipInitial}
+            tipMedia={media}
             onClose={() => {
               setTipOpen(false);
               setTipInitial(null);
