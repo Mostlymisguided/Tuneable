@@ -2448,7 +2448,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
     
-    // Special handling for location fields
+    // Special handling for location fields — persist full Mapbox-resolved shape
+    // so country/place links work on QueueMediaCard and place profiles.
+    const { applyResolvedLocation } = require('../utils/locationUtils');
+
     if (req.body.primaryLocation !== undefined) {
       const oldPrimaryLocation = media.primaryLocation || {};
       let newPrimaryLocation = null;
@@ -2456,24 +2459,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
       if (req.body.primaryLocation && typeof req.body.primaryLocation === 'object') {
         // If it's an object with data, use it
         if (Object.keys(req.body.primaryLocation).length > 0) {
-          newPrimaryLocation = {
-            city: req.body.primaryLocation.city || null,
-            region: req.body.primaryLocation.region || null,
-            country: req.body.primaryLocation.country || null,
-            countryCode: req.body.primaryLocation.countryCode || null,
-            coordinates: req.body.primaryLocation.coordinates ? {
-              lat: req.body.primaryLocation.coordinates.lat || null,
-              lng: req.body.primaryLocation.coordinates.lng || null
-            } : null,
-            detectedFromIP: req.body.primaryLocation.detectedFromIP || false
-          };
+          newPrimaryLocation = applyResolvedLocation(req.body.primaryLocation, null);
         }
       } else if (req.body.primaryLocation === null || req.body.primaryLocation === '') {
         // Clear location if null or empty string
         newPrimaryLocation = null;
       }
       
-      if (JSON.stringify(oldPrimaryLocation) !== JSON.stringify(newPrimaryLocation)) {
+      if (JSON.stringify(oldPrimaryLocation) !== JSON.stringify(newPrimaryLocation || {})) {
         changes.push({
           field: 'primaryLocation',
           oldValue: oldPrimaryLocation,
@@ -2491,23 +2484,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
       if (req.body.secondaryLocation && typeof req.body.secondaryLocation === 'object') {
         // If it's an object with data, use it
         if (Object.keys(req.body.secondaryLocation).length > 0) {
-          newSecondaryLocation = {
-            city: req.body.secondaryLocation.city || null,
-            region: req.body.secondaryLocation.region || null,
-            country: req.body.secondaryLocation.country || null,
-            countryCode: req.body.secondaryLocation.countryCode || null,
-            coordinates: req.body.secondaryLocation.coordinates ? {
-              lat: req.body.secondaryLocation.coordinates.lat || null,
-              lng: req.body.secondaryLocation.coordinates.lng || null
-            } : null
-          };
+          newSecondaryLocation = applyResolvedLocation(req.body.secondaryLocation, null);
         }
       } else if (req.body.secondaryLocation === null || req.body.secondaryLocation === '') {
         // Clear location if null or empty string
         newSecondaryLocation = null;
       }
       
-      if (JSON.stringify(oldSecondaryLocation) !== JSON.stringify(newSecondaryLocation)) {
+      if (JSON.stringify(oldSecondaryLocation) !== JSON.stringify(newSecondaryLocation || {})) {
         changes.push({
           field: 'secondaryLocation',
           oldValue: oldSecondaryLocation,

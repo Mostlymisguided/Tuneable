@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, COUNTRIES } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
   Music, 
   User, 
@@ -76,6 +76,8 @@ import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMedi
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import type { ResolvedLocation } from '../utils/locationHelpers';
 
 interface Media {
   _id: string;
@@ -322,21 +324,8 @@ const TuneProfile: React.FC = () => {
     aiUsage: { ...EMPTY_AI_USAGE } as AiUsage,
     coverArt: '',
     minimumBid: null as number | null,
-    primaryLocation: null as {
-      city?: string;
-      region?: string;
-      country?: string;
-      countryCode?: string;
-      coordinates?: { lat?: number; lng?: number };
-      detectedFromIP?: boolean;
-    } | null,
-    secondaryLocation: null as {
-      city?: string;
-      region?: string;
-      country?: string;
-      countryCode?: string;
-      coordinates?: { lat?: number; lng?: number };
-    } | null
+    primaryLocation: null as ResolvedLocation | null,
+    secondaryLocation: null as ResolvedLocation | null
   });
   const [useMultipleArtists, setUseMultipleArtists] = useState(false);
   const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>([]);
@@ -1104,11 +1093,11 @@ const TuneProfile: React.FC = () => {
         releaseYearValue = null; // Let backend extract from date
       }
       
-      // Process location fields - send null if empty, otherwise send the object
-      // Auto-populate countryCode if country is set but countryCode is missing
+      // Process location fields - keep Mapbox placeId/ancestors so country links work
       let primaryLocation = editForm.primaryLocation && (
-        editForm.primaryLocation.city || 
-        editForm.primaryLocation.region || 
+        editForm.primaryLocation.placeId ||
+        editForm.primaryLocation.city ||
+        editForm.primaryLocation.region ||
         editForm.primaryLocation.country
       ) ? { ...editForm.primaryLocation } : null;
       
@@ -1117,8 +1106,9 @@ const TuneProfile: React.FC = () => {
       }
       
       let secondaryLocation = editForm.secondaryLocation && (
-        editForm.secondaryLocation.city || 
-        editForm.secondaryLocation.region || 
+        editForm.secondaryLocation.placeId ||
+        editForm.secondaryLocation.city ||
+        editForm.secondaryLocation.region ||
         editForm.secondaryLocation.country
       ) ? { ...editForm.secondaryLocation } : null;
       
@@ -3475,113 +3465,26 @@ const TuneProfile: React.FC = () => {
                   Enhanced Metadata
                 </h3>
 
-                {/* Location Fields */}
+                {/* Location Fields — Mapbox search so country/place profiles stay linkable */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-white font-medium mb-2">Primary Location</label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={editForm.primaryLocation?.city || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          primaryLocation: { 
-                            ...(editForm.primaryLocation || {}), 
-                            city: e.target.value 
-                          } 
-                        })}
-                        className="input"
-                        placeholder="Town/City/Village"
-                      />
-                      <input
-                        type="text"
-                        value={editForm.primaryLocation?.region || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          primaryLocation: { 
-                            ...(editForm.primaryLocation || {}), 
-                            region: e.target.value 
-                          } 
-                        })}
-                        className="input"
-                        placeholder="Region/State"
-                      />
-                      <select
-                        value={editForm.primaryLocation?.country || ''}
-                        onChange={(e) => {
-                          const country = e.target.value;
-                          const countryCode = getCountryCode(country);
-                          setEditForm({ 
-                            ...editForm, 
-                            primaryLocation: { 
-                              ...(editForm.primaryLocation || {}), 
-                              country: country,
-                              countryCode: countryCode
-                            } 
-                          });
-                        }}
-                        className="input"
-                      >
-                        <option value="">Select Country</option>
-                        {COUNTRIES.map(country => (
-                          <option key={country} value={country}>{country}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-white font-medium mb-2">Secondary Location</label>
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={editForm.secondaryLocation?.city || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { 
-                            ...(editForm.secondaryLocation || {}), 
-                            city: e.target.value 
-                          } 
-                        })}
-                        className="input"
-                        placeholder="Town/City/Village"
-                      />
-                      <input
-                        type="text"
-                        value={editForm.secondaryLocation?.region || ''}
-                        onChange={(e) => setEditForm({ 
-                          ...editForm, 
-                          secondaryLocation: { 
-                            ...(editForm.secondaryLocation || {}), 
-                            region: e.target.value 
-                          } 
-                        })}
-                        className="input"
-                        placeholder="Region/State"
-                      />
-                      <select
-                        value={editForm.secondaryLocation?.country || ''}
-                        onChange={(e) => {
-                          const country = e.target.value;
-                          const countryCode = getCountryCode(country);
-                          setEditForm({ 
-                            ...editForm, 
-                            secondaryLocation: { 
-                              ...(editForm.secondaryLocation || {}), 
-                              country: country,
-                              countryCode: countryCode
-                            } 
-                          });
-                        }}
-                        className="input"
-                      >
-                        <option value="">Select Country</option>
-                        {COUNTRIES.map(country => (
-                          <option key={country} value={country}>{country}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  <LocationAutocomplete
+                    label="Primary Location"
+                    description="Search for a city, region, or country"
+                    value={editForm.primaryLocation}
+                    onChange={(location) =>
+                      setEditForm({ ...editForm, primaryLocation: location })
+                    }
+                    placeholder="Search for a place…"
+                  />
+                  <LocationAutocomplete
+                    label="Secondary Location"
+                    description="Optional second place associated with this tune"
+                    value={editForm.secondaryLocation}
+                    onChange={(location) =>
+                      setEditForm({ ...editForm, secondaryLocation: location })
+                    }
+                    placeholder="Search for a place…"
+                  />
                 </div>
 
                 {/* Creator Information */}
