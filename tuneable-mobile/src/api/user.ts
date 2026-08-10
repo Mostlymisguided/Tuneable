@@ -6,6 +6,26 @@ import type {
   UserProfileResponse,
 } from '@/src/types/user';
 
+export type ImportJobStatus = {
+  id: string;
+  status: 'queued' | 'running' | 'complete' | 'error' | string;
+  message?: string | null;
+  error?: string | null;
+  errorCode?: string | null;
+  details?: unknown;
+  result?: unknown;
+};
+
+export type ImportPreviewItem = {
+  key: string;
+  title?: string;
+  mediaId?: string;
+  matchStatus?: string;
+  useSuggestedMatch?: boolean;
+  crossRefStatus?: string;
+  externalMedia?: Record<string, unknown>;
+};
+
 export const userAPI = {
   getProfileById: async (userId: string): Promise<UserProfileResponse> => {
     const response = await api.get<UserProfileResponse>(`/users/${userId}/profile`);
@@ -53,5 +73,108 @@ export const userAPI = {
   deleteAccount: async (): Promise<{ message?: string }> => {
     const response = await api.delete<{ message?: string }>('/users/me');
     return response.data;
+  },
+
+  detectLocation: async (): Promise<{
+    success: boolean;
+    location?: {
+      country?: string;
+      city?: string;
+      region?: string;
+      countryCode?: string;
+    };
+  }> => {
+    const response = await api.get('/users/detect-location');
+    return response.data;
+  },
+
+  getSpotifyStatus: async (): Promise<{ connected: boolean }> => {
+    const response = await api.get<{ connected: boolean }>('/users/me/spotify-status');
+    return response.data;
+  },
+
+  getSoundCloudStatus: async (): Promise<{ connected: boolean }> => {
+    const response = await api.get<{ connected: boolean }>(
+      '/users/me/soundcloud-status'
+    );
+    return response.data;
+  },
+
+  startSpotifyImportPreview: async (
+    limit = 50
+  ): Promise<{ jobId: string; status: string }> => {
+    const response = await api.post<{ jobId: string; status: string }>(
+      '/users/me/import/spotify/preview/start',
+      { limit }
+    );
+    return response.data;
+  },
+
+  startSoundCloudImportPreview: async (
+    limit = 50,
+    crossRefMode: 'spotify_only' | 'full' | 'none' = 'spotify_only'
+  ): Promise<{ jobId: string; status: string }> => {
+    const response = await api.post<{ jobId: string; status: string }>(
+      '/users/me/import/soundcloud/preview/start',
+      { limit, crossRefMode }
+    );
+    return response.data;
+  },
+
+  startSpotifyImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ): Promise<{ jobId: string; status: string }> => {
+    const response = await api.post<{ jobId: string; status: string }>(
+      '/users/me/import/spotify/execute/start',
+      { items, defaultTip }
+    );
+    return response.data;
+  },
+
+  startSoundCloudImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ): Promise<{ jobId: string; status: string }> => {
+    const response = await api.post<{ jobId: string; status: string }>(
+      '/users/me/import/soundcloud/execute/start',
+      { items, defaultTip }
+    );
+    return response.data;
+  },
+
+  getImportJob: async (jobId: string): Promise<ImportJobStatus> => {
+    const response = await api.get<ImportJobStatus>(
+      `/users/me/import/jobs/${jobId}`
+    );
+    return response.data;
+  },
+
+  waitForImportJob: async <T = unknown>(
+    jobId: string,
+    onProgress?: (job: ImportJobStatus) => void,
+    options?: { intervalMs?: number; timeoutMs?: number }
+  ): Promise<T> => {
+    const intervalMs = options?.intervalMs ?? 500;
+    const timeoutMs = options?.timeoutMs ?? 10 * 60 * 1000;
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+      const job = await userAPI.getImportJob(jobId);
+      onProgress?.(job);
+      if (job.status === 'complete') {
+        return job.result as T;
+      }
+      if (job.status === 'error') {
+        const err = new Error(job.error || 'Import job failed') as Error & {
+          response?: { data: { error?: string } };
+        };
+        err.response = { data: { error: job.error || 'Import job failed' } };
+        throw err;
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error('Import job timed out — please try again with fewer tracks');
   },
 };

@@ -26,19 +26,19 @@ interface AuthContextValue {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<User>;
   register: (input: {
     username: string;
     email: string;
     password: string;
     parentInviteCode?: string;
-  }) => Promise<void>;
+  }) => Promise<User>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
-  handleOAuthCallback: (token: string) => Promise<void>;
-  applySession: (token: string, user: User) => Promise<void>;
+  handleOAuthCallback: (token: string) => Promise<User>;
+  applySession: (token: string, user: User) => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
     setUser(newUser);
     await saveSession(newToken, JSON.stringify(newUser));
+    return newUser;
   }, []);
 
   const deleteAccount = useCallback(async () => {
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       identifier.trim(),
       password
     );
-    await applySession(newToken, newUser);
+    return applySession(newToken, newUser);
   }, [applySession]);
 
   const register = useCallback(
@@ -135,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: input.password,
         ...(code ? { parentInviteCode: code } : {}),
       });
-      await applySession(newToken, newUser);
+      return applySession(newToken, newUser);
     },
     [applySession]
   );
@@ -167,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: fresh } = await authAPI.getProfile();
       setUser(fresh);
       await saveSession(oauthToken, JSON.stringify(fresh));
+      return fresh;
     } catch (error) {
       setToken(null);
       tokenRef.current = null;

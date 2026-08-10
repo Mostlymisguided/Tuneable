@@ -28,6 +28,7 @@ import {
   extractTokenFromUrl,
   getOAuthCallbackRedirect,
 } from '@/src/lib/oauth';
+import { getPostAuthHref } from '@/src/lib/onboarding';
 import { colors } from '@/src/theme/colors';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -40,6 +41,7 @@ export default function RegisterScreen() {
     applySession,
     isAuthenticated,
     isLoading: authLoading,
+    user: authUser,
   } = useAuth();
 
   const initialInvite = (
@@ -103,7 +105,7 @@ export default function RegisterScreen() {
   }, [initialInvite, validateInvite]);
 
   if (!authLoading && isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href={getPostAuthHref(authUser)} />;
   }
 
   const onInviteChange = (value: string) => {
@@ -153,13 +155,13 @@ export default function RegisterScreen() {
       if (optionalInvite && inviteStatus !== 'valid') {
         await validateInvite(optionalInvite);
       }
-      await register({
+      const nextUser = await register({
         username,
         email,
         password,
         ...(optionalInvite ? { parentInviteCode: optionalInvite } : {}),
       });
-      router.replace('/(tabs)');
+      router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       setError(getApiErrorMessage(err, 'Registration failed.'));
     } finally {
@@ -192,8 +194,8 @@ export default function RegisterScreen() {
           setError(`${provider} sign-up did not return a token.`);
           return;
         }
-        await handleOAuthCallback(token);
-        router.replace('/(tabs)');
+        const nextUser = await handleOAuthCallback(token);
+        router.replace(getPostAuthHref(nextUser));
       }
     } catch (err) {
       setError(getApiErrorMessage(err, `${provider} sign-up failed.`));
@@ -213,8 +215,8 @@ export default function RegisterScreen() {
       const { token, user } = await signInWithApple({
         inviteCode: optionalInvite,
       });
-      await applySession(token, user);
-      router.replace('/(tabs)');
+      const nextUser = await applySession(token, user);
+      router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       if (
         err &&

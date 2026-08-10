@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Coins,
   Loader2,
+  MapPin,
   Music,
   Sparkles,
   CheckCircle2,
@@ -15,17 +16,19 @@ import { buildOnboardingCompletePath } from '../utils/authHelpers';
 import { buildOAuthStartUrl } from '../utils/platform';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_TIP_POUNDS } from '../constants';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import type { ResolvedLocation } from '../utils/locationHelpers';
 
-type OnboardingStep = 'tip' | 'import';
+type OnboardingStep = 'tip' | 'location' | 'import';
 type ImportSource = 'spotify' | 'soundcloud';
 
 const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
 const ONBOARDING_IMPORT_LIMIT = 25;
 
-const STEP_ORDER: OnboardingStep[] = ['tip', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['tip', 'location', 'import'];
 
 function parseStep(value: string | null): OnboardingStep {
-  if (value === 'import') return value;
+  if (value === 'location' || value === 'import') return value;
   return 'tip';
 }
 
@@ -40,6 +43,9 @@ const Onboarding: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   const [defaultTip, setDefaultTip] = useState(DEFAULT_TIP_POUNDS.toFixed(2));
+
+  const [homeLocation, setHomeLocation] = useState<ResolvedLocation | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
@@ -73,6 +79,48 @@ const Onboarding: React.FC = () => {
       setDefaultTip(tip.toFixed(2));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.homeLocation?.city || user.homeLocation?.country || user.homeLocation?.placeId) {
+      setHomeLocation(user.homeLocation);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (step !== 'location') return;
+    if (homeLocation?.city || homeLocation?.country || homeLocation?.placeId) return;
+
+    let cancelled = false;
+    const detectUserLocation = async () => {
+      setIsDetectingLocation(true);
+      try {
+        const response = await userAPI.detectLocation();
+        if (cancelled) return;
+        if (response.success && response.location) {
+          setHomeLocation((prev) => {
+            if (prev?.placeId || prev?.city) return prev;
+            return {
+              ...(prev || {}),
+              country: response.location.country,
+              city: prev?.city || response.location.city,
+              region: prev?.region || response.location.region,
+              detectedFromIP: true,
+            };
+          });
+        }
+      } catch {
+        // IP hint is optional — user can still search manually
+      } finally {
+        if (!cancelled) setIsDetectingLocation(false);
+      }
+    };
+
+    void detectUserLocation();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, homeLocation?.city, homeLocation?.country, homeLocation?.placeId]);
 
   const checkConnections = useCallback(async () => {
     try {
@@ -152,6 +200,17 @@ const Onboarding: React.FC = () => {
     setSearchParams(params, { replace: true });
   };
 
+  const markTipSeen = async (tipAmount?: number) => {
+    const payload: Record<string, unknown> = {
+      onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
+    };
+    if (tipAmount !== undefined) {
+      payload.preferences = { defaultTip: tipAmount };
+    }
+    await authAPI.updateProfile(payload);
+    await refreshUser();
+  };
+
   const saveTipStep = async () => {
     const parsedTip = parseFloat(defaultTip);
     if (Number.isNaN(parsedTip) || parsedTip < 0.01) {
@@ -161,12 +220,8 @@ const Onboarding: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await authAPI.updateProfile({
-        preferences: { defaultTip: parsedTip },
-        onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
-      });
-      await refreshUser();
-      goToStep('import');
+      await markTipSeen(parsedTip);
+      goToStep('location');
     } catch (error: unknown) {
       const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
         || 'Failed to save default tip';
@@ -174,6 +229,45 @@ const Onboarding: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const skipTipStep = async () => {
+    setIsSaving(true);
+    try {
+      await markTipSeen();
+      goToStep('location');
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to continue';
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveLocationStep = async () => {
+    const hasLocation = !!(homeLocation?.city || homeLocation?.country || homeLocation?.placeId);
+    if (!hasLocation) {
+      toast.error('Pick a home location, or skip for now');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await authAPI.updateProfile({ homeLocation });
+      await refreshUser();
+      goToStep('import');
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to save home location';
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const skipLocationStep = () => {
+    goToStep('import');
   };
 
   const finishOnboarding = async (options?: { importSkipped?: boolean }) => {
@@ -314,7 +408,7 @@ const Onboarding: React.FC = () => {
         </p>
         <h1 className="mt-2 text-3xl font-bold text-white">Welcome to Tuneable</h1>
         <p className="mt-2 text-gray-400">
-          Two quick steps to get your library started.
+          A few quick steps to get set up. Everything can be changed later.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           {STEP_ORDER.map((s, i) => (
@@ -340,7 +434,7 @@ const Onboarding: React.FC = () => {
                 <p className="mt-2 text-sm text-gray-400">
                   Adding a tune to your library means placing a tip. Your default is set to{' '}
                   <strong className="text-white">£{DEFAULT_TIP_POUNDS.toFixed(2)}</strong>. Change it below if you
-                  wish, or continue with this amount. You can update it any time in settings.
+                  wish, or skip and keep this amount. You can update it any time in settings.
                 </p>
               </div>
             </div>
@@ -393,17 +487,90 @@ const Onboarding: React.FC = () => {
               )}
             </div>
 
-            <div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={skipTipStep}
+                disabled={isSaving}
+                className="rounded-xl border border-gray-600 px-5 py-3 font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50 sm:order-1 sm:flex-1"
+              >
+                Skip for now
+              </button>
               <button
                 type="button"
                 onClick={saveTipStep}
                 disabled={isSaving}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50 sm:order-2 sm:flex-[1.4]"
               >
                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
                 {Math.abs(parsedDefaultTip - DEFAULT_TIP_POUNDS) < 0.001
                   ? `Continue with £${DEFAULT_TIP_POUNDS.toFixed(2)}`
                   : `Save £${parsedDefaultTip.toFixed(2)} and continue`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'location' && (
+          <div className="space-y-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-600/20 text-purple-300">
+                <MapPin className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Where are you based?</h2>
+                <p className="mt-2 text-sm text-gray-400">
+                  Your home location connects you to local parties and charts. You can skip and set it
+                  later — we&apos;ll remind you on your dashboard until you do.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <LocationAutocomplete
+                variant="dark"
+                label="Home location"
+                value={homeLocation}
+                onChange={setHomeLocation}
+                placeholder="Search for your home city or town"
+              />
+              {isDetectingLocation && (
+                <p className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Detecting a country hint from your IP…
+                </p>
+              )}
+              {!isDetectingLocation && homeLocation?.detectedFromIP && !homeLocation?.placeId && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Country hint auto-detected. Search above to pick your exact place.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => goToStep('tip')}
+                className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800 sm:order-1"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={skipLocationStep}
+                disabled={isSaving}
+                className="rounded-xl border border-gray-600 px-5 py-3 font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50 sm:order-2 sm:flex-1"
+              >
+                Skip for now
+              </button>
+              <button
+                type="button"
+                onClick={saveLocationStep}
+                disabled={isSaving}
+                className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50 sm:order-3 sm:flex-[1.4]"
+              >
+                {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                Save and continue
               </button>
             </div>
           </div>
@@ -511,7 +678,7 @@ const Onboarding: React.FC = () => {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => goToStep('tip')}
+                onClick={() => goToStep('location')}
                 className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800"
               >
                 Back

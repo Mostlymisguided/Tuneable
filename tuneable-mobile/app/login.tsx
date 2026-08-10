@@ -21,7 +21,6 @@ import {
   isAppleSignInAvailable,
   signInWithApple,
 } from '@/src/lib/appleAuth';
-import { colors } from '@/src/theme/colors';
 import { API_ORIGIN } from '@/src/api/client';
 import {
   buildOAuthStartUrl,
@@ -29,6 +28,8 @@ import {
   extractTokenFromUrl,
   getOAuthCallbackRedirect,
 } from '@/src/lib/oauth';
+import { getPostAuthHref } from '@/src/lib/onboarding';
+import { colors } from '@/src/theme/colors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -39,6 +40,7 @@ export default function LoginScreen() {
     applySession,
     isAuthenticated,
     isLoading: authLoading,
+    user,
   } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -54,7 +56,7 @@ export default function LoginScreen() {
   }, []);
 
   if (!authLoading && isAuthenticated) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href={getPostAuthHref(user)} />;
   }
 
   const onSubmit = async () => {
@@ -65,8 +67,8 @@ export default function LoginScreen() {
     }
     setSubmitting(true);
     try {
-      await login(identifier, password);
-      router.replace('/(tabs)');
+      const nextUser = await login(identifier, password);
+      router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       if (axios.isAxiosError(err) && !err.response) {
         setError(
@@ -101,8 +103,8 @@ export default function LoginScreen() {
           setError(`${provider} sign-in did not return a token.`);
           return;
         }
-        await handleOAuthCallback(token);
-        router.replace('/(tabs)');
+        const nextUser = await handleOAuthCallback(token);
+        router.replace(getPostAuthHref(nextUser));
       } else if (result.type === 'cancel') {
         setError(null);
       }
@@ -121,9 +123,9 @@ export default function LoginScreen() {
     setError(null);
     setOauthLoading('apple');
     try {
-      const { token, user } = await signInWithApple();
-      await applySession(token, user);
-      router.replace('/(tabs)');
+      const { token, user: appleUser } = await signInWithApple();
+      const nextUser = await applySession(token, appleUser);
+      router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       if (
         err &&

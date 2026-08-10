@@ -12,6 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
+import { HomeLocationReminder } from '@/src/components/HomeLocationReminder';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import { partyAPI } from '@/src/api/party';
@@ -157,6 +158,8 @@ export default function HomeScreen() {
         <Text style={styles.lede}>
           Tip what&apos;s rising, revisit your library, and keep exploring.
         </Text>
+
+        <HomeLocationReminder />
 
         <View style={styles.statsRow}>
           <Pressable

@@ -3,10 +3,11 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
+import { getPostAuthHref } from '@/src/lib/onboarding';
 import { colors } from '@/src/theme/colors';
 
 export default function AuthCallbackScreen() {
-  const { handleOAuthCallback, isAuthenticated } = useAuth();
+  const { handleOAuthCallback, isAuthenticated, user } = useAuth();
   const params = useLocalSearchParams<{
     token?: string;
     oauth_success?: string;
@@ -36,8 +37,8 @@ export default function AuthCallbackScreen() {
       }
 
       try {
-        await handleOAuthCallback(token);
-        router.replace('/(tabs)');
+        const nextUser = await handleOAuthCallback(token);
+        router.replace(getPostAuthHref(nextUser));
       } catch {
         setError('Signed in with Google, but failed to load your profile.');
         setDone(true);
@@ -47,7 +48,7 @@ export default function AuthCallbackScreen() {
   }, [params.token, params.error, params.message, handleOAuthCallback]);
 
   if (isAuthenticated && !error) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href={getPostAuthHref(user)} />;
   }
 
   return (

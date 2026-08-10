@@ -36,6 +36,8 @@ interface Prompt {
   action: () => void | Promise<void>;
   actionLabel?: string;
   priority: number;
+  /** When true, the prompt stays until the underlying gap is fixed (no dismiss). */
+  persistent?: boolean;
 }
 
 const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss }) => {
@@ -123,7 +125,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       description: 'Verify your email address to unlock all features',
       icon: Mail,
       action: handleEmailVerification,
-      priority: 1
+      priority: 2
     });
   }
 
@@ -135,19 +137,21 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       description: 'Add a profile picture to personalize your account',
       icon: User,
       action: handleAddProfilePicture,
-      priority: 2
+      priority: 3
     });
   }
 
-  // Home location prompt
+  // Home location — persistent until set (skippable at onboarding, not forgettable)
   if (!hasHomeLocation) {
     prompts.push({
       id: 'location',
       title: 'Add Home Location',
-      description: 'Add your home location so tips influence charts where you\'re from',
+      description: 'Add your home location so tips influence local parties and charts where you\'re from',
       icon: MapPin,
       action: handleAddLocation,
-      priority: 3
+      actionLabel: 'Add location',
+      priority: 1,
+      persistent: true,
     });
   }
 
@@ -160,13 +164,13 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       icon: Navigation,
       action: handleEnableCurrentLocation,
       actionLabel: isEnablingLocation ? 'Detecting...' : 'Enable',
-      priority: 4
+      priority: 5
     });
   }
 
-  // Filter out dismissed prompts and sort by priority
+  // Filter out dismissed prompts (persistent ones always stay) and sort by priority
   const activePrompts = prompts
-    .filter(p => !dismissedPrompts.has(p.id))
+    .filter(p => p.persistent || !dismissedPrompts.has(p.id))
     .sort((a, b) => a.priority - b.priority);
 
   if (activePrompts.length === 0) return null;
@@ -221,13 +225,15 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
                 >
                   {prompt.actionLabel || (isBusy ? 'Sending...' : 'Complete')}
                 </button>
-                <button
-                  onClick={() => handleDismiss(prompt.id)}
-                  className="p-2 text-gray-400 hover:text-white transition-colors"
-                  title="Dismiss"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                {!prompt.persistent && (
+                  <button
+                    onClick={() => handleDismiss(prompt.id)}
+                    className="p-2 text-gray-400 hover:text-white transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           );

@@ -28,6 +28,14 @@ export interface User {
   preferences?: {
     defaultTip?: number; // pounds
     anonymousMode?: boolean;
+    favoriteTags?: string[];
+  };
+  onboarding?: {
+    defaultTipPromptSeenAt?: string;
+    completedAt?: string;
+    favoriteTagsSelectedAt?: string;
+    importPromptSeenAt?: string;
+    importSkipped?: boolean;
   };
 }
 
@@ -52,6 +60,11 @@ export interface ResolvedLocation {
   featureType?: string;
   label?: string;
   ancestors?: LocationAncestor[];
+  detectedFromIP?: boolean;
+  coordinates?: {
+    lat?: number;
+    lng?: number;
+  };
 }
 
 export interface UserStats {

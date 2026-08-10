@@ -42,7 +42,8 @@ export function getCurrentReturnPath(): string {
 /**
  * New signups need the full wizard until `completedAt` is set.
  * Grandfathers completed wizards and accounts older than 7 days.
- * Do NOT treat `defaultTipPromptSeenAt` alone as done — that is set mid-wizard after the tip step.
+ * Do NOT treat `defaultTipPromptSeenAt` alone as done — that is set mid-wizard after the tip step
+ * (including when the tip step is skipped).
  */
 export function needsOnboarding(user: OnboardingUser | null | undefined): boolean {
   if (!user) return false;

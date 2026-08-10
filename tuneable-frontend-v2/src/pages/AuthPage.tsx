@@ -15,14 +15,12 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { Browser } from '@capacitor/browser';
-import { authAPI, userAPI } from '../lib/api';
+import { authAPI } from '../lib/api';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
 import {
   isAppleWebSignInConfigured,
   signInWithAppleWeb,
 } from '../utils/appleSignIn';
-import LocationAutocomplete from '../components/LocationAutocomplete';
-import type { ResolvedLocation } from '../utils/locationHelpers';
 import { buildRegisterUrl, buildLoginUrl, getPostAuthPath } from '../utils/authHelpers';
 
 const AuthPage: React.FC = () => {
@@ -52,9 +50,6 @@ const AuthPage: React.FC = () => {
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
   
-  // Location detection state
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [locationDetectionStatus, setLocationDetectionStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -64,12 +59,6 @@ const AuthPage: React.FC = () => {
     givenName: '',
     familyName: '',
     parentInviteCode: '',
-    homeLocation: null as ResolvedLocation | null,
-    secondaryLocation: null as {
-      city: string;
-      region: string;
-      country: string;
-    } | null,
   });
 
   const { login, register, handleOAuthCallback } = useAuth();
@@ -202,9 +191,6 @@ const AuthPage: React.FC = () => {
         
         // Automatically show email form when invite code is validated
         setShowEmailForm(true);
-        
-        // Trigger location detection after successful invite code validation
-        detectUserLocation();
       } else {
         setInviteCodeValid(false);
         setInviterUsername('');
@@ -214,38 +200,6 @@ const AuthPage: React.FC = () => {
       setInviterUsername('');
     } finally {
       setIsValidatingCode(false);
-    }
-  };
-
-  // Separate location detection function
-  const detectUserLocation = async () => {
-    setIsDetectingLocation(true);
-    setLocationDetectionStatus('idle');
-    
-    try {
-      const response = await userAPI.detectLocation();
-      if (response.success && response.location) {
-        setFormData(prev => ({
-          ...prev,
-          homeLocation: {
-            ...(prev.homeLocation || {}),
-            country: response.location.country,
-            city: prev.homeLocation?.city || response.location.city,
-            region: prev.homeLocation?.region || response.location.region,
-            detectedFromIP: true,
-          },
-        }));
-        
-        setLocationDetectionStatus('success');
-        toast.success(`Auto-detected location: ${response.location.country}`);
-      } else {
-        setLocationDetectionStatus('failed');
-      }
-    } catch (error) {
-      console.log('Location detection failed:', error);
-      setLocationDetectionStatus('failed');
-    } finally {
-      setIsDetectingLocation(false);
     }
   };
 
@@ -902,37 +856,6 @@ const AuthPage: React.FC = () => {
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-        </div>
-
-        {/* Location Fields */}
-        <div className="flex flex-col w-full">
-          <LocationAutocomplete
-            variant="light"
-            label="Home Location (Optional)"
-            value={formData.homeLocation}
-            onChange={(location) => setFormData({ ...formData, homeLocation: location })}
-            placeholder="Search for your home city or town"
-          />
-          {locationDetectionStatus === 'success' && (
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              Country hint auto-detected from your IP. Search above to pick your exact place.
-            </p>
-          )}
-          
-          {/* Location detection status */}
-          {isDetectingLocation && (
-            <div className="flex items-center justify-center mt-2 text-xs text-blue-600">
-              <div className="animate-spin h-4 w-4 border-2 border-blue-300 border-t-blue-600 rounded-full mr-2"></div>
-              <span>Detecting your location...</span>
-            </div>
-          )}
-          
-          {locationDetectionStatus === 'success' && !isDetectingLocation && (
-            <div className="flex items-center justify-center mt-2 text-xs text-green-600">
-              <CheckCircle className="h-4 w-4 mr-1" />
-              <span>Location hint auto-detected</span>
-            </div>
-          )}
         </div>
 
         <div className="flex flex-col p-4 flex items-center justify-center">

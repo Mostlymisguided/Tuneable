@@ -48,4 +48,18 @@ export const authAPI = {
     const response = await api.post<LoginResponse>('/auth/apple', body);
     return response.data;
   },
+
+  updateProfile: async (
+    userData: Partial<User> & {
+      onboarding?: User['onboarding'];
+      preferences?: User['preferences'];
+      homeLocation?: User['homeLocation'];
+    }
+  ): Promise<{ user: User; message?: string }> => {
+    const response = await api.put<{ user: User; message?: string }>(
+      '/users/profile',
+      userData
+    );
+    return response.data;
+  },
 };

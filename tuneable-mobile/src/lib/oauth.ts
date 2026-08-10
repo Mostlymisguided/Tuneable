@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { API_ORIGIN } from '@/src/api/client';
 
-export type OAuthProvider = 'google' | 'facebook' | 'soundcloud';
+export type OAuthProvider = 'google' | 'facebook' | 'soundcloud' | 'spotify';
 
 /** Deep link returned after backend OAuth completes. */
 export function getOAuthCallbackRedirect(): string {
@@ -12,11 +12,18 @@ export function getOAuthCallbackRedirect(): string {
 
 export function buildOAuthStartUrl(
   provider: OAuthProvider,
-  options?: { inviteCode?: string }
+  options?: {
+    inviteCode?: string;
+    linkAccount?: boolean;
+    token?: string;
+    customRedirect?: string;
+  }
 ): string {
   const params = new URLSearchParams();
-  params.set('redirect', getOAuthCallbackRedirect());
+  params.set('redirect', options?.customRedirect || getOAuthCallbackRedirect());
   if (options?.inviteCode) params.set('invite', options.inviteCode);
+  if (options?.linkAccount) params.set('link_account', 'true');
+  if (options?.token) params.set('token', options.token);
   return `${API_ORIGIN}/api/auth/${provider}?${params.toString()}`;
 }
 
