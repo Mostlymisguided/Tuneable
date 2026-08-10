@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
@@ -24,7 +25,6 @@ import {
   filterChartMedia,
   hasActiveChartFilters,
 } from '@/src/lib/chartFilters';
-import { formatPoundsFromPence } from '@/src/lib/format';
 import { computeLocationQuickPicks } from '@/src/lib/location';
 import {
   formatArtist,
@@ -121,14 +121,10 @@ export default function MusicScreen() {
     [filteredMedia, visibleCount]
   );
 
-  const totals = useMemo(() => {
-    const tips = filteredMedia.reduce(
-      (sum, m) => sum + getChartTipPence(m, period),
-      0
-    );
-    const playableCount = filteredMedia.filter(isUploadPlayable).length;
-    return { tips, playableCount, trackCount: filteredMedia.length };
-  }, [filteredMedia, period]);
+  const playableCount = useMemo(
+    () => filteredMedia.filter(isUploadPlayable).length,
+    [filteredMedia]
+  );
 
   const handleLocationChange = (location: ResolvedLocation | null) => {
     setSelectedLocation(location);
@@ -211,12 +207,12 @@ export default function MusicScreen() {
             <Pressable
               style={styles.addTunesBtn}
               onPress={() => router.push('/music-search')}>
-              <Text style={styles.addTunesText}>Add tunes</Text>
+              <Text style={styles.addTunesText}>Add music</Text>
             </Pressable>
 
             <ChartFilterToolbar
               period={period}
-              onPeriodChange={setPeriod}
+              onPeriodChange={(next) => setPeriod(next as TimePeriodKey)}
               selectedTagTerms={selectedTagTerms}
               onTagTermsChange={setSelectedTagTerms}
               searchQuery={searchQuery}
@@ -236,30 +232,13 @@ export default function MusicScreen() {
               hasActiveFilters={filtersActive}
             />
 
-            <View style={styles.metrics}>
-              <Metric
-                label="Tracks"
-                value={String(totals.trackCount)}
-                border={colors.accent}
-              />
-              <Metric
-                label="Total Tips"
-                value={formatPoundsFromPence(totals.tips)}
-                border="#eab308"
-              />
-              <Metric
-                label="Playable"
-                value={String(totals.playableCount)}
-                border={colors.success}
-              />
-            </View>
-
-            {totals.playableCount > 0 ? (
-              <Pressable style={styles.playBtn} onPress={onPlayQueue}>
-                <Text style={styles.playBtnText}>
-                  Play {totals.playableCount} upload
-                  {totals.playableCount !== 1 ? 's' : ''}
-                </Text>
+            {playableCount > 0 ? (
+              <Pressable
+                style={styles.playBtn}
+                onPress={onPlayQueue}
+                accessibilityRole="button"
+                accessibilityLabel={`Play ${playableCount} upload${playableCount !== 1 ? 's' : ''}`}>
+                <Ionicons name="play" size={22} color="#fff" />
               </Pressable>
             ) : null}
 
@@ -318,23 +297,6 @@ export default function MusicScreen() {
   );
 }
 
-function Metric({
-  label,
-  value,
-  border,
-}: {
-  label: string;
-  value: string;
-  border: string;
-}) {
-  return (
-    <View style={[styles.metric, { borderColor: border }]}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
@@ -357,41 +319,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  metrics: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  metric: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    backgroundColor: colors.card,
-  },
-  metricValue: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  metricLabel: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 11,
-  },
   playBtn: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  playBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   error: {
     color: '#fca5a5',

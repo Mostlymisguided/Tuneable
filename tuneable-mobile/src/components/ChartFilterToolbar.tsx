@@ -11,41 +11,49 @@ import {
 } from '@/src/lib/chartFilters';
 import { TIME_PERIODS, type TimePeriodKey } from '@/src/types/media';
 
+type PeriodOption = { key: string; label: string };
+
 type Props = {
-  period: TimePeriodKey;
-  onPeriodChange: (period: TimePeriodKey) => void;
+  period: string;
+  onPeriodChange: (period: string) => void;
+  periods?: ReadonlyArray<PeriodOption>;
   selectedTagTerms: string[];
   onTagTermsChange: (terms: string[]) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
-  bpmFilterRange: BpmFilterRange;
-  onBpmFilterChange: (range: BpmFilterRange) => void;
+  bpmFilterRange?: BpmFilterRange;
+  onBpmFilterChange?: (range: BpmFilterRange) => void;
+  showBpm?: boolean;
   topTags: TopTagEntry[];
   showTagPanel: boolean;
   showTimePanel: boolean;
-  showBpmPanel: boolean;
+  showBpmPanel?: boolean;
   showSearchPanel: boolean;
   onToggleTagPanel: () => void;
   onToggleTimePanel: () => void;
-  onToggleBpmPanel: () => void;
+  onToggleBpmPanel?: () => void;
   onToggleSearchPanel: () => void;
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  searchPlaceholder?: string;
+  searchHint?: string;
 };
 
 export function ChartFilterToolbar({
   period,
   onPeriodChange,
+  periods = TIME_PERIODS,
   selectedTagTerms,
   onTagTermsChange,
   searchQuery,
   onSearchQueryChange,
-  bpmFilterRange,
+  bpmFilterRange = 'all',
   onBpmFilterChange,
+  showBpm = true,
   topTags,
   showTagPanel,
   showTimePanel,
-  showBpmPanel,
+  showBpmPanel = false,
   showSearchPanel,
   onToggleTagPanel,
   onToggleTimePanel,
@@ -53,9 +61,14 @@ export function ChartFilterToolbar({
   onToggleSearchPanel,
   onClearFilters,
   hasActiveFilters,
+  searchPlaceholder = 'Title, artist, or tag…',
+  searchHint = 'Filters the current chart. Use Add music for MusicBrainz search.',
 }: Props) {
   const selectedTags = getSelectedTagFilters(selectedTagTerms);
   const topTagsPreview = topTags.slice(0, 8);
+  const periodLabel =
+    periods.find((p) => p.key === period)?.label ??
+    TIME_PERIODS.find((p) => p.key === (period as TimePeriodKey))?.label;
 
   const toggleTag = (tag: string) => {
     const hash = `#${tag}`;
@@ -89,16 +102,18 @@ export function ChartFilterToolbar({
           icon="time-outline"
           label="Time"
           active={showTimePanel}
-          detail={TIME_PERIODS.find((p) => p.key === period)?.label}
+          detail={periodLabel}
           onPress={onToggleTimePanel}
         />
-        <FilterTrigger
-          icon="speedometer-outline"
-          label="BPM"
-          active={showBpmPanel || bpmFilterRange !== 'all'}
-          detail={formatBpmFilterLabel(bpmFilterRange)}
-          onPress={onToggleBpmPanel}
-        />
+        {showBpm ? (
+          <FilterTrigger
+            icon="speedometer-outline"
+            label="BPM"
+            active={showBpmPanel || bpmFilterRange !== 'all'}
+            detail={formatBpmFilterLabel(bpmFilterRange)}
+            onPress={onToggleBpmPanel ?? (() => {})}
+          />
+        ) : null}
         <FilterTrigger
           icon="search-outline"
           label="Search"
@@ -154,7 +169,7 @@ export function ChartFilterToolbar({
       {showTimePanel ? (
         <FilterPanel title="Time Period" onHide={onToggleTimePanel}>
           <View style={styles.chips}>
-            {TIME_PERIODS.map((p) => {
+            {periods.map((p) => {
               const active = period === p.key;
               return (
                 <Pressable
@@ -172,7 +187,7 @@ export function ChartFilterToolbar({
         </FilterPanel>
       ) : null}
 
-      {showBpmPanel ? (
+      {showBpm && showBpmPanel && onBpmFilterChange && onToggleBpmPanel ? (
         <FilterPanel title="Filter by BPM" onHide={onToggleBpmPanel}>
           <View style={styles.chips}>
             {BPM_FILTER_OPTIONS.map((option) => {
@@ -198,16 +213,14 @@ export function ChartFilterToolbar({
           <TextInput
             value={searchQuery}
             onChangeText={onSearchQueryChange}
-            placeholder="Title, artist, or tag…"
+            placeholder={searchPlaceholder}
             placeholderTextColor={colors.textMuted}
             style={styles.searchInput}
             autoCapitalize="none"
             autoCorrect={false}
             clearButtonMode="while-editing"
           />
-          <Text style={styles.searchHint}>
-            Filters the current chart. Use Add tunes for MusicBrainz search.
-          </Text>
+          <Text style={styles.searchHint}>{searchHint}</Text>
         </FilterPanel>
       ) : null}
     </View>

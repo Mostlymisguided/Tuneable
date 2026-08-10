@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/src/theme/colors';
-import { formatPoundsFromPence } from '@/src/lib/format';
 import {
   formatLocation,
   type LocationQuickPick,
@@ -8,12 +7,16 @@ import {
 import type { ResolvedLocation } from '@/src/types/user';
 
 type Props = {
+  chartLabel?: string;
+  contentNoun?: string;
   selectedLocation: ResolvedLocation | null;
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
 };
 
 export function GlobalChartHero({
+  chartLabel = "The World's Best Music",
+  contentNoun = 'Music',
   selectedLocation,
   onLocationChange,
   locationQuickPicks,
@@ -24,7 +27,7 @@ export function GlobalChartHero({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.eyebrow}>The World&apos;s Best Music</Text>
+      <Text style={styles.eyebrow}>{chartLabel}</Text>
       <Text style={styles.votedFrom}>In</Text>
       <Text style={styles.locationTitle}>{locationLabel}</Text>
 
@@ -42,7 +45,6 @@ export function GlobalChartHero({
               <LocationChip
                 key={loc.placeId}
                 label={label}
-                subtitle={loc.total > 0 ? formatPoundsFromPence(loc.total) : undefined}
                 active={selected}
                 onPress={() =>
                   onLocationChange(
@@ -65,7 +67,7 @@ export function GlobalChartHero({
 
       {selectedLocation?.placeId ? (
         <Text style={styles.filterNote}>
-          Music in {formatLocation(selectedLocation)} and below
+          {contentNoun} in {formatLocation(selectedLocation)} and below
         </Text>
       ) : null}
     </View>
@@ -74,12 +76,10 @@ export function GlobalChartHero({
 
 function LocationChip({
   label,
-  subtitle,
   active,
   onPress,
 }: {
   label: string;
-  subtitle?: string;
   active: boolean;
   onPress: () => void;
 }) {
@@ -90,11 +90,6 @@ function LocationChip({
       <Text style={[styles.chipText, active && styles.chipTextActive]}>
         {label}
       </Text>
-      {subtitle ? (
-        <Text style={[styles.chipSub, active && styles.chipTextActive]}>
-          {subtitle}
-        </Text>
-      ) : null}
     </Pressable>
   );
 }
@@ -153,10 +148,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#fff',
-  },
-  chipSub: {
-    color: colors.textMuted,
-    fontSize: 10,
   },
   filterNote: {
     marginTop: 10,
