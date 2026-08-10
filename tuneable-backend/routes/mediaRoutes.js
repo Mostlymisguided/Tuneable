@@ -3868,6 +3868,30 @@ router.post('/admin/enrichment/:id/dismiss', authMiddleware, async (req, res) =>
   }
 });
 
+// @route   POST /api/media/admin/enrichment/:id/preview-candidate
+// @desc    Lazy-load MusicBrainz details (tags/album/duration) for a candidate
+// @access  Private (Admin)
+router.post('/admin/enrichment/:id/preview-candidate', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const metadataEnrichmentService = require('../services/metadataEnrichmentService');
+    const index = parseInt(req.body?.candidateIndex, 10);
+    if (!Number.isFinite(index) || index < 0) {
+      return res.status(400).json({ error: 'candidateIndex is required' });
+    }
+    const result = await metadataEnrichmentService.previewCandidate(
+      req.params.id,
+      index
+    );
+    res.json({ success: true, candidate: result.candidate });
+  } catch (error) {
+    console.error('Error previewing enrichment candidate:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to preview candidate' });
+  }
+});
+
 // @route   POST /api/media/admin/enrichment/:id/choose-candidate
 // @desc    Apply a specific MusicBrainz candidate by index
 // @access  Private (Admin)

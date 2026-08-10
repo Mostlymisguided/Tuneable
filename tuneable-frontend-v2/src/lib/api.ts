@@ -904,6 +904,11 @@ export const mediaAPI = {
     return response.data;
   },
 
+  previewEnrichmentCandidate: async (id: string, candidateIndex: number) => {
+    const response = await api.post(`/media/admin/enrichment/${id}/preview-candidate`, { candidateIndex });
+    return response.data;
+  },
+
   // Place global bid (chart support)
   placeGlobalBid: async (mediaId: string, amount: number, externalMedia?: {
     title: string;

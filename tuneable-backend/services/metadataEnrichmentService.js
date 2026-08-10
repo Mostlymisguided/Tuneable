@@ -281,6 +281,47 @@ function suggestionFromCandidate(candidate, extras = {}) {
   };
 }
 
+function suggestionHasStructuredArtists(suggestion) {
+  return Array.isArray(suggestion?.artists)
+    && suggestion.artists.length > 0
+    && suggestion.artists.every((entry) => String(entry?.name || '').trim());
+}
+
+/**
+ * Legacy enrichment rows stored MB names joined with '' (e.g. "LogicAlessia CaraKhalid")
+ * and empty artists[]. Re-fetch credits so apply/list never write that blob again.
+ */
+async function hydrateSuggestionArtists(suggestion) {
+  if (!suggestion) return suggestion;
+
+  if (suggestionHasStructuredArtists(suggestion)) {
+    const featuring = Array.isArray(suggestion.featuring) ? suggestion.featuring : [];
+    const display = formatCreatorDisplay(suggestion.artists, featuring);
+    if (display && display !== suggestion.artist) {
+      return { ...suggestion, artist: display };
+    }
+    return suggestion;
+  }
+
+  const mbid = suggestion.musicbrainzId;
+  if (!mbid) return suggestion;
+
+  try {
+    await throttleMusicBrainz();
+    const details = await musicbrainzService.getRecording(mbid);
+    if (!details?.artists?.length) return suggestion;
+    return {
+      ...suggestion,
+      artist: details.artist || suggestion.artist,
+      artists: details.artists,
+      featuring: details.featuring || [],
+    };
+  } catch (err) {
+    console.warn('hydrateSuggestionArtists failed:', mbid, err.message);
+    return suggestion;
+  }
+}
+
 function findExistingCreatorByName(existing, name) {
   const want = normalize(name);
   if (!want || !Array.isArray(existing)) return null;
@@ -655,6 +696,7 @@ async function processEnrichmentItem(itemOrId) {
         genres: detailed.genres || [],
         score: best.score,
         matchType: best.matchType,
+        detailsFetched: true,
       },
       ...scored.slice(1, 5),
     ];
@@ -818,7 +860,7 @@ async function applyEnrichment(itemId, actorId, overrides = {}) {
     throw err;
   }
 
-  const suggestion = {
+  let suggestion = {
     title: overrides.title || item.suggestion.title,
     artist: overrides.artist || item.suggestion.artist,
     artists: overrides.artists ?? item.suggestion.artists ?? [],
@@ -839,9 +881,13 @@ async function applyEnrichment(itemId, actorId, overrides = {}) {
 
   // If admin overrides the display artist string without structured arrays, clear arrays
   // so resolveArtistArraysFromSuggestion re-parses from the string.
-  if (overrides.artist && overrides.artists == null) {
+  const adminArtistOverride = Boolean(overrides.artist && overrides.artists == null);
+  if (adminArtistOverride) {
     suggestion.artists = [];
     suggestion.featuring = overrides.featuring ?? [];
+  } else {
+    // Legacy rows: smashed artist string + empty artists[] — pull credits from MB first
+    suggestion = await hydrateSuggestionArtists(suggestion);
   }
 
   // Tag-only / backfill rows should not rewrite title/artist unless asked
@@ -909,6 +955,65 @@ async function batchDismissEnrichments(ids, actorId, adminNotes) {
   return results;
 }
 
+function candidateToPlain(candidate) {
+  if (!candidate) return null;
+  return typeof candidate.toObject === 'function' ? candidate.toObject() : { ...candidate };
+}
+
+function persistCandidateDetails(item, candidateIndex, detailed) {
+  const next = {
+    musicbrainzId: detailed.musicbrainzId,
+    musicbrainzReleaseId: detailed.musicbrainzReleaseId || null,
+    title: detailed.title,
+    artist: detailed.artist,
+    artists: detailed.artists || [],
+    featuring: detailed.featuring || [],
+    album: detailed.album || null,
+    duration: detailed.duration || 0,
+    releaseDate: detailed.releaseDate || null,
+    releaseYear: detailed.releaseYear || null,
+    releaseDatePrecision: detailed.releaseDatePrecision || null,
+    isrc: detailed.isrc || null,
+    tags: detailed.tags || [],
+    genres: detailed.genres || [],
+    score: detailed.score ?? item.candidates[candidateIndex]?.score ?? 0,
+    matchType: detailed.matchType ?? item.candidates[candidateIndex]?.matchType ?? null,
+    detailsFetched: true,
+  };
+  item.candidates[candidateIndex] = next;
+  item.markModified('candidates');
+  return next;
+}
+
+/**
+ * Lazy-load MusicBrainz recording details for a review candidate (tags, ISRC, album, etc.).
+ * Persists onto the candidate so reopening the queue does not re-hit MB.
+ */
+async function previewCandidate(itemId, candidateIndex) {
+  const item = await MetadataEnrichment.findById(itemId);
+  if (!item) {
+    const err = new Error('Enrichment item not found');
+    err.status = 404;
+    throw err;
+  }
+  const candidate = item.candidates?.[candidateIndex];
+  if (!candidate) {
+    const err = new Error('Invalid candidate index');
+    err.status = 400;
+    throw err;
+  }
+
+  const plain = candidateToPlain(candidate);
+  if (plain.detailsFetched) {
+    return { candidate: plain, item };
+  }
+
+  const detailed = await enrichCandidateDetails(plain);
+  const saved = persistCandidateDetails(item, candidateIndex, detailed);
+  await item.save();
+  return { candidate: saved, item };
+}
+
 async function chooseCandidate(itemId, candidateIndex, actorId) {
   const item = await MetadataEnrichment.findById(itemId);
   if (!item) {
@@ -923,8 +1028,9 @@ async function chooseCandidate(itemId, candidateIndex, actorId) {
     throw err;
   }
 
-  const plain = typeof candidate.toObject === 'function' ? candidate.toObject() : { ...candidate };
+  const plain = candidateToPlain(candidate);
   const detailed = await enrichCandidateDetails(plain);
+  persistCandidateDetails(item, candidateIndex, detailed);
   item.suggestion = suggestionFromCandidate(detailed);
   item.confidence = confidenceFromScore(detailed.score ?? candidate.score);
   await item.save();
@@ -1094,8 +1200,13 @@ module.exports = {
   batchApplyEnrichments,
   batchDismissEnrichments,
   chooseCandidate,
+  previewCandidate,
   scoreCandidate,
   filterNewTags,
+  hydrateSuggestionArtists,
+  suggestionHasStructuredArtists,
+  resolveArtistArraysFromSuggestion,
+  applySuggestionToMedia,
   HIGH_SCORE,
   MEDIUM_SCORE,
 };

@@ -9,6 +9,8 @@ import {
   ExternalLink,
   Tags,
   CheckCheck,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { mediaAPI } from '../lib/api';
@@ -56,9 +58,12 @@ interface EnrichmentItem {
     album?: string | null;
     duration?: number;
     releaseYear?: number | null;
+    isrc?: string | null;
     tags?: string[];
+    genres?: string[];
     score?: number;
     matchType?: string;
+    detailsFetched?: boolean;
   }>;
   currentTags?: string[];
   currentGenres?: string[];
@@ -177,6 +182,8 @@ const MetadataEnrichmentAdmin: React.FC = () => {
   const [batchBusy, setBatchBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
+  const [previewingCandidate, setPreviewingCandidate] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -187,6 +194,8 @@ const MetadataEnrichmentAdmin: React.FC = () => {
       setPages(data.pagination?.pages || 1);
       setTotal(data.pagination?.total || 0);
       setSelected(new Set());
+      setExpandedCandidates(new Set());
+      setPreviewingCandidate(null);
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to load enrichment queue');
     } finally {
@@ -312,6 +321,46 @@ const MetadataEnrichmentAdmin: React.FC = () => {
       toast.error(error?.response?.data?.error || 'Failed to apply candidate');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const candidateExpandKey = (itemId: string, index: number) => `${itemId}:${index}`;
+
+  const handleToggleCandidate = async (
+    itemId: string,
+    candidateIndex: number,
+    candidate: NonNullable<EnrichmentItem['candidates']>[number]
+  ) => {
+    const key = candidateExpandKey(itemId, candidateIndex);
+    const willExpand = !expandedCandidates.has(key);
+
+    setExpandedCandidates((prev) => {
+      const next = new Set(prev);
+      if (willExpand) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+    if (!willExpand || candidate.detailsFetched) return;
+
+    setPreviewingCandidate(key);
+    try {
+      const data = await mediaAPI.previewEnrichmentCandidate(itemId, candidateIndex);
+      if (data?.candidate) {
+        setItems((prev) =>
+          prev.map((item) => {
+            if (item._id !== itemId || !item.candidates) return item;
+            const candidates = item.candidates.map((c, i) =>
+              i === candidateIndex ? { ...c, ...data.candidate, detailsFetched: true } : c
+            );
+            return { ...item, candidates };
+          })
+        );
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to load candidate details');
+    } finally {
+      setPreviewingCandidate(null);
     }
   };
 
@@ -650,33 +699,89 @@ const MetadataEnrichmentAdmin: React.FC = () => {
                 {item.candidates && item.candidates.length > 1 && item.status === 'needs_review' ? (
                   <div className="space-y-2">
                     <div className="text-xs text-gray-400">Other candidates</div>
-                    {item.candidates.map((c, idx) => (
-                      <div
-                        key={`${c.musicbrainzId || idx}`}
-                        className="flex flex-wrap items-center justify-between gap-2 text-sm bg-gray-900/50 border border-gray-700 rounded px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <span className="text-white">{c.title}</span>
-                          <span className="text-gray-400"> — {formatSuggestionArtist(c)}</span>
-                          <span className="text-gray-500 text-xs ml-2">
-                            {(c.score != null ? `${(c.score * 100).toFixed(0)}%` : '')}
-                            {c.matchType ? ` · ${c.matchType}` : ''}
-                            {c.releaseYear ? ` · ${c.releaseYear}` : ''}
-                          </span>
-                          {c.tags && c.tags.length > 0 ? (
-                            <TagChips labels={c.tags} tone="amber" />
+                    {item.candidates.slice(1).map((c, offset) => {
+                      const idx = offset + 1;
+                      const expandKey = candidateExpandKey(item._id, idx);
+                      const isExpanded = expandedCandidates.has(expandKey);
+                      const isPreviewing = previewingCandidate === expandKey;
+                      const candidateTags = c.tags?.length ? c.tags : c.genres;
+
+                      return (
+                        <div
+                          key={`${c.musicbrainzId || idx}`}
+                          className="bg-gray-900/50 border border-gray-700 rounded px-3 py-2 space-y-2"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleCandidate(item._id, idx, c)}
+                              className="min-w-0 flex-1 text-left flex items-start gap-1.5 group"
+                              aria-expanded={isExpanded}
+                            >
+                              <span className="mt-0.5 text-gray-500 group-hover:text-gray-300 shrink-0">
+                                {isExpanded
+                                  ? <ChevronDown className="h-3.5 w-3.5" />
+                                  : <ChevronRight className="h-3.5 w-3.5" />}
+                              </span>
+                              <span className="min-w-0 text-sm">
+                                <span className="text-white">{c.title}</span>
+                                <span className="text-gray-400"> — {formatSuggestionArtist(c)}</span>
+                                <span className="text-gray-500 text-xs ml-2">
+                                  {c.score != null ? `${(c.score * 100).toFixed(0)}%` : ''}
+                                  {c.matchType ? ` · ${c.matchType}` : ''}
+                                  {c.releaseYear ? ` · ${c.releaseYear}` : ''}
+                                </span>
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busyId === item._id || batchBusy}
+                              onClick={() => void handleChoose(item._id, idx)}
+                              className="text-xs px-2 py-1 bg-purple-800 hover:bg-purple-700 rounded shrink-0"
+                            >
+                              Use this
+                            </button>
+                          </div>
+
+                          {isExpanded ? (
+                            <div className="pl-5 space-y-2 text-sm border-t border-gray-700/80 pt-2">
+                              <div className="text-xs text-gray-500">
+                                {c.album || 'No album'} · {formatDuration(c.duration)}
+                                {c.releaseYear ? ` · ${c.releaseYear}` : ''}
+                                {c.isrc ? ` · ${c.isrc}` : ''}
+                              </div>
+                              <div>
+                                <div className="text-[11px] text-gray-500 uppercase tracking-wide">
+                                  Tags
+                                </div>
+                                {isPreviewing ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Loading MusicBrainz details…
+                                  </div>
+                                ) : (
+                                  <TagChips
+                                    labels={candidateTags}
+                                    empty="No MB tags found"
+                                    tone="amber"
+                                  />
+                                )}
+                              </div>
+                              {c.musicbrainzId ? (
+                                <a
+                                  href={`https://musicbrainz.org/recording/${c.musicbrainzId}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-purple-300 hover:underline inline-block"
+                                >
+                                  View on MusicBrainz
+                                </a>
+                              ) : null}
+                            </div>
                           ) : null}
                         </div>
-                        <button
-                          type="button"
-                          disabled={busyId === item._id || batchBusy}
-                          onClick={() => void handleChoose(item._id, idx)}
-                          className="text-xs px-2 py-1 bg-purple-800 hover:bg-purple-700 rounded"
-                        >
-                          Use this
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>

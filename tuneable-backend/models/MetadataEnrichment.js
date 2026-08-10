@@ -35,6 +35,8 @@ const candidateSchema = new mongoose.Schema({
   genres: { type: [String], default: [] },
   score: { type: Number, default: 0 },
   matchType: { type: String, default: null },
+  /** True after a recording lookup (tags/ISRC/release) has been fetched for this candidate. */
+  detailsFetched: { type: Boolean, default: false },
 }, { _id: false });
 
 const suggestionSchema = new mongoose.Schema({
