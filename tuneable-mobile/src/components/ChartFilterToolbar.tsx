@@ -62,7 +62,7 @@ export function ChartFilterToolbar({
   onClearFilters,
   hasActiveFilters,
   searchPlaceholder = 'Title, artist, or tag…',
-  searchHint = 'Filters the current chart. Use Add music for MusicBrainz search.',
+  searchHint = 'Filters the current chart. Use Add for MusicBrainz search.',
 }: Props) {
   const selectedTags = getSelectedTagFilters(selectedTagTerms);
   const topTagsPreview = topTags.slice(0, 8);
