@@ -11,9 +11,12 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronRight,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { mediaAPI } from '../lib/api';
+
+type LocationBackfillMode = 'missing' | 'artist_home' | 'musicbrainz';
 
 interface EnrichmentItem {
   _id: string;
@@ -179,6 +182,15 @@ const MetadataEnrichmentAdmin: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [locationBusy, setLocationBusy] = useState(false);
+  const [locationLimit, setLocationLimit] = useState(50);
+  const [locationMode, setLocationMode] = useState<LocationBackfillMode>('missing');
+  const [locationNameSearch, setLocationNameSearch] = useState(false);
+  const [locationCoverage, setLocationCoverage] = useState<{
+    total?: number;
+    withLoc?: number;
+    missing?: number;
+  } | null>(null);
   const [batchBusy, setBatchBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -282,6 +294,96 @@ const MetadataEnrichmentAdmin: React.FC = () => {
       toast.error(error?.response?.data?.error || 'Backfill failed');
     } finally {
       setBackfilling(false);
+    }
+  };
+
+  const summarizeLocationResult = (result: any, label: string) => {
+    if (result?.coverage) {
+      setLocationCoverage({
+        total: result.coverage.total,
+        withLoc: result.coverage.withLoc,
+        missing: result.coverage.missing,
+      });
+    }
+    const cov = result?.coverage;
+    const coverageBit = cov
+      ? ` · coverage ${cov.withLoc}/${cov.total} (${cov.missing} missing)`
+      : '';
+    if (result?.statsOnly) {
+      toast.info(`${label}: stats only${coverageBit}`);
+      return;
+    }
+    const bySource = result?.bySource && Object.keys(result.bySource).length > 0
+      ? ` · ${Object.entries(result.bySource).map(([k, v]) => `${k}:${v}`).join(', ')}`
+      : '';
+    toast.success(
+      `${label}: ${result?.updated ?? 0} updated`
+        + ` / ${result?.unmatched ?? 0} unmatched`
+        + ` / ${result?.scanned ?? 0} scanned`
+        + `${result?.dryRun ? ' (dry-run)' : ''}`
+        + bySource
+        + coverageBit
+    );
+  };
+
+  const handleLocationDrip = async () => {
+    setLocationBusy(true);
+    try {
+      const result = await mediaAPI.runEnrichmentDrip({
+        locationsOnly: true,
+        locationLimit: 25,
+        includeCoverage: true,
+      });
+      const loc = result?.locations;
+      toast.success(
+        `Location drip: ${loc?.updated ?? 0} updated`
+          + ` / ${loc?.unmatched ?? 0} unmatched`
+          + ` / ${loc?.scanned ?? 0} scanned`
+          + (result?.coverage?.locations
+            ? ` · ${result.coverage.locations.withLoc}/${result.coverage.locations.total} with location`
+            : '')
+      );
+      if (result?.coverage?.locations) {
+        setLocationCoverage({
+          total: result.coverage.locations.total,
+          withLoc: result.coverage.locations.withLoc,
+          missing: result.coverage.locations.missing,
+        });
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Location drip failed');
+    } finally {
+      setLocationBusy(false);
+    }
+  };
+
+  const handleLocationBackfill = async (opts: {
+    statsOnly?: boolean;
+    dryRun?: boolean;
+    execute?: boolean;
+  }) => {
+    setLocationBusy(true);
+    try {
+      const result = await mediaAPI.runLocationBackfill({
+        statsOnly: opts.statsOnly === true,
+        dryRun: opts.execute === true ? false : opts.dryRun !== false,
+        execute: opts.execute === true,
+        limit: Math.min(Math.max(locationLimit || 50, 1), 200),
+        mode: locationMode,
+        nameSearch: locationNameSearch,
+        includeStats: true,
+        quiet: true,
+      });
+      const label = opts.statsOnly
+        ? 'Location stats'
+        : opts.execute
+          ? 'Location backfill'
+          : 'Location dry-run';
+      summarizeLocationResult(result, label);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Location backfill failed');
+    } finally {
+      setLocationBusy(false);
     }
   };
 
@@ -460,6 +562,104 @@ const MetadataEnrichmentAdmin: React.FC = () => {
             Process queue{pendingCount ? ` (${pendingCount})` : ''}
           </button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-sky-900/60 bg-sky-950/30 px-3 py-3 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm text-sky-200">
+            <MapPin className="h-4 w-4" />
+            <span className="font-medium">Media locations</span>
+            {locationCoverage ? (
+              <span className="text-xs text-sky-300/80">
+                {locationCoverage.withLoc}/{locationCoverage.total} with location
+                {locationCoverage.missing != null ? ` · ${locationCoverage.missing} missing` : ''}
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleLocationDrip()}
+            disabled={locationBusy || backfilling}
+            className="px-3 py-1.5 bg-sky-800 hover:bg-sky-700 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
+            title="Run one capped location drip (25 missing)"
+          >
+            {locationBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+            Location drip (25)
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="text-xs text-gray-400 flex items-center gap-1.5">
+            Limit
+            <input
+              type="number"
+              min={1}
+              max={200}
+              value={locationLimit}
+              onChange={(e) => setLocationLimit(Math.min(Math.max(parseInt(e.target.value, 10) || 50, 1), 200))}
+              className="w-16 rounded bg-gray-900 border border-gray-700 px-2 py-1 text-white"
+            />
+          </label>
+          {(
+            [
+              { value: 'missing' as const, label: 'Missing' },
+              { value: 'artist_home' as const, label: 'Artist home' },
+              { value: 'musicbrainz' as const, label: 'MusicBrainz' },
+            ]
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setLocationMode(opt.value)}
+              className={`px-2.5 py-1 rounded-full border text-xs ${
+                locationMode === opt.value
+                  ? 'bg-sky-800/70 border-sky-500 text-white'
+                  : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-gray-500'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <label className="flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer ml-1">
+            <input
+              type="checkbox"
+              checked={locationNameSearch}
+              onChange={(e) => setLocationNameSearch(e.target.checked)}
+              className="rounded border-gray-600"
+            />
+            Name search
+          </label>
+          <div className="flex flex-wrap gap-2 ml-auto">
+            <button
+              type="button"
+              disabled={locationBusy}
+              onClick={() => void handleLocationBackfill({ statsOnly: true })}
+              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded text-xs"
+            >
+              Stats
+            </button>
+            <button
+              type="button"
+              disabled={locationBusy}
+              onClick={() => void handleLocationBackfill({ dryRun: true })}
+              className="px-2.5 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded text-xs"
+            >
+              Dry-run
+            </button>
+            <button
+              type="button"
+              disabled={locationBusy}
+              onClick={() => void handleLocationBackfill({ execute: true })}
+              className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 disabled:opacity-50 rounded text-xs font-medium"
+            >
+              Execute backfill
+            </button>
+          </div>
+        </div>
+        <p className="text-[11px] text-sky-300/70">
+          Dedicated backfill fills missing media origins (artist home → MusicBrainz → ISRC).
+          Cap is 200 per run. Name search is noisier — use sparingly.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs">

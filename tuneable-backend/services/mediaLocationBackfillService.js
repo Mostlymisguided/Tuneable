@@ -501,6 +501,12 @@ function createBackfillContext(opts) {
   return { processMedia };
 }
 
+let locationBackfillRunning = false;
+
+function isLocationBackfillRunning() {
+  return locationBackfillRunning;
+}
+
 /**
  * Run a bounded media location backfill pass.
  * @param {object} [opts]
@@ -518,6 +524,19 @@ function createBackfillContext(opts) {
  * @param {boolean} [opts.includeStats]
  */
 async function runMediaLocationBackfill(rawOpts = {}) {
+  if (locationBackfillRunning) {
+    return { skipped: true, reason: 'already_running' };
+  }
+
+  locationBackfillRunning = true;
+  try {
+    return await runMediaLocationBackfillUnlocked(rawOpts);
+  } finally {
+    locationBackfillRunning = false;
+  }
+}
+
+async function runMediaLocationBackfillUnlocked(rawOpts = {}) {
   const opts = normalizeOpts(rawOpts);
   const log = opts.quiet ? () => {} : (...args) => console.log(...args);
 
@@ -623,6 +642,7 @@ async function runMediaLocationBackfill(rawOpts = {}) {
 module.exports = {
   runMediaLocationBackfill,
   getLocationCoverageStats,
+  isLocationBackfillRunning,
   isMusicTune,
   needsLocationBackfill,
 };

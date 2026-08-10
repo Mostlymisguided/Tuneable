@@ -873,6 +873,23 @@ export const mediaAPI = {
     return response.data;
   },
 
+  runLocationBackfill: async (params?: {
+    dryRun?: boolean;
+    execute?: boolean;
+    statsOnly?: boolean;
+    limit?: number;
+    mode?: 'missing' | 'artist_home' | 'musicbrainz';
+    artistHomeOnly?: boolean;
+    musicbrainzOnly?: boolean;
+    nameSearch?: boolean;
+    upgradeInferred?: boolean;
+    includeStats?: boolean;
+    quiet?: boolean;
+  }) => {
+    const response = await api.post('/media/admin/enrichment/location-backfill', params || {});
+    return response.data;
+  },
+
   batchApplyEnrichments: async (ids: string[], overrides?: Record<string, unknown>) => {
     const response = await api.post('/media/admin/enrichment/batch-apply', {
       ids,

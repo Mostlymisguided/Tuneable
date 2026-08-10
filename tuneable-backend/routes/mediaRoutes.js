@@ -3741,8 +3741,9 @@ router.post('/admin/enrichment/drip', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
     const { runEnrichmentDrip, isDripRunning } = require('../services/enrichmentDripService');
-    if (isDripRunning()) {
-      return res.status(409).json({ error: 'Enrichment drip already running' });
+    const { isLocationBackfillRunning } = require('../services/mediaLocationBackfillService');
+    if (isDripRunning() || isLocationBackfillRunning()) {
+      return res.status(409).json({ error: 'Enrichment drip or location backfill already running' });
     }
     const body = req.body || {};
     const result = await runEnrichmentDrip({
@@ -3764,6 +3765,52 @@ router.post('/admin/enrichment/drip', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error running enrichment drip:', error);
     res.status(500).json({ error: error.message || 'Failed to run enrichment drip' });
+  }
+});
+
+// @route   POST /api/media/admin/enrichment/location-backfill
+// @desc    Run dedicated Media.primaryLocation backfill (bounded; optional dry-run/stats)
+// @access  Private (Admin)
+router.post('/admin/enrichment/location-backfill', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const {
+      runMediaLocationBackfill,
+      isLocationBackfillRunning,
+    } = require('../services/mediaLocationBackfillService');
+    const { isDripRunning } = require('../services/enrichmentDripService');
+    if (isLocationBackfillRunning() || isDripRunning()) {
+      return res.status(409).json({ error: 'Location backfill or enrichment drip already running' });
+    }
+
+    const body = req.body || {};
+    const rawLimit = parseInt(body.limit, 10);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), 200)
+      : 50;
+
+    const result = await runMediaLocationBackfill({
+      dryRun: body.dryRun !== false && body.execute !== true,
+      statsOnly: body.statsOnly === true,
+      limit: body.statsOnly === true ? null : limit,
+      artistHomeOnly: body.artistHomeOnly === true || body.mode === 'artist_home',
+      musicbrainzOnly: body.musicbrainzOnly === true || body.mode === 'musicbrainz',
+      nameSearch: body.nameSearch === true,
+      upgradeInferred: body.upgradeInferred === true,
+      quiet: body.quiet !== false,
+      includeStats: body.includeStats !== false,
+    });
+
+    if (result?.skipped) {
+      return res.status(409).json({ error: 'Location backfill already running', ...result });
+    }
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Error running location backfill:', error);
+    res.status(500).json({ error: error.message || 'Failed to run location backfill' });
   }
 });
 
