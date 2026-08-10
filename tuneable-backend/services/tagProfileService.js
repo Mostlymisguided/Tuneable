@@ -1,5 +1,6 @@
 const Media = require('../models/Media');
 const Party = require('../models/Party');
+const Bid = require('../models/Bid');
 const {
   getCanonicalTag,
   normalizeTagForMatching,
@@ -11,6 +12,15 @@ const { generateSlug, getExistingTagParty } = require('./tagPartyService');
 const { loadBidsByMediaId } = require('./relatedMediaService');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const SKIP_PLACE_FEATURE_TYPES = new Set(['continent', 'earth', 'world']);
+const CITYISH_FEATURE_TYPES = new Set([
+  'place',
+  'locality',
+  'district',
+  'neighborhood',
+  'postcode',
+  'address',
+]);
 
 /**
  * Resolve a URL slug into display name + canonical matching key.
@@ -135,6 +145,176 @@ function computeRelatedTags(matchedMedia, currentDisplayName, { limit = 8 } = {}
 }
 
 /**
+ * Bucket a media primaryLocation into a city-first place, else country.
+ * Skips continent/world; skips region so lists stay city-or-country.
+ */
+function originBucketFromLocation(loc) {
+  if (!loc || typeof loc !== 'object' || !loc.placeId) return null;
+
+  const ft = loc.featureType || null;
+  if (ft && SKIP_PLACE_FEATURE_TYPES.has(ft)) return null;
+
+  const ancestors = Array.isArray(loc.ancestors) ? loc.ancestors.filter(Boolean) : [];
+  const countryAncestor = ancestors.find((a) => a.placetype === 'country') || null;
+
+  const isCityish =
+    (ft && CITYISH_FEATURE_TYPES.has(ft)) ||
+    (!ft && !!(loc.city || loc.label));
+
+  // City / locality (or unlabeled fine place) — not country/region
+  if (ft !== 'country' && ft !== 'region' && (isCityish || (ft && !SKIP_PLACE_FEATURE_TYPES.has(ft)))) {
+    const name = (loc.city || loc.label || loc.display || '').trim();
+    if (name) {
+      return {
+        placeId: loc.placeId,
+        name: loc.city || loc.label || name,
+        featureType: ft || 'place',
+      };
+    }
+  }
+
+  // Country fallback
+  if (countryAncestor?.placeId) {
+    const name = (countryAncestor.label || loc.country || '').trim();
+    if (name) {
+      return {
+        placeId: countryAncestor.placeId,
+        name,
+        featureType: 'country',
+      };
+    }
+  }
+
+  if (ft === 'country') {
+    const name = (loc.label || loc.country || loc.display || '').trim();
+    if (name) {
+      return {
+        placeId: loc.placeId,
+        name,
+        featureType: 'country',
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Top origin places for tagged media — tip-weighted, city-first then country.
+ */
+function computeTopOriginPlaces(matchedMedia, { limit = 3 } = {}) {
+  const byPlaceId = new Map();
+
+  for (const item of matchedMedia) {
+    const bucket = originBucketFromLocation(item.primaryLocation);
+    if (!bucket) continue;
+    const tipWeight = typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0;
+    const existing = byPlaceId.get(bucket.placeId);
+    if (existing) {
+      existing.tipWeight += tipWeight;
+      existing.count += 1;
+      if (bucket.name.length > existing.name.length) existing.name = bucket.name;
+    } else {
+      byPlaceId.set(bucket.placeId, {
+        placeId: bucket.placeId,
+        name: bucket.name,
+        featureType: bucket.featureType,
+        tipWeight,
+        count: 1,
+      });
+    }
+  }
+
+  const ranked = [...byPlaceId.values()].sort(
+    (a, b) => b.tipWeight - a.tipWeight || b.count - a.count || a.name.localeCompare(b.name)
+  );
+
+  // Prefer a single granularity: cities when we have them, else countries
+  const cities = ranked.filter((p) => p.featureType !== 'country');
+  const chosen = (cities.length > 0 ? cities : ranked).slice(0, limit);
+
+  return chosen.map(({ placeId, name, featureType }) => ({ placeId, name, featureType }));
+}
+
+/**
+ * Top tipper-home places supporting this tag's media — tip-amount weighted.
+ * City-first (bidderHomePlaceId) with country fallback when home is country-level.
+ */
+async function computeTopSupportPlaces(mediaIds, { limit = 3 } = {}) {
+  if (!Array.isArray(mediaIds) || mediaIds.length === 0) return [];
+
+  const rows = await Bid.aggregate([
+    {
+      $match: {
+        status: 'active',
+        mediaId: { $in: mediaIds },
+        bidderHomePlaceId: { $exists: true, $ne: null },
+      },
+    },
+    {
+      $group: {
+        _id: '$bidderHomePlaceId',
+        tipWeight: { $sum: '$amount' },
+        count: { $sum: 1 },
+        placeLabel: { $first: '$bidderPlaceLabel' },
+        display: { $first: '$bidderLocationDisplay' },
+        featureType: { $first: '$bidderFeatureType' },
+        country: { $first: '$bidderCountry' },
+        countryPlaceId: { $first: '$bidderCountryPlaceId' },
+      },
+    },
+    { $sort: { tipWeight: -1, count: -1 } },
+  ]);
+
+  const byPlaceId = new Map();
+
+  const add = (placeId, name, featureType, tipWeight, count) => {
+    if (!placeId || !name) return;
+    if (featureType && SKIP_PLACE_FEATURE_TYPES.has(featureType)) return;
+    const existing = byPlaceId.get(placeId);
+    if (existing) {
+      existing.tipWeight += tipWeight;
+      existing.count += count;
+      if (name.length > existing.name.length) existing.name = name;
+    } else {
+      byPlaceId.set(placeId, {
+        placeId,
+        name,
+        featureType: featureType || null,
+        tipWeight,
+        count,
+      });
+    }
+  };
+
+  for (const row of rows) {
+    const featureType = row.featureType || null;
+    const isCountryHome =
+      featureType === 'country' ||
+      (!row.placeLabel && !!row.country);
+
+    if (isCountryHome) {
+      const placeId = row.countryPlaceId || row._id;
+      const name = (row.country || row.placeLabel || row.display || '').trim();
+      add(placeId, name, 'country', row.tipWeight, row.count);
+      continue;
+    }
+
+    const name = (row.placeLabel || (row.display || '').split(',')[0] || '').trim();
+    add(row._id, name, featureType || 'place', row.tipWeight, row.count);
+  }
+
+  const ranked = [...byPlaceId.values()].sort(
+    (a, b) => b.tipWeight - a.tipWeight || b.count - a.count || a.name.localeCompare(b.name)
+  );
+
+  const cities = ranked.filter((p) => p.featureType !== 'country');
+  const chosen = (cities.length > 0 ? cities : ranked).slice(0, limit);
+
+  return chosen.map(({ placeId, name, featureType }) => ({ placeId, name, featureType }));
+}
+
+/**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
 async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
@@ -191,6 +371,11 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
   const pageSlice = matched.slice(skip, skip + limitNum);
   const tipTotal = matched.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
   const relatedTags = computeRelatedTags(matched, displayName, { limit: 8 });
+  const topOriginPlaces = computeTopOriginPlaces(matched, { limit: 3 });
+  const topSupportPlaces = await computeTopSupportPlaces(
+    matched.map((m) => m._id),
+    { limit: 3 }
+  );
 
   // Attach active bids (with tipper user info) for supporters display on the page slice only
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
@@ -222,6 +407,8 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
     },
     relatedParty,
     relatedTags,
+    topOriginPlaces,
+    topSupportPlaces,
     media,
     pagination: {
       page: pageNum,
@@ -237,4 +424,6 @@ module.exports = {
   getTagProfile,
   generateSlug,
   collectTagVariants,
+  computeTopOriginPlaces,
+  computeTopSupportPlaces,
 };

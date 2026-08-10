@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Tag, Loader2, Music, Coins } from 'lucide-react';
+import { Tag, Loader2, Music, Coins, MapPin } from 'lucide-react';
 import { tagAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
 import { getMediaCoverArt } from '../utils/coverArt';
 import { penceToPounds } from '../utils/currency';
+import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 
 interface TagEntity {
@@ -24,6 +25,12 @@ interface RelatedTag {
   slug: string;
 }
 
+interface TagPlaceChip {
+  placeId: string;
+  name: string;
+  featureType?: string | null;
+}
+
 type TagMediaItem = TippedQueueItem;
 
 const TagProfile: React.FC = () => {
@@ -35,6 +42,8 @@ const TagProfile: React.FC = () => {
   const [tag, setTag] = useState<TagEntity | null>(null);
   const [stats, setStats] = useState<TagStats | null>(null);
   const [relatedTags, setRelatedTags] = useState<RelatedTag[]>([]);
+  const [topOriginPlaces, setTopOriginPlaces] = useState<TagPlaceChip[]>([]);
+  const [topSupportPlaces, setTopSupportPlaces] = useState<TagPlaceChip[]>([]);
   const [media, setMedia] = useState<TagMediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -52,7 +61,9 @@ const TagProfile: React.FC = () => {
         setTag(data.tag);
         setStats(data.stats || null);
         setRelatedTags(data.relatedTags || []);
-        setMedia(data.media || []);
+        setTopOriginPlaces(data.topOriginPlaces || []);
+        setTopSupportPlaces(data.topSupportPlaces || []);
+        setMedia((data.media || []) as TagMediaItem[]);
         setTotal(data.pagination?.total ?? (data.media?.length || 0));
       } catch (err: unknown) {
         console.error('Error loading tag profile:', err);
@@ -85,6 +96,31 @@ const TagProfile: React.FC = () => {
       })),
     [media, displayName]
   );
+
+  const renderPlaceRow = (label: string, places: TagPlaceChip[]) => {
+    if (places.length === 0) return null;
+    return (
+      <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 mb-2">
+        <span className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold mr-0.5">
+          {label}
+        </span>
+        {places.map((place) => {
+          const path = getPlaceProfilePath(place.placeId);
+          if (!path) return null;
+          return (
+            <Link
+              key={`${label}-${place.placeId}`}
+              to={path}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-100 text-xs font-medium hover:bg-blue-500/25 hover:border-blue-400/50 transition-colors no-underline"
+            >
+              <MapPin className="h-3 w-3 text-blue-300" />
+              {place.name}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 pb-24 md:pb-8">
@@ -171,6 +207,14 @@ const TagProfile: React.FC = () => {
                       {related.name}
                     </Link>
                   ))}
+                </div>
+              )}
+
+              {/* Top origin + support places */}
+              {!loading && (topOriginPlaces.length > 0 || topSupportPlaces.length > 0) && (
+                <div className="mb-3">
+                  {renderPlaceRow('From', topOriginPlaces)}
+                  {renderPlaceRow('Supported in', topSupportPlaces)}
                 </div>
               )}
 
