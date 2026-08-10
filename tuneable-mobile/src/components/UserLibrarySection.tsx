@@ -159,18 +159,13 @@ export function UserLibrarySection({
   };
 
   const playItem = (item: ChartMediaItem) => {
-    const playableQueue = filtered.filter(isUploadPlayable);
-    const index = playableQueue.findIndex(
-      (m) => mediaId(m) === mediaId(item)
-    );
+    const index = filtered.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) return;
-    void setQueueAndPlay(playableQueue, index);
+    void setQueueAndPlay(filtered, index);
   };
 
   const onPlayQueue = () => {
-    const playableQueue = filtered.filter(isUploadPlayable);
-    if (playableQueue.length === 0) return;
-    void setQueueAndPlay(playableQueue, 0);
+    void setQueueAndPlay(filtered, 0);
   };
 
   const confirmTip = async (amountPounds: number, tags: string[]) => {

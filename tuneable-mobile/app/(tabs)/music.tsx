@@ -138,16 +138,13 @@ export default function MusicScreen() {
   };
 
   const onPlayItem = (item: ChartMediaItem) => {
-    const playableQueue = filteredMedia.filter(isUploadPlayable);
-    const index = playableQueue.findIndex((m) => mediaId(m) === mediaId(item));
+    const index = filteredMedia.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) return;
-    void setQueueAndPlay(playableQueue, index);
+    void setQueueAndPlay(filteredMedia, index);
   };
 
   const onPlayQueue = () => {
-    const playableQueue = filteredMedia.filter(isUploadPlayable);
-    if (playableQueue.length === 0) return;
-    void setQueueAndPlay(playableQueue, 0);
+    void setQueueAndPlay(filteredMedia, 0);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {

@@ -209,13 +209,9 @@ export default function TuneProfileScreen() {
   const onPlayRelated = (item: RelatedMediaItem) => {
     const queue = related.map(relatedToChartItem);
     const chart = relatedToChartItem(item);
-    if (!isUploadPlayable(chart)) return;
-    const playableQueue = queue.filter(isUploadPlayable);
-    const index = playableQueue.findIndex(
-      (m) => mediaId(m) === mediaId(chart)
-    );
+    const index = queue.findIndex((m) => mediaId(m) === mediaId(chart));
     if (index < 0) return;
-    void setQueueAndPlay(playableQueue, index);
+    void setQueueAndPlay(queue, index);
   };
 
   const placeTip = async (amountPounds: number, tags: string[] = []) => {

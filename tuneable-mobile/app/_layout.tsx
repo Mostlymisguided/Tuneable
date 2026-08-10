@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext';
+import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
 import { colors } from '@/src/theme/colors';
 
@@ -85,6 +86,7 @@ function RootNavigator() {
         <Stack.Screen name="auth/callback" />
       </Stack>
       <PlayerDock />
+      <AppToast />
     </View>
   );
 }

@@ -136,18 +136,15 @@ export default function PodcastsScreen() {
   };
 
   const onPlayItem = (episode: PodcastEpisode) => {
-    const playableQueue = filteredEpisodes.filter(isEpisodePlayable);
-    const index = playableQueue.findIndex(
+    const index = filteredEpisodes.findIndex(
       (e) => episodeId(e) === episodeId(episode)
     );
     if (index < 0) return;
-    void setQueueAndPlay(playableQueue, index);
+    void setQueueAndPlay(filteredEpisodes, index);
   };
 
   const onPlayQueue = () => {
-    const playableQueue = filteredEpisodes.filter(isEpisodePlayable);
-    if (playableQueue.length === 0) return;
-    void setQueueAndPlay(playableQueue, 0);
+    void setQueueAndPlay(filteredEpisodes, 0);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {

@@ -22,7 +22,6 @@ import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import {
   formatArtist,
   getChartTipPence,
-  isUploadPlayable,
   mediaId,
 } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
@@ -102,10 +101,9 @@ export default function HomeScreen() {
   );
 
   const onPlayRisingItem = (item: ChartMediaItem) => {
-    const playable = rising.filter(isUploadPlayable);
-    const index = playable.findIndex((m) => mediaId(m) === mediaId(item));
+    const index = rising.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) return;
-    void setQueueAndPlay(playable, index);
+    void setQueueAndPlay(rising, index);
   };
 
   const onPlayLibraryItem = (item: UserLibraryItem) => {

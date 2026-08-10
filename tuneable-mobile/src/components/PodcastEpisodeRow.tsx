@@ -50,20 +50,18 @@ export function PodcastEpisodeRow({
     DEFAULT_PODCAST_COVER;
   const collapsedTags = allTags.slice(0, COLLAPSED_TAG_COUNT);
   const toggleFooter = () => setFooterExpanded((open) => !open);
-  const handleCoverPress = () => {
-    if (playable) onPlay();
-  };
 
   return (
     <View style={[styles.richCard, !playable && styles.rowMuted]}>
       <View style={styles.richTop}>
         <Pressable
-          onPress={handleCoverPress}
-          disabled={!playable}
+          onPress={onPlay}
           style={styles.coverWrap}
           accessibilityRole="button"
           accessibilityLabel={
-            playable ? `Play chart position ${rank}` : `Chart position ${rank}`
+            playable
+              ? `Play chart position ${rank}`
+              : `Play next available from chart position ${rank}`
           }>
           {({ pressed }) => (
             <>
@@ -74,7 +72,7 @@ export function PodcastEpisodeRow({
                     styles.rankPlayCircle,
                     !playable && styles.rankPlayCircleMuted,
                   ]}>
-                  {pressed && playable ? (
+                  {pressed ? (
                     <Ionicons name="play" size={16} color="#fff" />
                   ) : (
                     <Text
@@ -91,10 +89,7 @@ export function PodcastEpisodeRow({
           )}
         </Pressable>
 
-        <Pressable
-          style={styles.richMeta}
-          onPress={playable ? onPlay : undefined}
-          disabled={!playable}>
+        <Pressable style={styles.richMeta} onPress={onPlay}>
           <View style={styles.titleRow}>
             <Text style={styles.richTitle} numberOfLines={1}>
               {episode.title || 'Untitled episode'}

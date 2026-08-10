@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   countSupporters,
   MiniSupportersBar,
@@ -17,7 +17,7 @@ type Props = {
   item: ChartMediaItem;
   tipPence?: number;
   variant?: 'compact' | 'rich';
-  /** Hide the inline "Catalog only" hint; use play alert instead. */
+  /** Hide the inline "Catalog only" hint. */
   hideCatalogHint?: boolean;
   onOpen: () => void;
   onPlay: () => void;
@@ -45,27 +45,18 @@ export function ChartTrackRow({
   const canExpandFooter =
     allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 3;
 
-  const handlePlay = () => {
-    if (playable) {
-      onPlay();
-      return;
-    }
-    Alert.alert(
-      'Catalog only',
-      'No upload yet — this tune can’t be played in the app until someone attaches audio.'
-    );
-  };
-
   const showHint = !playable && !hideCatalogHint;
   const toggleFooter = () => setFooterExpanded((open) => !open);
 
   const coverArt = (
     <Pressable
-      onPress={handlePlay}
+      onPress={onPlay}
       style={styles.coverWrap}
       accessibilityRole="button"
       accessibilityLabel={
-        playable ? `Play chart position ${rank}` : `Chart position ${rank}`
+        playable
+          ? `Play chart position ${rank}`
+          : `Play next available from chart position ${rank}`
       }>
       {({ pressed }) => (
         <>
@@ -79,7 +70,7 @@ export function ChartTrackRow({
                 styles.rankPlayCircle,
                 !playable && styles.rankPlayCircleMuted,
               ]}>
-              {pressed && playable ? (
+              {pressed ? (
                 <Ionicons name="play" size={16} color="#fff" />
               ) : (
                 <Text
