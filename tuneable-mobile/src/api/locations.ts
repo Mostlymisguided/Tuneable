@@ -31,6 +31,7 @@ export type LocationProfileResponse = {
     city?: string | null;
     region?: string | null;
   };
+  timePeriod?: string;
   stats?: { mediaCount?: number; globalPlaceAggregate?: number };
   relatedPlaces?: LocationPlaceChip[];
   relatedTags?: LocationRelatedTag[];
@@ -73,7 +74,7 @@ export const locationAPI = {
 
   getProfile: async (
     placeId: string,
-    params?: { page?: number; limit?: number }
+    params?: { page?: number; limit?: number; timePeriod?: string }
   ): Promise<LocationProfileResponse> => {
     const response = await api.get<LocationProfileResponse>(
       `/locations/${encodeURIComponent(placeId)}/profile`,

@@ -1,4 +1,5 @@
 const Media = require('../models/Media');
+const Bid = require('../models/Bid');
 const {
   getCanonicalTag,
   normalizeTagForMatching,
@@ -8,8 +9,16 @@ const { generateSlug } = require('./tagPartyService');
 const { loadBidsByMediaId } = require('./relatedMediaService');
 const mapboxGeocoding = require('./mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
+const { getPeriodStartDate } = require('../utils/globalPartyChart');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const VALID_TIME_PERIODS = new Set([
+  'all-time',
+  'today',
+  'this-week',
+  'this-month',
+  'this-year',
+]);
 
 const MEDIA_FIELDS =
   'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation';
@@ -254,9 +263,56 @@ async function resolveLocationMediaIds(rawPlaceId) {
 }
 
 /**
+ * Rank place-origin media by tip aggregate within a rolling time window.
+ * Returns only tracks with tips in-period; display aggregate is the period sum.
+ */
+async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
+  if (!startDate || !Array.isArray(matchedMedia) || matchedMedia.length === 0) {
+    return matchedMedia;
+  }
+
+  const mediaIds = matchedMedia.map((m) => m._id);
+  const periodRows = await Bid.aggregate([
+    {
+      $match: {
+        status: 'active',
+        mediaId: { $in: mediaIds },
+        createdAt: { $gte: startDate },
+      },
+    },
+    {
+      $group: {
+        _id: '$mediaId',
+        tipWeight: { $sum: '$amount' },
+      },
+    },
+  ]);
+
+  const periodById = new Map(
+    periodRows.map((row) => [row._id.toString(), row.tipWeight || 0])
+  );
+
+  return matchedMedia
+    .map((item) => {
+      const periodVal = periodById.get(item._id.toString()) || 0;
+      return {
+        ...item,
+        timePeriodBidValue: periodVal,
+        globalMediaAggregate: periodVal,
+      };
+    })
+    .filter((item) => (item.timePeriodBidValue || 0) > 0)
+    .sort(
+      (a, b) =>
+        (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0) ||
+        String(a.title || '').localeCompare(String(b.title || ''))
+    );
+}
+
+/**
  * Place profile: origin-scoped media ranked by tip aggregate.
  */
-async function getLocationProfile(rawPlaceId, { page = 1, limit = 50 } = {}) {
+async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time' } = {}) {
   const placeId = normalizePlaceId(rawPlaceId);
   if (!placeId) {
     const err = new Error('Place not found');
@@ -267,6 +323,8 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50 } = {}) {
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const skip = (pageNum - 1) * limitNum;
+  const period = VALID_TIME_PERIODS.has(timePeriod) ? timePeriod : 'all-time';
+  const startDate = getPeriodStartDate(period);
 
   const matched = await Media.find(mediaOriginQuery(placeId))
     .sort({ globalMediaAggregate: -1, createdAt: -1 })
@@ -283,11 +341,17 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50 } = {}) {
     throw err;
   }
 
-  const total = matched.length;
-  const pageSlice = matched.slice(skip, skip + limitNum);
-  const tipTotal = matched.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
+  // Related chips stay all-time; Top Tunes re-rank by period
   const relatedPlaces = computeRelatedPlaces(matched, placeId, place.featureType, { limit: 8 });
   const relatedTags = computeRelatedTags(matched, { limit: 8 });
+
+  const ranked = startDate
+    ? await rankMatchedMediaByPeriod(matched, startDate)
+    : matched;
+
+  const total = ranked.length;
+  const pageSlice = ranked.slice(skip, skip + limitNum);
+  const tipTotal = ranked.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
@@ -297,6 +361,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50 } = {}) {
 
   return {
     place,
+    timePeriod: period,
     stats: {
       mediaCount: total,
       globalPlaceAggregate: tipTotal,

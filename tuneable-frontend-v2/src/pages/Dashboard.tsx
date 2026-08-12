@@ -48,6 +48,7 @@ const Dashboard: React.FC = () => {
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
+  const [isInvitedUsersCollapsed, setIsInvitedUsersCollapsed] = useState(false);
   
   // Increase tip modal (Dashboard tune library)
   const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
@@ -2671,124 +2672,138 @@ Join here: ${inviteLink}`.trim();
 
       {/* Invited Users Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-        <div className="card flex items-center justify-center md:justify-start mb-4">
-          <Users className="h-6 w-6 text-purple-400 mr-2" />
-          <h2 className="text-2xl font-semibold text-white">Invited Users</h2>
-          <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
-            {invitedUsers.length}
-          </span>
-        </div>
-        
-        {/* Invite Sharing Section - Always visible */}
-        {!isLoadingInvited && (
-          <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4 mb-4">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-              <div>
-                <p className="text-sm text-gray-300">Share your invite link</p>
-                <p className="text-xs text-gray-500 mt-1 break-all">
-                  {inviteLink}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleCopyInvite}
-                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy Invite
-                </button>
-                <button
-                  onClick={handleEmailInvite}
-                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Mail className="h-4 w-4" />
-                  Email
-                </button>
-                <button
-                  onClick={handleFacebookShare}
-                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Facebook className="h-4 w-4" />
-                  Facebook
-                </button>
-                <button
-                  onClick={handleInstagramShare}
-                  className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Instagram className="h-4 w-4" />
-                  Instagram
-                </button>
-                <button
-                  onClick={handleSystemShare}
-                  className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
-                >
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </button>
-              </div>
-            </div>
+        <button
+          onClick={() => setIsInvitedUsersCollapsed(prev => !prev)}
+          className="card w-full flex items-center justify-between mb-4 hover:bg-gray-800/50 transition-colors"
+        >
+          <div className="flex items-center">
+            <Users className="h-6 w-6 text-purple-400 mr-2" />
+            <h2 className="text-2xl font-semibold text-white">Invited Users</h2>
+            <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+              {invitedUsers.length}
+            </span>
           </div>
-        )}
-        
-        {isLoadingInvited && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-          </div>
-        )}
-        {!isLoadingInvited && invitedUsers.length === 0 && (
-          <div className="text-center py-8 text-gray-400">
-            <Users className="h-12 w-12 mx-auto mb-4 text-gray-500" />
-            <p>No users have signed up with your invite code yet.</p>
-            <p className="text-sm mt-2">Share your invite code: <span className="font-mono text-purple-400">{user?.primaryInviteCode || user?.personalInviteCode}</span></p>
-          </div>
-        )}
-        {!isLoadingInvited && invitedUsers.length > 0 && (
-          <div className="space-y-3">
-            {(showAllInvitedUsers ? invitedUsers : invitedUsers.slice(0, 3)).map((invitedUser) => {
-              const userName = (invitedUser.givenName || invitedUser.familyName) 
-                ? `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
-                : `Joined ${new Date(invitedUser.createdAt).toLocaleDateString()}`;
-              
-              return (
-                <div key={invitedUser._id || invitedUser.id} className="flex items-center gap-3 bg-black/20 rounded px-4 py-3">
-                  <img 
-                    src={invitedUser.profilePic || DEFAULT_PROFILE_PIC} 
-                    alt={invitedUser.username} 
-                    className="h-10 w-10 rounded-full object-cover flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white font-medium">{invitedUser.username}</div>
-                    <div className="text-gray-400 text-sm">
-                      {userName}
-                    </div>
-                    {(invitedUser.givenName || invitedUser.familyName) && (
-                      <div className="text-gray-500 text-xs mt-1">
-                        Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
-                      </div>
-                    )}
+          {isInvitedUsersCollapsed ? (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+
+        {!isInvitedUsersCollapsed && (
+          <>
+            {/* Invite Sharing Section - Always visible when expanded */}
+            {!isLoadingInvited && (
+              <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4 mb-4">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-gray-300">Share your invite link</p>
+                    <p className="text-xs text-gray-500 mt-1 break-all">
+                      {inviteLink}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleCopyInvite}
+                      className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy Invite
+                    </button>
+                    <button
+                      onClick={handleEmailInvite}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </button>
+                    <button
+                      onClick={handleFacebookShare}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <Facebook className="h-4 w-4" />
+                      Facebook
+                    </button>
+                    <button
+                      onClick={handleInstagramShare}
+                      className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <Instagram className="h-4 w-4" />
+                      Instagram
+                    </button>
+                    <button
+                      onClick={handleSystemShare}
+                      className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Share
+                    </button>
                   </div>
                 </div>
-              );
-            })}
-            {invitedUsers.length > 3 && (
-              <div className="flex justify-center pt-2">
-                <button
-                  onClick={() => setShowAllInvitedUsers(!showAllInvitedUsers)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
-                >
-                  <span>{showAllInvitedUsers ? 'Show Less' : `Show More (${invitedUsers.length - 3} more)`}</span>
-                  {showAllInvitedUsers ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </button>
               </div>
             )}
-          </div>
+
+            {isLoadingInvited && (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+              </div>
+            )}
+            {!isLoadingInvited && invitedUsers.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <Users className="h-12 w-12 mx-auto mb-4 text-gray-500" />
+                <p>No users have signed up with your invite code yet.</p>
+                <p className="text-sm mt-2">Share your invite code: <span className="font-mono text-purple-400">{user?.primaryInviteCode || user?.personalInviteCode}</span></p>
+              </div>
+            )}
+            {!isLoadingInvited && invitedUsers.length > 0 && (
+              <div className="space-y-3">
+                {(showAllInvitedUsers ? invitedUsers : invitedUsers.slice(0, 3)).map((invitedUser) => {
+                  const userName = (invitedUser.givenName || invitedUser.familyName)
+                    ? `${invitedUser.givenName || ''} ${invitedUser.familyName || ''}`.trim()
+                    : `Joined ${new Date(invitedUser.createdAt).toLocaleDateString()}`;
+
+                  return (
+                    <div key={invitedUser._id || invitedUser.id} className="flex items-center gap-3 bg-black/20 rounded px-4 py-3">
+                      <img
+                        src={invitedUser.profilePic || DEFAULT_PROFILE_PIC}
+                        alt={invitedUser.username}
+                        className="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white font-medium">{invitedUser.username}</div>
+                        <div className="text-gray-400 text-sm">
+                          {userName}
+                        </div>
+                        {(invitedUser.givenName || invitedUser.familyName) && (
+                          <div className="text-gray-500 text-xs mt-1">
+                            Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {invitedUsers.length > 3 && (
+                  <div className="flex justify-center pt-2">
+                    <button
+                      onClick={() => setShowAllInvitedUsers(!showAllInvitedUsers)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <span>{showAllInvitedUsers ? 'Show Less' : `Show More (${invitedUsers.length - 3} more)`}</span>
+                      {showAllInvitedUsers ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 

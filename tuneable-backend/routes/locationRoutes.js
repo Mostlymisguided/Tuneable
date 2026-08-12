@@ -72,13 +72,13 @@ router.post('/resolve', async (req, res) => {
 router.get('/:placeId/profile', async (req, res) => {
   try {
     const { placeId } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, timePeriod = 'all-time' } = req.query;
 
     if (!placeId || !String(placeId).trim()) {
       return res.status(400).json({ error: 'Place id is required' });
     }
 
-    const profile = await getLocationProfile(placeId, { page, limit });
+    const profile = await getLocationProfile(placeId, { page, limit, timePeriod });
     res.json(profile);
   } catch (error) {
     if (error.status === 404) {
