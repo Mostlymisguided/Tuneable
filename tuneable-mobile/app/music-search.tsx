@@ -13,10 +13,11 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
 import { searchAPI } from '@/src/api/search';
 import { useAuth } from '@/src/auth/AuthContext';
-import { formatPoundsFromPence } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, GLOBAL_PARTY_ID } from '@/src/types/media';
 import {
@@ -72,7 +73,7 @@ export default function MusicSearchScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tipAmounts, setTipAmounts] = useState<Record<string, string>>({});
+  const [tipTarget, setTipTarget] = useState<SearchResultItem | null>(null);
   const [searchSource, setSearchSource] = useState<'local' | 'external' | string | null>(
     null
   );
@@ -82,20 +83,9 @@ export default function MusicSearchScreen() {
   const [statusNote, setStatusNote] = useState<string | null>(null);
 
   const defaultTip = useMemo(
-    () => (user?.preferences?.defaultTip ?? 1).toFixed(2),
+    () => user?.preferences?.defaultTip ?? 1,
     [user?.preferences?.defaultTip]
   );
-
-  const seedTips = (items: SearchResultItem[]) => {
-    setTipAmounts((prev) => {
-      const next = { ...prev };
-      for (const item of items) {
-        const id = searchResultId(item);
-        if (id && next[id] == null) next[id] = defaultTip;
-      }
-      return next;
-    });
-  };
 
   const filteredResults = useMemo(() => {
     if (filter === 'library') return results.filter(isLibraryResult);
@@ -128,7 +118,6 @@ export default function MusicSearchScreen() {
       setSearchSource(res.source || null);
       setHasMoreExternal(Boolean(res.hasMoreExternal));
       setNextPageToken(res.nextPageToken || null);
-      seedTips(items);
 
       if (res.source === 'local') {
         setStatusNote(
@@ -163,7 +152,6 @@ export default function MusicSearchScreen() {
       setSearchSource(res.source || 'external');
       setHasMoreExternal(false);
       setNextPageToken(res.nextPageToken || null);
-      seedTips(items);
       setStatusNote(`Showing ${items.length} MusicBrainz catalog matches`);
       setFilter('all');
     } catch (err) {
@@ -188,7 +176,6 @@ export default function MusicSearchScreen() {
       setResults((prev) => mergeUnique(prev, items));
       setNextPageToken(res.nextPageToken || null);
       if (res.source) setSearchSource(res.source);
-      seedTips(items);
       setStatusNote((prev) =>
         prev ? `${prev.split(' ·')[0]} · loaded more` : `Loaded ${items.length} more`
       );
@@ -199,7 +186,7 @@ export default function MusicSearchScreen() {
     }
   };
 
-  const addAndTip = async (item: SearchResultItem) => {
+  const openTipSheet = (item: SearchResultItem) => {
     const id = searchResultId(item);
     const url = searchResultUrl(item) ?? undefined;
     const externalIds = item.externalIds;
@@ -210,34 +197,35 @@ export default function MusicSearchScreen() {
       );
       return;
     }
-    const tipText = tipAmounts[id] ?? defaultTip;
-    const bidAmount = Number.parseFloat(tipText.replace(',', '.'));
-    if (Number.isNaN(bidAmount) || bidAmount < 0.01) {
-      Alert.alert('Invalid tip', 'Tip must be at least £0.01');
-      return;
-    }
-    const needed = Math.round(bidAmount * 100);
-    if ((user?.balance ?? 0) < needed) {
-      Alert.alert(
-        'Insufficient balance',
-        `You need ${formatPoundsFromPence(needed)} (have ${formatPoundsFromPence(user?.balance)}). Top up your wallet first.`
-      );
-      return;
+    setTipTarget(item);
+  };
+
+  const addAndTip = async (amountPounds: number, tags: string[]) => {
+    const item = tipTarget;
+    if (!item) return;
+    const id = searchResultId(item);
+    const url = searchResultUrl(item) ?? undefined;
+    const externalIds = item.externalIds;
+    if (!url && (!externalIds || Object.keys(externalIds).length === 0)) {
+      throw new Error('This result has no source URL or MusicBrainz ID.');
     }
 
     setAddingId(id);
     setError(null);
     try {
+      const mergedTags = Array.from(
+        new Set([...(item.tags || []), ...tags].filter(Boolean))
+      );
       const res = await partyAPI.addMediaToParty(GLOBAL_PARTY_ID, {
         url,
         title: item.title || 'Unknown',
         artist: formatSearchArtist(item.artist),
-        bidAmount,
+        bidAmount: amountPounds,
         platform: searchResultPlatform(item),
         duration: item.duration,
         coverArt: item.coverArt,
         category: item.category || 'Music',
-        tags: item.tags,
+        tags: mergedTags.length ? mergedTags : undefined,
         externalIds,
         album: item.album ?? null,
         releaseDate: item.releaseDate ?? null,
@@ -257,6 +245,7 @@ export default function MusicSearchScreen() {
           ?.message ||
         (err instanceof Error ? err.message : 'Failed to add tune');
       setError(message);
+      throw new Error(message);
     } finally {
       setAddingId(null);
     }
@@ -428,6 +417,7 @@ export default function MusicSearchScreen() {
           const isAdding = addingId === id;
           const label = resultLabel(item);
           const library = isLibraryResult(item);
+          const durationLabel = formatDuration(item.duration);
           return (
             <View style={styles.card}>
               <Image
@@ -441,39 +431,58 @@ export default function MusicSearchScreen() {
                 <Text style={styles.artist} numberOfLines={1}>
                   {formatSearchArtist(item.artist)}
                 </Text>
-                <Text
-                  style={[
-                    styles.sourceLabel,
-                    library ? styles.sourceLibrary : styles.sourceCatalog,
-                  ]}>
-                  {label}
-                </Text>
-                <View style={styles.tipRow}>
-                  <Text style={styles.currency}>£</Text>
-                  <TextInput
-                    style={styles.tipInput}
-                    keyboardType="decimal-pad"
-                    value={tipAmounts[id] ?? defaultTip}
-                    onChangeText={(t) =>
-                      setTipAmounts((prev) => ({ ...prev, [id]: t }))
-                    }
-                    editable={!isAdding}
-                  />
-                  <Pressable
-                    style={[styles.addBtn, isAdding && styles.disabled]}
-                    disabled={isAdding}
-                    onPress={() => void addAndTip(item)}>
-                    {isAdding ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.addText}>Add & tip</Text>
-                    )}
-                  </Pressable>
+                <View style={styles.metaRow}>
+                  <Text
+                    style={[
+                      styles.sourceLabel,
+                      library ? styles.sourceLibrary : styles.sourceCatalog,
+                    ]}>
+                    {label}
+                  </Text>
+                  {durationLabel ? (
+                    <>
+                      <Text style={styles.metaDot}>·</Text>
+                      <View style={styles.durationRow}>
+                        <Ionicons
+                          name="time-outline"
+                          size={11}
+                          color={colors.textMuted}
+                        />
+                        <Text style={styles.duration}>{durationLabel}</Text>
+                      </View>
+                    </>
+                  ) : null}
                 </View>
               </View>
+              <Pressable
+                style={styles.heartBtn}
+                hitSlop={8}
+                disabled={isAdding}
+                accessibilityRole="button"
+                accessibilityLabel={`Tip and add ${item.title || 'tune'}`}
+                onPress={() => openTipSheet(item)}>
+                {isAdding ? (
+                  <ActivityIndicator color={colors.accentLight} size="small" />
+                ) : (
+                  <Ionicons name="heart" size={24} color={colors.accentLight} />
+                )}
+              </Pressable>
             </View>
           );
         }}
+      />
+
+      <TipSheet
+        visible={Boolean(tipTarget)}
+        title={tipTarget?.title || 'Untitled'}
+        subtitle={
+          tipTarget ? formatSearchArtist(tipTarget.artist) : undefined
+        }
+        balancePence={user?.balance ?? 0}
+        defaultTipPounds={defaultTip}
+        initialTags={tipTarget?.tags}
+        onClose={() => setTipTarget(null)}
+        onConfirm={addAndTip}
       />
     </Screen>
   );
@@ -620,6 +629,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -645,8 +655,14 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
   },
-  sourceLabel: {
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
     marginTop: 4,
+  },
+  sourceLabel: {
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -658,40 +674,25 @@ const styles = StyleSheet.create({
   sourceCatalog: {
     color: colors.textMuted,
   },
-  tipRow: {
+  metaDot: {
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
+    gap: 2,
   },
-  currency: {
-    color: colors.textSecondary,
-    fontWeight: '600',
+  duration: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
   },
-  tipInput: {
-    width: 64,
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    color: colors.text,
-    fontSize: 14,
-  },
-  addBtn: {
-    marginLeft: 'auto',
-    backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 88,
+  heartBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
-  },
-  addText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
+    justifyContent: 'center',
   },
   disabled: { opacity: 0.6 },
 });

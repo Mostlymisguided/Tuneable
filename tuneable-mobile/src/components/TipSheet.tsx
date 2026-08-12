@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -68,6 +69,9 @@ type Props = {
 function roundPounds(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/** Soft-gate skip for this app session after "Tip with home only". */
+let skipLocationPromptThisSession = false;
 
 export function TipSheet({
   visible,
@@ -230,6 +234,38 @@ export function TipSheet({
     }
   };
 
+  const executeTip = async () => {
+    setSubmitting(true);
+    try {
+      await onConfirm(amount, tags);
+      onClose();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const msg =
+          (err.response?.data as { message?: string } | undefined)?.message ||
+          err.message;
+        setError(msg || 'Tip failed');
+      } else if (err instanceof Error && err.message) {
+        setError(err.message);
+      } else {
+        setError('Tip failed');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const enableLocationThenTip = async () => {
+    setError(null);
+    setEnablingLocation(true);
+    try {
+      await refreshCurrentLocation({ force: true });
+    } finally {
+      setEnablingLocation(false);
+    }
+    await executeTip();
+  };
+
   const submit = async () => {
     setError(null);
     if (amount < effectiveMinTip) {
@@ -243,22 +279,38 @@ export function TipSheet({
       );
       return;
     }
-    setSubmitting(true);
-    try {
-      await onConfirm(amount, tags);
-      onClose();
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string } | undefined)?.message ||
-          err.message;
-        setError(msg || 'Tip failed');
-      } else {
-        setError('Tip failed');
-      }
-    } finally {
-      setSubmitting(false);
+
+    const shouldPromptLocation =
+      !currentLocation &&
+      canOfferCurrentLocation &&
+      !skipLocationPromptThisSession;
+
+    if (shouldPromptLocation) {
+      Alert.alert(
+        'Influence local charts?',
+        'Enable location so this tip also counts where you are now. You can still tip using home only.',
+        [
+          {
+            text: 'Enable current location',
+            style: 'default',
+            onPress: () => {
+              void enableLocationThenTip();
+            },
+          },
+          {
+            text: 'Tip without location',
+            onPress: () => {
+              skipLocationPromptThisSession = true;
+              void executeTip();
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+      return;
     }
+
+    await executeTip();
   };
 
   const handleClose = () => {
@@ -365,7 +417,13 @@ export function TipSheet({
             </View>
 
             {user ? (
-              <View style={styles.influenceCard}>
+              <View
+                style={[
+                  styles.influenceCard,
+                  !currentLocation &&
+                    canOfferCurrentLocation &&
+                    styles.influenceCardAttention,
+                ]}>
                 <View style={styles.influenceHeader}>
                   <Ionicons
                     name="location-outline"
@@ -411,8 +469,9 @@ export function TipSheet({
 
                 {!currentLocation && canOfferCurrentLocation ? (
                   <View style={styles.enableRow}>
-                    <Text style={[styles.influenceHint, styles.enableCopy]}>
-                      Enable location to also influence charts where you are.
+                    <Text style={styles.enableCopy}>
+                      Without location, this tip only counts on your home
+                      charts. Enable it to also influence charts where you are.
                     </Text>
                     <Pressable
                       style={styles.enableBtn}
@@ -426,8 +485,10 @@ export function TipSheet({
                         <ActivityIndicator color="#fff" size="small" />
                       ) : (
                         <>
-                          <Ionicons name="navigate" size={14} color="#fff" />
-                          <Text style={styles.enableBtnText}>Enable</Text>
+                          <Ionicons name="navigate" size={16} color="#fff" />
+                          <Text style={styles.enableBtnText}>
+                            Enable location
+                          </Text>
                         </>
                       )}
                     </Pressable>
@@ -660,6 +721,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
+  influenceCardAttention: {
+    backgroundColor: 'rgba(147, 51, 234, 0.18)',
+    borderColor: 'rgba(168, 85, 247, 0.65)',
+  },
   influenceHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -696,27 +761,29 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   enableRow: {
-    marginTop: 10,
+    marginTop: 12,
     gap: 10,
   },
   enableCopy: {
-    marginTop: 0,
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
   },
   enableBtn: {
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: colors.accent,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 88,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     justifyContent: 'center',
   },
   enableBtnText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
   },
   tagsSection: {
