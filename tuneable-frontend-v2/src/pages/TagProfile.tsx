@@ -196,7 +196,7 @@ const TagProfile: React.FC = () => {
             {/* Tag Info */}
             <div className="flex-1 w-full text-white">
               <div className="text-xs uppercase tracking-wide text-purple-300 font-semibold mb-1 text-center md:text-left">
-                Tag
+                {/^\d{4}$/.test(displayName) ? 'Year' : 'Tag'}
               </div>
               <h1 className="text-2xl md:text-4xl font-bold mb-3 text-center md:text-left">
                 {displayName}

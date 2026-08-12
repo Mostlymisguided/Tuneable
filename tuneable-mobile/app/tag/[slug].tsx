@@ -172,7 +172,7 @@ export default function TagProfileScreen() {
         )}
       </View>
 
-      <Text style={styles.eyebrow}>Tag</Text>
+      <Text style={styles.eyebrow}>{/^\d{4}$/.test(tagName) ? 'Year' : 'Tag'}</Text>
       <Text style={styles.title}>{tagName}</Text>
 
       <View style={styles.statChips}>
@@ -489,10 +489,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
     marginTop: 4,
     marginBottom: 8,
   },
@@ -500,7 +498,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     fontWeight: '800',
-    flexShrink: 1,
+    textAlign: 'center',
   },
   timeTrigger: {
     flexDirection: 'row',
@@ -510,7 +508,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.08)',
-    maxWidth: '58%',
   },
   timeTriggerActive: {
     backgroundColor: 'rgba(55, 65, 81, 0.95)',
@@ -525,7 +522,6 @@ const styles = StyleSheet.create({
   timeTriggerDetail: {
     color: '#c4b5fd',
     fontSize: 11,
-    maxWidth: 80,
   },
   timePanel: {
     marginBottom: 10,
@@ -553,6 +549,7 @@ const styles = StyleSheet.create({
   timeChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 8,
   },
   timeChip: {

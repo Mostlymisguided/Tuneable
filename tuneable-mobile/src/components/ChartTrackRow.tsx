@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import {
   countSupporters,
   MiniSupportersBar,
@@ -15,6 +15,7 @@ import {
   getCountryPlaceProfileHref,
 } from '@/src/lib/location';
 import { formatArtist, isUploadPlayable } from '@/src/lib/media';
+import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
 
@@ -162,9 +163,18 @@ export function ChartTrackRow({
     });
   }
   if (releaseYear != null) {
+    const yearHref = getTagProfileHref(String(releaseYear));
     metaParts.push({
       key: 'year',
-      node: <Text style={styles.metaStat}>{releaseYear}</Text>,
+      node: (
+        <Pressable
+          onPress={() => router.push(yearHref as Href)}
+          hitSlop={4}
+          accessibilityRole="link"
+          accessibilityLabel={`Open year ${releaseYear}`}>
+          <Text style={styles.metaStat}>{releaseYear}</Text>
+        </Pressable>
+      ),
     });
   }
   metaParts.push({

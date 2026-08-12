@@ -31,6 +31,19 @@ const VALID_TIME_PERIODS = new Set([
 ]);
 
 /**
+ * Parse a 4-digit release-year slug (e.g. "2024") for year-based tag profiles.
+ * @returns {number|null}
+ */
+function parseReleaseYearFromSlug(rawSlug) {
+  if (!rawSlug || typeof rawSlug !== 'string') return null;
+  const slug = decodeURIComponent(rawSlug).trim();
+  if (!/^\d{4}$/.test(slug)) return null;
+  const year = parseInt(slug, 10);
+  if (!Number.isFinite(year) || year < 1900 || year > 2100) return null;
+  return year;
+}
+
+/**
  * Resolve a URL slug into display name + canonical matching key.
  * Prefers an existing tag party when present (stable name/slug).
  */
@@ -39,6 +52,18 @@ async function resolveTagFromSlug(rawSlug) {
 
   const slug = decodeURIComponent(rawSlug).trim().toLowerCase();
   if (!slug) return null;
+
+  const releaseYear = parseReleaseYearFromSlug(slug);
+  if (releaseYear != null) {
+    const yearLabel = String(releaseYear);
+    return {
+      displayName: yearLabel,
+      canonicalTag: yearLabel,
+      slug: yearLabel,
+      party: null,
+      releaseYear,
+    };
+  }
 
   const nameFromSlug = slug.replace(/-/g, ' ').trim();
 
@@ -381,49 +406,65 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
     throw err;
   }
 
-  const { displayName, canonicalTag, slug, party } = resolved;
+  const { displayName, canonicalTag, slug, party, releaseYear } = resolved;
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const skip = (pageNum - 1) * limitNum;
   const period = VALID_TIME_PERIODS.has(timePeriod) ? timePeriod : 'all-time';
   const startDate = getPeriodStartDate(period);
 
-  const variants = collectTagVariants(displayName, canonicalTag);
-
-  const baseQuery = {
-    status: 'active',
-    contentType: 'music',
-    contentForm: { $nin: PODCAST_FORMS },
-    tags: { $exists: true, $ne: [] },
-  };
-
-  // Broad candidate set via indexed tags field, then fuzzy-filter
   const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation';
 
-  const candidates = await Media.find({
-    ...baseQuery,
-    tags: { $in: variants },
-  })
-    .sort({ globalMediaAggregate: -1, createdAt: -1 })
-    .select(MEDIA_FIELDS)
-    .populate('addedBy', 'username profilePic uuid')
-    .lean();
+  let matched;
 
-  // Fallback: if $in found nothing (casing / spelling drift), scan top tipped music
-  let pool = candidates;
-  if (pool.length === 0) {
-    pool = await Media.find(baseQuery)
+  if (typeof releaseYear === 'number') {
+    // Year profiles rank by Media.releaseYear (not genre tags)
+    matched = await Media.find({
+      status: 'active',
+      contentType: 'music',
+      contentForm: { $nin: PODCAST_FORMS },
+      releaseYear,
+    })
       .sort({ globalMediaAggregate: -1, createdAt: -1 })
-      .limit(500)
       .select(MEDIA_FIELDS)
       .populate('addedBy', 'username profilePic uuid')
       .lean();
-  }
+  } else {
+    const variants = collectTagVariants(displayName, canonicalTag);
 
-  const matched = pool.filter((item) => {
-    if (!item.tags || !Array.isArray(item.tags)) return false;
-    return item.tags.some((t) => typeof t === 'string' && tagsMatch(t, displayName));
-  });
+    const baseQuery = {
+      status: 'active',
+      contentType: 'music',
+      contentForm: { $nin: PODCAST_FORMS },
+      tags: { $exists: true, $ne: [] },
+    };
+
+    // Broad candidate set via indexed tags field, then fuzzy-filter
+    const candidates = await Media.find({
+      ...baseQuery,
+      tags: { $in: variants },
+    })
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .select(MEDIA_FIELDS)
+      .populate('addedBy', 'username profilePic uuid')
+      .lean();
+
+    // Fallback: if $in found nothing (casing / spelling drift), scan top tipped music
+    let pool = candidates;
+    if (pool.length === 0) {
+      pool = await Media.find(baseQuery)
+        .sort({ globalMediaAggregate: -1, createdAt: -1 })
+        .limit(500)
+        .select(MEDIA_FIELDS)
+        .populate('addedBy', 'username profilePic uuid')
+        .lean();
+    }
+
+    matched = pool.filter((item) => {
+      if (!item.tags || !Array.isArray(item.tags)) return false;
+      return item.tags.some((t) => typeof t === 'string' && tagsMatch(t, displayName));
+    });
+  }
 
   // Related chips stay all-time (stable header); Top Tunes re-rank by period
   const relatedTags = computeRelatedTags(matched, displayName, { limit: 8 });
@@ -491,4 +532,5 @@ module.exports = {
   collectTagVariants,
   computeTopOriginPlaces,
   computeTopSupportPlaces,
+  parseReleaseYearFromSlug,
 };

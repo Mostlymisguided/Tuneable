@@ -8,6 +8,7 @@ import AiAssistedBadge from './AiAssistedBadge';
 import { DEFAULT_COVER_ART } from '../constants';
 import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
+import { getTagProfilePath } from '../utils/tagNormalizer';
 
 const META_LINK_CLASS =
   'truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
@@ -114,9 +115,15 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   }
   if (releaseYear != null) {
     metaParts.push(
-      <span key="year" title={`Released ${releaseYear}`} className="tabular-nums">
+      <Link
+        key="year"
+        to={getTagProfilePath(String(releaseYear))}
+        title={`Released ${releaseYear}`}
+        onClick={(e) => e.stopPropagation()}
+        className={`${META_LINK_CLASS} tabular-nums`}
+      >
         {releaseYear}
-      </span>
+      </Link>
     );
   }
   if (country) {
