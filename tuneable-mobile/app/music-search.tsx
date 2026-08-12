@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,12 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
 import { searchAPI } from '@/src/api/search';
+import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { colors } from '@/src/theme/colors';
@@ -81,10 +82,56 @@ export default function MusicSearchScreen() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [soundcloudConnected, setSoundcloudConnected] = useState(false);
+  const [libraryTotal, setLibraryTotal] = useState<number | null>(null);
+  const [importStatusLoading, setImportStatusLoading] = useState(false);
 
   const defaultTip = useMemo(
     () => user?.preferences?.defaultTip ?? 1,
     [user?.preferences?.defaultTip]
+  );
+
+  const refreshImportStatus = useCallback(async () => {
+    setImportStatusLoading(true);
+    try {
+      const [spotify, soundcloud, library] = await Promise.all([
+        userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
+        userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
+        userAPI.getTuneLibrary().catch(() => null),
+      ]);
+      setSpotifyConnected(Boolean(spotify?.connected));
+      setSoundcloudConnected(Boolean(soundcloud?.connected));
+      setLibraryTotal(
+        typeof library?.total === 'number' ? library.total : null
+      );
+    } finally {
+      setImportStatusLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshImportStatus();
+    }, [refreshImportStatus])
+  );
+
+  const importSubtitle = useCallback(
+    (connected: boolean, providerLabel: string) => {
+      if (!connected) {
+        return providerLabel === 'Spotify'
+          ? 'Import your saved tracks'
+          : 'Import your liked tracks';
+      }
+      if (libraryTotal != null && libraryTotal > 0) {
+        return `Connected · ${libraryTotal} in library · Import more`;
+      }
+      if (user?.onboarding?.importPromptSeenAt && !user?.onboarding?.importSkipped) {
+        return 'Connected · Import more';
+      }
+      return 'Connected · Ready to import';
+    },
+    [libraryTotal, user?.onboarding?.importPromptSeenAt, user?.onboarding?.importSkipped]
   );
 
   const filteredResults = useMemo(() => {
@@ -259,13 +306,13 @@ export default function MusicSearchScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
-        <Text style={styles.title}>Add tunes</Text>
+        <Text style={styles.title}>Add Music</Text>
       </View>
 
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
-          placeholder="Search library or MusicBrainz"
+          placeholder="Search for music"
           placeholderTextColor={colors.textMuted}
           value={query}
           onChangeText={setQuery}
@@ -290,6 +337,48 @@ export default function MusicSearchScreen() {
       <Text style={styles.balance}>
         Balance {formatPoundsFromPence(user?.balance)}
       </Text>
+
+      {!hasSearched ? (
+        <View style={styles.importSection}>
+          <Text style={styles.importSectionLabel}>Import likes</Text>
+          <View style={styles.importGrid}>
+            <Pressable
+              style={[styles.importCard, styles.spotifyCard]}
+              onPress={() =>
+                router.push({
+                  pathname: '/import-library',
+                  params: { source: 'spotify' },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Import from Spotify">
+              <Text style={styles.importTitle}>Spotify</Text>
+              <Text style={styles.importSub}>
+                {importStatusLoading && !spotifyConnected
+                  ? 'Checking…'
+                  : importSubtitle(spotifyConnected, 'Spotify')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.importCard, styles.soundcloudCard]}
+              onPress={() =>
+                router.push({
+                  pathname: '/import-library',
+                  params: { source: 'soundcloud' },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Import from SoundCloud">
+              <Text style={styles.importTitleSc}>SoundCloud</Text>
+              <Text style={styles.importSub}>
+                {importStatusLoading && !soundcloudConnected
+                  ? 'Checking…'
+                  : importSubtitle(soundcloudConnected, 'SoundCloud')}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {statusNote ? <Text style={styles.status}>{statusNote}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -342,7 +431,7 @@ export default function MusicSearchScreen() {
               <Text style={styles.emptyTitle}>
                 {filter !== 'all' && results.length > 0
                   ? `No ${filter} matches`
-                  : 'No tunes found'}
+                  : 'No music found'}
               </Text>
               <Text style={styles.empty}>
                 {filter !== 'all' && results.length > 0
@@ -367,11 +456,10 @@ export default function MusicSearchScreen() {
                 size={40}
                 color={colors.textMuted}
               />
-              <Text style={styles.emptyTitle}>Find something to tip</Text>
+              <Text style={styles.emptyTitle}>Search for Music</Text>
               <Text style={styles.empty}>
-                We check Tuneable’s library first, then MusicBrainz. Uploads stay
-                playable in-app; catalog tips are tippable until someone uploads
-                audio.
+                Tip tracks into the chart from Tuneable’s library or MusicBrainz.
+                Catalog tips stay tippable until someone uploads playable audio.
               </Text>
             </View>
           )
@@ -532,6 +620,50 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: colors.textMuted,
     fontSize: 13,
+  },
+  importSection: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    gap: 8,
+  },
+  importSectionLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  importGrid: {
+    gap: 8,
+  },
+  importCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  spotifyCard: {
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+  },
+  soundcloudCard: {
+    borderColor: 'rgba(249, 115, 22, 0.4)',
+    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+  },
+  importTitle: {
+    color: '#86efac',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  importTitleSc: {
+    color: '#fdba74',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  importSub: {
+    marginTop: 3,
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   status: {
     paddingHorizontal: 16,

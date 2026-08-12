@@ -193,7 +193,7 @@ export default function HomeScreen() {
           />
           <QuickLink
             icon="add-circle-outline"
-            label="Add tunes"
+            label="Add Music"
             onPress={() => router.push('/music-search')}
           />
           {canUploadMedia(user) ? (
