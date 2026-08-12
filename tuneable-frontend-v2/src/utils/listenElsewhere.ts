@@ -1,6 +1,6 @@
 /**
  * Escape hatch when Tuneable can't play a track yet:
- * prefer a known platform URL (YouTube), else Ecosia title+artist search.
+ * prefer a known platform URL (YouTube), else Google title+artist search.
  */
 
 import {
@@ -31,13 +31,14 @@ type MediaLike = PlayabilityFields & {
   contentForm?: string | string[];
 };
 
-const ECOSIA_SEARCH = 'https://www.ecosia.org/search';
+const GOOGLE_SEARCH = 'https://www.google.com/search';
+const LISTEN_ELSEWHERE_LABEL = 'Open externally';
 
-export function buildEcosiaListenUrl(title: string, artist?: string | null): string {
+export function buildGoogleListenUrl(title: string, artist?: string | null): string {
   const parts = [title.trim(), (artist || '').trim()].filter(Boolean);
   const q = parts.map((p) => `"${p}"`).join(' ');
   const params = new URLSearchParams({ q: `${q} music`.trim() });
-  return `${ECOSIA_SEARCH}?${params.toString()}`;
+  return `${GOOGLE_SEARCH}?${params.toString()}`;
 }
 
 function youtubeWatchUrl(raw: string): string | null {
@@ -71,7 +72,7 @@ export function getListenElsewhereTarget(
     return {
       url: yt,
       kind: 'youtube',
-      label: 'Open on YouTube',
+      label: LISTEN_ELSEWHERE_LABEL,
     };
   }
 
@@ -80,9 +81,9 @@ export function getListenElsewhereTarget(
     artist && artist !== 'Unknown Artist' ? artist : null;
 
   return {
-    url: buildEcosiaListenUrl(media.title!.trim(), artistForQuery),
+    url: buildGoogleListenUrl(media.title!.trim(), artistForQuery),
     kind: 'search',
-    label: 'Find on the web',
+    label: LISTEN_ELSEWHERE_LABEL,
   };
 }
 

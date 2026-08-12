@@ -1585,11 +1585,7 @@ const TuneProfile: React.FC = () => {
 
   const handleListenElsewhere = () => {
     if (!openListenElsewhere(media)) return;
-    toast.info(
-      listenElsewhere?.kind === 'youtube'
-        ? 'Opening YouTube — audio isn’t on Tuneable yet.'
-        : 'Searching the web — audio isn’t on Tuneable yet.'
-    );
+    toast.info('Opening externally — audio isn’t on Tuneable yet.');
   };
 
   // Handle play button click
@@ -1599,7 +1595,7 @@ const TuneProfile: React.FC = () => {
     if (!isMediaPlayable(media)) {
       toast.info(
         listenElsewhere
-          ? 'This track is not playable yet — tip to support adding audio, or find it on the web.'
+          ? 'This track is not playable yet — tip to support adding audio, or open externally.'
           : isYouTubeOnly(media) || !isMediaPlayable(media)
             ? 'This track is not playable yet — tip to support adding audio to Tuneable.'
             : 'Playback is not available for this track yet.'
