@@ -102,6 +102,9 @@ export interface UserLibraryItem {
   coverArt?: string | null;
   duration?: number | null;
   bpm?: number | null;
+  releaseDate?: string | null;
+  releaseYear?: number | null;
+  primaryLocation?: ResolvedLocation | null;
   tags?: string[];
   contentForm?: string[];
   sources?: Record<string, string>;
