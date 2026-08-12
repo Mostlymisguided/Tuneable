@@ -84,8 +84,6 @@ export default function TuneProfileScreen() {
   const [tipOpen, setTipOpen] = useState(false);
   const [tipInitial, setTipInitial] = useState<number | null>(null);
   const [supportAmount, setSupportAmount] = useState(1.11);
-  const [tipping, setTipping] = useState(false);
-  const [supportError, setSupportError] = useState<string | null>(null);
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
@@ -266,29 +264,6 @@ export default function TuneProfileScreen() {
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
     await placeTip(amountPounds, tags);
-  };
-
-  const onSupportTip = async () => {
-    setSupportError(null);
-    const amount = roundPounds(supportAmount);
-    if (amount < MIN_TIP) {
-      setSupportError('Minimum tip is £0.01');
-      return;
-    }
-    if (Math.round(amount * 100) > (user.balance ?? 0)) {
-      setSupportError(
-        `Insufficient balance (${formatPoundsFromPence(user.balance)} available)`
-      );
-      return;
-    }
-    setTipping(true);
-    try {
-      await placeTip(amount);
-    } catch (err) {
-      setSupportError(err instanceof Error ? err.message : 'Tip failed');
-    } finally {
-      setTipping(false);
-    }
   };
 
   const openTipSheet = (amount?: number) => {
@@ -622,8 +597,7 @@ export default function TuneProfileScreen() {
               <View style={styles.stepperRow}>
                 <Pressable
                   style={styles.stepperBtn}
-                  onPress={() => adjustSupport(-0.01)}
-                  disabled={tipping}>
+                  onPress={() => adjustSupport(-0.01)}>
                   <Ionicons name="remove" size={18} color="#fff" />
                 </Pressable>
                 <Text style={styles.stepperValue}>
@@ -631,19 +605,17 @@ export default function TuneProfileScreen() {
                 </Text>
                 <Pressable
                   style={styles.stepperBtn}
-                  onPress={() => adjustSupport(0.01)}
-                  disabled={tipping}>
+                  onPress={() => adjustSupport(0.01)}>
                   <Ionicons name="add" size={18} color="#fff" />
                 </Pressable>
                 <Pressable
-                  style={[styles.supportTipBtn, tipping && styles.disabled]}
-                  onPress={() => void onSupportTip()}
-                  disabled={tipping}>
-                  {tipping ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.supportTipText}>Tip</Text>
-                  )}
+                  style={styles.supportTipBtn}
+                  onPress={() => openTipSheet(supportAmount)}
+                  accessibilityLabel={`Confirm tip of £${supportAmount.toFixed(2)}`}>
+                  <Ionicons name="heart" size={16} color="#fff" />
+                  <Text style={styles.supportTipText}>
+                    £{supportAmount.toFixed(2)}
+                  </Text>
                 </Pressable>
               </View>
 
@@ -659,7 +631,7 @@ export default function TuneProfileScreen() {
                   return (
                     <Pressable
                       key={chip.label}
-                      disabled={disabled || tipping}
+                      disabled={disabled}
                       onPress={() => {
                         setSupportAmount(roundPounds(chip.value));
                         openTipSheet(chip.value);
@@ -680,9 +652,6 @@ export default function TuneProfileScreen() {
                   );
                 })}
               </View>
-              {supportError ? (
-                <Text style={styles.supportError}>{supportError}</Text>
-              ) : null}
             </View>
           </ScrollView>
 
@@ -1104,19 +1073,23 @@ const styles = StyleSheet.create({
   },
   supportTipBtn: {
     marginLeft: 12,
-    backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-    minWidth: 72,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#9333ea',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.55)',
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    minWidth: 88,
   },
   supportTipText: {
     color: '#fff',
     fontWeight: '700',
     fontSize: 15,
   },
-  disabled: { opacity: 0.6 },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1146,12 +1119,6 @@ const styles = StyleSheet.create({
   },
   tipChipChampionText: {
     color: '#fde68a',
-  },
-  supportError: {
-    marginTop: 10,
-    color: '#fca5a5',
-    textAlign: 'center',
-    fontSize: 13,
   },
   error: {
     color: '#fca5a5',
