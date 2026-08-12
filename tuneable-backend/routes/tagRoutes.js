@@ -84,13 +84,13 @@ router.get('/popular', async (req, res) => {
 router.get('/:slug/profile', async (req, res) => {
   try {
     const { slug } = req.params;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, timePeriod = 'all-time' } = req.query;
 
     if (!slug || !String(slug).trim()) {
       return res.status(400).json({ error: 'Tag slug is required' });
     }
 
-    const profile = await getTagProfile(slug, { page, limit });
+    const profile = await getTagProfile(slug, { page, limit, timePeriod });
     res.json(profile);
   } catch (error) {
     if (error.status === 404) {

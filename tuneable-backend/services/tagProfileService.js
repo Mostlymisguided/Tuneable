@@ -10,6 +10,7 @@ const {
 } = require('../utils/tagNormalizer');
 const { generateSlug, getExistingTagParty } = require('./tagPartyService');
 const { loadBidsByMediaId } = require('./relatedMediaService');
+const { getPeriodStartDate } = require('../utils/globalPartyChart');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const SKIP_PLACE_FEATURE_TYPES = new Set(['continent', 'earth', 'world']);
@@ -20,6 +21,13 @@ const CITYISH_FEATURE_TYPES = new Set([
   'neighborhood',
   'postcode',
   'address',
+]);
+const VALID_TIME_PERIODS = new Set([
+  'all-time',
+  'today',
+  'this-week',
+  'this-month',
+  'this-year',
 ]);
 
 /**
@@ -315,9 +323,57 @@ async function computeTopSupportPlaces(mediaIds, { limit = 3 } = {}) {
 }
 
 /**
+ * Rank tagged media by tip aggregate within a rolling time window.
+ * Returns only tracks with tips in-period; display aggregate is the period sum.
+ */
+async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
+  if (!startDate || !Array.isArray(matchedMedia) || matchedMedia.length === 0) {
+    return matchedMedia;
+  }
+
+  const mediaIds = matchedMedia.map((m) => m._id);
+  const periodRows = await Bid.aggregate([
+    {
+      $match: {
+        status: 'active',
+        mediaId: { $in: mediaIds },
+        createdAt: { $gte: startDate },
+      },
+    },
+    {
+      $group: {
+        _id: '$mediaId',
+        tipWeight: { $sum: '$amount' },
+      },
+    },
+  ]);
+
+  const periodById = new Map(
+    periodRows.map((row) => [row._id.toString(), row.tipWeight || 0])
+  );
+
+  return matchedMedia
+    .map((item) => {
+      const periodVal = periodById.get(item._id.toString()) || 0;
+      return {
+        ...item,
+        timePeriodBidValue: periodVal,
+        // Queue cards read globalMediaAggregate for tip display
+        globalMediaAggregate: periodVal,
+      };
+    })
+    .filter((item) => (item.timePeriodBidValue || 0) > 0)
+    .sort(
+      (a, b) =>
+        (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0) ||
+        String(a.title || '').localeCompare(String(b.title || ''))
+    );
+}
+
+/**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
-async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
+async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time' } = {}) {
   const resolved = await resolveTagFromSlug(rawSlug);
   if (!resolved) {
     const err = new Error('Tag not found');
@@ -329,6 +385,8 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const skip = (pageNum - 1) * limitNum;
+  const period = VALID_TIME_PERIODS.has(timePeriod) ? timePeriod : 'all-time';
+  const startDate = getPeriodStartDate(period);
 
   const variants = collectTagVariants(displayName, canonicalTag);
 
@@ -367,15 +425,21 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
     return item.tags.some((t) => typeof t === 'string' && tagsMatch(t, displayName));
   });
 
-  const total = matched.length;
-  const pageSlice = matched.slice(skip, skip + limitNum);
-  const tipTotal = matched.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
+  // Related chips stay all-time (stable header); Top Tunes re-rank by period
   const relatedTags = computeRelatedTags(matched, displayName, { limit: 8 });
   const topOriginPlaces = computeTopOriginPlaces(matched, { limit: 3 });
   const topSupportPlaces = await computeTopSupportPlaces(
     matched.map((m) => m._id),
     { limit: 3 }
   );
+
+  const ranked = startDate
+    ? await rankMatchedMediaByPeriod(matched, startDate)
+    : matched;
+
+  const total = ranked.length;
+  const pageSlice = ranked.slice(skip, skip + limitNum);
+  const tipTotal = ranked.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
   // Attach active bids (with tipper user info) for supporters display on the page slice only
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
@@ -401,6 +465,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50 } = {}) {
       slug,
       canonicalTag,
     },
+    timePeriod: period,
     stats: {
       mediaCount: total,
       globalTagAggregate: tipTotal,

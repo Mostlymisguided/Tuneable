@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Tag, Loader2, Music, Coins, MapPin } from 'lucide-react';
+import { Tag, Loader2, Music, Coins, MapPin, Clock } from 'lucide-react';
 import { tagAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -33,6 +33,22 @@ interface TagPlaceChip {
 
 type TagMediaItem = TippedQueueItem;
 
+const TIME_PERIOD_OPTIONS = [
+  { key: 'all-time', label: 'All Time' },
+  { key: 'this-month', label: 'This Month' },
+  { key: 'this-week', label: 'This Week' },
+  { key: 'today', label: 'Today' },
+] as const;
+
+type TimePeriod = (typeof TIME_PERIOD_OPTIONS)[number]['key'];
+
+function formatTimePeriodLabel(period: string): string {
+  return (
+    TIME_PERIOD_OPTIONS.find((p) => p.key === period)?.label ??
+    period.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+  );
+}
+
 const TagProfile: React.FC = () => {
   const { slug: slugParam } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -48,6 +64,8 @@ const TagProfile: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<TimePeriod>('all-time');
+  const [showTimeFilter, setShowTimeFilter] = useState(false);
 
   const loadProfile = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -57,7 +75,10 @@ const TagProfile: React.FC = () => {
         setError(null);
       }
       try {
-        const data = await tagAPI.getProfile(slug, { limit: 50 });
+        const data = await tagAPI.getProfile(slug, {
+          limit: 50,
+          timePeriod: selectedTimePeriod,
+        });
         setTag(data.tag);
         setStats(data.stats || null);
         setRelatedTags(data.relatedTags || []);
@@ -72,7 +93,7 @@ const TagProfile: React.FC = () => {
         if (!silent) setLoading(false);
       }
     },
-    [slug]
+    [slug, selectedTimePeriod]
   );
 
   useEffect(() => {
@@ -96,6 +117,10 @@ const TagProfile: React.FC = () => {
       })),
     [media, displayName]
   );
+
+  const handleTimePeriodChange = (period: TimePeriod) => {
+    setSelectedTimePeriod(period);
+  };
 
   const renderPlaceRow = (label: string, places: TagPlaceChip[]) => {
     if (places.length === 0) return null;
@@ -189,7 +214,11 @@ const TagProfile: React.FC = () => {
                   <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm">
                     <Coins className="h-3.5 w-3.5 text-gray-400" />
                     <span className="font-semibold">{penceToPounds(tipTotal)}</span>
-                    <span className="text-gray-400">total support</span>
+                    <span className="text-gray-400">
+                      {selectedTimePeriod === 'all-time'
+                        ? 'total support'
+                        : `${formatTimePeriodLabel(selectedTimePeriod).toLowerCase()} support`}
+                    </span>
                   </span>
                 )}
               </div>
@@ -236,6 +265,58 @@ const TagProfile: React.FC = () => {
 
         {/* Top Tunes */}
         <div className="mb-8 px-2 md:px-0">
+          <div className="mb-3 md:mb-4 flex flex-wrap justify-center sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setShowTimeFilter((open) => !open)}
+              className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                showTimeFilter || selectedTimePeriod !== 'all-time'
+                  ? 'bg-gray-700 ring-1 ring-purple-500/50'
+                  : 'bg-gray-800'
+              }`}
+            >
+              <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
+              Time
+              <span className="text-xs text-purple-300 font-normal">
+                ({formatTimePeriodLabel(selectedTimePeriod)})
+              </span>
+            </button>
+          </div>
+
+          {showTimeFilter && (
+            <div className="card p-3 md:p-6 mb-3 md:mb-4 max-w-2xl mx-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Clock className="h-4 w-4 mr-2 text-purple-400" />
+                  Sort by Time
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowTimeFilter(false)}
+                  className="text-sm text-gray-400 hover:text-white"
+                >
+                  Hide
+                </button>
+              </div>
+              <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
+                {TIME_PERIOD_OPTIONS.map((period) => (
+                  <button
+                    key={period.key}
+                    type="button"
+                    onClick={() => handleTimePeriodChange(period.key)}
+                    className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
+                      selectedTimePeriod === period.key
+                        ? 'bg-purple-700 text-white'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {period.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {(() => {
             const heading = (
               <h2 className="text-xl md:text-2xl font-bold text-white flex items-center">
@@ -269,7 +350,18 @@ const TagProfile: React.FC = () => {
                   ) : (
                     <div className="text-center py-12 text-gray-400">
                       <Music className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                      No tracks tagged <span className="text-white font-medium">{displayName}</span> yet.
+                      {selectedTimePeriod === 'all-time' ? (
+                        <>
+                          No tracks tagged{' '}
+                          <span className="text-white font-medium">{displayName}</span> yet.
+                        </>
+                      ) : (
+                        <>
+                          No tips for{' '}
+                          <span className="text-white font-medium">{displayName}</span>{' '}
+                          in {formatTimePeriodLabel(selectedTimePeriod).toLowerCase()}.
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

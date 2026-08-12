@@ -24,7 +24,12 @@ import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { getTagProfileHref, tagsMatch } from '@/src/lib/tagNormalizer';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
-import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
+import {
+  DEFAULT_COVER_ART,
+  TIME_PERIODS,
+  type ChartMediaItem,
+  type TimePeriodKey,
+} from '@/src/types/media';
 
 function PlaceRow({
   label,
@@ -54,6 +59,10 @@ function PlaceRow({
   );
 }
 
+function formatTimePeriodLabel(period: TimePeriodKey): string {
+  return TIME_PERIODS.find((p) => p.key === period)?.label ?? period;
+}
+
 export default function TagProfileScreen() {
   const { slug: slugParam } = useLocalSearchParams<{ slug: string }>();
   const slug = typeof slugParam === 'string' ? decodeURIComponent(slugParam) : '';
@@ -74,6 +83,8 @@ export default function TagProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
+  const [period, setPeriod] = useState<TimePeriodKey>('all-time');
+  const [showTimePanel, setShowTimePanel] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -82,7 +93,7 @@ export default function TagProfileScreen() {
       else setLoading(true);
       setError(null);
       try {
-        const data = await tagAPI.getProfile(slug, { limit: 50 });
+        const data = await tagAPI.getProfile(slug, { limit: 50, timePeriod: period });
         setTagName(data.tag?.name || slug.replace(/-/g, ' '));
         setTipTotal(data.stats?.globalTagAggregate ?? 0);
         setTotal(data.pagination?.total ?? data.media?.length ?? 0);
@@ -103,7 +114,7 @@ export default function TagProfileScreen() {
         setRefreshing(false);
       }
     },
-    [slug]
+    [slug, period]
   );
 
   useFocusEffect(
@@ -175,7 +186,11 @@ export default function TagProfileScreen() {
           <View style={styles.statChip}>
             <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
             <Text style={styles.statChipText}>{formatPoundsFromPence(tipTotal)}</Text>
-            <Text style={styles.statChipMuted}>total support</Text>
+            <Text style={styles.statChipMuted}>
+              {period === 'all-time'
+                ? 'total support'
+                : `${formatTimePeriodLabel(period).toLowerCase()} support`}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -201,7 +216,48 @@ export default function TagProfileScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Top Tunes</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Top Tunes</Text>
+        <Pressable
+          onPress={() => setShowTimePanel((open) => !open)}
+          style={[
+            styles.timeTrigger,
+            (showTimePanel || period !== 'all-time') && styles.timeTriggerActive,
+          ]}>
+          <Ionicons name="time-outline" size={14} color={colors.accentLight} />
+          <Text style={styles.timeTriggerLabel}>Time</Text>
+          <Text style={styles.timeTriggerDetail} numberOfLines={1}>
+            ({formatTimePeriodLabel(period)})
+          </Text>
+        </Pressable>
+      </View>
+
+      {showTimePanel ? (
+        <View style={styles.timePanel}>
+          <View style={styles.timePanelHeader}>
+            <Text style={styles.timePanelTitle}>Time Period</Text>
+            <Pressable onPress={() => setShowTimePanel(false)} hitSlop={8}>
+              <Text style={styles.timePanelHide}>Hide</Text>
+            </Pressable>
+          </View>
+          <View style={styles.timeChips}>
+            {TIME_PERIODS.map((p) => {
+              const active = period === p.key;
+              return (
+                <Pressable
+                  key={p.key}
+                  onPress={() => setPeriod(p.key)}
+                  style={[styles.timeChip, active && styles.timeChipActive]}>
+                  <Text
+                    style={[styles.timeChipText, active && styles.timeChipTextActive]}>
+                    {p.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -241,7 +297,16 @@ export default function TagProfileScreen() {
           ListEmptyComponent={
             !loading ? (
               <Text style={styles.empty}>
-                No tracks tagged <Text style={styles.emptyStrong}>{tagName}</Text> yet.
+                {period === 'all-time' ? (
+                  <>
+                    No tracks tagged <Text style={styles.emptyStrong}>{tagName}</Text> yet.
+                  </>
+                ) : (
+                  <>
+                    No tips for <Text style={styles.emptyStrong}>{tagName}</Text> in{' '}
+                    {formatTimePeriodLabel(period).toLowerCase()}.
+                  </>
+                )}
               </Text>
             ) : null
           }
@@ -252,7 +317,7 @@ export default function TagProfileScreen() {
                 ...item,
                 tags: (item.tags || []).filter((t) => !tagsMatch(t, tagName)),
               }}
-              tipPence={item.globalMediaAggregate}
+              tipPence={item.timePeriodBidValue ?? item.globalMediaAggregate}
               variant="rich"
               onOpen={() => {
                 const id = mediaId(item);
@@ -423,12 +488,89 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 4,
+    marginBottom: 8,
+  },
   sectionTitle: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 8,
-    marginTop: 4,
+    flexShrink: 1,
+  },
+  timeTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    maxWidth: '58%',
+  },
+  timeTriggerActive: {
+    backgroundColor: 'rgba(55, 65, 81, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+  },
+  timeTriggerLabel: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timeTriggerDetail: {
+    color: '#c4b5fd',
+    fontSize: 11,
+    maxWidth: 80,
+  },
+  timePanel: {
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  timePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  timePanelTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  timePanelHide: {
+    color: colors.textMuted,
+    fontSize: 13,
+  },
+  timeChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  timeChipActive: {
+    backgroundColor: '#7e22ce',
+  },
+  timeChipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timeChipTextActive: {
+    color: '#fff',
   },
   centered: {
     alignItems: 'center',
