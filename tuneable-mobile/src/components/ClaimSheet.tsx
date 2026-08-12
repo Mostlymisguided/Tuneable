@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  InputAccessoryView,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +29,8 @@ type Props = {
   onClose: () => void;
   onSubmitted?: () => void;
 };
+
+const PROOF_INPUT_ACCESSORY_ID = 'claim-proof-done';
 
 function isCreator(user: { role?: string[] } | null | undefined): boolean {
   return Boolean(user?.role?.includes('creator') || user?.role?.includes('admin'));
@@ -107,21 +113,33 @@ export function ClaimSheet({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title} numberOfLines={2}>
-              {titleByStep[step]}
-            </Text>
-            <Pressable onPress={onClose} hitSlop={12} disabled={submitting}>
-              <Ionicons name="close" size={24} color={colors.textMuted} />
-            </Pressable>
-          </View>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.sheet}>
+            <View style={styles.header}>
+              <Text style={styles.title} numberOfLines={2}>
+                {titleByStep[step]}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  Keyboard.dismiss();
+                  onClose();
+                }}
+                hitSlop={12}
+                disabled={submitting}
+              >
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
 
-          <ScrollView
-            contentContainerStyle={styles.body}
-            keyboardShouldPersistTaps="handled"
-          >
+            <ScrollView
+              contentContainerStyle={styles.body}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            >
             {step === 'intent' && (
               <>
                 <Text style={styles.copy}>
@@ -214,6 +232,9 @@ export function ClaimSheet({
                   multiline
                   maxLength={2000}
                   editable={!submitting}
+                  inputAccessoryViewID={
+                    Platform.OS === 'ios' ? PROOF_INPUT_ACCESSORY_ID : undefined
+                  }
                 />
                 <Text style={styles.charCount}>{proofText.length}/2000</Text>
                 {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -222,7 +243,10 @@ export function ClaimSheet({
                     styles.primaryBtn,
                     (!proofText.trim() || submitting) && styles.primaryBtnDisabled,
                   ]}
-                  onPress={() => void submit()}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    void submit();
+                  }}
                   disabled={!proofText.trim() || submitting}
                 >
                   {submitting ? (
@@ -237,7 +261,10 @@ export function ClaimSheet({
                 </Pressable>
                 <Pressable
                   style={styles.secondaryBtn}
-                  onPress={() => setStep('intent')}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setStep('intent');
+                  }}
                   disabled={submitting}
                 >
                   <Text style={styles.secondaryBtnText}>Back</Text>
@@ -245,17 +272,50 @@ export function ClaimSheet({
               </>
             )}
           </ScrollView>
+          </View>
         </View>
-      </View>
+        {Platform.OS === 'ios' ? (
+          <InputAccessoryView nativeID={PROOF_INPUT_ACCESSORY_ID}>
+            <View style={styles.accessory}>
+              <Pressable
+                onPress={Keyboard.dismiss}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss keyboard"
+              >
+                <Text style={styles.accessoryDone}>Done</Text>
+              </Pressable>
+            </View>
+          </InputAccessoryView>
+        ) : null}
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
+  },
+  accessory: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#2a1f3d',
+  },
+  accessoryDone: {
+    color: colors.accent,
+    fontSize: 16,
+    fontWeight: '700',
   },
   sheet: {
     maxHeight: '88%',
