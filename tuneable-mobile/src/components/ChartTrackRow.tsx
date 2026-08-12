@@ -74,7 +74,7 @@ export function ChartTrackRow({
   const hasFooter = allTags.length > 0 || supporterCount > 0;
   const hiddenTagCount = Math.max(0, allTags.length - COLLAPSED_TAG_COUNT);
   const canExpandFooter =
-    allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 3;
+    allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 0;
 
   const showHint = !playable && !hideCatalogHint;
   const toggleFooter = () => setFooterExpanded((open) => !open);
@@ -157,9 +157,18 @@ export function ChartTrackRow({
     });
   }
   if (bpm != null) {
+    const bpmHref = getTagProfileHref(String(bpm));
     metaParts.push({
       key: 'bpm',
-      node: <Text style={styles.metaStat}>{bpm}</Text>,
+      node: (
+        <Pressable
+          onPress={() => router.push(bpmHref as Href)}
+          hitSlop={4}
+          accessibilityRole="link"
+          accessibilityLabel={`Open ${bpm} BPM`}>
+          <Text style={styles.metaStat}>{bpm}</Text>
+        </Pressable>
+      ),
     });
   }
   if (releaseYear != null) {

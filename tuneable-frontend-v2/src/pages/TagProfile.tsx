@@ -13,6 +13,7 @@ interface TagEntity {
   name: string;
   slug: string;
   canonicalTag?: string;
+  kind?: 'tag' | 'year' | 'bpm';
 }
 
 interface TagStats {
@@ -101,6 +102,18 @@ const TagProfile: React.FC = () => {
   }, [loadProfile]);
 
   const displayName = tag?.name || slug.replace(/-/g, ' ');
+  const kindLabel =
+    tag?.kind === 'year'
+      ? 'Year'
+      : tag?.kind === 'bpm'
+        ? 'BPM'
+        : /^\d{4}$/.test(displayName)
+          ? 'Year'
+          : /^\d{2,3}$/.test(displayName) &&
+              Number(displayName) >= 20 &&
+              Number(displayName) <= 400
+            ? 'BPM'
+            : 'Tag';
   const tipTotal = stats?.globalTagAggregate ?? 0;
   const mosaicCovers = media.slice(0, 4).map((item) => ({
     id: item._id,
@@ -196,10 +209,10 @@ const TagProfile: React.FC = () => {
             {/* Tag Info */}
             <div className="flex-1 w-full text-white">
               <div className="text-xs uppercase tracking-wide text-purple-300 font-semibold mb-1 text-center md:text-left">
-                {/^\d{4}$/.test(displayName) ? 'Year' : 'Tag'}
+                {kindLabel}
               </div>
               <h1 className="text-2xl md:text-4xl font-bold mb-3 text-center md:text-left">
-                {displayName}
+                {kindLabel === 'BPM' ? `${displayName} BPM` : displayName}
               </h1>
 
               {/* Stat chips */}
@@ -252,7 +265,13 @@ const TagProfile: React.FC = () => {
                 <div className="w-full max-w-lg flex justify-center md:justify-start">
                   <MediaChampions
                     tagSlug={slug}
-                    entityLabel={`#${displayName}`}
+                    entityLabel={
+                      kindLabel === 'BPM'
+                        ? `${displayName} BPM`
+                        : kindLabel === 'Year'
+                          ? displayName
+                          : `#${displayName}`
+                    }
                     variant="strip"
                     compact
                     maxDisplay={3}
@@ -352,13 +371,29 @@ const TagProfile: React.FC = () => {
                       <Music className="h-10 w-10 mx-auto mb-3 opacity-50" />
                       {selectedTimePeriod === 'all-time' ? (
                         <>
-                          No tracks tagged{' '}
-                          <span className="text-white font-medium">{displayName}</span> yet.
+                          {kindLabel === 'BPM' ? (
+                            <>
+                              No tracks at{' '}
+                              <span className="text-white font-medium">{displayName} BPM</span> yet.
+                            </>
+                          ) : kindLabel === 'Year' ? (
+                            <>
+                              No tracks from{' '}
+                              <span className="text-white font-medium">{displayName}</span> yet.
+                            </>
+                          ) : (
+                            <>
+                              No tracks tagged{' '}
+                              <span className="text-white font-medium">{displayName}</span> yet.
+                            </>
+                          )}
                         </>
                       ) : (
                         <>
                           No tips for{' '}
-                          <span className="text-white font-medium">{displayName}</span>{' '}
+                          <span className="text-white font-medium">
+                            {kindLabel === 'BPM' ? `${displayName} BPM` : displayName}
+                          </span>{' '}
                           in {formatTimePeriodLabel(selectedTimePeriod).toLowerCase()}.
                         </>
                       )}

@@ -107,10 +107,16 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   );
   if (bpm != null) {
     metaParts.push(
-      <span key="bpm" title={`${bpm} BPM`} className="tabular-nums">
+      <Link
+        key="bpm"
+        to={getTagProfilePath(String(bpm))}
+        title={`${bpm} BPM`}
+        onClick={(e) => e.stopPropagation()}
+        className={`${META_LINK_CLASS} tabular-nums`}
+      >
         <span className="md:hidden">{bpm}</span>
         <span className="hidden md:inline">{bpm} BPM</span>
-      </span>
+      </Link>
     );
   }
   if (releaseYear != null) {

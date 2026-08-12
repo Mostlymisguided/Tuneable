@@ -8,7 +8,12 @@ export type TagPlaceChip = {
 };
 
 export type TagProfileResponse = {
-  tag: { name: string; slug: string; canonicalTag?: string };
+  tag: {
+    name: string;
+    slug: string;
+    canonicalTag?: string;
+    kind?: 'tag' | 'year' | 'bpm';
+  };
   timePeriod?: string;
   stats?: { mediaCount?: number; globalTagAggregate?: number };
   relatedTags?: Array<{ name: string; slug: string }>;

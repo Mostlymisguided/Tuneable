@@ -71,6 +71,7 @@ export default function TagProfileScreen() {
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
 
   const [tagName, setTagName] = useState(slug.replace(/-/g, ' '));
+  const [tagKind, setTagKind] = useState<'tag' | 'year' | 'bpm'>('tag');
   const [tipTotal, setTipTotal] = useState(0);
   const [total, setTotal] = useState(0);
   const [relatedTags, setRelatedTags] = useState<Array<{ name: string; slug: string }>>(
@@ -94,7 +95,16 @@ export default function TagProfileScreen() {
       setError(null);
       try {
         const data = await tagAPI.getProfile(slug, { limit: 50, timePeriod: period });
-        setTagName(data.tag?.name || slug.replace(/-/g, ' '));
+        const name = data.tag?.name || slug.replace(/-/g, ' ');
+        setTagName(name);
+        setTagKind(
+          data.tag?.kind ||
+            (/^\d{4}$/.test(name)
+              ? 'year'
+              : /^\d{2,3}$/.test(name) && Number(name) >= 20 && Number(name) <= 400
+                ? 'bpm'
+                : 'tag')
+        );
         setTipTotal(data.stats?.globalTagAggregate ?? 0);
         setTotal(data.pagination?.total ?? data.media?.length ?? 0);
         setRelatedTags(data.relatedTags || []);
@@ -172,8 +182,12 @@ export default function TagProfileScreen() {
         )}
       </View>
 
-      <Text style={styles.eyebrow}>{/^\d{4}$/.test(tagName) ? 'Year' : 'Tag'}</Text>
-      <Text style={styles.title}>{tagName}</Text>
+      <Text style={styles.eyebrow}>
+        {tagKind === 'year' ? 'Year' : tagKind === 'bpm' ? 'BPM' : 'Tag'}
+      </Text>
+      <Text style={styles.title}>
+        {tagKind === 'bpm' ? `${tagName} BPM` : tagName}
+      </Text>
 
       <View style={styles.statChips}>
         <View style={styles.statChip}>
@@ -298,13 +312,26 @@ export default function TagProfileScreen() {
             !loading ? (
               <Text style={styles.empty}>
                 {period === 'all-time' ? (
-                  <>
-                    No tracks tagged <Text style={styles.emptyStrong}>{tagName}</Text> yet.
-                  </>
+                  tagKind === 'bpm' ? (
+                    <>
+                      No tracks at <Text style={styles.emptyStrong}>{tagName} BPM</Text> yet.
+                    </>
+                  ) : tagKind === 'year' ? (
+                    <>
+                      No tracks from <Text style={styles.emptyStrong}>{tagName}</Text> yet.
+                    </>
+                  ) : (
+                    <>
+                      No tracks tagged <Text style={styles.emptyStrong}>{tagName}</Text> yet.
+                    </>
+                  )
                 ) : (
                   <>
-                    No tips for <Text style={styles.emptyStrong}>{tagName}</Text> in{' '}
-                    {formatTimePeriodLabel(period).toLowerCase()}.
+                    No tips for{' '}
+                    <Text style={styles.emptyStrong}>
+                      {tagKind === 'bpm' ? `${tagName} BPM` : tagName}
+                    </Text>{' '}
+                    in {formatTimePeriodLabel(period).toLowerCase()}.
                   </>
                 )}
               </Text>

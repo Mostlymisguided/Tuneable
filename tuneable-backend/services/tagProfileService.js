@@ -44,6 +44,33 @@ function parseReleaseYearFromSlug(rawSlug) {
 }
 
 /**
+ * Parse a BPM slug (e.g. "128") for tempo-based tag profiles.
+ * Excludes 4-digit years (handled by parseReleaseYearFromSlug).
+ * @returns {number|null}
+ */
+function parseBpmFromSlug(rawSlug) {
+  if (!rawSlug || typeof rawSlug !== 'string') return null;
+  const slug = decodeURIComponent(rawSlug).trim().toLowerCase();
+  // Allow "128", "128bpm", "128-bpm"
+  const match = slug.match(/^(\d{2,3})(?:-?bpm)?$/);
+  if (!match) return null;
+  const bpm = parseInt(match[1], 10);
+  if (!Number.isFinite(bpm) || bpm < 20 || bpm > 400) return null;
+  // Prefer year profiles for 1900–2100 four-digit slugs
+  if (/^\d{4}$/.test(slug)) return null;
+  return bpm;
+}
+
+/**
+ * Mongo filter matching media whose bpm rounds to the given integer.
+ */
+function mediaBpmQuery(bpm) {
+  return {
+    bpm: { $gte: bpm - 0.5, $lt: bpm + 0.5 },
+  };
+}
+
+/**
  * Resolve a URL slug into display name + canonical matching key.
  * Prefers an existing tag party when present (stable name/slug).
  */
@@ -62,6 +89,20 @@ async function resolveTagFromSlug(rawSlug) {
       slug: yearLabel,
       party: null,
       releaseYear,
+      kind: 'year',
+    };
+  }
+
+  const bpm = parseBpmFromSlug(slug);
+  if (bpm != null) {
+    const bpmLabel = String(bpm);
+    return {
+      displayName: bpmLabel,
+      canonicalTag: bpmLabel,
+      slug: bpmLabel,
+      party: null,
+      bpm,
+      kind: 'bpm',
     };
   }
 
@@ -96,6 +137,7 @@ async function resolveTagFromSlug(rawSlug) {
     canonicalTag,
     slug: resolvedSlug,
     party: party || null,
+    kind: 'tag',
   };
 }
 
@@ -406,7 +448,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
     throw err;
   }
 
-  const { displayName, canonicalTag, slug, party, releaseYear } = resolved;
+  const { displayName, canonicalTag, slug, party, releaseYear, bpm, kind } = resolved;
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const skip = (pageNum - 1) * limitNum;
@@ -424,6 +466,18 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
       contentType: 'music',
       contentForm: { $nin: PODCAST_FORMS },
       releaseYear,
+    })
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .select(MEDIA_FIELDS)
+      .populate('addedBy', 'username profilePic uuid')
+      .lean();
+  } else if (typeof bpm === 'number') {
+    // BPM profiles rank by Media.bpm (rounded integer match)
+    matched = await Media.find({
+      status: 'active',
+      contentType: 'music',
+      contentForm: { $nin: PODCAST_FORMS },
+      ...mediaBpmQuery(bpm),
     })
       .sort({ globalMediaAggregate: -1, createdAt: -1 })
       .select(MEDIA_FIELDS)
@@ -505,6 +559,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
       name: displayName,
       slug,
       canonicalTag,
+      kind: kind || (releaseYear != null ? 'year' : bpm != null ? 'bpm' : 'tag'),
     },
     timePeriod: period,
     stats: {
@@ -533,4 +588,6 @@ module.exports = {
   computeTopOriginPlaces,
   computeTopSupportPlaces,
   parseReleaseYearFromSlug,
+  parseBpmFromSlug,
+  mediaBpmQuery,
 };

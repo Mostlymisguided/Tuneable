@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const Bid = require('../models/Bid');
 const Media = require('../models/Media');
 const { isValidObjectId } = require('../utils/validators');
-const { resolveTagFromSlug, collectTagVariants, generateSlug } = require('./tagProfileService');
+const { resolveTagFromSlug, collectTagVariants, generateSlug, mediaBpmQuery } = require('./tagProfileService');
 const { getCanonicalTag, tagsMatch, normalizeTagForStorage } = require('../utils/tagNormalizer');
 
 /** Minimum distinct tippers in-scope before crowning Champions. */
@@ -180,19 +180,47 @@ async function aggregateChampionsForMatch(match, options = {}) {
 }
 
 /**
- * Media IDs for all active music tagged with this slug (canonical matching).
+ * Media IDs for all active music tagged with this slug (canonical matching),
+ * or matching a year/BPM virtual tag profile.
  */
 async function resolveTagMediaIds(rawSlug) {
   const resolved = await resolveTagFromSlug(rawSlug);
   if (!resolved) return null;
 
-  const { displayName, canonicalTag, slug } = resolved;
-  const variants = collectTagVariants(displayName, canonicalTag);
+  const { displayName, canonicalTag, slug, releaseYear, bpm } = resolved;
 
-  const baseQuery = {
+  const musicFilter = {
     status: 'active',
     contentType: 'music',
     contentForm: { $nin: PODCAST_FORMS },
+  };
+
+  if (typeof releaseYear === 'number') {
+    const mediaIds = await Media.find({ ...musicFilter, releaseYear })
+      .select('_id')
+      .lean()
+      .then((rows) => rows.map((m) => m._id));
+    return {
+      tag: { name: displayName, slug, canonicalTag },
+      mediaIds,
+    };
+  }
+
+  if (typeof bpm === 'number') {
+    const mediaIds = await Media.find({ ...musicFilter, ...mediaBpmQuery(bpm) })
+      .select('_id')
+      .lean()
+      .then((rows) => rows.map((m) => m._id));
+    return {
+      tag: { name: displayName, slug, canonicalTag },
+      mediaIds,
+    };
+  }
+
+  const variants = collectTagVariants(displayName, canonicalTag);
+
+  const baseQuery = {
+    ...musicFilter,
     tags: { $exists: true, $ne: [] },
   };
 
