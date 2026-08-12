@@ -193,32 +193,40 @@ export function ChartTrackRow({
       <View style={styles.richTop}>
         {coverArt}
 
-        <Pressable style={styles.richMeta} onPress={onOpen}>
-          <View style={styles.titleRow}>
-            <Text style={styles.richTitle} numberOfLines={1}>
-              {item.title || 'Untitled'}
-            </Text>
-            <View style={styles.metaStats}>
-              {metaParts.map((part, index) => (
-                <View key={part.key} style={styles.metaPart}>
-                  {index > 0 ? <Text style={styles.metaDot}>·</Text> : null}
-                  {part.node}
-                </View>
-              ))}
+        <View style={styles.richMeta}>
+          <Pressable onPress={onOpen}>
+            <View style={styles.titleRow}>
+              <Text style={styles.richTitle} numberOfLines={1}>
+                {item.title || 'Untitled'}
+              </Text>
+              <View style={styles.metaStats}>
+                {metaParts.map((part, index) => (
+                  <View key={part.key} style={styles.metaPart}>
+                    {index > 0 ? <Text style={styles.metaDot}>·</Text> : null}
+                    {part.node}
+                  </View>
+                ))}
+              </View>
             </View>
+          </Pressable>
+          <View style={styles.artistRow}>
+            <Pressable style={styles.artistPress} onPress={onOpen}>
+              <Text style={styles.artist} numberOfLines={1}>
+                {formatArtist(item.artist)}
+              </Text>
+              {showHint ? (
+                <Text style={styles.hint}>Catalog only — no upload yet</Text>
+              ) : null}
+            </Pressable>
+            <Pressable
+              onPress={onTip}
+              hitSlop={8}
+              style={styles.tipBtn}
+              accessibilityLabel="Send a tip">
+              <Ionicons name="heart" size={22} color="#f472b6" />
+            </Pressable>
           </View>
-          <Text style={styles.artist} numberOfLines={1}>
-            {formatArtist(item.artist)}
-          </Text>
-          {showHint ? (
-            <Text style={styles.hint}>Catalog only — no upload yet</Text>
-          ) : null}
-        </Pressable>
-
-        <Pressable onPress={onTip} hitSlop={8} style={styles.tipBtn}>
-          <Ionicons name="heart" size={24} color="#f472b6" />
-          <Text style={styles.tipAmount}>{formatPoundsFromPence(displayTip)}</Text>
-        </Pressable>
+        </View>
       </View>
 
       {hasFooter && !footerExpanded ? (
@@ -325,7 +333,7 @@ const styles = StyleSheet.create({
   },
   richTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
   },
   richCover: {
@@ -371,10 +379,11 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   richTitle: {
     flex: 1,
+    minWidth: 0,
     color: colors.text,
     fontSize: 14,
     fontWeight: '600',
@@ -383,14 +392,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    flexShrink: 1,
-    maxWidth: '55%',
+    flexShrink: 0,
   },
   metaPart: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    flexShrink: 1,
+    flexShrink: 0,
   },
   metaStat: {
     color: colors.textMuted,
@@ -406,15 +414,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  tipBtn: {
-    alignItems: 'center',
-    paddingLeft: 4,
-  },
-  tipAmount: {
+  artistRow: {
     marginTop: 2,
-    color: colors.textSecondary,
-    fontSize: 10,
-    fontWeight: '600',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  artistPress: {
+    flex: 1,
+    minWidth: 0,
+  },
+  tipBtn: {
+    padding: 2,
+    flexShrink: 0,
   },
   denseFooter: {
     flexDirection: 'row',

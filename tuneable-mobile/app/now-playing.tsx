@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, router } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { SeekBar } from '@/src/components/SeekBar';
+import { TipSheet } from '@/src/components/TipSheet';
+import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatArtist, mediaId } from '@/src/lib/media';
 import { episodeId, seriesTitle } from '@/src/lib/podcast';
@@ -27,7 +29,8 @@ import { DEFAULT_COVER_ART } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
 
 export default function NowPlayingScreen() {
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
+  const [tipOpen, setTipOpen] = useState(false);
   const track = useCurrentTrack();
   const episode = useCurrentEpisode();
 
@@ -112,6 +115,17 @@ export default function NowPlayingScreen() {
     : tuneId
       ? (`/tune/${tuneId}` as const)
       : null;
+  const tipMedia = episode ?? track ?? undefined;
+  const defaultTip = user.preferences?.defaultTip ?? 1.11;
+
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
+    const id = podcastId || tuneId;
+    if (!id) throw new Error('Missing media id');
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
+    if (typeof res.updatedBalance === 'number') {
+      updateBalance(res.updatedBalance);
+    }
+  };
 
   return (
     <Screen>
@@ -184,7 +198,26 @@ export default function NowPlayingScreen() {
             <Ionicons name="play-skip-forward" size={34} color={colors.text} />
           </Pressable>
         </View>
+
+        <Pressable
+          style={styles.heartBtn}
+          onPress={() => setTipOpen(true)}
+          accessibilityLabel="Send a tip">
+          <Ionicons name="heart" size={22} color="#e9d5ff" />
+          <Text style={styles.heartLabel}>Tip</Text>
+        </Pressable>
       </View>
+
+      <TipSheet
+        visible={tipOpen}
+        title={title}
+        subtitle={subtitle}
+        balancePence={user.balance ?? 0}
+        defaultTipPounds={defaultTip}
+        tipMedia={tipMedia}
+        onClose={() => setTipOpen(false)}
+        onConfirm={onConfirmTip}
+      />
     </Screen>
   );
 }
@@ -269,6 +302,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  heartBtn: {
+    marginTop: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+  },
+  heartLabel: {
+    color: '#e9d5ff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   empty: {
     flex: 1,

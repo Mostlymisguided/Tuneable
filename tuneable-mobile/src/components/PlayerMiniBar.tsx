@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -8,11 +9,14 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
+import { TipSheet } from '@/src/components/TipSheet';
+import { mediaAPI } from '@/src/api/media';
+import { useAuth } from '@/src/auth/AuthContext';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
-import { formatArtist } from '@/src/lib/media';
-import { seriesTitle } from '@/src/lib/podcast';
+import { formatArtist, mediaId } from '@/src/lib/media';
+import { episodeId, seriesTitle } from '@/src/lib/podcast';
 import {
   useCurrentTrack,
   useMusicPlayerStore,
@@ -24,6 +28,8 @@ import {
 
 /** Shows music or podcast — podcast wins if both somehow set (shouldn't happen). */
 export function PlayerMiniBar() {
+  const { user, updateBalance } = useAuth();
+  const [tipOpen, setTipOpen] = useState(false);
   const episode = useCurrentEpisode();
   const track = useCurrentTrack();
 
@@ -39,37 +45,77 @@ export function PlayerMiniBar() {
 
   const openNowPlaying = () => router.push('/now-playing');
 
-  if (episode) {
-    return (
-      <MiniBarChrome
-        coverUri={episode.coverArt || episode.podcastSeries?.coverArt || DEFAULT_PODCAST_COVER}
-        title={episode.title || 'Episode'}
-        subtitle={seriesTitle(episode)}
-        isPlaying={podPlaying}
-        isLoading={podLoading}
-        onToggle={() => void podToggle()}
-        onNext={() => void podNext()}
-        onOpen={openNowPlaying}
-      />
-    );
-  }
+  const tipTitle = episode?.title || track?.title || 'Untitled';
+  const tipSubtitle = episode
+    ? seriesTitle(episode)
+    : track
+      ? formatArtist(track.artist)
+      : undefined;
+  const tipMedia = episode ?? track ?? undefined;
+  const defaultTip = user?.preferences?.defaultTip ?? 1.11;
 
-  if (track) {
-    return (
-      <MiniBarChrome
-        coverUri={track.coverArt || DEFAULT_COVER_ART}
-        title={track.title || 'Untitled'}
-        subtitle={formatArtist(track.artist)}
-        isPlaying={musicPlaying}
-        isLoading={musicLoading}
-        onToggle={() => void musicToggle()}
-        onNext={() => void musicNext()}
-        onOpen={openNowPlaying}
-      />
-    );
-  }
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
+    const id = episode
+      ? episodeId(episode)
+      : track
+        ? mediaId(track)
+        : '';
+    if (!id) throw new Error('Missing media id');
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
+    if (typeof res.updatedBalance === 'number') {
+      updateBalance(res.updatedBalance);
+    }
+  };
 
-  return null;
+  const chrome = episode ? (
+    <MiniBarChrome
+      coverUri={
+        episode.coverArt ||
+        episode.podcastSeries?.coverArt ||
+        DEFAULT_PODCAST_COVER
+      }
+      title={episode.title || 'Episode'}
+      subtitle={seriesTitle(episode)}
+      isPlaying={podPlaying}
+      isLoading={podLoading}
+      onToggle={() => void podToggle()}
+      onNext={() => void podNext()}
+      onTip={() => setTipOpen(true)}
+      onOpen={openNowPlaying}
+    />
+  ) : track ? (
+    <MiniBarChrome
+      coverUri={track.coverArt || DEFAULT_COVER_ART}
+      title={track.title || 'Untitled'}
+      subtitle={formatArtist(track.artist)}
+      isPlaying={musicPlaying}
+      isLoading={musicLoading}
+      onToggle={() => void musicToggle()}
+      onNext={() => void musicNext()}
+      onTip={() => setTipOpen(true)}
+      onOpen={openNowPlaying}
+    />
+  ) : null;
+
+  if (!chrome) return null;
+
+  return (
+    <>
+      {chrome}
+      {user ? (
+        <TipSheet
+          visible={tipOpen}
+          title={tipTitle}
+          subtitle={tipSubtitle}
+          balancePence={user.balance ?? 0}
+          defaultTipPounds={defaultTip}
+          tipMedia={tipMedia}
+          onClose={() => setTipOpen(false)}
+          onConfirm={onConfirmTip}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function MiniBarChrome({
@@ -80,6 +126,7 @@ function MiniBarChrome({
   isLoading,
   onToggle,
   onNext,
+  onTip,
   onOpen,
 }: {
   coverUri: string;
@@ -89,6 +136,7 @@ function MiniBarChrome({
   isLoading: boolean;
   onToggle: () => void;
   onNext: () => void;
+  onTip: () => void;
   onOpen?: () => void;
 }) {
   return (
@@ -106,6 +154,13 @@ function MiniBarChrome({
             {subtitle}
           </Text>
         </View>
+      </Pressable>
+      <Pressable
+        onPress={onTip}
+        hitSlop={12}
+        style={styles.iconBtn}
+        accessibilityLabel="Send a tip">
+        <Ionicons name="heart" size={22} color="#f472b6" />
       </Pressable>
       <Pressable onPress={onToggle} hitSlop={12} style={styles.iconBtn}>
         {isLoading ? (
