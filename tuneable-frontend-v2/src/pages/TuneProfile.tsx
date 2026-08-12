@@ -2343,14 +2343,14 @@ const TuneProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
-              {/* Claim Tune — rights-pending limbo only */}
+              {/* Claim media — rights-pending limbo only */}
               {!canEditTune() && isRightsPendingClaimable(media) && (
                 <button
                   onClick={handleClaimTune}
                   className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
                 >
                   <Award className="h-4 w-4" />
-                  <span className="hidden sm:inline">Claim Tune</span>
+                  <span className="hidden sm:inline">Claim media</span>
                   <span className="sm:hidden">Claim</span>
                 </button>
               )}
@@ -2386,7 +2386,7 @@ const TuneProfile: React.FC = () => {
                 alt={`${media.title} cover`}
                 className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
-              {/* Play / awaiting rights or upload overlay */}
+              {/* Play / awaiting rights overlay (matches mobile claim flow) */}
               <div 
                 className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
                   isMediaPlayable(media)
@@ -2404,67 +2404,32 @@ const TuneProfile: React.FC = () => {
                     const blockReason = getPlayabilityBlockReason(media);
                     const rightsBlocked = blockReason === 'rights';
                     const disputed = blockReason === 'disputed';
-                    const showClaimCta = rightsBlocked && !canEditTune();
 
                     return (
                       <div className="text-center px-4">
-                        {rightsBlocked || disputed ? (
-                          <Award className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                        ) : (
-                          <Upload className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                        )}
+                        <Award className="h-8 w-8 text-amber-400 mx-auto mb-2" />
                         <p className="text-white text-sm font-semibold">
-                          {disputed
-                            ? 'Rights disputed'
-                            : rightsBlocked
-                              ? 'Awaiting rights'
-                              : 'Awaiting upload'}
+                          {disputed ? 'Rights disputed' : 'Awaiting Rights'}
                         </p>
                         <p className="text-gray-300 text-xs mt-1 mb-3">
                           {disputed
                             ? 'Playback is paused while ownership is resolved'
                             : rightsBlocked
-                              ? showClaimCta
-                                ? 'Claim ownership to receive tips held in escrow'
-                                : canAttachAudio()
-                                  ? 'Upload audio, or wait for the rights holder to claim'
-                                  : 'Tip to support — earnings are held for the rights holder'
-                              : canAttachAudio()
-                                ? isContributorAudioUpload()
-                                  ? 'Upload audio on behalf of the rights holder'
-                                  : 'Upload your audio to make this tune playable'
-                                : 'Tip to support this tune'}
+                              ? 'Claim ownership to receive tips held in escrow'
+                              : 'Claim this media and upload audio if you are the rights holder'}
                         </p>
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
-                          {showClaimCta && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleClaimTune();
-                              }}
-                              className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
-                            >
-                              Claim this tune
-                            </button>
-                          )}
-                          {canAttachAudio() && !disputed && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAttachAudioClick(e);
-                              }}
-                              className={`px-4 py-2 text-sm font-semibold rounded-lg shadow-lg transition-all ${
-                                showClaimCta
-                                  ? 'bg-white/15 hover:bg-white/25 text-white border border-white/30'
-                                  : 'bg-amber-500 hover:bg-amber-400 text-black'
-                              }`}
-                            >
-                              {isContributorAudioUpload() ? 'Upload on behalf' : 'Upload audio'}
-                            </button>
-                          )}
-                        </div>
+                        {!disputed && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowClaimModal(true);
+                            }}
+                            className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
+                          >
+                            Claim media
+                          </button>
+                        )}
                       </div>
                     );
                   })()
