@@ -35,7 +35,6 @@ import {
   isUploadPlayable,
   mediaId,
 } from '@/src/lib/media';
-import { canUploadMedia } from '@/src/lib/permissions';
 import {
   buildTipStatChips,
   resolveTipStatInputs,
@@ -140,7 +139,6 @@ export default function TuneProfileScreen() {
   );
 
   const playable = isUploadPlayable(media);
-  const canUpload = canUploadMedia(user);
   const blockReason = getPlayabilityBlockReason(media);
   const rightsBlocked = blockReason === 'rights';
   const disputed = blockReason === 'disputed';
@@ -369,59 +367,26 @@ export default function TuneProfileScreen() {
                 ) : (
                   <View style={styles.awaitingBox}>
                     <Ionicons
-                      name={
-                        rightsBlocked || disputed
-                          ? 'ribbon-outline'
-                          : 'cloud-upload-outline'
-                      }
+                      name="ribbon-outline"
                       size={28}
                       color="#fbbf24"
                     />
                     <Text style={styles.awaitingTitle}>
-                      {disputed
-                        ? 'Rights disputed'
-                        : rightsBlocked
-                          ? 'Awaiting rights'
-                          : 'Awaiting upload'}
+                      {disputed ? 'Rights disputed' : 'Awaiting Rights'}
                     </Text>
                     <Text style={styles.awaitingHint}>
                       {disputed
                         ? 'Playback is paused while ownership is resolved'
                         : rightsBlocked
                           ? 'Claim ownership to receive tips held in escrow'
-                          : canUpload
-                            ? 'Upload audio to make this tune playable'
-                            : 'Tip to support this tune'}
+                          : 'Claim this media and upload audio if you are the rights holder'}
                     </Text>
                     <View style={styles.awaitingActions}>
-                      {showClaimCta && !disputed ? (
+                      {!disputed ? (
                         <Pressable
                           style={styles.claimOverlayBtn}
                           onPress={() => setClaimOpen(true)}>
-                          <Text style={styles.claimOverlayText}>Claim this tune</Text>
-                        </Pressable>
-                      ) : null}
-                      {canUpload && !disputed ? (
-                        <Pressable
-                          style={
-                            showClaimCta
-                              ? styles.uploadOverlayBtnSecondary
-                              : styles.uploadOverlayBtn
-                          }
-                          onPress={() =>
-                            router.push({
-                              pathname: '/upload',
-                              params: { attachTo: mediaId(media) || id },
-                            })
-                          }>
-                          <Text
-                            style={
-                              showClaimCta
-                                ? styles.uploadOverlayTextSecondary
-                                : styles.uploadOverlayText
-                            }>
-                            Upload audio
-                          </Text>
+                          <Text style={styles.claimOverlayText}>Claim media</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -829,30 +794,6 @@ const styles = StyleSheet.create({
   },
   claimOverlayText: {
     color: '#111',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  uploadOverlayBtn: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  uploadOverlayBtnSecondary: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  uploadOverlayText: {
-    color: '#111',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  uploadOverlayTextSecondary: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 13,
   },
