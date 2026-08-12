@@ -46,7 +46,7 @@ export function PodcastEpisodeRow({
   const hasFooter = allTags.length > 0 || supporterCount > 0;
   const hiddenTagCount = Math.max(0, allTags.length - COLLAPSED_TAG_COUNT);
   const canExpandFooter =
-    allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 3;
+    allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 0;
   const cover =
     episode.coverArt ||
     episode.podcastSeries?.coverArt ||
