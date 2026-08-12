@@ -8,6 +8,7 @@ import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
+import TagList from './TagList';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
 interface TopTunesSong {
@@ -292,20 +293,8 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
                 
                 {/* Tags */}
                 {song.tags && song.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {song.tags.slice(0, 3).map((tag, tagIndex) => (
-                      <span
-                        key={tagIndex}
-                        className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                    {song.tags.length > 3 && (
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                        +{song.tags.length - 3}
-                      </span>
-                    )}
+                  <div className="mt-1">
+                    <TagList tags={song.tags} limit={3} />
                   </div>
                 )}
               </div>

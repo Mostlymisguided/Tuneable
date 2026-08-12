@@ -5,6 +5,7 @@ import {
   countSupporters,
   MiniSupportersBar,
 } from '@/src/components/MiniSupportersBar';
+import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import {
   DEFAULT_PODCAST_COVER,
@@ -124,9 +125,7 @@ export function PodcastEpisodeRow({
         <View style={styles.denseFooter}>
           <View style={styles.tagsInline}>
             {collapsedTags.map((tag) => (
-              <View key={tag} style={styles.tagChip}>
-                <Text style={styles.tagText}>#{tag}</Text>
-              </View>
+              <TagChip key={tag} tag={tag} />
             ))}
             {hiddenTagCount > 0 ? (
               <Pressable style={styles.moreChip} onPress={toggleFooter} hitSlop={6}>
@@ -148,9 +147,7 @@ export function PodcastEpisodeRow({
           {allTags.length > 0 ? (
             <View style={styles.tags}>
               {allTags.map((tag) => (
-                <View key={tag} style={styles.tagChip}>
-                  <Text style={styles.tagText}>#{tag}</Text>
-                </View>
+                <TagChip key={tag} tag={tag} />
               ))}
             </View>
           ) : null}
@@ -285,16 +282,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-  },
-  tagChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(126, 34, 206, 0.25)',
-  },
-  tagText: {
-    color: '#ddd6fe',
-    fontSize: 11,
   },
   moreChip: {
     paddingHorizontal: 7,

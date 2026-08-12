@@ -29,6 +29,7 @@ export interface ChartMediaItem {
   album?: string | null;
   releaseDate?: string | null;
   releaseYear?: number | null;
+  primaryLocation?: import('@/src/types/user').ResolvedLocation | null;
   description?: string | null;
   tags?: string[];
   category?: string;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import { Music, Users, MapPin, Coins, Heart } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
 import { isLocationMatch } from '../utils/locationHelpers';
+import { getTagProfilePath } from '../utils/tagNormalizer';
 
 // Define types directly to avoid import issues
 interface PartyType {
@@ -521,14 +522,16 @@ const Parties: React.FC = () => {
 
         {/* Tags Display */}
         {party.tags && party.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div className="flex flex-wrap gap-1 mt-2 relative z-20">
             {party.tags.slice(0, 3).map((tag: string, index: number) => (
-              <span
+              <Link
                 key={index}
-                className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
+                to={getTagProfilePath(tag)}
+                onClick={(e) => e.stopPropagation()}
+                className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full no-underline hover:bg-purple-200"
               >
                 #{tag}
-              </span>
+              </Link>
             ))}
             {party.tags.length > 3 && (
               <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">

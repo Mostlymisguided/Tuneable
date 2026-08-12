@@ -1,16 +1,41 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import {
   countSupporters,
   MiniSupportersBar,
 } from '@/src/components/MiniSupportersBar';
+import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import {
+  getCountryLabelFromLocation,
+  getCountryPlaceProfileHref,
+} from '@/src/lib/location';
 import { formatArtist, isUploadPlayable } from '@/src/lib/media';
 
 const COLLAPSED_TAG_COUNT = 2;
+
+function getReleaseYear(item: ChartMediaItem): number | null {
+  const year = item.releaseYear;
+  if (typeof year === 'number' && Number.isFinite(year) && year >= 1900 && year <= 2100) {
+    return Math.trunc(year);
+  }
+  const date = item.releaseDate;
+  if (!date) return null;
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const fromDate = parsed.getFullYear();
+  return fromDate >= 1900 && fromDate <= 2100 ? fromDate : null;
+}
+
+function getBpm(item: ChartMediaItem): number | null {
+  const bpm = item.bpm;
+  if (typeof bpm !== 'number' || !Number.isFinite(bpm) || bpm <= 0) return null;
+  return Math.round(bpm);
+}
 
 type Props = {
   rank: number;
@@ -38,6 +63,11 @@ export function ChartTrackRow({
   const playable = isUploadPlayable(item);
   const displayTip = tipPence ?? item.partyMediaAggregate ?? 0;
   const durationLabel = formatDuration(item.duration);
+  const bpm = getBpm(item);
+  const releaseYear = getReleaseYear(item);
+  const country = getCountryLabelFromLocation(item.primaryLocation);
+  const countryHref = getCountryPlaceProfileHref(item.primaryLocation);
+  const countryLabel = country || 'Earth';
   const allTags = item.tags ?? [];
   const supporterCount = countSupporters(item.bids);
   const hasFooter = allTags.length > 0 || supporterCount > 0;
@@ -113,6 +143,49 @@ export function ChartTrackRow({
     );
   }
 
+  const metaParts: Array<{ key: string; node: ReactNode }> = [];
+  if (durationLabel) {
+    metaParts.push({
+      key: 'duration',
+      node: (
+        <View style={styles.durationRow}>
+          <Ionicons name="time-outline" size={11} color={colors.textMuted} />
+          <Text style={styles.metaStat}>{durationLabel}</Text>
+        </View>
+      ),
+    });
+  }
+  if (bpm != null) {
+    metaParts.push({
+      key: 'bpm',
+      node: <Text style={styles.metaStat}>{bpm}</Text>,
+    });
+  }
+  if (releaseYear != null) {
+    metaParts.push({
+      key: 'year',
+      node: <Text style={styles.metaStat}>{releaseYear}</Text>,
+    });
+  }
+  metaParts.push({
+    key: 'country',
+    node: countryHref ? (
+      <Pressable
+        onPress={() => router.push(countryHref)}
+        hitSlop={4}
+        accessibilityRole="link"
+        accessibilityLabel={`Open place ${countryLabel}`}>
+        <Text style={styles.metaStat} numberOfLines={1}>
+          {countryLabel}
+        </Text>
+      </Pressable>
+    ) : (
+      <Text style={styles.metaStat} numberOfLines={1}>
+        {countryLabel}
+      </Text>
+    ),
+  });
+
   const collapsedTags = allTags.slice(0, COLLAPSED_TAG_COUNT);
 
   return (
@@ -126,18 +199,12 @@ export function ChartTrackRow({
               {item.title || 'Untitled'}
             </Text>
             <View style={styles.metaStats}>
-              {item.bpm != null ? (
-                <Text style={styles.metaStat}>{item.bpm}</Text>
-              ) : null}
-              {item.bpm != null && durationLabel ? (
-                <Text style={styles.metaDot}>·</Text>
-              ) : null}
-              {durationLabel ? (
-                <View style={styles.durationRow}>
-                  <Ionicons name="time-outline" size={11} color={colors.textMuted} />
-                  <Text style={styles.metaStat}>{durationLabel}</Text>
+              {metaParts.map((part, index) => (
+                <View key={part.key} style={styles.metaPart}>
+                  {index > 0 ? <Text style={styles.metaDot}>·</Text> : null}
+                  {part.node}
                 </View>
-              ) : null}
+              ))}
             </View>
           </View>
           <Text style={styles.artist} numberOfLines={1}>
@@ -158,9 +225,7 @@ export function ChartTrackRow({
         <View style={styles.denseFooter}>
           <View style={styles.tagsInline}>
             {collapsedTags.map((tag) => (
-              <View key={tag} style={styles.tagChip}>
-                <Text style={styles.tagText}>#{tag}</Text>
-              </View>
+              <TagChip key={tag} tag={tag} />
             ))}
             {hiddenTagCount > 0 ? (
               <Pressable style={styles.moreChip} onPress={toggleFooter} hitSlop={6}>
@@ -182,9 +247,7 @@ export function ChartTrackRow({
           {allTags.length > 0 ? (
             <View style={styles.tags}>
               {allTags.map((tag) => (
-                <View key={tag} style={styles.tagChip}>
-                  <Text style={styles.tagText}>#{tag}</Text>
-                </View>
+                <TagChip key={tag} tag={tag} />
               ))}
             </View>
           ) : null}
@@ -320,11 +383,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    flexShrink: 0,
+    flexShrink: 1,
+    maxWidth: '55%',
+  },
+  metaPart: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    flexShrink: 1,
   },
   metaStat: {
     color: colors.textMuted,
     fontSize: 11,
+    fontVariant: ['tabular-nums'],
   },
   metaDot: {
     color: colors.textMuted,
@@ -364,16 +435,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-  },
-  tagChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(126, 34, 206, 0.25)',
-  },
-  tagText: {
-    color: '#ddd6fe',
-    fontSize: 11,
   },
   moreChip: {
     paddingHorizontal: 7,

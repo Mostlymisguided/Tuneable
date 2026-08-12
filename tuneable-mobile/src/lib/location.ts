@@ -50,6 +50,28 @@ export function formatLocationLabel(
   return label === 'Earth' ? null : label;
 }
 
+/**
+ * Country name for compact UI (chips, meta rows). Prefers Mapbox country place,
+ * then falls back to legacy country string. Returns null when unknown.
+ */
+export function getCountryLabelFromLocation(
+  location: ResolvedLocation | null | undefined
+): string | null {
+  if (!location) return null;
+  const pick = getCountryPickFromLocation(location);
+  if (pick?.country?.trim()) return pick.country.trim();
+  const country = location.country?.trim();
+  return country || null;
+}
+
+/** Country-level place profile href from a media/user location. */
+export function getCountryPlaceProfileHref(
+  location: ResolvedLocation | null | undefined
+): `/place/${string}` | null {
+  const pick = getCountryPickFromLocation(location);
+  return getPlaceProfileHref(pick?.placeId);
+}
+
 export function getCountryPickFromLocation(
   location: ResolvedLocation | null | undefined
 ): CountryLocationPick | null {
