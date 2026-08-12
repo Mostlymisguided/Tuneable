@@ -260,7 +260,7 @@ async function geocodeQuery(query, options = {}) {
     q: trimmed,
     autocomplete: false,
     permanent: true,
-    types: PLACE_TYPES,
+    types: options.types || PLACE_TYPES,
     limit: 1,
     language: options.language || 'en',
   };

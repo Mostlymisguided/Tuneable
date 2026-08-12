@@ -2450,7 +2450,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
     
     // Special handling for location fields — persist full Mapbox-resolved shape
     // so country/place links work on QueueMediaCard and place profiles.
-    const { applyResolvedLocation } = require('../utils/locationUtils');
+    // Legacy free-text locations (pre-Mapbox autocomplete) are geocoded when possible.
+    const {
+      applyResolvedLocation,
+      ensureMapboxResolvedLocation,
+    } = require('../utils/locationUtils');
 
     if (req.body.primaryLocation !== undefined) {
       const oldPrimaryLocation = media.primaryLocation || {};
@@ -2460,6 +2464,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
         // If it's an object with data, use it
         if (Object.keys(req.body.primaryLocation).length > 0) {
           newPrimaryLocation = applyResolvedLocation(req.body.primaryLocation, null);
+          if (newPrimaryLocation && !newPrimaryLocation.placeId) {
+            try {
+              newPrimaryLocation = await ensureMapboxResolvedLocation(newPrimaryLocation);
+            } catch (geoErr) {
+              console.warn(
+                'primaryLocation Mapbox enrich failed:',
+                geoErr.message
+              );
+            }
+          }
         }
       } else if (req.body.primaryLocation === null || req.body.primaryLocation === '') {
         // Clear location if null or empty string
@@ -2485,6 +2499,16 @@ router.put('/:id', authMiddleware, async (req, res) => {
         // If it's an object with data, use it
         if (Object.keys(req.body.secondaryLocation).length > 0) {
           newSecondaryLocation = applyResolvedLocation(req.body.secondaryLocation, null);
+          if (newSecondaryLocation && !newSecondaryLocation.placeId) {
+            try {
+              newSecondaryLocation = await ensureMapboxResolvedLocation(newSecondaryLocation);
+            } catch (geoErr) {
+              console.warn(
+                'secondaryLocation Mapbox enrich failed:',
+                geoErr.message
+              );
+            }
+          }
         }
       } else if (req.body.secondaryLocation === null || req.body.secondaryLocation === '') {
         // Clear location if null or empty string
@@ -3829,6 +3853,7 @@ router.post('/admin/enrichment/location-backfill', authMiddleware, async (req, r
       musicbrainzOnly: body.musicbrainzOnly === true || body.mode === 'musicbrainz',
       nameSearch: body.nameSearch === true,
       upgradeInferred: body.upgradeInferred === true,
+      upgradeMapbox: body.upgradeMapbox === true || body.mode === 'upgrade_mapbox',
       quiet: body.quiet !== false,
       includeStats: body.includeStats !== false,
     });

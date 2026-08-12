@@ -20,6 +20,8 @@ const {
   applyResolvedLocation,
   countryNameFromCode,
   formatLocationDisplay,
+  needsMapboxEnrichment,
+  ensureMapboxResolvedLocation,
 } = require('../utils/locationUtils');
 
 function sleep(ms) {
@@ -34,6 +36,8 @@ function normalizeOpts(opts = {}) {
     nameSearch: Boolean(opts.nameSearch),
     forceManual: Boolean(opts.forceManual),
     upgradeInferred: Boolean(opts.upgradeInferred),
+    /** Geocode existing text/coords locations that lack placeId (incl. manual). */
+    upgradeMapbox: Boolean(opts.upgradeMapbox),
     skipMapbox: Boolean(opts.skipMapbox),
     limit: opts.limit != null ? Number(opts.limit) : null,
     delayMs: opts.delayMs != null ? Number(opts.delayMs) : 150,
@@ -63,6 +67,9 @@ function isMusicTune(media) {
 }
 
 function needsLocationBackfill(media, opts) {
+  if (opts.upgradeMapbox) {
+    return needsMapboxEnrichment(media.primaryLocation);
+  }
   if (media.locationSource === 'manual' && !opts.forceManual) return false;
   if (!hasUsableLocation(media.primaryLocation)) return true;
   if (opts.upgradeInferred) {
@@ -100,6 +107,30 @@ function buildQuery(opts) {
       ],
     },
   ];
+
+  // Upgrade text/coords locations that predate Mapbox placeIds (includes manual).
+  if (opts.upgradeMapbox) {
+    and.push({
+      $and: [
+        {
+          $or: [
+            { 'primaryLocation.placeId': { $exists: false } },
+            { 'primaryLocation.placeId': null },
+            { 'primaryLocation.placeId': '' },
+          ],
+        },
+        {
+          $or: [
+            { 'primaryLocation.city': { $exists: true, $nin: [null, ''] } },
+            { 'primaryLocation.country': { $exists: true, $nin: [null, ''] } },
+            { 'primaryLocation.countryCode': { $exists: true, $nin: [null, ''] } },
+            { 'primaryLocation.coordinates.lat': { $exists: true, $ne: null } },
+          ],
+        },
+      ],
+    });
+    return { $and: and };
+  }
 
   if (!opts.forceManual) {
     and.push({
@@ -303,6 +334,57 @@ function createBackfillContext(opts) {
     }
   }
 
+  async function tryUpgradeExistingMapbox(media) {
+    if (!opts.upgradeMapbox || !hasMapbox(opts)) return false;
+    if (!needsMapboxEnrichment(media.primaryLocation)) return false;
+
+    const cacheKey = [
+      media.primaryLocation.city,
+      media.primaryLocation.region,
+      media.primaryLocation.country,
+      media.primaryLocation.countryCode,
+      media.primaryLocation.coordinates?.lat,
+      media.primaryLocation.coordinates?.lng,
+    ]
+      .filter((v) => v != null && v !== '')
+      .join('|');
+
+    let enriched;
+    if (cacheKey && geocodeCache.has(cacheKey)) {
+      const cached = geocodeCache.get(cacheKey);
+      enriched = cached
+        ? applyResolvedLocation(cached, media.primaryLocation)
+        : media.primaryLocation;
+    } else {
+      if (opts.delayMs > 0) await sleep(opts.delayMs);
+      try {
+        enriched = await ensureMapboxResolvedLocation(media.primaryLocation);
+        geocodeCache.set(
+          cacheKey,
+          enriched?.placeId ? enriched : null
+        );
+      } catch (err) {
+        console.error(
+          `   Mapbox upgrade failed for "${media.title}": ${err.message}`
+        );
+        geocodeCache.set(cacheKey, null);
+        return false;
+      }
+    }
+
+    if (!enriched?.placeId) return false;
+
+    const before = media.primaryLocation?.placeId || null;
+    media.primaryLocation = enriched;
+    // Keep original locationSource (manual / musicbrainz / …)
+    if (before === enriched.placeId) return false;
+
+    return {
+      source: 'mapbox_upgrade',
+      display: formatLocationDisplay(media.primaryLocation),
+    };
+  }
+
   async function getCachedArtistOrigin(artistMbid) {
     if (artistOriginCache.has(artistMbid)) {
       return artistOriginCache.get(artistMbid);
@@ -478,6 +560,17 @@ function createBackfillContext(opts) {
       return { status: 'skip' };
     }
 
+    if (opts.upgradeMapbox) {
+      const upgraded = await tryUpgradeExistingMapbox(media);
+      if (upgraded) {
+        if (!opts.dryRun) {
+          await media.save();
+        }
+        return { status: 'updated', ...upgraded };
+      }
+      return { status: 'unmatched' };
+    }
+
     const steps = [
       tryArtistHome,
       tryMusicBrainzRecording,
@@ -517,6 +610,7 @@ function isLocationBackfillRunning() {
  * @param {boolean} [opts.nameSearch]
  * @param {boolean} [opts.forceManual]
  * @param {boolean} [opts.upgradeInferred]
+ * @param {boolean} [opts.upgradeMapbox] Geocode existing locations missing placeId
  * @param {boolean} [opts.skipMapbox]
  * @param {number} [opts.delayMs=150]
  * @param {number} [opts.mbDelayMs=1200]
@@ -541,12 +635,27 @@ async function runMediaLocationBackfillUnlocked(rawOpts = {}) {
   const log = opts.quiet ? () => {} : (...args) => console.log(...args);
 
   log(`\n📍 mediaLocationBackfill (${opts.dryRun ? 'DRY RUN' : 'EXECUTE'})`);
+  if (opts.upgradeMapbox) log('   mode: upgrade-mapbox (enrich placeId on existing locations)');
   if (opts.artistHomeOnly) log('   mode: artist-home-only');
   if (opts.musicbrainzOnly) log('   mode: musicbrainz-only');
   if (opts.nameSearch) log('   name-search: on');
   if (opts.upgradeInferred) log('   upgrade-inferred: on');
   if (opts.forceManual) log('   force-manual: on');
 
+  if (opts.upgradeMapbox && !hasMapbox(opts)) {
+    log('   ✗ MAPBOX_ACCESS_TOKEN required for --upgrade-mapbox');
+    return {
+      dryRun: opts.dryRun,
+      coverage: null,
+      scanned: 0,
+      updated: 0,
+      unmatched: 0,
+      skipped: 0,
+      errors: 1,
+      bySource: {},
+      error: 'MAPBOX_ACCESS_TOKEN required',
+    };
+  }
   let coverage = null;
   if (rawOpts.includeStats !== false) {
     coverage = await getLocationCoverageStats();

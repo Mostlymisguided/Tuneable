@@ -13,6 +13,8 @@
  * Never overwrites locationSource === 'manual' unless --force-manual.
  * By default only fills media missing a usable primaryLocation (--missing-only default).
  * Pass --upgrade-inferred to also replace locationSource in (uploader, null) with better sources.
+ * Pass --upgrade-mapbox to geocode existing text/coords locations that lack placeId
+ *   (includes manual edits made before Mapbox autocomplete).
  *
  * Usage:
  *   node scripts/backfillMediaLocations.js --dry-run
@@ -21,10 +23,12 @@
  *   node scripts/backfillMediaLocations.js --execute --artist-home-only
  *   node scripts/backfillMediaLocations.js --execute --musicbrainz-only
  *   node scripts/backfillMediaLocations.js --execute --name-search
+ *   node scripts/backfillMediaLocations.js --dry-run --upgrade-mapbox
+ *   node scripts/backfillMediaLocations.js --execute --upgrade-mapbox
  *   node scripts/backfillMediaLocations.js --execute --production
  *
  * Requires: MONGO_URI (or MONGODB_URI)
- * Optional: MAPBOX_ACCESS_TOKEN (improves city/country resolution)
+ * Optional: MAPBOX_ACCESS_TOKEN (improves city/country resolution; required for --upgrade-mapbox)
  */
 
 const path = require('path');
@@ -67,6 +71,7 @@ async function main() {
     nameSearch: args.includes('--name-search'),
     forceManual: args.includes('--force-manual'),
     upgradeInferred: args.includes('--upgrade-inferred'),
+    upgradeMapbox: args.includes('--upgrade-mapbox'),
     skipMapbox: args.includes('--skip-mapbox'),
     limit: argValue('--limit'),
     delayMs: argValue('--delay-ms') ?? 150,

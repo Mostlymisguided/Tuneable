@@ -394,6 +394,82 @@ function countryNameFromCode(code) {
 }
 
 /**
+ * True when location has text/coords usable for Mapbox resolve but no placeId yet
+ * (pre-Mapbox manual edits, failed geocodes, etc.).
+ */
+function needsMapboxEnrichment(location) {
+  if (!location || location.placeId) return false;
+  if (hasUsableLocation(location)) return true;
+  const lat = location.coordinates?.lat;
+  const lng = location.coordinates?.lng;
+  return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng));
+}
+
+/**
+ * Geocode/reverse-geocode a text-or-coords location into full Mapbox fields.
+ * Preserves existing city/region/country when merging. No-op without token or placeId.
+ *
+ * @param {Object|null|undefined} location
+ * @returns {Promise<Object|null>}
+ */
+async function ensureMapboxResolvedLocation(location) {
+  if (!location || typeof location !== 'object') return location || null;
+  if (location.placeId) return applyResolvedLocation(location);
+  if (!process.env.MAPBOX_ACCESS_TOKEN) return applyResolvedLocation(location);
+
+  const { geocodeQuery, reverseGeocode } = require('../services/mapboxGeocodingService');
+
+  let resolved = null;
+  const hasPlaceText = !!(location.city || location.region);
+  const countryLabel =
+    location.country || countryNameFromCode(location.countryCode) || null;
+  const query = [location.city, location.region, countryLabel].filter(Boolean).join(', ');
+  const countryHint = location.countryCode
+    ? String(location.countryCode).toLowerCase()
+    : undefined;
+
+  // Prefer forward geocode when we have place/country text so country-only
+  // centroids are not reverse-geocoded into an arbitrary locality.
+  if (query) {
+    try {
+      const forwardOpts = {};
+      if (hasPlaceText) {
+        if (countryHint) forwardOpts.country = countryHint;
+      } else {
+        // Country-only: restrict to country features so "Europe" doesn't
+        // resolve to a French commune named Europe.
+        forwardOpts.types = 'country';
+      }
+      resolved = await geocodeQuery(query, forwardOpts);
+    } catch (err) {
+      console.warn(
+        `ensureMapboxResolvedLocation: forward geocode failed for "${query}":`,
+        err.message
+      );
+    }
+  }
+
+  const lat = Number(location.coordinates?.lat);
+  const lng = Number(location.coordinates?.lng);
+  if (!resolved?.placeId && Number.isFinite(lat) && Number.isFinite(lng)) {
+    try {
+      resolved = await reverseGeocode(lng, lat);
+    } catch (err) {
+      console.warn(
+        `ensureMapboxResolvedLocation: reverse geocode failed for ${lng},${lat}:`,
+        err.message
+      );
+    }
+  }
+
+  if (!resolved?.placeId) {
+    return applyResolvedLocation(location);
+  }
+
+  return applyResolvedLocation(resolved, location);
+}
+
+/**
  * Apply a resolved location onto media.primaryLocation + locationSource.
  * Never overwrites locationSource === 'manual' unless forceManual.
  *
@@ -595,6 +671,8 @@ module.exports = {
   applyResolvedLocation,
   hasUsableLocation,
   isStrongArtistHomeLocation,
+  needsMapboxEnrichment,
+  ensureMapboxResolvedLocation,
   applyLocationToMedia,
   getUserBidLocation,
   getBidLocationSnapshot,
