@@ -23,6 +23,7 @@ import {
 import { Screen } from '@/src/components/Screen';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
+import { TagClaimSheet } from '@/src/components/TagClaimSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -88,6 +89,10 @@ export default function TuneProfileScreen() {
   const [supportAmount, setSupportAmount] = useState(1.11);
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
+  const [tagClaimOpen, setTagClaimOpen] = useState(false);
+  const [rankedTags, setRankedTags] = useState<
+    Array<{ tag: string; aggregate?: number; tipperCount?: number }>
+  >([]);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
 
   const load = useCallback(
@@ -108,12 +113,14 @@ export default function TuneProfileScreen() {
             .catch(() => ({ locationRankings: [] as MediaLocationRanking[] })),
         ]);
         setMedia(profileRes.media ?? null);
+        setRankedTags(profileRes.rankedTags ?? []);
         setRelated(relatedRes.relatedMedia ?? []);
         setTagRankings(tagRes.tagRankings ?? []);
         setLocationRankings(locationRes.locationRankings ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load tune');
         setMedia(null);
+        setRankedTags([]);
         setTagRankings([]);
         setLocationRankings([]);
       } finally {
@@ -150,6 +157,27 @@ export default function TuneProfileScreen() {
   const tipTotal = media?.globalMediaAggregate ?? 0;
   const tipCount = media?.tipCount ?? media?.bids?.length ?? 0;
   const durationLabel = formatDuration(media?.duration);
+  const userHasTipped = useMemo(() => {
+    if (!user || !media?.bids?.length) return false;
+    const uid = String(user._id || user.id || '');
+    const uuid = user.uuid || '';
+    return media.bids.some((bid) => {
+      const bidder = bid.userId;
+      if (!bidder) return false;
+      if (typeof bidder === 'string') {
+        return bidder === uid || bidder === uuid;
+      }
+      return (
+        String(bidder._id || '') === uid ||
+        String(bidder.uuid || '') === uuid
+      );
+    });
+  }, [media?.bids, user]);
+
+  const displayTags = useMemo(() => {
+    if (rankedTags.length > 0) return rankedTags;
+    return (media?.tags || []).map((tag) => ({ tag, aggregate: 0 }));
+  }, [rankedTags, media?.tags]);
 
   const heroMetadata = useMemo(() => {
     if (!media) return [] as string[];
@@ -248,11 +276,15 @@ export default function TuneProfileScreen() {
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
     }
+    if (res.rankedTags) {
+      setRankedTags(res.rankedTags);
+    }
     setMedia((prev) =>
       prev
         ? {
             ...prev,
             globalMediaAggregate: (prev.globalMediaAggregate ?? 0) + tipPence,
+            tags: res.media?.tags?.length ? res.media.tags : prev.tags,
             bids: [
               ...(prev.bids ?? []),
               {
@@ -268,10 +300,11 @@ export default function TuneProfileScreen() {
           }
         : prev
     );
+    return res;
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
-    await placeTip(amountPounds, tags);
+    return placeTip(amountPounds, tags);
   };
 
   const openTipSheet = (amount?: number) => {
@@ -449,14 +482,19 @@ export default function TuneProfileScreen() {
                   </View>
                 ) : null}
               </View>
-            ) : media.tags && media.tags.length > 0 ? (
+            ) : displayTags.length > 0 ? (
               <View style={styles.tags}>
-                {media.tags.slice(0, 8).map((tag) => (
+                {displayTags.slice(0, 8).map((item) => (
                   <Pressable
-                    key={tag}
-                    onPress={() => router.push(getTagProfileHref(tag) as Href)}
+                    key={item.tag}
+                    onPress={() => router.push(getTagProfileHref(item.tag) as Href)}
                     style={styles.tag}>
-                    <Text style={styles.tagText}>#{tag}</Text>
+                    <Text style={styles.tagText}>#{item.tag}</Text>
+                    {typeof item.aggregate === 'number' && item.aggregate > 0 ? (
+                      <Text style={styles.tagAgg}>
+                        {formatPoundsFromPence(item.aggregate)}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 ))}
               </View>
@@ -510,6 +548,14 @@ export default function TuneProfileScreen() {
                   onPress={() => setClaimOpen(true)}>
                   <Ionicons name="ribbon-outline" size={16} color="#fff" />
                   <Text style={styles.claimBtnText}>Claim</Text>
+                </Pressable>
+              ) : null}
+              {userHasTipped ? (
+                <Pressable
+                  style={styles.tagBtn}
+                  onPress={() => setTagClaimOpen(true)}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.text} />
+                  <Text style={styles.tagBtnText}>Tag</Text>
                 </Pressable>
               ) : null}
               <Pressable style={styles.shareBtn} onPress={() => void onShare()}>
@@ -695,11 +741,28 @@ export default function TuneProfileScreen() {
             defaultTipPounds={defaultTip}
             initialAmountPounds={tipInitial}
             tipMedia={media}
+            mediaId={mediaId(media) || id}
             onClose={() => {
               setTipOpen(false);
               setTipInitial(null);
             }}
             onConfirm={onConfirmTip}
+            onTagClaimed={() => void load(true)}
+          />
+          <TagClaimSheet
+            visible={tagClaimOpen}
+            mediaId={mediaId(media) || id || ''}
+            mediaTitle={media.title || 'Untitled'}
+            suggestedTags={displayTags}
+            onClose={() => setTagClaimOpen(false)}
+            onClaimed={(result) => {
+              if (result.rankedTags) setRankedTags(result.rankedTags);
+              if (result.tags) {
+                setMedia((prev) =>
+                  prev ? { ...prev, tags: result.tags } : prev
+                );
+              }
+            }}
           />
           <ClaimSheet
             visible={claimOpen}
@@ -899,6 +962,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: 'rgba(168, 85, 247, 0.15)',
     borderWidth: 1,
     borderColor: 'rgba(168, 85, 247, 0.3)',
@@ -910,6 +976,27 @@ const styles = StyleSheet.create({
     color: '#e9d5ff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  tagAgg: {
+    color: 'rgba(233, 213, 255, 0.75)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  tagBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  tagBtnText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
   },
   statChips: {
     flexDirection: 'row',

@@ -125,6 +125,7 @@ export default function NowPlayingScreen() {
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
     }
+    return res;
   };
 
   return (

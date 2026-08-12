@@ -946,7 +946,42 @@ export const mediaAPI = {
           ...(currentLocation ? { currentLocation } : {}),
         };
     const response = await api.post(`/media/${mediaId}/global-bid`, payload);
-    return response.data;
+    return response.data as {
+      message?: string;
+      updatedBalance?: number;
+      bid?: unknown;
+      globalPartyId?: string;
+      media?: { tags?: string[]; elements?: string[]; globalMediaAggregate?: number };
+      rankedTags?: Array<{
+        tag: string;
+        canonicalTag?: string;
+        aggregate?: number;
+        tipperCount?: number;
+      }>;
+      suggestedAgreeTags?: string[];
+      canAgreeTopTags?: boolean;
+    };
+  },
+
+  /** Tipper claims tags post-tip, or agrees with top £-backed tags. */
+  claimMediaTags: async (
+    mediaId: string,
+    body: { tags?: string[]; agreeTop?: boolean; agreeLimit?: number }
+  ) => {
+    const response = await api.post(`/media/${mediaId}/tag-claims`, body);
+    return response.data as {
+      message?: string;
+      claimedTags?: string[];
+      tags?: string[];
+      elements?: string[];
+      rankedTags?: Array<{
+        tag: string;
+        canonicalTag?: string;
+        aggregate?: number;
+        tipperCount?: number;
+      }>;
+      userTipPence?: number;
+    };
   },
 
   // Get top parties for media

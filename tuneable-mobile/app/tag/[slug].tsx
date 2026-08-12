@@ -162,6 +162,7 @@ export default function TagProfileScreen() {
       updateBalance(res.updatedBalance);
     }
     void load(true);
+    return res;
   };
 
   const listHeader = (

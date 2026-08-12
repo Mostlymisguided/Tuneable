@@ -191,6 +191,7 @@ export function UserLibrarySection({
     if (typeof res.updatedBalance === 'number') {
       onBalanceUpdate?.(res.updatedBalance);
     }
+    return res;
   };
 
   const findLibraryItem = (item: ChartMediaItem): UserLibraryItem | undefined => {

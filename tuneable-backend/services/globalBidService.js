@@ -24,6 +24,7 @@ async function placeGlobalBid(userId, {
   externalMedia,
   currentLocation,
   skipIfAlreadyTipped = false,
+  tags: tipTags,
 } = {}) {
   if (!amount || amount < 0.01) {
     const err = new Error('Minimum bid is £0.01');
@@ -157,6 +158,21 @@ async function placeGlobalBid(userId, {
     throw err;
   }
 
+  const tipChips = Array.isArray(tipTags)
+    ? tipTags
+    : Array.isArray(externalMedia?.tags)
+      ? externalMedia.tags
+      : [];
+
+  if (tipChips.length > 0) {
+    const applied = applyTipChipsToMedia(media, tipChips);
+    if (applied.didAddTag || applied.didAddElement) {
+      media.tags = applied.tags;
+      media.elements = applied.elements;
+      await media.save();
+    }
+  }
+
   // Import (and similar batch flows) may resolve several external rows onto one Media
   // via ISRC / externalIds / title+artist. Skip a second tip on the same media.
   if (skipIfAlreadyTipped) {
@@ -216,6 +232,22 @@ async function placeGlobalBid(userId, {
 
   await bid.save();
 
+  if (tipChips.length > 0) {
+    try {
+      const mediaTagClaimService = require('./mediaTagClaimService');
+      await mediaTagClaimService.incrementClaimsForTags({
+        userId,
+        mediaId: media._id,
+        tags: tipChips,
+        amountPence: bidAmountPence,
+        bidId: bid._id,
+        source: 'tip',
+      });
+    } catch (claimError) {
+      console.error('Failed to record tip tag claims (globalBidService):', claimError);
+    }
+  }
+
   try {
     const artistEscrowService = require('./artistEscrowService');
     artistEscrowService.allocateEscrowForBid(bid._id, media._id, bidAmountPence).catch((error) => {
@@ -228,7 +260,7 @@ async function placeGlobalBid(userId, {
   try {
     const tagRankingsService = require('./tagRankingsService');
     tagRankingsService.invalidateUserTagRankings(userId).catch(console.error);
-    tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(console.error);
+    tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10, true).catch(console.error);
   } catch (error) {
     console.error('Error setting up tag rankings:', error);
   }

@@ -1860,6 +1860,23 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         await bid.save();
 
+        // Hybrid: explicit tip tags → £-backed claims (no auto-back when tags omitted)
+        if (Array.isArray(tags) && tags.length > 0) {
+          try {
+            const mediaTagClaimService = require('../services/mediaTagClaimService');
+            await mediaTagClaimService.incrementClaimsForTags({
+              userId,
+              mediaId: media._id,
+              tags,
+              amountPence: bidAmountPence,
+              bidId: bid._id,
+              source: 'tip',
+            });
+          } catch (claimError) {
+            console.error('Failed to record tip tag claims (add media):', claimError);
+          }
+        }
+
         // Auto-create location party for user's home location if it doesn't exist (async, don't block response)
         if (user.homeLocation && user.homeLocation.countryCode) {
             ensureLocationPartyExists(user).catch(error => {
@@ -1890,7 +1907,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             console.error('Failed to invalidate tag rankings:', error);
           });
           // Recalculate tag rankings in background
-          tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(error => {
+          tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10, true).catch(error => {
             console.error('Failed to recalculate tag rankings:', error);
           });
         } catch (error) {
@@ -2458,6 +2475,23 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
 
         await bid.save();
 
+        // Hybrid: explicit tip tags → £-backed claims (no auto-back when tags omitted)
+        if (Array.isArray(tags) && tags.length > 0) {
+          try {
+            const mediaTagClaimService = require('../services/mediaTagClaimService');
+            await mediaTagClaimService.incrementClaimsForTags({
+              userId,
+              mediaId: populatedMedia._id,
+              tags,
+              amountPence: bidAmountPence,
+              bidId: bid._id,
+              source: 'tip',
+            });
+          } catch (claimError) {
+            console.error('Failed to record tip tag claims (party bid):', claimError);
+          }
+        }
+
         // Auto-create location party for user's home location if it doesn't exist (async, don't block response)
         if (user.homeLocation && user.homeLocation.countryCode) {
             ensureLocationPartyExists(user).catch(error => {
@@ -2488,7 +2522,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             console.error('Failed to invalidate tag rankings:', error);
           });
           // Recalculate tag rankings in background
-          tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(error => {
+          tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10, true).catch(error => {
             console.error('Failed to recalculate tag rankings:', error);
           });
         } catch (error) {

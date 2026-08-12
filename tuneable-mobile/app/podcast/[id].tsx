@@ -299,10 +299,11 @@ export default function PodcastEpisodeProfileScreen() {
           }
         : prev
     );
+    return res;
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
-    await placeTip(amountPounds, tags);
+    return placeTip(amountPounds, tags);
   };
 
   const onSupportTip = async () => {

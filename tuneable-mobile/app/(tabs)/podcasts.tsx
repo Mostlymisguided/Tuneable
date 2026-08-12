@@ -171,6 +171,7 @@ export default function PodcastsScreen() {
             (b.globalMediaAggregate ?? 0) - (a.globalMediaAggregate ?? 0)
         )
     );
+    return res;
   };
 
   const hasMore = visibleCount < filteredEpisodes.length;

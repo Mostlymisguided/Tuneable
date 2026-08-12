@@ -65,6 +65,7 @@ export function PlayerMiniBar() {
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
     }
+    return res;
   };
 
   const chrome = episode ? (

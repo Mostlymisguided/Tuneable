@@ -142,6 +142,7 @@ export default function HomeScreen() {
             getChartTipPence(b, 'today') - getChartTipPence(a, 'today')
         )
     );
+    return res;
   };
 
   return (

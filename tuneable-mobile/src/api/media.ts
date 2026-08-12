@@ -11,7 +11,32 @@ export type PlaceGlobalBidResponse = {
   message?: string;
   updatedBalance?: number; // pence
   bid?: { amount?: number };
-  media?: { globalMediaAggregate?: number };
+  media?: {
+    _id?: string;
+    uuid?: string;
+    tags?: string[];
+    elements?: string[];
+    globalMediaAggregate?: number;
+  };
+  rankedTags?: RankedMediaTag[];
+  suggestedAgreeTags?: string[];
+  canAgreeTopTags?: boolean;
+};
+
+export type RankedMediaTag = {
+  tag: string;
+  canonicalTag?: string;
+  aggregate?: number;
+  tipperCount?: number;
+};
+
+export type ClaimMediaTagsResponse = {
+  message?: string;
+  claimedTags?: string[];
+  tags?: string[];
+  elements?: string[];
+  rankedTags?: RankedMediaTag[];
+  userTipPence?: number;
 };
 
 export type AudioFileAsset = {
@@ -109,6 +134,18 @@ export const mediaAPI = {
         ...(tags.length > 0 ? { tags } : {}),
         ...(currentLocation ? { currentLocation } : {}),
       }
+    );
+    return response.data;
+  },
+
+  /** Tipper claims tags post-tip, or agrees with top £-backed tags. */
+  claimTags: async (
+    mediaId: string,
+    body: { tags?: string[]; agreeTop?: boolean; agreeLimit?: number }
+  ): Promise<ClaimMediaTagsResponse> => {
+    const response = await api.post<ClaimMediaTagsResponse>(
+      `/media/${mediaId}/tag-claims`,
+      body
     );
     return response.data;
   },

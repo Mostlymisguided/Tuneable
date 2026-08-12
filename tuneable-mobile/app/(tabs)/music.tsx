@@ -170,6 +170,7 @@ export default function MusicScreen() {
           (a, b) => getChartTipPence(b, period) - getChartTipPence(a, period)
         )
     );
+    return res;
   };
 
   const hasMore = visibleCount < filteredMedia.length;

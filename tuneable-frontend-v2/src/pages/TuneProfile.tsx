@@ -54,6 +54,7 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import TagClaimModal from '../components/TagClaimModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import MiniSupportersBar from '../components/MiniSupportersBar';
@@ -347,6 +348,11 @@ const TuneProfile: React.FC = () => {
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
+  const [showTagClaimModal, setShowTagClaimModal] = useState(false);
+  const [tagClaimPostTip, setTagClaimPostTip] = useState(false);
+  const [rankedTags, setRankedTags] = useState<
+    Array<{ tag: string; aggregate?: number; tipperCount?: number }>
+  >([]);
   const [tagRankings, setTagRankings] = useState<any[]>([]);
   const [locationRankings, setLocationRankings] = useState<Array<{
     placeId: string;
@@ -446,6 +452,7 @@ const TuneProfile: React.FC = () => {
       console.log('📥 Media profile response:', response);
       setMedia(enrichMediaWithPlayability(response.media));
       setComments(response.media.comments || []);
+      setRankedTags(response.rankedTags || []);
       console.log('✅ Media profile loaded successfully');
     } catch (err: any) {
       console.error('❌ Error fetching media profile:', err);
@@ -1832,12 +1839,19 @@ const TuneProfile: React.FC = () => {
     setIsPlacingGlobalBid(true);
 
     try {
-      await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags);
+      const result = await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags);
       
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
       
       // Refresh media data to show updated metrics
       await fetchMediaProfile();
+
+      // Hybrid: tip without tags → offer optional agree / claim step
+      if (result?.canAgreeTopTags || (tags.length === 0 && (result?.suggestedAgreeTags?.length || media?.tags?.length))) {
+        if (result?.rankedTags) setRankedTags(result.rankedTags);
+        setTagClaimPostTip(true);
+        setShowTagClaimModal(true);
+      }
       
     } catch (err: any) {
       console.error('Error placing global tip:', err);
@@ -2577,6 +2591,24 @@ const TuneProfile: React.FC = () => {
                   </button>
                 )}
                 {renderShareButton()}
+                {user && media.bids?.some((bid: any) => {
+                  const bidderId = bid?.userId?._id || bid?.userId?.uuid || bid?.userId;
+                  const uid = (user as any)._id || (user as any).id;
+                  const uuid = (user as any).uuid;
+                  return bidderId && (String(bidderId) === String(uid) || String(bidderId) === String(uuid));
+                }) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTagClaimPostTip(false);
+                      setShowTagClaimModal(true);
+                    }}
+                    className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+                  >
+                    <Tag className="h-4 w-4" />
+                    <span>Tag</span>
+                  </button>
+                ) : null}
                 {!isEditMode && (
                   <button
                     type="button"
@@ -4045,6 +4077,32 @@ const TuneProfile: React.FC = () => {
         isLoading={isPlacingGlobalBid}
         isNonPlayable={media ? !isMediaPlayable(media) : false}
       />
+
+      {mediaId ? (
+        <TagClaimModal
+          isOpen={showTagClaimModal}
+          onClose={() => {
+            setShowTagClaimModal(false);
+            setTagClaimPostTip(false);
+          }}
+          mediaId={mediaId}
+          mediaTitle={media?.title}
+          postTipPrompt={tagClaimPostTip}
+          suggestedTags={
+            rankedTags.length
+              ? rankedTags
+              : (media?.tags || []).map((tag: string) => ({ tag }))
+          }
+          onClaimed={(result) => {
+            if (result.rankedTags) setRankedTags(result.rankedTags);
+            if (result.tags) {
+              setMedia((prev: any) =>
+                prev ? { ...prev, tags: result.tags } : prev
+              );
+            }
+          }}
+        />
+      ) : null}
 
       <BidConfirmationModal
         isOpen={!!recommendedItemToTip}

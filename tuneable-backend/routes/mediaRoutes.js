@@ -1816,6 +1816,14 @@ router.get('/:mediaId/profile', async (req, res) => {
       tipCount: allBids.length,
     };
 
+    let rankedTags = [];
+    try {
+      const mediaTagClaimService = require('../services/mediaTagClaimService');
+      rankedTags = await mediaTagClaimService.getRankedTagsForMedia(media._id, { limit: 24 });
+    } catch (rankedError) {
+      console.error('Failed to load ranked tags for media profile:', rankedError);
+    }
+
     console.log('📤 Sending media profile response:', {
       message: 'Media profile fetched successfully',
       media: transformedMedia
@@ -1824,6 +1832,7 @@ router.get('/:mediaId/profile', async (req, res) => {
     res.json({
       message: 'Media profile fetched successfully',
       media: transformedMedia, // Updated to 'media' key for frontend compatibility
+      rankedTags,
     });
 
   } catch (error) {
@@ -3063,6 +3072,85 @@ router.delete('/comments/:commentId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/media/:mediaId/tag-claims
+// @desc    Tipper claims tags (post-tip) and/or agrees with top £-backed tags
+// @access  Private
+router.post('/:mediaId/tag-claims', authMiddleware, async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const { tags, agreeTop, agreeLimit } = req.body || {};
+    const userId = req.user._id;
+
+    let media;
+    if (isValidObjectId(mediaId)) {
+      media = await Media.findById(mediaId).select('_id');
+    } else if (mediaId.includes('-')) {
+      media = await Media.findOne({ uuid: mediaId }).select('_id');
+    }
+
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    const hasTags = Array.isArray(tags) && tags.length > 0;
+    if (!hasTags && !agreeTop) {
+      return res.status(400).json({
+        error: 'Provide tags and/or agreeTop: true',
+      });
+    }
+
+    const mediaTagClaimService = require('../services/mediaTagClaimService');
+    const result = await mediaTagClaimService.claimTagsForTipper({
+      userId,
+      mediaId: media._id,
+      tags: hasTags ? tags : [],
+      agreeTop: Boolean(agreeTop),
+      agreeLimit: agreeLimit != null ? Number(agreeLimit) : 5,
+    });
+
+    try {
+      const tagRankingsService = require('../services/tagRankingsService');
+      tagRankingsService.invalidateUserTagRankings(userId).catch(() => {});
+      tagRankingsService
+        .calculateAndUpdateUserTagRankings(userId, 10, true)
+        .catch((err) => console.error('Failed to recalculate tag rankings:', err));
+    } catch (rankError) {
+      console.error('Error scheduling tag rankings after claim:', rankError);
+    }
+
+    // Auto-join tag parties for newly claimed tags (async)
+    if (result.claimedTags?.length) {
+      try {
+        const { autoJoinTagParties } = require('../services/partyAutoJoinService');
+        const User = require('../models/User');
+        const refreshedUser = await User.findById(userId);
+        if (refreshedUser && result.media) {
+          autoJoinTagParties(refreshedUser, result.media).catch((error) => {
+            console.error('Failed to auto-join tag parties after claim:', error);
+          });
+        }
+      } catch (joinError) {
+        console.error('Error setting up tag party auto-join after claim:', joinError);
+      }
+    }
+
+    res.json({
+      message: 'Tags claimed successfully',
+      claimedTags: result.claimedTags,
+      tags: result.tags,
+      elements: result.elements,
+      rankedTags: result.rankedTags,
+      userTipPence: result.userTipPence,
+    });
+  } catch (error) {
+    console.error('Error claiming media tags:', error);
+    const status = error.status || 500;
+    res.status(status).json({
+      error: error.message || 'Failed to claim tags',
+    });
+  }
+});
+
 // @route   POST /api/media/:mediaId/global-bid
 // @desc    Place a global bid (chart support) on a media item
 // @access  Private
@@ -3270,6 +3358,34 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
 
     await bid.save();
 
+    // Hybrid: only tips that include tags create £-backed claims (no auto-back).
+    let rankedTags = [];
+    let suggestedAgreeTags = [];
+    if (Array.isArray(tags) && tags.length > 0) {
+      try {
+        const mediaTagClaimService = require('../services/mediaTagClaimService');
+        await mediaTagClaimService.incrementClaimsForTags({
+          userId,
+          mediaId: media._id,
+          tags,
+          amountPence: bidAmountPence,
+          bidId: bid._id,
+          source: 'tip',
+        });
+        rankedTags = await mediaTagClaimService.getRankedTagsForMedia(media._id, { limit: 12 });
+      } catch (claimError) {
+        console.error('Failed to record tip tag claims:', claimError);
+      }
+    } else {
+      try {
+        const mediaTagClaimService = require('../services/mediaTagClaimService');
+        suggestedAgreeTags = await mediaTagClaimService.getTopTagsForAgree(media._id, 5);
+        rankedTags = await mediaTagClaimService.getRankedTagsForMedia(media._id, { limit: 12 });
+      } catch (claimError) {
+        console.error('Failed to load suggested agree tags:', claimError);
+      }
+    }
+
     // ✅ OPTIMIZED: TuneBytes will be calculated async after response (non-blocking)
 
     // Allocate artist escrow for this bid (async, don't block response)
@@ -3291,7 +3407,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
         console.error('Failed to invalidate tag rankings:', error);
       });
       // Recalculate tag rankings in background
-      tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10).catch(error => {
+      tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10, true).catch(error => {
         console.error('Failed to recalculate tag rankings:', error);
       });
     } catch (error) {
@@ -3455,7 +3571,19 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       message: 'Global bid placed successfully',
       bid,
       updatedBalance: user.balance,
-      globalPartyId: globalParty._id
+      globalPartyId: globalParty._id,
+      media: {
+        _id: media._id,
+        uuid: media.uuid,
+        tags: media.tags || [],
+        elements: media.elements || [],
+        globalMediaAggregate: media.globalMediaAggregate,
+      },
+      rankedTags,
+      suggestedAgreeTags,
+      // Client can offer "agree with top tags" when the tipper skipped tags.
+      canAgreeTopTags:
+        !(Array.isArray(tags) && tags.length > 0) && suggestedAgreeTags.length > 0,
     });
   } catch (error) {
     console.error('Error placing global bid:', error);

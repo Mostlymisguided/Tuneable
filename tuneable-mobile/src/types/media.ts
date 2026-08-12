@@ -96,6 +96,12 @@ export interface RelatedPlaylistsResponse {
 export interface MediaProfileResponse {
   message?: string;
   media: ChartMediaItem;
+  rankedTags?: Array<{
+    tag: string;
+    canonicalTag?: string;
+    aggregate?: number;
+    tipperCount?: number;
+  }>;
 }
 
 export interface MediaTagRanking {

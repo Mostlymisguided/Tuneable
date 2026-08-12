@@ -457,7 +457,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             </label>
           </div>
           <p className="text-xs text-gray-400 mb-2">
-            Genre, mood, setting — or instruments like guitar, 808s, vocals
+            Your tip only backs tags you add. Skip to choose later — nothing is auto-applied.
           </p>
           
           <div className="flex space-x-2 mb-2">

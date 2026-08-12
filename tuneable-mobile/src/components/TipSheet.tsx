@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useAuth } from '@/src/auth/AuthContext';
+import { mediaAPI } from '@/src/api/media';
 import {
   getCurrentLocationStatus,
   getTipCurrentLocation,
@@ -38,6 +39,10 @@ import {
 import { colors } from '@/src/theme/colors';
 
 export type TipMediaLike = {
+  _id?: string;
+  id?: string;
+  uuid?: string;
+  tags?: string[] | null;
   bids?: TipBidLike[] | null;
   globalMediaAggregate?: number | null;
   globalMediaAggregateAvg?: number | null;
@@ -59,11 +64,24 @@ type Props = {
   initialAmountPounds?: number | null;
   /** Media used to resolve Min / Avg / Champion shortcuts. */
   tipMedia?: TipMediaLike;
+  /** Explicit media id for post-tip tag claims (falls back to tipMedia ids). */
+  mediaId?: string | null;
   /** Tags pre-selected when the sheet opens. */
   initialTags?: string[];
   minTip?: number;
   onClose: () => void;
-  onConfirm: (amountPounds: number, tags: string[]) => Promise<void>;
+  onConfirm: (
+    amountPounds: number,
+    tags: string[]
+  ) => Promise<
+    | {
+        canAgreeTopTags?: boolean;
+        suggestedAgreeTags?: string[];
+      }
+    | void
+  >;
+  /** Called after optional agree-with-top-tags step (or skip). */
+  onTagClaimed?: () => void;
 };
 
 function roundPounds(n: number): number {
@@ -81,10 +99,12 @@ export function TipSheet({
   defaultTipPounds = 1.11,
   initialAmountPounds = null,
   tipMedia = null,
+  mediaId = null,
   initialTags,
   minTip = 0.01,
   onClose,
   onConfirm,
+  onTagClaimed,
 }: Props) {
   const { user } = useAuth();
   const [amount, setAmount] = useState(defaultTipPounds);
@@ -93,11 +113,21 @@ export function TipSheet({
   const [error, setError] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [phase, setPhase] = useState<'tip' | 'agree'>('tip');
+  const [agreeTags, setAgreeTags] = useState<string[]>([]);
+  const [selectedAgree, setSelectedAgree] = useState<string[]>([]);
+  const [claimMediaId, setClaimMediaId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState(getTipCurrentLocation);
   const [locationStatus, setLocationStatus] = useState<CurrentLocationStatus>(
     getCurrentLocationStatus
   );
   const [enablingLocation, setEnablingLocation] = useState(false);
+
+  const resolvedMediaId = useMemo(() => {
+    if (mediaId) return mediaId;
+    if (!tipMedia) return null;
+    return tipMedia._id || tipMedia.id || tipMedia.uuid || null;
+  }, [mediaId, tipMedia]);
 
   const tipStats = useMemo(
     () => resolveTipStatInputs(tipMedia, user),
@@ -160,6 +190,10 @@ export function TipSheet({
     setError(null);
     setSubmitting(false);
     setTagInput('');
+    setPhase('tip');
+    setAgreeTags([]);
+    setSelectedAgree([]);
+    setClaimMediaId(null);
     const seeded = (initialTags || [])
       .map((tag) => normalizeTipChipForDisplay(tag))
       .filter(Boolean)
@@ -176,6 +210,16 @@ export function TipSheet({
     effectiveMinTip,
     initialTagsKey,
   ]);
+
+  const finishAndClose = () => {
+    setPhase('tip');
+    setAgreeTags([]);
+    setSelectedAgree([]);
+    setClaimMediaId(null);
+    setTags([]);
+    setTagInput('');
+    onClose();
+  };
 
   const applyAmount = (next: number) => {
     const safe = Math.max(effectiveMinTip, roundPounds(next));
@@ -237,8 +281,36 @@ export function TipSheet({
   const executeTip = async () => {
     setSubmitting(true);
     try {
-      await onConfirm(amount, tags);
-      onClose();
+      const result = await onConfirm(amount, tags);
+      const mid = resolvedMediaId;
+      const suggested =
+        result?.suggestedAgreeTags?.filter(Boolean) ||
+        (tipMedia?.tags || []).filter(Boolean);
+      const uniqueSuggested = suggested
+        .map((tag) => normalizeTipChipForDisplay(tag))
+        .filter(Boolean)
+        .filter(
+          (chip, index, arr) =>
+            arr.findIndex((c) => c.toLowerCase() === chip.toLowerCase()) ===
+            index
+        )
+        .slice(0, 5);
+
+      const shouldOfferAgree =
+        tags.length === 0 &&
+        Boolean(mid) &&
+        uniqueSuggested.length > 0 &&
+        (result?.canAgreeTopTags !== false);
+
+      if (shouldOfferAgree && mid) {
+        setClaimMediaId(mid);
+        setAgreeTags(uniqueSuggested);
+        setSelectedAgree(uniqueSuggested);
+        setPhase('agree');
+        setError(null);
+      } else {
+        finishAndClose();
+      }
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const msg =
@@ -249,6 +321,47 @@ export function TipSheet({
         setError(err.message);
       } else {
         setError('Tip failed');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleAgreeTag = (tag: string) => {
+    setSelectedAgree((prev) =>
+      prev.some((t) => t.toLowerCase() === tag.toLowerCase())
+        ? prev.filter((t) => t.toLowerCase() !== tag.toLowerCase())
+        : [...prev, tag].slice(0, 5)
+    );
+  };
+
+  const submitAgree = async () => {
+    if (!claimMediaId) {
+      finishAndClose();
+      return;
+    }
+    if (selectedAgree.length === 0) {
+      finishAndClose();
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await mediaAPI.claimTags(claimMediaId, { tags: selectedAgree });
+      onTagClaimed?.();
+      finishAndClose();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const msg =
+          (err.response?.data as { error?: string; message?: string } | undefined)
+            ?.error ||
+          (err.response?.data as { message?: string } | undefined)?.message ||
+          err.message;
+        setError(msg || 'Could not back tags');
+      } else if (err instanceof Error && err.message) {
+        setError(err.message);
+      } else {
+        setError('Could not back tags');
       }
     } finally {
       setSubmitting(false);
@@ -315,9 +428,7 @@ export function TipSheet({
 
   const handleClose = () => {
     if (submitting) return;
-    setTags([]);
-    setTagInput('');
-    onClose();
+    finishAndClose();
   };
 
   const currentStatusLabel =
@@ -345,6 +456,59 @@ export function TipSheet({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sheetContent}>
+            {phase === 'agree' ? (
+              <>
+                <Text style={styles.heading}>Tip placed</Text>
+                <Text style={styles.title} numberOfLines={2}>
+                  {title}
+                </Text>
+                <Text style={styles.agreeCopy}>
+                  Back your tip with community tags? Your £ only supports tags
+                  you choose — nothing is auto-applied.
+                </Text>
+                <View style={styles.tagChips}>
+                  {agreeTags.map((tag) => {
+                    const selected = selectedAgree.some(
+                      (t) => t.toLowerCase() === tag.toLowerCase()
+                    );
+                    return (
+                      <Pressable
+                        key={tag}
+                        onPress={() => toggleAgreeTag(tag)}
+                        disabled={submitting}
+                        style={[
+                          styles.tagChip,
+                          styles.tagChipTag,
+                          selected && styles.agreeChipSelected,
+                        ]}>
+                        <Text style={styles.tagChipText}>#{tag}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+                <Pressable
+                  style={[styles.confirm, submitting && styles.confirmDisabled]}
+                  onPress={() => void submitAgree()}
+                  disabled={submitting || selectedAgree.length === 0}>
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.confirmText}>
+                      Back tip with {selectedAgree.length} tag
+                      {selectedAgree.length === 1 ? '' : 's'}
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={styles.cancel}
+                  onPress={finishAndClose}
+                  disabled={submitting}>
+                  <Text style={styles.cancelText}>Skip for now</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
             <Text style={styles.heading}>Confirm Your Tip</Text>
             <Text style={styles.title} numberOfLines={2}>
               {title}
@@ -516,7 +680,7 @@ export function TipSheet({
                 <Text style={styles.tagsTitle}>Add Tags & Elements (Optional)</Text>
               </View>
               <Text style={styles.tagsHint}>
-                Genre, mood, setting — or instruments like guitar, 808s, vocals
+                Optional — your tip only backs tags you add. Skip to choose later.
               </Text>
               <View style={styles.tagInputRow}>
                 <TextInput
@@ -592,6 +756,8 @@ export function TipSheet({
               disabled={submitting}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
+              </>
+            )}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -859,6 +1025,17 @@ const styles = StyleSheet.create({
   },
   tagChipElement: {
     backgroundColor: '#0d9488',
+  },
+  agreeCopy: {
+    marginTop: 10,
+    marginBottom: 4,
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  agreeChipSelected: {
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   tagChipText: {
     color: '#fff',

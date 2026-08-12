@@ -46,51 +46,77 @@ async function calculateAndUpdateUserTagRankings(userId, limit = 10, forceRecalc
 
     console.log(`🏷️  Calculating tag rankings for user ${actualUserId}`);
 
-    // Get all active bids by this user
-    const userBids = await Bid.find({ 
-      userId: actualUserId,
-      status: 'active'
-    })
-      .populate('mediaId', 'tags')
-      .lean();
+    const mediaTagClaimService = require('./mediaTagClaimService');
+    const { getCanonicalTag } = require('../utils/tagNormalizer');
+    const MediaTagClaim = require('../models/MediaTagClaim');
 
-    console.log(`📊 Found ${userBids.length} active bids for user`);
+    // Prefer explicit £-backed claims (hybrid). Legacy tips without claims
+    // still use media.tags inheritance until the user starts claiming.
+    let tagAggregates = await mediaTagClaimService.getUserTagAggregatesFromClaims(actualUserId);
+    const usingClaims = Object.keys(tagAggregates).length > 0;
 
-    // Aggregate by tag (GlobalUserTagAggregate)
-    const tagAggregates = {};
-    userBids.forEach(bid => {
-      if (bid.mediaId?.tags && Array.isArray(bid.mediaId.tags)) {
-        bid.mediaId.tags.forEach(tag => {
-          tagAggregates[tag] = (tagAggregates[tag] || 0) + bid.amount;
-        });
-      }
-    });
+    if (!usingClaims) {
+      const userBids = await Bid.find({
+        userId: actualUserId,
+        status: 'active',
+      })
+        .populate('mediaId', 'tags')
+        .lean();
 
-    console.log(`📊 User has bid on ${Object.keys(tagAggregates).length} different tags`);
+      console.log(`📊 Found ${userBids.length} active bids for user (legacy tag inheritance)`);
+
+      userBids.forEach((bid) => {
+        if (bid.mediaId?.tags && Array.isArray(bid.mediaId.tags)) {
+          bid.mediaId.tags.forEach((tag) => {
+            tagAggregates[tag] = (tagAggregates[tag] || 0) + bid.amount;
+          });
+        }
+      });
+    }
+
+    console.log(
+      `📊 User has ${usingClaims ? 'claimed' : 'inherited'} ${Object.keys(tagAggregates).length} different tags`
+    );
 
     // Calculate GlobalUserTagAggregateRank for each tag
     const tagRankings = [];
     
     for (const [tag, userAggregate] of Object.entries(tagAggregates)) {
-      // Get all media with this tag
-      const mediaWithTag = await Media.find({ tags: tag }).select('_id').lean();
-      const mediaIds = mediaWithTag.map(m => m._id);
-      
-      if (mediaIds.length === 0) continue;
-      
-      // Get all bids on these media items
-      const allBidsForTag = await Bid.find({
-        mediaId: { $in: mediaIds },
-        status: 'active'
-      }).lean();
-      
-      // Aggregate by user
       const userTagTotals = {};
-      allBidsForTag.forEach(bid => {
-        const uid = bid.userId.toString();
-        userTagTotals[uid] = (userTagTotals[uid] || 0) + bid.amount;
-      });
-      
+
+      if (usingClaims) {
+        const canonicalTag = getCanonicalTag(tag);
+        const claimTotals = await MediaTagClaim.aggregate([
+          { $match: { canonicalTag } },
+          {
+            $group: {
+              _id: '$userId',
+              total: { $sum: '$amountPence' },
+            },
+          },
+        ]);
+        claimTotals.forEach((row) => {
+          userTagTotals[row._id.toString()] = row.total;
+        });
+      } else {
+        // Legacy: all tips on media that carry this tag
+        const mediaWithTag = await Media.find({ tags: tag }).select('_id').lean();
+        const mediaIds = mediaWithTag.map((m) => m._id);
+        if (mediaIds.length === 0) continue;
+
+        const allBidsForTag = await Bid.find({
+          mediaId: { $in: mediaIds },
+          status: 'active',
+        }).lean();
+
+        allBidsForTag.forEach((bid) => {
+          const uid = bid.userId.toString();
+          userTagTotals[uid] = (userTagTotals[uid] || 0) + bid.amount;
+        });
+      }
+
+      if (Object.keys(userTagTotals).length === 0) continue;
+
       // Sort users by aggregate
       const sortedUsers = Object.entries(userTagTotals)
         .sort(([, a], [, b]) => b - a);
