@@ -202,6 +202,7 @@ const LocationProfile: React.FC = () => {
                 </div>
               )}
 
+              {/* Champions strip — top tippers; tap expands ranked chip list */}
               {!loading && !error && placeId && (
                 <div className="w-full max-w-lg flex justify-center md:justify-start">
                   <MediaChampions
@@ -209,7 +210,7 @@ const LocationProfile: React.FC = () => {
                     entityLabel={displayName}
                     variant="strip"
                     compact
-                    maxDisplay={3}
+                    maxDisplay={10}
                   />
                 </div>
               )}

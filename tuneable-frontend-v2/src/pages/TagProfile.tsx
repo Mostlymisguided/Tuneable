@@ -260,7 +260,7 @@ const TagProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Champions strip — top 3 when a podium exists; tap expands full panel */}
+              {/* Champions strip — top tippers; tap expands ranked chip list */}
               {!loading && !error && slug && (
                 <div className="w-full max-w-lg flex justify-center md:justify-start">
                   <MediaChampions
@@ -274,7 +274,7 @@ const TagProfile: React.FC = () => {
                     }
                     variant="strip"
                     compact
-                    maxDisplay={3}
+                    maxDisplay={10}
                   />
                 </div>
               )}
