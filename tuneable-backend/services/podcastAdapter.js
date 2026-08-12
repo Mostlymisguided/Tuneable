@@ -483,7 +483,8 @@ class PodcastAdapter {
 
       sources: new Map(
         [
-          ['audio_direct', spotifyEpisode.audioPreviewUrl],
+          // Preview-only — do not use audio_direct (that implies full playback)
+          ['spotify_preview', spotifyEpisode.audioPreviewUrl],
           ['spotify', spotifyEpisode.spotifyUrl]
         ].filter(([_, url]) => url)
       ),
@@ -526,8 +527,8 @@ class PodcastAdapter {
     // Check if series already exists (by external IDs or RSS URL)
     const orConditions = [
       { 'externalIds.taddy': seriesData.taddyUuid },
-      { 'externalIds.podcastIndex': seriesData.podcastIndexId },
-      { 'externalIds.iTunes': seriesData.iTunesId },
+      { 'externalIds.podcastIndex': seriesData.podcastIndexId != null ? String(seriesData.podcastIndexId) : null },
+      { 'externalIds.iTunes': seriesData.iTunesId != null ? String(seriesData.iTunesId) : (seriesData.appleId != null ? String(seriesData.appleId) : null) },
       { 'externalIds.spotify': seriesData.spotifyId }
     ].filter(q => Object.values(q)[0]);
     if (seriesData.rssUrl) {
@@ -617,8 +618,8 @@ class PodcastAdapter {
       externalIds: new Map(
         [
           ['taddy', seriesData.taddyUuid],
-          ['podcastIndex', seriesData.podcastIndexId?.toString()],
-          ['iTunes', seriesData.iTunesId?.toString()],
+          ['podcastIndex', seriesData.podcastIndexId != null ? String(seriesData.podcastIndexId) : null],
+          ['iTunes', seriesData.iTunesId != null ? String(seriesData.iTunesId) : (seriesData.appleId != null ? String(seriesData.appleId) : null)],
           ['spotify', seriesData.spotifyId]
         ].filter(([_, id]) => id)
       ),

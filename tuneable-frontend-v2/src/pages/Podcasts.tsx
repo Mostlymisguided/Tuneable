@@ -35,6 +35,59 @@ import {
 } from '../utils/locationHelpers';
 import { resolveTipStatInputs } from '../utils/tipStats';
 
+type SpotifyPodcastResolveStatus = 'rss_matched' | 'unresolved' | 'in_library';
+
+interface SpotifyPodcastImportItem {
+  key: string;
+  spotifyId: string;
+  title: string;
+  publisher?: string;
+  coverArt?: string | null;
+  description?: string;
+  resolveStatus: SpotifyPodcastResolveStatus;
+  resolveSource?: string | null;
+  rssUrl?: string | null;
+  podcastIndexId?: string | null;
+  playable: boolean;
+  selected: boolean;
+  matchedTitle?: string | null;
+  confidence?: number;
+  existingSeriesId?: string | null;
+}
+
+interface SpotifyPodcastImportSummary {
+  total: number;
+  inLibrary: number;
+  rssMatched: number;
+  unresolved: number;
+  selectedCount: number;
+  selectableCount: number;
+}
+
+const backendBase = () =>
+  import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
+async function pollPodcastImportJob(jobId: string, token: string, onProgress?: (msg: string) => void) {
+  const started = Date.now();
+  const timeoutMs = 10 * 60 * 1000;
+  while (Date.now() - started < timeoutMs) {
+    const res = await fetch(`${backendBase()}/api/podcasts/import-jobs/${jobId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const job = await res.json();
+    if (!res.ok) throw new Error(job.error || 'Failed to poll import job');
+    if (job.message) onProgress?.(job.message);
+    if (job.status === 'complete') return job.result;
+    if (job.status === 'error') {
+      const err = new Error(job.error || 'Import job failed');
+      (err as Error & { code?: string }).code = job.errorCode;
+      throw err;
+    }
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  throw new Error('Import timed out — try again with fewer shows');
+}
+
 interface PodcastEpisode {
   _id?: string;
   id?: string;
@@ -173,6 +226,11 @@ const Podcasts: React.FC = () => {
   const [showImportSection, setShowImportSection] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [isImportingSpotify, setIsImportingSpotify] = useState(false);
+  const [isScanningSpotify, setIsScanningSpotify] = useState(false);
+  const [spotifyImportItems, setSpotifyImportItems] = useState<SpotifyPodcastImportItem[]>([]);
+  const [spotifyImportSummary, setSpotifyImportSummary] = useState<SpotifyPodcastImportSummary | null>(null);
+  const [spotifyImportProgress, setSpotifyImportProgress] = useState<string | null>(null);
+  const [episodesPerShow, setEpisodesPerShow] = useState(10);
   const [isImportingOpml, setIsImportingOpml] = useState(false);
   const [opmlFile, setOpmlFile] = useState<File | null>(null);
   
@@ -619,17 +677,14 @@ const Podcasts: React.FC = () => {
     setIsImportingLink(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/import-link`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ url: linkUrl })
-        }
-      );
+      const response = await fetch(`${backendBase()}/api/podcasts/import-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: linkUrl.trim(), maxEpisodes: 20 }),
+      });
 
       if (!response.ok) {
         const error = await response.json();
@@ -637,15 +692,17 @@ const Podcasts: React.FC = () => {
       }
 
       const data = await response.json();
-      
+
       if (data.type === 'episode' && data.episode) {
-        toast.success(`Imported episode: ${data.episode.title}`);
-        // Refresh chart
+        const playableNote = data.playable === false ? ' (metadata only — no full audio yet)' : '';
+        toast.success(`Imported episode: ${data.episode.title}${playableNote}`);
         fetchChart();
         setLinkUrl('');
       } else if (data.type === 'series' && data.series) {
-        toast.success(`Imported series: ${data.series.title}`);
+        const epCount = data.episodesImported != null ? ` (+${data.episodesImported} episodes)` : '';
+        toast.success(`Imported series: ${data.series.title}${epCount}`);
         setLinkUrl('');
+        fetchChart();
       }
     } catch (error: any) {
       console.error('Error importing link:', error);
@@ -661,13 +718,13 @@ const Podcasts: React.FC = () => {
       navigate('/login');
       return;
     }
-    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || backendBase();
     const redirectUrl = encodeURIComponent(`${window.location.origin}/podcasts?oauth_success=true`);
     const token = localStorage.getItem('token');
     window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
   };
 
-  const handleImportFromSpotify = async () => {
+  const handleScanSpotifyPodcasts = async () => {
     if (!user) {
       toast.error('Please log in to import podcasts');
       navigate('/login');
@@ -677,27 +734,105 @@ const Podcasts: React.FC = () => {
       handleConnectSpotify();
       return;
     }
-    setIsImportingSpotify(true);
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please log in again');
+      return;
+    }
+
+    setIsScanningSpotify(true);
+    setSpotifyImportProgress('Starting Spotify scan…');
+    setSpotifyImportItems([]);
+    setSpotifyImportSummary(null);
+
     try {
-      const res = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/import-spotify`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({ maxShows: 50, episodesPerShow: 10 })
-        }
+      const startRes = await fetch(`${backendBase()}/api/podcasts/import-spotify/preview/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ limit: 50 }),
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok) throw new Error(startData.error || 'Failed to start scan');
+
+      const preview = await pollPodcastImportJob(startData.jobId, token, setSpotifyImportProgress);
+      setSpotifyImportItems(preview.items || []);
+      setSpotifyImportSummary(preview.summary || null);
+      toast.success(
+        `Found ${preview.summary?.total || 0} shows — ${preview.summary?.rssMatched || 0} matched to playable RSS`
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Import failed');
-      toast.success(`Imported ${data.imported?.seriesCount || 0} series and ${data.imported?.episodeCount || 0} episodes from Spotify`);
+    } catch (err: any) {
+      if (err.code === 'SPOTIFY_REAUTH' || /reconnect Spotify/i.test(err.message || '')) {
+        setSpotifyConnected(false);
+        toast.error('Spotify session expired — reconnect to continue');
+      } else {
+        toast.error(err.message || 'Failed to scan Spotify podcasts');
+      }
+    } finally {
+      setIsScanningSpotify(false);
+      setSpotifyImportProgress(null);
+    }
+  };
+
+  const toggleSpotifyImportItem = (key: string) => {
+    setSpotifyImportItems((prev) =>
+      prev.map((item) =>
+        item.key === key && item.resolveStatus !== 'in_library'
+          ? { ...item, selected: !item.selected }
+          : item
+      )
+    );
+  };
+
+  const setAllSpotifySelectable = (selected: boolean) => {
+    setSpotifyImportItems((prev) =>
+      prev.map((item) => (item.resolveStatus === 'in_library' ? item : { ...item, selected }))
+    );
+  };
+
+  const handleImportSelectedSpotify = async () => {
+    if (!user) {
+      toast.error('Please log in to import podcasts');
+      return;
+    }
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const selected = spotifyImportItems.filter((i) => i.selected);
+    if (!selected.length) {
+      toast.error('Select at least one show to import');
+      return;
+    }
+
+    setIsImportingSpotify(true);
+    setSpotifyImportProgress('Importing selected shows…');
+    try {
+      const startRes = await fetch(`${backendBase()}/api/podcasts/import-spotify/execute/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ items: selected, episodesPerShow }),
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok) throw new Error(startData.error || 'Failed to start import');
+
+      const results = await pollPodcastImportJob(startData.jobId, token, setSpotifyImportProgress);
+      toast.success(
+        `Imported ${results.seriesImported || 0} series and ${results.episodesImported || 0} playable episodes`
+      );
+      setSpotifyImportItems([]);
+      setSpotifyImportSummary(null);
       fetchChart();
     } catch (err: any) {
       toast.error(err.message || 'Failed to import from Spotify');
     } finally {
       setIsImportingSpotify(false);
+      setSpotifyImportProgress(null);
     }
   };
 
@@ -715,17 +850,16 @@ const Podcasts: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('file', opmlFile);
-      const res = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/import-opml`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          body: formData
-        }
-      );
+      const res = await fetch(`${backendBase()}/api/podcasts/import-opml`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        body: formData,
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Import failed');
-      toast.success(`Imported ${data.imported?.seriesCount || 0} series and ${data.imported?.episodeCount || 0} episodes from OPML`);
+      toast.success(
+        `Imported ${data.imported?.seriesCount || 0} series and ${data.imported?.episodeCount || 0} episodes from OPML`
+      );
       setOpmlFile(null);
       fetchChart();
     } catch (err: any) {
@@ -1587,6 +1721,9 @@ const Podcasts: React.FC = () => {
 
               {showImportSection && (
                 <div className="space-y-4 border-t border-gray-700/50 pt-4">
+                  <p className="text-xs text-gray-400">
+                    Spotify &amp; Apple identify shows you care about; we match them to RSS / Podcast Index so episodes are fully playable on Tuneable.
+                  </p>
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Import from URL</h4>
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -1594,7 +1731,7 @@ const Podcasts: React.FC = () => {
                         type="text"
                         value={linkUrl}
                         onChange={(e) => setLinkUrl(e.target.value)}
-                        placeholder="Paste Apple Podcasts, Spotify, or RSS URL..."
+                        placeholder="Paste Apple Podcasts, Spotify show/episode, or RSS URL…"
                         className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
                       />
                       <button
@@ -1608,16 +1745,106 @@ const Podcasts: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Import from Spotify</h4>
-                    <button
-                      onClick={handleImportFromSpotify}
-                      disabled={isImportingSpotify || !user}
-                      className="px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      {isImportingSpotify ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing...</span></> : spotifyConnected ? <><Music2 className="h-5 w-5" /><span>Import My Spotify Podcasts</span></> : <><Music2 className="h-5 w-5" /><span>Connect Spotify & Import</span></>}
-                    </button>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Scans your saved shows, matches each to a playable RSS feed, then lets you choose what to import.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={handleScanSpotifyPodcasts}
+                        disabled={isScanningSpotify || isImportingSpotify || !user}
+                        className="px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        {isScanningSpotify
+                          ? <><Loader className="h-5 w-5 animate-spin" /><span>Scanning…</span></>
+                          : spotifyConnected
+                            ? <><Music2 className="h-5 w-5" /><span>Scan My Spotify Podcasts</span></>
+                            : <><Music2 className="h-5 w-5" /><span>Connect Spotify &amp; Scan</span></>}
+                      </button>
+                      {spotifyImportItems.length > 0 && (
+                        <>
+                          <label className="text-xs text-gray-400 flex items-center gap-2">
+                            Episodes / show
+                            <select
+                              value={episodesPerShow}
+                              onChange={(e) => setEpisodesPerShow(Number(e.target.value))}
+                              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-white"
+                            >
+                              {[5, 10, 20, 30, 50].map((n) => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            onClick={handleImportSelectedSpotify}
+                            disabled={isImportingSpotify || !spotifyImportItems.some((i) => i.selected)}
+                            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+                          >
+                            {isImportingSpotify
+                              ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing…</span></>
+                              : <span>Import selected ({spotifyImportItems.filter((i) => i.selected).length})</span>}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {(spotifyImportProgress || isScanningSpotify || isImportingSpotify) && (
+                      <p className="text-xs text-purple-300 mt-2">{spotifyImportProgress || 'Working…'}</p>
+                    )}
+                    {spotifyImportSummary && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        {spotifyImportSummary.total} shows · {spotifyImportSummary.rssMatched} playable matches · {spotifyImportSummary.inLibrary} already in library · {spotifyImportSummary.unresolved} unresolved
+                      </p>
+                    )}
+                    {spotifyImportItems.length > 0 && (
+                      <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-gray-700 divide-y divide-gray-700/80">
+                        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-gray-800/95 px-3 py-2 text-xs text-gray-400">
+                          <button type="button" className="hover:text-white" onClick={() => setAllSpotifySelectable(true)}>Select all</button>
+                          <button type="button" className="hover:text-white" onClick={() => setAllSpotifySelectable(false)}>Clear</button>
+                        </div>
+                        {spotifyImportItems.map((item) => {
+                          const badge =
+                            item.resolveStatus === 'in_library'
+                              ? { label: 'In library', className: 'bg-green-900/40 text-green-300' }
+                              : item.resolveStatus === 'rss_matched'
+                                ? { label: 'Playable RSS', className: 'bg-blue-900/40 text-blue-300' }
+                                : { label: 'No RSS match', className: 'bg-amber-900/40 text-amber-200' };
+                          return (
+                            <label
+                              key={item.key}
+                              className={`flex items-start gap-3 px-3 py-2.5 ${item.resolveStatus === 'in_library' ? 'opacity-60' : 'hover:bg-gray-700/40 cursor-pointer'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-1"
+                                checked={!!item.selected}
+                                disabled={item.resolveStatus === 'in_library'}
+                                onChange={() => toggleSpotifyImportItem(item.key)}
+                              />
+                              {item.coverArt ? (
+                                <img src={item.coverArt} alt="" className="h-10 w-10 rounded object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="h-10 w-10 rounded bg-gray-700 flex-shrink-0" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm text-white truncate">{item.title}</span>
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded border border-transparent ${badge.className}`}>{badge.label}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 truncate">{item.publisher || 'Unknown publisher'}</p>
+                                {item.matchedTitle && item.matchedTitle !== item.title && (
+                                  <p className="text-[11px] text-gray-500 truncate">Matched: {item.matchedTitle}</p>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Import from OPML</h4>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Best for Apple Podcasts / Overcast / Pocket Casts: export an OPML of your subscriptions, then upload it here.
+                    </p>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <label className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-gray-700 rounded-lg border border-gray-600 cursor-pointer hover:bg-gray-600 transition-colors">
                         <Upload className="h-5 w-5 text-purple-400" />

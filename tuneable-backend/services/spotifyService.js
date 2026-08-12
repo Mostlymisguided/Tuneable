@@ -109,16 +109,64 @@ async function searchTrackByIsrc(isrc) {
 }
 
 /**
+ * Refresh a user's Spotify access token using their refresh token.
+ * @param {object} user - Mongoose user doc with spotifyRefreshToken
+ * @returns {Promise<string>} New access token
+ */
+async function refreshUserAccessToken(user) {
+  if (!user?.spotifyRefreshToken) {
+    const err = new Error('Spotify token expired. Please reconnect Spotify.');
+    err.code = 'SPOTIFY_REAUTH';
+    throw err;
+  }
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET are required');
+  }
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const res = await axios.post(
+    SPOTIFY_TOKEN_URL,
+    new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: user.spotifyRefreshToken,
+    }).toString(),
+    {
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      timeout: 15000,
+    }
+  );
+
+  const accessToken = res.data.access_token;
+  if (!accessToken) {
+    const err = new Error('Spotify token expired. Please reconnect Spotify.');
+    err.code = 'SPOTIFY_REAUTH';
+    throw err;
+  }
+  user.spotifyAccessToken = accessToken;
+  if (res.data.refresh_token) {
+    user.spotifyRefreshToken = res.data.refresh_token;
+  }
+  await user.save();
+  return accessToken;
+}
+
+/**
  * Get all saved shows for a user (paginated)
  * @param {string} accessToken - User's Spotify OAuth token
- * @param {number} limit - Max shows per request (max 50)
+ * @param {number} limit - Max shows overall (default 50)
  * @returns {Promise<Array>} Array of show objects
  */
 async function getSavedShows(accessToken, limit = 50) {
   const shows = [];
-  let url = `${SPOTIFY_API}/me/shows?limit=${Math.min(limit, 50)}`;
+  const max = Math.min(Math.max(limit || 50, 1), 200);
+  let url = `${SPOTIFY_API}/me/shows?limit=${Math.min(max, 50)}`;
 
-  while (url) {
+  while (url && shows.length < max) {
     const res = await axios.get(url, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
@@ -127,7 +175,33 @@ async function getSavedShows(accessToken, limit = 50) {
     url = res.data.next || null;
   }
 
-  return shows;
+  return shows.slice(0, max);
+}
+
+/**
+ * Fetch a public Spotify show by ID (client credentials).
+ */
+async function getShowById(showId, accessToken = null) {
+  const token = accessToken || (await getClientAccessToken());
+  const res = await axios.get(`${SPOTIFY_API}/shows/${showId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { market: 'US' },
+    timeout: 15000,
+  });
+  return res.data;
+}
+
+/**
+ * Fetch a public Spotify episode by ID (client credentials).
+ */
+async function getEpisodeById(episodeId, accessToken = null) {
+  const token = accessToken || (await getClientAccessToken());
+  const res = await axios.get(`${SPOTIFY_API}/episodes/${episodeId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    params: { market: 'US' },
+    timeout: 15000,
+  });
+  return res.data;
 }
 
 /**
@@ -160,6 +234,7 @@ async function getSavedTracks(accessToken, limit = 50) {
  * @returns {Promise<Object>} { episodes, show }
  */
 async function getShowEpisodes(accessToken, showId, limit = 50) {
+  const max = Math.min(Math.max(limit || 50, 1), 50);
   const url = `${SPOTIFY_API}/shows/${showId}?market=US`;
   const showRes = await axios.get(url, {
     headers: { Authorization: `Bearer ${accessToken}` }
@@ -167,9 +242,9 @@ async function getShowEpisodes(accessToken, showId, limit = 50) {
   const show = showRes.data;
 
   const episodes = [];
-  let episodesUrl = `${SPOTIFY_API}/shows/${showId}/episodes?limit=${Math.min(limit, 50)}&market=US`;
+  let episodesUrl = `${SPOTIFY_API}/shows/${showId}/episodes?limit=${Math.min(max, 50)}&market=US`;
 
-  while (episodesUrl) {
+  while (episodesUrl && episodes.length < max) {
     const epRes = await axios.get(episodesUrl, {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
@@ -178,7 +253,7 @@ async function getShowEpisodes(accessToken, showId, limit = 50) {
     episodesUrl = epRes.data.next || null;
   }
 
-  return { show, episodes };
+  return { show, episodes: episodes.slice(0, max) };
 }
 
 /**
@@ -276,6 +351,9 @@ module.exports = {
   getSavedShows,
   getSavedTracks,
   getShowEpisodes,
+  getShowById,
+  getEpisodeById,
+  refreshUserAccessToken,
   convertShowToSeriesFormat,
   convertEpisodeToOurFormat,
   convertSavedTrackToTuneableFormat,

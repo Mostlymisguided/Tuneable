@@ -68,6 +68,44 @@ class PodcastIndexService {
     }
   }
 
+  // Lookup podcast by Apple/iTunes collection ID
+  async getPodcastByItunesId(itunesId) {
+    try {
+      const endpoint = `/podcasts/byitunesid?id=${encodeURIComponent(itunesId)}`;
+      const headers = this.generateAuthHeaders(endpoint);
+      const response = await axios.get(`${this.baseUrl}${endpoint}`, { headers });
+      return {
+        success: true,
+        podcast: response.data.feed || null
+      };
+    } catch (error) {
+      console.error('PodcastIndex byitunesid error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.description || 'Failed to lookup by iTunes ID'
+      };
+    }
+  }
+
+  // Lookup podcast by RSS feed URL
+  async getPodcastByFeedUrl(feedUrl) {
+    try {
+      const endpoint = `/podcasts/byfeedurl?url=${encodeURIComponent(feedUrl)}`;
+      const headers = this.generateAuthHeaders(endpoint);
+      const response = await axios.get(`${this.baseUrl}${endpoint}`, { headers });
+      return {
+        success: true,
+        podcast: response.data.feed || null
+      };
+    } catch (error) {
+      console.error('PodcastIndex byfeedurl error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.description || 'Failed to lookup by feed URL'
+      };
+    }
+  }
+
   // Get episodes for a podcast
   async getPodcastEpisodes(podcastId, maxResults = 50) {
     try {

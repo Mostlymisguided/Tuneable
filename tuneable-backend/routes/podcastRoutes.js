@@ -1335,79 +1335,297 @@ router.post('/discovery/taddy/import-episodes', authMiddleware, async (req, res)
 // Import podcast episode/series from URL (link pasting)
 router.post('/import-link', authMiddleware, async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, maxEpisodes = 20 } = req.body;
     const userId = req.user._id;
+    const epLimit = Math.min(Math.max(parseInt(maxEpisodes, 10) || 20, 1), 50);
 
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    // Parse the URL
     const parsedUrl = parsePodcastUrl(url);
     if (!parsedUrl) {
-      return res.status(400).json({ error: 'Invalid podcast URL. Supported: Apple Podcasts, RSS feeds' });
+      return res.status(400).json({
+        error: 'Invalid podcast URL. Supported: Apple Podcasts, Spotify show/episode, RSS feeds',
+      });
     }
 
+    const { resolveShowToFeed, findBestEpisodeMatch } = require('../services/podcastImportResolveService');
     let result;
 
-    // Handle Apple Podcasts
+    // ——— Apple Podcasts ———
     if (parsedUrl.type === 'apple') {
       if (parsedUrl.isEpisode && parsedUrl.episodeId && parsedUrl.seriesId) {
-        // Import specific episode
         const episodesResult = await applePodcastsService.getPodcastEpisodes(parsedUrl.seriesId, 200);
         if (!episodesResult.success) {
           return res.status(500).json({ error: 'Failed to fetch episode from Apple Podcasts' });
         }
 
-        // Find the specific episode
         const episode = episodesResult.episodes.find(
-          ep => ep.trackId?.toString() === parsedUrl.episodeId
+          (ep) => ep.trackId?.toString() === parsedUrl.episodeId
         );
-
         if (!episode) {
           return res.status(404).json({ error: 'Episode not found' });
         }
 
-        // Get podcast data
         const podcastResult = await applePodcastsService.getPodcastById(parsedUrl.seriesId);
         const podcastData = podcastResult.podcast || {};
-
-        // Convert and import
         const episodeData = applePodcastsService.convertEpisodeToOurFormat(episode, podcastData);
         const seriesData = applePodcastsService.convertPodcastToOurFormat(podcastData);
 
-        const { episode: importedEpisode, series: importedSeries } = 
+        const { episode: importedEpisode, series: importedSeries } =
           await podcastAdapter.importEpisodeWithSeries('apple', episodeData, seriesData, userId);
 
         result = {
           success: true,
           type: 'episode',
           episode: importedEpisode,
-          series: importedSeries
+          series: importedSeries,
         };
       } else if (parsedUrl.isSeries && parsedUrl.seriesId) {
-        // Import series (and optionally episodes)
         const podcastResult = await applePodcastsService.getPodcastById(parsedUrl.seriesId);
         if (!podcastResult.success || !podcastResult.podcast) {
           return res.status(404).json({ error: 'Podcast series not found' });
         }
 
         const seriesData = applePodcastsService.convertPodcastToOurFormat(podcastResult.podcast);
-        const series = await podcastAdapter.createOrFindSeries(seriesData, userId);
+        const series = await podcastAdapter.createOrFindSeries(seriesData, userId, 'apple');
+
+        let episodesImported = 0;
+        if (seriesData.rssUrl || seriesData.iTunesId) {
+          const resolved = await resolveShowToFeed({
+            title: seriesData.title,
+            publisher: seriesData.author,
+            iTunesId: seriesData.iTunesId,
+          });
+          const feedId = resolved.podcastIndexId;
+          if (feedId) {
+            const epResult = await podcastIndexService.getPodcastEpisodes(feedId, epLimit);
+            const podcastData = {
+              ...seriesData,
+              podcastIndexId: feedId,
+              rssUrl: resolved.rssUrl || seriesData.rssUrl,
+            };
+            for (const piEpisode of (epResult.episodes || []).slice(0, epLimit)) {
+              try {
+                const episodeData = podcastIndexService.convertEpisodeToOurFormat(piEpisode, podcastData);
+                await podcastAdapter.importEpisodeWithSeries('podcastIndex', episodeData, podcastData, userId);
+                episodesImported += 1;
+              } catch (_) { /* skip bad episode */ }
+            }
+          }
+        }
 
         result = {
           success: true,
           type: 'series',
-          series: series
+          series,
+          episodesImported,
         };
       }
-    } else if (parsedUrl.type === 'rss') {
-      // RSS feed - for now, return info that RSS parsing needs to be implemented
-      return res.status(501).json({ 
-        error: 'RSS feed parsing not yet implemented. Please use Apple Podcasts URLs for now.' 
-      });
+    }
+
+    // ——— Spotify show / episode → resolve RSS for playback ———
+    else if (parsedUrl.type === 'spotify') {
+      if (parsedUrl.isSeries && parsedUrl.seriesId) {
+        const show = await spotifyService.getShowById(parsedUrl.seriesId);
+        const seriesData = spotifyService.convertShowToSeriesFormat(show);
+        const resolved = await resolveShowToFeed({
+          title: seriesData.title,
+          publisher: seriesData.author,
+        });
+
+        const merged = {
+          ...seriesData,
+          rssUrl: resolved.rssUrl || seriesData.rssUrl,
+          podcastIndexId: resolved.podcastIndexId,
+          iTunesId: resolved.iTunesId,
+          title: resolved.matchedTitle || seriesData.title,
+        };
+        const series = await podcastAdapter.createOrFindSeries(merged, userId, 'spotify');
+
+        let episodesImported = 0;
+        if (resolved.podcastIndexId) {
+          const epResult = await podcastIndexService.getPodcastEpisodes(resolved.podcastIndexId, epLimit);
+          const podcastData = podcastIndexService.convertPodcastToOurFormat(
+            (await podcastIndexService.getPodcastById(resolved.podcastIndexId)).podcast || {
+              title: merged.title,
+              url: merged.rssUrl,
+              id: resolved.podcastIndexId,
+            }
+          );
+          podcastData.spotifyId = seriesData.spotifyId;
+          podcastData.spotifyUrl = seriesData.spotifyUrl;
+          for (const piEpisode of (epResult.episodes || []).slice(0, epLimit)) {
+            try {
+              const episodeData = podcastIndexService.convertEpisodeToOurFormat(piEpisode, podcastData);
+              await podcastAdapter.importEpisodeWithSeries('podcastIndex', episodeData, podcastData, userId);
+              episodesImported += 1;
+            } catch (_) { /* skip */ }
+          }
+        } else if (resolved.rssUrl) {
+          const rssResult = await parseRSSFeed(resolved.rssUrl, epLimit);
+          for (const item of (rssResult.episodes || []).slice(0, epLimit)) {
+            try {
+              item.feedUrl = resolved.rssUrl;
+              await podcastAdapter.importEpisodeWithSeries('rss', item, merged, userId);
+              episodesImported += 1;
+            } catch (_) { /* skip */ }
+          }
+        }
+
+        result = {
+          success: true,
+          type: 'series',
+          series,
+          episodesImported,
+          resolveStatus: resolved.playable ? resolved.status : 'unresolved',
+          playable: !!resolved.playable,
+        };
+      } else if (parsedUrl.isEpisode && parsedUrl.episodeId) {
+        const spotifyEpisode = await spotifyService.getEpisodeById(parsedUrl.episodeId);
+        const show = spotifyEpisode.show || null;
+        const seriesData = show
+          ? spotifyService.convertShowToSeriesFormat(show)
+          : {
+              title: spotifyEpisode.show?.name || 'Unknown Podcast',
+              author: spotifyEpisode.show?.publisher || '',
+              image: spotifyEpisode.show?.images?.[0]?.url || null,
+              spotifyId: spotifyEpisode.show?.id || null,
+            };
+
+        const resolved = await resolveShowToFeed({
+          title: seriesData.title,
+          publisher: seriesData.author,
+        });
+
+        const merged = {
+          ...seriesData,
+          rssUrl: resolved.rssUrl || null,
+          podcastIndexId: resolved.podcastIndexId,
+          iTunesId: resolved.iTunesId,
+        };
+
+        let importedEpisode = null;
+        let importedSeries = null;
+
+        if (resolved.podcastIndexId) {
+          const epResult = await podcastIndexService.getPodcastEpisodes(resolved.podcastIndexId, 100);
+          const match = findBestEpisodeMatch(
+            epResult.episodes || [],
+            spotifyEpisode.name,
+            spotifyEpisode.release_date
+          );
+          const podcastData = {
+            ...merged,
+            title: merged.title,
+            rssUrl: merged.rssUrl,
+            podcastIndexId: resolved.podcastIndexId,
+            spotifyId: seriesData.spotifyId,
+          };
+
+          if (match?.episode) {
+            const episodeData = podcastIndexService.convertEpisodeToOurFormat(match.episode, podcastData);
+            const out = await podcastAdapter.importEpisodeWithSeries(
+              'podcastIndex',
+              episodeData,
+              podcastData,
+              userId
+            );
+            importedEpisode = out.episode;
+            importedSeries = out.series;
+          }
+        }
+
+        if (!importedEpisode) {
+          // Fallback: store Spotify identity (preview only — not full audio)
+          const episodeData = spotifyService.convertEpisodeToOurFormat(spotifyEpisode, show);
+          const out = await podcastAdapter.importEpisodeWithSeries(
+            'spotify',
+            episodeData,
+            merged,
+            userId
+          );
+          importedEpisode = out.episode;
+          importedSeries = out.series;
+        }
+
+        result = {
+          success: true,
+          type: 'episode',
+          episode: importedEpisode,
+          series: importedSeries,
+          resolveStatus: resolved.playable ? resolved.status : 'unresolved',
+          playable: !!(importedEpisode?.sources?.audio_direct ||
+            (importedEpisode?.sources instanceof Map && importedEpisode.sources.get('audio_direct'))),
+        };
+      }
+    }
+
+    // ——— Direct RSS (or generic URL that looks like a feed) ———
+    else if (parsedUrl.type === 'rss' || parsedUrl.type === 'generic') {
+      const feedUrl = parsedUrl.originalUrl;
+      let rssResult;
+      try {
+        rssResult = await parseRSSFeed(feedUrl, epLimit);
+      } catch (err) {
+        return res.status(400).json({
+          error: parsedUrl.type === 'generic'
+            ? 'URL is not a recognized podcast link or RSS feed'
+            : `Failed to parse RSS feed: ${err.message}`,
+        });
+      }
+
+      const channel = rssResult.channel || {};
+      if (!channel.title && !(rssResult.episodes || []).length) {
+        return res.status(400).json({ error: 'URL did not look like a podcast RSS feed' });
+      }
+
+      const seriesData = {
+        title: channel.title || 'Unknown Podcast',
+        description: channel.description || channel.summary || '',
+        author: channel.author || '',
+        image: channel.image || null,
+        categories: channel.categories || [],
+        language: channel.language || 'en',
+        explicit: channel.explicit || false,
+        rssUrl: feedUrl,
+      };
+
+      // Enrich with Podcast Index IDs when possible
+      try {
+        const byFeed = await podcastIndexService.getPodcastByFeedUrl(feedUrl);
+        if (byFeed.success && byFeed.podcast?.id) {
+          seriesData.podcastIndexId = String(byFeed.podcast.id);
+          if (byFeed.podcast.itunesId) seriesData.iTunesId = String(byFeed.podcast.itunesId);
+        }
+      } catch (_) { /* optional */ }
+
+      const series = await podcastAdapter.createOrFindSeries(seriesData, userId, 'rss');
+      let episodesImported = 0;
+      for (const item of (rssResult.episodes || []).slice(0, epLimit)) {
+        try {
+          item.feedUrl = feedUrl;
+          await podcastAdapter.importEpisodeWithSeries('rss', item, seriesData, userId);
+          episodesImported += 1;
+        } catch (_) { /* skip */ }
+      }
+
+      result = {
+        success: true,
+        type: 'series',
+        series,
+        episodesImported,
+        playable: episodesImported > 0,
+      };
     } else {
-      return res.status(400).json({ error: 'Unsupported URL type. Please use Apple Podcasts URLs.' });
+      return res.status(400).json({
+        error: 'Unsupported URL type. Use Apple Podcasts, Spotify, or an RSS feed URL.',
+      });
+    }
+
+    if (!result) {
+      return res.status(400).json({ error: 'Could not import podcast from that URL' });
     }
 
     res.json(result);
@@ -1427,67 +1645,84 @@ router.get('/spotify-status', authMiddleware, async (req, res) => {
   }
 });
 
-// Import podcasts from user's Spotify saved shows
+// ——— Spotify podcast library import (preview → select → execute) ———
+router.post('/import-spotify/preview/start', authMiddleware, async (req, res) => {
+  try {
+    const podcastLibraryImportJobService = require('../services/podcastLibraryImportJobService');
+    const limit = Math.min(parseInt(req.body?.limit, 10) || 50, 100);
+    const { jobId } = podcastLibraryImportJobService.startSpotifyPreviewJob(req.user._id, { limit });
+    res.json({ jobId });
+  } catch (error) {
+    console.error('Spotify podcast preview start error:', error);
+    const status = error.code === 'SPOTIFY_REAUTH' ? 401 : 500;
+    res.status(status).json({ error: error.message || 'Failed to start Spotify podcast preview' });
+  }
+});
+
+router.post('/import-spotify/execute/start', authMiddleware, async (req, res) => {
+  try {
+    const podcastLibraryImportJobService = require('../services/podcastLibraryImportJobService');
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const episodesPerShow = Math.min(parseInt(req.body?.episodesPerShow, 10) || 10, 50);
+    const { jobId } = podcastLibraryImportJobService.startSpotifyExecuteJob(req.user._id, {
+      items,
+      episodesPerShow,
+    });
+    res.json({ jobId });
+  } catch (error) {
+    console.error('Spotify podcast execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start Spotify podcast import' });
+  }
+});
+
+router.get('/import-jobs/:jobId', authMiddleware, async (req, res) => {
+  try {
+    const podcastLibraryImportJobService = require('../services/podcastLibraryImportJobService');
+    const job = podcastLibraryImportJobService.getJobForUser(req.params.jobId, req.user._id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    res.json(job);
+  } catch (error) {
+    console.error('Podcast import job poll error:', error);
+    res.status(500).json({ error: 'Failed to get import job status' });
+  }
+});
+
+// Legacy one-shot Spotify import (still works; prefers RSS resolve via new service)
 router.post('/import-spotify', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const user = await User.findById(userId).select('spotifyAccessToken spotifyId');
-    if (!user?.spotifyAccessToken) {
-      return res.status(400).json({ error: 'Spotify not connected. Please connect your Spotify account first.' });
-    }
-
+    const podcastLibraryImportService = require('../services/podcastLibraryImportService');
     const maxShows = Math.min(parseInt(req.body.maxShows) || 50, 50);
     const episodesPerShow = Math.min(parseInt(req.body.episodesPerShow) || 10, 50);
 
-    const savedShows = await spotifyService.getSavedShows(user.spotifyAccessToken, maxShows);
-    const imported = { series: [], episodes: 0 };
-    const errors = [];
+    const preview = await podcastLibraryImportService.previewSpotifyPodcastImport(
+      req.user._id,
+      maxShows
+    );
+    const selected = (preview.items || [])
+      .filter((i) => i.resolveStatus !== 'in_library')
+      .map((i) => ({ ...i, selected: true }));
 
-    for (const show of savedShows) {
-      try {
-        const seriesData = spotifyService.convertShowToSeriesFormat(show);
-        const { episodes } = await spotifyService.getShowEpisodes(
-          user.spotifyAccessToken,
-          show.id,
-          episodesPerShow
-        );
-        const series = await podcastAdapter.createOrFindSeries(
-          { ...seriesData, spotifyId: show.id },
-          userId,
-          'spotify'
-        );
-        imported.series.push({ id: series._id, title: series.title });
-
-        for (const ep of episodes) {
-          try {
-            const episodeData = spotifyService.convertEpisodeToOurFormat(ep, show);
-            await podcastAdapter.importEpisodeWithSeries(
-              'spotify',
-              episodeData,
-              seriesData,
-              userId
-            );
-            imported.episodes += 1;
-          } catch (epErr) {
-            errors.push({ episode: ep.name, reason: epErr.message });
-          }
-        }
-      } catch (showErr) {
-        errors.push({ show: show.name, reason: showErr.message });
-      }
-    }
+    const results = await podcastLibraryImportService.executeSpotifyPodcastImport(req.user._id, {
+      items: selected,
+      episodesPerShow,
+    });
 
     res.json({
       success: true,
       imported: {
-        seriesCount: imported.series.length,
-        episodeCount: imported.episodes,
-        series: imported.series
+        seriesCount: results.seriesImported + results.seriesUpdated,
+        episodeCount: results.episodesImported,
+        series: results.items
+          .filter((i) => i.seriesId)
+          .map((i) => ({ id: i.seriesId, title: i.title })),
       },
-      errors: errors.length ? errors : undefined
+      details: results,
+      errors: results.items.filter((i) => i.status === 'error').length
+        ? results.items.filter((i) => i.status === 'error')
+        : undefined,
     });
   } catch (error) {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.code === 'SPOTIFY_REAUTH') {
       return res.status(401).json({ error: 'Spotify token expired. Please reconnect Spotify.' });
     }
     console.error('Spotify import error:', error);

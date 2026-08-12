@@ -253,6 +253,7 @@ class ApplePodcastsService {
       language: applePodcast.country || 'en',
       rssUrl: applePodcast.feedUrl || '',
       appleId: applePodcast.collectionId,
+      iTunesId: applePodcast.collectionId,
       genre: applePodcast.primaryGenreName || '',
       releaseDate: applePodcast.releaseDate ? new Date(applePodcast.releaseDate) : null,
       trackCount: applePodcast.trackCount || 0,
