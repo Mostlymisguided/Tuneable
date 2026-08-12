@@ -2446,7 +2446,7 @@ const TuneProfile: React.FC = () => {
                               ? 'Claim ownership to receive tips held in escrow'
                               : 'Claim this media and upload audio if you are the rights holder'}
                         </p>
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                        <div className="flex flex-col items-center justify-center gap-2">
                           {!disputed && (
                             <button
                               type="button"

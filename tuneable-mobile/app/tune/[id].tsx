@@ -849,6 +849,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 8,
     alignItems: 'center',
+    flexDirection: 'column',
   },
   claimOverlayBtn: {
     backgroundColor: '#f59e0b',
