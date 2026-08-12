@@ -4,6 +4,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getPostAuthHref } from '@/src/lib/onboarding';
+import { clarifyOAuthErrorMessage } from '@/src/lib/oauthErrorMessage';
 import { colors } from '@/src/theme/colors';
 
 export default function AuthCallbackScreen() {
@@ -20,10 +21,14 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     const run = async () => {
       if (params.error) {
+        const isSpotify = params.error === 'spotify_auth_failed';
         setError(
-          typeof params.message === 'string'
-            ? decodeURIComponent(params.message)
-            : String(params.error)
+          clarifyOAuthErrorMessage(
+            typeof params.message === 'string' ? params.message : null,
+            isSpotify
+              ? 'Spotify connection failed. Please try again.'
+              : String(params.error)
+          )
         );
         setDone(true);
         return;
@@ -56,7 +61,7 @@ export default function AuthCallbackScreen() {
       {!done && !error ? (
         <>
           <ActivityIndicator color={colors.accentLight} size="large" />
-          <Text style={styles.text}>Finishing Google sign-in…</Text>
+          <Text style={styles.text}>Finishing sign-in…</Text>
         </>
       ) : (
         <>

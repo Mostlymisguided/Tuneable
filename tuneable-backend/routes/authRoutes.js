@@ -28,6 +28,68 @@ function appendQueryParams(url, params) {
 }
 
 /**
+ * passport-spotify wraps Spotify /v1/me failures as "failed to fetch user profile".
+ * Map those (and raw oauthError payloads) to actionable user-facing copy.
+ */
+function formatSpotifyOAuthError(err) {
+  const rawMessage = String(err?.message || '').trim();
+  const oauthStatus = err?.oauthError?.statusCode;
+  const oauthRaw = err?.oauthError?.data;
+  let oauthBody = '';
+  if (oauthRaw == null) {
+    oauthBody = '';
+  } else if (typeof oauthRaw === 'string') {
+    oauthBody = oauthRaw;
+  } else if (Buffer.isBuffer(oauthRaw)) {
+    oauthBody = oauthRaw.toString('utf8');
+  } else {
+    try {
+      oauthBody = JSON.stringify(oauthRaw);
+    } catch {
+      oauthBody = String(oauthRaw);
+    }
+  }
+
+  // Prefer nested Spotify JSON message when present
+  let spotifyApiMessage = '';
+  try {
+    const parsed = JSON.parse(oauthBody);
+    spotifyApiMessage = parsed?.error?.message || parsed?.message || '';
+  } catch {
+    spotifyApiMessage = '';
+  }
+  const haystack = `${oauthBody} ${spotifyApiMessage} ${rawMessage}`;
+
+  if (/not be registered|not registered|User not registered/i.test(haystack)) {
+    return 'Spotify blocked this account: it is not on Tuneable’s developer allowlist. Add the exact Spotify account email from spotify.com/account/overview under Developer Dashboard → Users Management, then try again.';
+  }
+  if (/premium subscription required/i.test(haystack)) {
+    return 'Spotify blocked this connection: the Tuneable Spotify app owner needs an active Premium subscription (required for Development Mode).';
+  }
+  if (oauthStatus === 403 || /403/.test(String(oauthStatus))) {
+    return spotifyApiMessage
+      ? `Spotify rejected the connection (403): ${spotifyApiMessage}`
+      : 'Spotify rejected the connection (403). In Development Mode the app owner needs Premium and each tester must be allowlisted with their Spotify account email.';
+  }
+  if (/failed to fetch user profile/i.test(rawMessage)) {
+    return spotifyApiMessage
+      ? `Couldn’t finish connecting Spotify: ${spotifyApiMessage}`
+      : 'Couldn’t finish connecting Spotify — Spotify rejected the account lookup after you authorized. If you’re testing, confirm the app owner has Premium and your Spotify account email is on the developer allowlist.';
+  }
+  if (/Please log in first/i.test(rawMessage)) {
+    return rawMessage;
+  }
+  if (/already linked/i.test(rawMessage)) {
+    return rawMessage;
+  }
+  if (/User not found/i.test(rawMessage)) {
+    return 'Couldn’t connect Spotify — your Tuneable session was lost. Log in again, then retry Connect Spotify.';
+  }
+
+  return rawMessage || 'Spotify connection failed. Please try again.';
+}
+
+/**
  * Dedupe Facebook authorization-code exchanges.
  * Browsers/proxies sometimes hit the callback twice; the second exchange fails with
  * "This authorization code has been used" and surfaces as an interrupted sign-in.
@@ -607,7 +669,11 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
                 delete req.session.linkingUserUuid;
               }
               
-              const errorMessage = encodeURIComponent(err.message || 'SoundCloud authentication failed');
+              const errorMessage = encodeURIComponent(
+                /failed to fetch user profile/i.test(String(err.message || ''))
+                  ? 'Couldn’t finish connecting SoundCloud — SoundCloud rejected the account lookup after you authorized. Please try again.'
+                  : (err.message || 'SoundCloud authentication failed')
+              );
               return res.redirect(`${redirectUrl}?error=account_linking_failed&message=${errorMessage}`);
             }
             
@@ -1019,12 +1085,16 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           // "User not registered in the Developer Dashboard" in dev mode)
           console.error('❌ Spotify OAuth callback error:', err.message);
           if (err.oauthError) {
-            console.error('   Spotify API response:', err.oauthError.statusCode, err.oauthError.data);
+            console.error(
+              '   Spotify API response:',
+              err.oauthError.statusCode,
+              err.oauthError.data
+            );
           }
           clearSpotifySession();
           return res.redirect(appendQueryParams(baseRedirect, {
             error: 'spotify_auth_failed',
-            message: err.message || 'Spotify connection failed'
+            message: formatSpotifyOAuthError(err)
           }));
         }
         if (!user) {
@@ -1032,7 +1102,7 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           clearSpotifySession();
           return res.redirect(appendQueryParams(baseRedirect, {
             error: 'spotify_auth_failed',
-            message: 'Spotify connection failed'
+            message: 'Spotify connection failed — authorization was denied or your session was lost. Please try Connect Spotify again while logged in.'
           }));
         }
         req.user = user;
@@ -1064,7 +1134,8 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
         console.error('Spotify callback error:', error);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(appendQueryParams(`${frontendUrl}/auth/callback`, {
-          error: 'spotify_auth_failed'
+          error: 'spotify_auth_failed',
+          message: 'Spotify connected, but Tuneable couldn’t finish signing you in. Please try again.'
         }));
       }
     }

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import { getPostAuthPath } from '../utils/authHelpers';
+import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -32,22 +33,27 @@ const AuthCallback: React.FC = () => {
           errorMessage = 'Session expired. Please try signing in again.';
         } else if (error === 'facebook_auth_failed' || error === 'google_auth_failed') {
           errorMessage = errorMessageParam
-            ? decodeURIComponent(errorMessageParam)
+            ? clarifyOAuthErrorMessage(errorMessageParam, 'Authentication failed. Please try again.')
             : 'Authentication failed. Please try again.';
         } else if (error === 'account_already_linked' || error === 'account_linking_failed') {
           errorMessage = errorMessageParam
-            ? decodeURIComponent(errorMessageParam)
+            ? clarifyOAuthErrorMessage(errorMessageParam, 'Account linking failed. Please try again.')
             : 'Account linking failed. Please try again.';
+        } else if (error === 'spotify_auth_failed') {
+          errorMessage = clarifyOAuthErrorMessage(
+            errorMessageParam,
+            'Spotify connection failed. Please try again.'
+          );
         } else if (errorDetails) {
-          errorMessage = `Authentication error: ${decodeURIComponent(errorDetails)}`;
+          errorMessage = `Authentication error: ${clarifyOAuthErrorMessage(errorDetails)}`;
         } else if (errorReason) {
           errorMessage = `Authentication failed: ${errorReason}`;
         } else if (errorMessageParam) {
-          errorMessage = decodeURIComponent(errorMessageParam);
+          errorMessage = clarifyOAuthErrorMessage(errorMessageParam);
         }
 
         toast.error(errorMessage, {
-          autoClose: 10000,
+          autoClose: 12000,
           pauseOnHover: true,
         });
 

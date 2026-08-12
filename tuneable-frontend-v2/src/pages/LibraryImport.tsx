@@ -18,6 +18,7 @@ import { userAPI } from '../lib/api';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { buildOAuthStartUrl } from '../utils/platform';
+import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
 
 type ImportSource = 'spotify' | 'soundcloud';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
@@ -188,7 +189,10 @@ const LibraryImport: React.FC = () => {
     const message = searchParams.get('message');
 
     if (error) {
-      toast.error(decodeURIComponent(message || 'Connection failed'));
+      toast.error(
+        clarifyOAuthErrorMessage(message, 'Connection failed. Please try again.'),
+        { autoClose: 12000, pauseOnHover: true }
+      );
       const next = new URLSearchParams(searchParams);
       next.delete('error');
       next.delete('message');

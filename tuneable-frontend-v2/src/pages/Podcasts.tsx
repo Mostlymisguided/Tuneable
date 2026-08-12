@@ -34,6 +34,7 @@ import {
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { resolveTipStatInputs } from '../utils/tipStats';
+import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
 
 type SpotifyPodcastResolveStatus = 'rss_matched' | 'unresolved' | 'in_library';
 
@@ -310,7 +311,10 @@ const Podcasts: React.FC = () => {
         toast.success('Spotify connected! You can now import your podcasts.');
       }).catch(() => toast.error('Failed to complete Spotify connection'));
     } else if (error === 'spotify_auth_failed') {
-      toast.error(decodeURIComponent(message || 'Spotify connection failed'));
+      toast.error(
+        clarifyOAuthErrorMessage(message, 'Spotify connection failed. Please try again.'),
+        { autoClose: 12000, pauseOnHover: true }
+      );
       const next = new URLSearchParams(searchParams);
       next.delete('error');
       next.delete('message');
