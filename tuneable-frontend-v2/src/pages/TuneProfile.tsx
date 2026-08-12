@@ -40,7 +40,8 @@ import {
   SlidersHorizontal,
   Bot,
   Info,
-  MapPin
+  MapPin,
+  ExternalLink,
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import ReportModal from '../components/ReportModal';
@@ -66,6 +67,10 @@ import {
   normalizeSources,
   getPlayabilityBlockReason,
 } from '../utils/mediaPlayability';
+import {
+  getListenElsewhereTarget,
+  openListenElsewhere,
+} from '../utils/listenElsewhere';
 import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
@@ -1569,15 +1574,28 @@ const TuneProfile: React.FC = () => {
     }
   };
 
+  const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
+
+  const handleListenElsewhere = () => {
+    if (!openListenElsewhere(media)) return;
+    toast.info(
+      listenElsewhere?.kind === 'youtube'
+        ? 'Opening YouTube — audio isn’t on Tuneable yet.'
+        : 'Searching the web — audio isn’t on Tuneable yet.'
+    );
+  };
+
   // Handle play button click
   const handlePlaySong = () => {
     if (!media) return;
 
     if (!isMediaPlayable(media)) {
       toast.info(
-        isYouTubeOnly(media) || !isMediaPlayable(media)
-          ? 'This track is not playable yet — tip to support adding audio to Tuneable.'
-          : 'Playback is not available for this track yet.'
+        listenElsewhere
+          ? 'This track is not playable yet — tip to support adding audio, or find it on the web.'
+          : isYouTubeOnly(media) || !isMediaPlayable(media)
+            ? 'This track is not playable yet — tip to support adding audio to Tuneable.'
+            : 'Playback is not available for this track yet.'
       );
       return;
     }
@@ -2418,18 +2436,33 @@ const TuneProfile: React.FC = () => {
                               ? 'Claim ownership to receive tips held in escrow'
                               : 'Claim this media and upload audio if you are the rights holder'}
                         </p>
-                        {!disputed && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowClaimModal(true);
-                            }}
-                            className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
-                          >
-                            Claim media
-                          </button>
-                        )}
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
+                          {!disputed && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowClaimModal(true);
+                              }}
+                              className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
+                            >
+                              Claim media
+                            </button>
+                          )}
+                          {listenElsewhere && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleListenElsewhere();
+                              }}
+                              className="px-4 py-2 bg-black/50 hover:bg-black/70 border border-white/20 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              {listenElsewhere.label}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })()
@@ -2531,6 +2564,16 @@ const TuneProfile: React.FC = () => {
                   >
                     <Play className="h-4 w-4" fill="currentColor" />
                     Play
+                  </button>
+                )}
+                {listenElsewhere && (
+                  <button
+                    type="button"
+                    onClick={handleListenElsewhere}
+                    className="px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-white/15 transition-all flex items-center gap-2 text-sm"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {listenElsewhere.label}
                   </button>
                 )}
                 {renderShareButton()}

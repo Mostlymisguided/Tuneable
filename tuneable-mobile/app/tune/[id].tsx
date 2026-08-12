@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -35,6 +36,7 @@ import {
   isUploadPlayable,
   mediaId,
 } from '@/src/lib/media';
+import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
 import {
   buildTipStatChips,
   resolveTipStatInputs,
@@ -141,6 +143,7 @@ export default function TuneProfileScreen() {
   const rightsBlocked = blockReason === 'rights';
   const disputed = blockReason === 'disputed';
   const showClaimCta = Boolean(media && isRightsPendingClaimable(media));
+  const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
   const artist =
     media?.creatorDisplay ||
     (media ? formatArtist(media.artist) : 'Unknown artist');
@@ -221,6 +224,11 @@ export default function TuneProfileScreen() {
   const onPlay = async () => {
     if (!media || !playable) return;
     await setQueueAndPlay([media], 0);
+  };
+
+  const onListenElsewhere = () => {
+    if (!listenElsewhere) return;
+    void Linking.openURL(listenElsewhere.url);
   };
 
   const onPlayRelated = (item: RelatedMediaItem) => {
@@ -364,6 +372,20 @@ export default function TuneProfileScreen() {
                           <Text style={styles.claimOverlayText}>Claim media</Text>
                         </Pressable>
                       ) : null}
+                      {listenElsewhere ? (
+                        <Pressable
+                          style={styles.listenElsewhereOverlayBtn}
+                          onPress={onListenElsewhere}>
+                          <Ionicons
+                            name="open-outline"
+                            size={14}
+                            color="#fff"
+                          />
+                          <Text style={styles.listenElsewhereOverlayText}>
+                            {listenElsewhere.label}
+                          </Text>
+                        </Pressable>
+                      ) : null}
                     </View>
                   </View>
                 )}
@@ -470,6 +492,16 @@ export default function TuneProfileScreen() {
                 <Pressable style={styles.playBtn} onPress={() => void onPlay()}>
                   <Ionicons name="play" size={16} color="#fff" />
                   <Text style={styles.playBtnText}>Play</Text>
+                </Pressable>
+              ) : null}
+              {listenElsewhere ? (
+                <Pressable
+                  style={styles.listenElsewhereBtn}
+                  onPress={onListenElsewhere}>
+                  <Ionicons name="open-outline" size={16} color={colors.text} />
+                  <Text style={styles.listenElsewhereBtnText}>
+                    {listenElsewhere.label}
+                  </Text>
                 </Pressable>
               ) : null}
               {showClaimCta ? (
@@ -766,6 +798,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  listenElsewhereOverlayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  listenElsewhereOverlayText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   claimBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -893,6 +941,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
@@ -911,6 +960,22 @@ const styles = StyleSheet.create({
   playBtnText: {
     color: '#fff',
     fontWeight: '700',
+    fontSize: 14,
+  },
+  listenElsewhereBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  listenElsewhereBtnText: {
+    color: colors.text,
+    fontWeight: '600',
     fontSize: 14,
   },
   shareBtn: {
