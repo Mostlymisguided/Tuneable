@@ -24,6 +24,18 @@ type ImportSource = 'spotify' | 'soundcloud';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
 type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
 type IdentityConfidence = 'verified' | 'catalog' | 'likely' | 'unverified';
+type TipMode = 'fixed' | 'spread';
+type ImportScope = 'all' | 'playable';
+
+const MIN_TIP_POUNDS = 0.01;
+
+/** Divide balance across N tracks (pence floor). Returns null if below min tip. */
+function spreadTipPerTrack(balancePounds: number, count: number, minTip = MIN_TIP_POUNDS): number | null {
+  if (count <= 0 || balancePounds < minTip) return null;
+  const tip = Math.floor((balancePounds * 100) / count) / 100;
+  if (tip < minTip) return null;
+  return tip;
+}
 
 interface ImportItem {
   key: string;
@@ -152,6 +164,7 @@ const LibraryImport: React.FC = () => {
   const [items, setItems] = useState<ImportItem[]>([]);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [bulkTip, setBulkTip] = useState('1.11');
+  const [tipMode, setTipMode] = useState<TipMode>('fixed');
   const [tipAmounts, setTipAmounts] = useState<Record<string, string>>({});
   const [executeResult, setExecuteResult] = useState<{
     tipped: number;
@@ -233,6 +246,7 @@ const LibraryImport: React.FC = () => {
     setSummary(null);
     setExecuteResult(null);
     setTipAmounts({});
+    setTipMode('fixed');
     setProgressMessage(null);
     setProgressCurrent(0);
     setProgressTotal(0);
@@ -303,6 +317,7 @@ const LibraryImport: React.FC = () => {
       setItems(data.items || []);
       setSummary(data.summary || null);
       setTipAmounts({});
+      setTipMode('fixed');
       setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
       setStep('summary');
     } catch (error: any) {
@@ -364,7 +379,7 @@ const LibraryImport: React.FC = () => {
 
   const tipAmount = useMemo(() => {
     const parsed = parseFloat(bulkTip);
-    return Number.isFinite(parsed) && parsed >= 0.01 ? parsed : 1.11;
+    return Number.isFinite(parsed) && parsed >= MIN_TIP_POUNDS ? parsed : 1.11;
   }, [bulkTip]);
 
   const selectableItems = useMemo(
@@ -377,6 +392,16 @@ const LibraryImport: React.FC = () => {
     [items]
   );
 
+  const playableItems = useMemo(
+    () => selectableItems.filter((i) => i.isPlayable),
+    [selectableItems]
+  );
+
+  const awaitingItems = useMemo(
+    () => selectableItems.filter((i) => !i.isPlayable),
+    [selectableItems]
+  );
+
   const possibleMatchCount = summary?.possibleMatches
     ?? items.filter((i) => i.matchStatus === 'possible_match').length;
 
@@ -387,25 +412,94 @@ const LibraryImport: React.FC = () => {
     ?? items.filter((i) => i.matchStatus === 'new').length;
 
   const actionableCount = selectableItems.length;
+  const playableCount = playableItems.length;
+  const awaitingCount = awaitingItems.length;
 
   const userBalance = summary?.userBalance ?? (user?.balance != null ? penceToPoundsNumber(user.balance) : 0);
 
-  const fullImportCost = actionableCount * tipAmount;
-  const affordableCount = tipAmount > 0
-    ? Math.min(actionableCount, Math.floor((userBalance + 0.0001) / tipAmount))
-    : 0;
-  const affordableCost = affordableCount * tipAmount;
-  const canAffordAll = fullImportCost <= userBalance + 0.0001;
+  const costForScope = useCallback((scope: ImportScope, mode: TipMode) => {
+    const targets = scope === 'playable' ? playableItems : selectableItems;
+    const count = targets.length;
+    if (count === 0) {
+      return {
+        count: 0,
+        tip: tipAmount,
+        total: 0,
+        affordableCount: 0,
+        canAffordAll: true,
+        spreadOk: false,
+      };
+    }
+    if (mode === 'spread') {
+      const tip = spreadTipPerTrack(userBalance, count);
+      if (tip == null) {
+        const affordableCount = Math.floor((userBalance + 0.0001) / MIN_TIP_POUNDS);
+        return {
+          count,
+          tip: MIN_TIP_POUNDS,
+          total: 0,
+          affordableCount,
+          canAffordAll: false,
+          spreadOk: false,
+        };
+      }
+      return {
+        count,
+        tip,
+        total: tip * count,
+        affordableCount: count,
+        canAffordAll: true,
+        spreadOk: true,
+      };
+    }
+    const total = count * tipAmount;
+    const affordableCount = tipAmount > 0
+      ? Math.min(count, Math.floor((userBalance + 0.0001) / tipAmount))
+      : 0;
+    return {
+      count,
+      tip: tipAmount,
+      total,
+      affordableCount,
+      canAffordAll: total <= userBalance + 0.0001,
+      spreadOk: false,
+    };
+  }, [playableItems, selectableItems, tipAmount, userBalance]);
+
+  const playableCost = useMemo(() => costForScope('playable', tipMode), [costForScope, tipMode]);
+  const allCost = useMemo(() => costForScope('all', tipMode), [costForScope, tipMode]);
+
+  const selectedSpreadTip = useMemo(
+    () => (selectedItems.length > 0 ? spreadTipPerTrack(userBalance, selectedItems.length) : null),
+    [selectedItems.length, userBalance]
+  );
 
   const totalCost = useMemo(() => {
+    if (tipMode === 'spread' && selectedSpreadTip != null) {
+      return selectedSpreadTip * selectedItems.length;
+    }
     return selectedItems.reduce((sum, item) => {
       const raw = tipAmounts[item.key] ?? bulkTip;
       const amount = parseFloat(raw);
       return sum + (Number.isFinite(amount) ? amount : 0);
     }, 0);
-  }, [selectedItems, tipAmounts, bulkTip]);
+  }, [selectedItems, tipAmounts, bulkTip, tipMode, selectedSpreadTip]);
 
-  const canAffordSelected = totalCost <= userBalance + 0.0001;
+  const canAffordSelected = totalCost <= userBalance + 0.0001
+    && (tipMode !== 'spread' || selectedSpreadTip != null || selectedItems.length === 0);
+
+  const applyTipsToTargets = useCallback((targets: ImportItem[], tip: number) => {
+    const formatted = tip.toFixed(2);
+    setBulkTip(formatted);
+    setTipAmounts((prev) => {
+      const next = { ...prev };
+      targets.forEach((item) => {
+        next[item.key] = formatted;
+      });
+      return next;
+    });
+    return formatted;
+  }, []);
 
   const toggleAll = (selected: boolean) => {
     setItems((prev) => prev.map((i) => ({
@@ -414,43 +508,40 @@ const LibraryImport: React.FC = () => {
     })));
   };
 
-  const selectAffordable = () => {
-    let remaining = userBalance;
-    const nextTips = { ...tipAmounts };
-    setItems((prev) => prev.map((item) => {
-      if (item.matchStatus === 'in_library') {
-        return { ...item, selected: false };
-      }
-      const tip = parseFloat(nextTips[item.key] ?? bulkTip);
-      const amount = Number.isFinite(tip) && tip >= 0.01 ? tip : 1.11;
-      if (amount <= remaining + 0.0001) {
-        remaining -= amount;
-        return { ...item, selected: true };
-      }
-      return { ...item, selected: false };
-    }));
-    toast.success('Selected tracks that fit your balance');
+  const selectPlayable = () => {
+    setItems((prev) => prev.map((item) => ({
+      ...item,
+      selected: item.matchStatus !== 'in_library' && item.isPlayable,
+    })));
+    toast.success(playableCount > 0
+      ? `Selected ${playableCount} playable track${playableCount === 1 ? '' : 's'}`
+      : 'No playable tracks in this scan');
   };
 
-  const prepareAffordableSelection = () => {
+  const selectAffordable = () => {
     let remaining = userBalance;
+    const tip = tipMode === 'spread' ? MIN_TIP_POUNDS : tipAmount;
     setItems((prev) => prev.map((item) => {
       if (item.matchStatus === 'in_library') {
         return { ...item, selected: false };
       }
-      const amount = tipAmount;
+      const amount = Number.isFinite(tip) && tip >= MIN_TIP_POUNDS ? tip : 1.11;
       if (amount <= remaining + 0.0001) {
         remaining -= amount;
         return { ...item, selected: true };
       }
       return { ...item, selected: false };
     }));
-    setTipAmounts({});
+    toast.success(
+      tipMode === 'spread'
+        ? 'Selected as many tracks as fit at the minimum tip — then spread balance'
+        : 'Selected tracks that fit your balance'
+    );
   };
 
   const syncTipToTargets = (rawAmount: string, targets: ImportItem[]) => {
     const amount = parseFloat(rawAmount);
-    if (!Number.isFinite(amount) || amount < 0.01) return null;
+    if (!Number.isFinite(amount) || amount < MIN_TIP_POUNDS) return null;
     const formatted = amount.toFixed(2);
     setBulkTip(formatted);
     setTipAmounts((prev) => {
@@ -469,9 +560,10 @@ const LibraryImport: React.FC = () => {
       toast.error('Select at least one track first');
       return;
     }
+    setTipMode('fixed');
     const result = syncTipToTargets(bulkTip, targets);
     if (!result) {
-      toast.error('Enter a valid tip amount (min £0.01)');
+      toast.error(`Enter a valid tip amount (min £${MIN_TIP_POUNDS.toFixed(2)})`);
       return;
     }
     toast.success(
@@ -480,6 +572,7 @@ const LibraryImport: React.FC = () => {
   };
 
   const handleBulkTipChange = (value: string) => {
+    setTipMode('fixed');
     setBulkTip(value);
     const targets = items.filter((i) => i.selected && i.matchStatus !== 'in_library');
     if (targets.length === 0) return;
@@ -492,15 +585,63 @@ const LibraryImport: React.FC = () => {
     });
   };
 
+  const enableSpreadMode = (targets?: ImportItem[], opts?: { silent?: boolean }) => {
+    const list = targets ?? selectedItems;
+    const tip = spreadTipPerTrack(userBalance, list.length);
+    if (tip == null) {
+      toast.error(
+        list.length === 0
+          ? 'Select tracks first'
+          : `Balance too low to spread £${MIN_TIP_POUNDS.toFixed(2)}+ across ${list.length} tracks — select fewer or top up`
+      );
+      return false;
+    }
+    setTipMode('spread');
+    applyTipsToTargets(list, tip);
+    if (!opts?.silent) {
+      toast.success(`Spreading £${(tip * list.length).toFixed(2)} → £${tip.toFixed(2)} each × ${list.length}`);
+    }
+    return true;
+  };
+
+  // Keep per-track tips in sync while in spread mode
+  useEffect(() => {
+    if (tipMode !== 'spread') return;
+    if (selectedItems.length === 0) return;
+    const tip = spreadTipPerTrack(userBalance, selectedItems.length);
+    if (tip == null) return;
+    const formatted = tip.toFixed(2);
+    setBulkTip((prev) => (prev === formatted ? prev : formatted));
+    setTipAmounts((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      selectedItems.forEach((item) => {
+        if (next[item.key] !== formatted) {
+          next[item.key] = formatted;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [tipMode, selectedItems, userBalance]);
+
   const handleExecute = async () => {
     if (selectedItems.length === 0) {
       toast.error('Select at least one track');
+      return;
+    }
+    if (tipMode === 'spread' && selectedSpreadTip == null) {
+      toast.error(`Need at least £${MIN_TIP_POUNDS.toFixed(2)} per track — select fewer or top up`);
       return;
     }
     if (!canAffordSelected) {
       toast.error('Insufficient balance — top up your wallet first');
       return;
     }
+
+    const effectiveTip = tipMode === 'spread' && selectedSpreadTip != null
+      ? selectedSpreadTip
+      : tipAmount;
 
     const payload = selectedItems.map((item) => ({
       key: item.key,
@@ -510,60 +651,72 @@ const LibraryImport: React.FC = () => {
       matchStatus: item.matchStatus,
       useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
       crossRefStatus: item.crossRefStatus || undefined,
-      amount: parseFloat(tipAmounts[item.key] ?? bulkTip),
+      amount: tipMode === 'spread' && selectedSpreadTip != null
+        ? selectedSpreadTip
+        : parseFloat(tipAmounts[item.key] ?? bulkTip),
       externalMedia: item.externalMedia,
       skipIfInLibrary: true,
     }));
 
-    await runExecuteJob(payload, parseFloat(bulkTip));
+    await runExecuteJob(payload, effectiveTip);
   };
 
-  const importFromSummary = async (mode: 'all' | 'affordable') => {
-    if (actionableCount === 0) {
-      toast.info('Nothing new to import — everything scanned is already in your library');
-      return;
-    }
-    if (mode === 'all' && !canAffordAll) {
-      toast.error('Insufficient balance for the full scan — try “Import what I can afford”');
-      return;
-    }
-    if (mode === 'affordable' && affordableCount === 0) {
-      toast.error('Your balance is too low for even one tip — top up your wallet');
+  const importFromSummary = async (scope: ImportScope) => {
+    const cost = costForScope(scope, tipMode);
+    if (cost.count === 0) {
+      toast.info(
+        scope === 'playable'
+          ? 'No playable tracks in this scan — try Import all or Review'
+          : 'Nothing new to import — everything scanned is already in your library'
+      );
       return;
     }
 
-    if (mode === 'affordable') {
-      prepareAffordableSelection();
-    } else {
-      toggleAll(true);
-      setTipAmounts({});
-    }
+    let tip = cost.tip;
+    let targets = scope === 'playable' ? [...playableItems] : [...selectableItems];
 
-    // Allow state to flush before reading selected via a local payload
-    const tip = tipAmount;
-    let remaining = mode === 'affordable' ? userBalance : Number.POSITIVE_INFINITY;
-    const payloadItems = items
-      .filter((i) => i.matchStatus !== 'in_library')
-      .filter(() => {
-        if (mode === 'all') return true;
+    if (tipMode === 'spread') {
+      if (!cost.spreadOk) {
+        toast.error(
+          `Balance too low to spread £${MIN_TIP_POUNDS.toFixed(2)}+ across ${cost.count} tracks — select fewer via Review, or top up`
+        );
+        return;
+      }
+    } else if (!cost.canAffordAll) {
+      if (cost.affordableCount === 0) {
+        toast.error('Your balance is too low for even one tip — top up your wallet');
+        return;
+      }
+      let remaining = userBalance;
+      targets = targets.filter(() => {
         if (tip <= remaining + 0.0001) {
           remaining -= tip;
           return true;
         }
         return false;
-      })
-      .map((item) => ({
-        key: item.key,
-        title: item.title,
-        selected: true,
-        mediaId: item.mediaId || undefined,
-        matchStatus: item.matchStatus,
-        useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
-        crossRefStatus: item.crossRefStatus || undefined,
-        amount: tip,
-        externalMedia: item.externalMedia,
-        skipIfInLibrary: true,
-      }));
+      });
+      toast.info(`Importing ${targets.length} of ${cost.count} at £${tip.toFixed(2)} each (balance limit)`);
+    }
+
+    const targetKeys = new Set(targets.map((t) => t.key));
+    setItems((prev) => prev.map((item) => ({
+      ...item,
+      selected: targetKeys.has(item.key),
+    })));
+    applyTipsToTargets(targets, tip);
+
+    const payloadItems = targets.map((item) => ({
+      key: item.key,
+      title: item.title,
+      selected: true,
+      mediaId: item.mediaId || undefined,
+      matchStatus: item.matchStatus,
+      useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
+      crossRefStatus: item.crossRefStatus || undefined,
+      amount: tip,
+      externalMedia: item.externalMedia,
+      skipIfInLibrary: true,
+    }));
 
     if (payloadItems.length === 0) {
       toast.error('No tracks to import');
@@ -609,7 +762,7 @@ const LibraryImport: React.FC = () => {
             Import &amp; Support
           </h1>
           <p className="text-gray-400 mt-2 max-w-2xl">
-            Scan your likes, see what&apos;s already on Tuneable, then tip to add the rest to your library.
+            Scan your likes, see what&apos;s playable vs awaiting audio, then tip to add them to your library.
           </p>
           <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">{stepLabel}</p>
         </div>
@@ -750,35 +903,114 @@ const LibraryImport: React.FC = () => {
                 <div className="text-2xl font-bold text-green-300">{summary.inLibrary}</div>
                 <div className="text-xs text-gray-400 mt-1">Already supported</div>
               </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-emerald-800/60">
+                <div className="text-2xl font-bold text-emerald-300">{playableCount}</div>
+                <div className="text-xs text-gray-400 mt-1">Playable now</div>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-4 border border-amber-800/60">
+                <div className="text-2xl font-bold text-amber-300">{awaitingCount}</div>
+                <div className="text-xs text-gray-400 mt-1">Awaiting audio</div>
+              </div>
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                 <div className="text-2xl font-bold text-blue-300">{onCatalogCount}</div>
                 <div className="text-xs text-gray-400 mt-1">Exact catalog matches</div>
               </div>
-              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <div className="text-2xl font-bold text-amber-300">{possibleMatchCount}</div>
-                <div className="text-xs text-gray-400 mt-1">Possible matches</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-800/80 rounded-lg p-3 border border-gray-700">
+                <div className="text-lg font-semibold text-amber-200">{possibleMatchCount}</div>
+                <div className="text-xs text-gray-400 mt-0.5">Possible matches</div>
               </div>
-              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                <div className="text-2xl font-bold text-purple-300">{newTrackCount}</div>
-                <div className="text-xs text-gray-400 mt-1">New to Tuneable</div>
+              <div className="bg-gray-800/80 rounded-lg p-3 border border-gray-700">
+                <div className="text-lg font-semibold text-purple-300">{newTrackCount}</div>
+                <div className="text-xs text-gray-400 mt-0.5">New to Tuneable</div>
               </div>
             </div>
 
+            {actionableCount > 0 ? (
+              <p className="text-sm text-gray-400">
+                Of {actionableCount} track{actionableCount === 1 ? '' : 's'} to add,{' '}
+                <span className="text-emerald-300 font-medium">{playableCount} playable</span>
+                {awaitingCount > 0 ? (
+                  <>
+                    {' '}and{' '}
+                    <span className="text-amber-300 font-medium">
+                      {awaitingCount} catalog/new (awaiting audio)
+                    </span>
+                  </>
+                ) : null}
+                .
+              </p>
+            ) : null}
+
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 space-y-5">
               <div className="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Default tip per track</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">£</span>
-                    <input
-                      type="number"
-                      min={0.01}
-                      step={0.01}
-                      value={bulkTip}
-                      onChange={(e) => setBulkTip(e.target.value)}
-                      className="w-24 bg-gray-900 border border-gray-600 rounded px-2 py-1"
-                    />
+                <div className="space-y-3">
+                  <div className="flex rounded-lg border border-gray-600 overflow-hidden text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setTipMode('fixed')}
+                      className={`px-3 py-1.5 ${
+                        tipMode === 'fixed'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-900 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Fixed tip
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const previewTargets = playableCount > 0 ? playableItems : selectableItems;
+                        if (!enableSpreadMode(previewTargets, { silent: true })) return;
+                      }}
+                      className={`px-3 py-1.5 ${
+                        tipMode === 'spread'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-900 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Spread balance
+                    </button>
                   </div>
+                  {tipMode === 'fixed' ? (
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Default tip per track</label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">£</span>
+                        <input
+                          type="number"
+                          min={MIN_TIP_POUNDS}
+                          step={0.01}
+                          value={bulkTip}
+                          onChange={(e) => {
+                            setTipMode('fixed');
+                            setBulkTip(e.target.value);
+                          }}
+                          className="w-24 bg-gray-900 border border-gray-600 rounded px-2 py-1"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-300 space-y-1">
+                      <div>
+                        Spreads your balance evenly across the import set (min £{MIN_TIP_POUNDS.toFixed(2)} each).
+                      </div>
+                      {playableCount > 0 && playableCost.spreadOk ? (
+                        <div className="text-emerald-300">
+                          Playable: £{playableCost.tip.toFixed(2)} × {playableCost.count}
+                          {' '}· £{playableCost.total.toFixed(2)}
+                        </div>
+                      ) : null}
+                      {actionableCount > 0 && allCost.spreadOk ? (
+                        <div className="text-gray-400">
+                          All: £{allCost.tip.toFixed(2)} × {allCost.count}
+                          {' '}· £{allCost.total.toFixed(2)}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-400">Your balance</div>
@@ -789,22 +1021,41 @@ const LibraryImport: React.FC = () => {
               <div className="border-t border-gray-700 pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">
-                    {actionableCount} track{actionableCount === 1 ? '' : 's'} to add
+                    Playable to add
                   </span>
-                  <span className="text-white font-medium">£{fullImportCost.toFixed(2)}</span>
+                  <span className="text-emerald-300 font-medium">
+                    {playableCount}
+                    {playableCount > 0
+                      ? ` · £${playableCost.total.toFixed(2)}${tipMode === 'spread' && playableCost.spreadOk ? ` (£${playableCost.tip.toFixed(2)} ea)` : ''}`
+                      : ''}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">You can afford</span>
-                  <span className={affordableCount < actionableCount ? 'text-amber-300' : 'text-green-300'}>
-                    {affordableCount} of {actionableCount}
-                    {affordableCount > 0 ? ` (£${affordableCost.toFixed(2)})` : ''}
+                  <span className="text-gray-400">
+                    All tracks to add
+                  </span>
+                  <span className="text-white font-medium">
+                    {actionableCount}
+                    {actionableCount > 0
+                      ? ` · £${allCost.total.toFixed(2)}${tipMode === 'spread' && allCost.spreadOk ? ` (£${allCost.tip.toFixed(2)} ea)` : ''}`
+                      : ''}
                   </span>
                 </div>
-                {!canAffordAll && actionableCount > 0 && (
+                {tipMode === 'fixed' && actionableCount > 0 && !allCost.canAffordAll && (
+                  <div className="text-sm text-amber-300 pt-1">
+                    At £{tipAmount.toFixed(2)} each you can afford {allCost.affordableCount} of {actionableCount}
+                    {playableCount > 0 && !playableCost.canAffordAll
+                      ? ` · ${playableCost.affordableCount} of ${playableCount} playable`
+                      : ''}
+                    . Switch to Spread balance to tip everyone selected, or{' '}
+                    <Link to="/wallet" className="underline">top up</Link>.
+                  </div>
+                )}
+                {tipMode === 'spread' && playableCount > 0 && !playableCost.spreadOk && (
                   <div className="text-sm text-red-400 flex items-center gap-1 pt-1">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     <span>
-                      Need £{(fullImportCost - userBalance).toFixed(2)} more for everything —{' '}
+                      Need at least £{(MIN_TIP_POUNDS * playableCount).toFixed(2)} to spread across {playableCount} playable tracks —{' '}
                       <Link to="/wallet" className="underline">top up wallet</Link>
                     </span>
                   </div>
@@ -816,25 +1067,62 @@ const LibraryImport: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <div className="flex flex-col gap-3 pt-2">
                 {actionableCount > 0 && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => void importFromSummary(canAffordAll ? 'all' : 'affordable')}
-                      disabled={isExecuting || isLoading || (!canAffordAll && affordableCount === 0)}
-                      className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
-                    >
-                      {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Coins className="w-5 h-5" />}
-                      {canAffordAll
-                        ? `Import & tip all · £${fullImportCost.toFixed(2)}`
-                        : `Import what I can afford · £${affordableCost.toFixed(2)}`}
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void importFromSummary('playable')}
+                        disabled={
+                          isExecuting
+                          || isLoading
+                          || playableCount === 0
+                          || (tipMode === 'spread' ? !playableCost.spreadOk : playableCost.affordableCount === 0)
+                        }
+                        className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Coins className="w-5 h-5" />}
+                        {playableCount === 0
+                          ? 'No playable tracks'
+                          : tipMode === 'spread' && playableCost.spreadOk
+                            ? `Import playable · £${playableCost.total.toFixed(2)}`
+                            : tipMode === 'fixed' && !playableCost.canAffordAll && playableCost.affordableCount > 0
+                              ? `Import ${playableCost.affordableCount} playable · £${(playableCost.affordableCount * tipAmount).toFixed(2)}`
+                              : `Import playable · £${playableCost.total.toFixed(2)}`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void importFromSummary('all')}
+                        disabled={
+                          isExecuting
+                          || isLoading
+                          || (tipMode === 'spread' ? !allCost.spreadOk : allCost.affordableCount === 0)
+                        }
+                        className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        {isExecuting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Coins className="w-5 h-5" />}
+                        {tipMode === 'spread' && allCost.spreadOk
+                          ? `Import all · £${allCost.total.toFixed(2)}`
+                          : tipMode === 'fixed' && !allCost.canAffordAll && allCost.affordableCount > 0
+                            ? `Import ${allCost.affordableCount} I can afford · £${(allCost.affordableCount * tipAmount).toFixed(2)}`
+                            : `Import all · £${allCost.total.toFixed(2)}`}
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
-                        if (!canAffordAll) prepareAffordableSelection();
-                        else toggleAll(true);
+                        if (playableCount > 0) {
+                          setItems((prev) => prev.map((item) => ({
+                            ...item,
+                            selected: item.matchStatus !== 'in_library' && item.isPlayable,
+                          })));
+                        } else {
+                          toggleAll(true);
+                        }
+                        if (tipMode === 'spread') {
+                          enableSpreadMode(playableCount > 0 ? playableItems : selectableItems, { silent: true });
+                        }
                         setStep('review');
                       }}
                       disabled={isExecuting || isLoading}
@@ -842,6 +1130,7 @@ const LibraryImport: React.FC = () => {
                     >
                       Review tracks
                       {possibleMatchCount > 0 ? ` (${possibleMatchCount} possible)` : ''}
+                      {playableCount > 0 ? ` · ${playableCount} playable pre-selected` : ''}
                     </button>
                   </>
                 )}
@@ -942,28 +1231,77 @@ const LibraryImport: React.FC = () => {
             </div>
 
             <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-4 flex flex-wrap gap-4 items-end justify-between">
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Default tip for selection</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">£</span>
-                  <input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    value={bulkTip}
-                    onChange={(e) => handleBulkTipChange(e.target.value)}
-                    className="w-24 bg-gray-900 border border-gray-600 rounded px-2 py-1"
-                  />
+              <div className="space-y-3">
+                <div className="flex rounded-lg border border-gray-600 overflow-hidden text-sm w-fit">
                   <button
                     type="button"
-                    onClick={applyBulkTip}
-                    className="text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded"
+                    onClick={() => setTipMode('fixed')}
+                    className={`px-3 py-1.5 ${
+                      tipMode === 'fixed'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-900 text-gray-400 hover:text-white'
+                    }`}
                   >
-                    Apply to selected
+                    Fixed tip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => enableSpreadMode(selectedItems)}
+                    className={`px-3 py-1.5 ${
+                      tipMode === 'spread'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-900 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Spread balance
                   </button>
                 </div>
+                {tipMode === 'fixed' ? (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Default tip for selection</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400">£</span>
+                      <input
+                        type="number"
+                        min={MIN_TIP_POUNDS}
+                        step={0.01}
+                        value={bulkTip}
+                        onChange={(e) => handleBulkTipChange(e.target.value)}
+                        className="w-24 bg-gray-900 border border-gray-600 rounded px-2 py-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyBulkTip}
+                        className="text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded"
+                      >
+                        Apply to selected
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-300">
+                    {selectedSpreadTip != null && selectedItems.length > 0 ? (
+                      <>
+                        £{userBalance.toFixed(2)} ÷ {selectedItems.length}
+                        {' = '}
+                        <span className="text-yellow-300 font-medium">£{selectedSpreadTip.toFixed(2)}</span>
+                        {' each'}
+                        <span className="text-gray-500">
+                          {' '}(£{(selectedSpreadTip * selectedItems.length).toFixed(2)} total)
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-red-400">
+                        Select fewer tracks or top up to spread at least £{MIN_TIP_POUNDS.toFixed(2)} each
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap gap-3 text-sm items-center">
+                <button type="button" onClick={selectPlayable} className="text-emerald-400 hover:underline">
+                  Select playable ({playableCount})
+                </button>
                 <button type="button" onClick={() => toggleAll(true)} className="text-purple-400 hover:underline">
                   Select all
                 </button>
@@ -978,6 +1316,18 @@ const LibraryImport: React.FC = () => {
                 <div>
                   <div className="text-sm text-gray-400">
                     {selectedItems.length} track{selectedItems.length !== 1 ? 's' : ''} selected
+                    {selectedItems.length > 0 ? (
+                      <>
+                        {' · '}
+                        <span className="text-emerald-300">
+                          {selectedItems.filter((i) => i.isPlayable).length} playable
+                        </span>
+                        {' / '}
+                        <span className="text-amber-300">
+                          {selectedItems.filter((i) => !i.isPlayable).length} awaiting
+                        </span>
+                      </>
+                    ) : null}
                   </div>
                   <div className="text-xl font-bold flex items-center gap-2">
                     <Coins className="w-5 h-5 text-yellow-400" />
@@ -986,7 +1336,7 @@ const LibraryImport: React.FC = () => {
                   {!canAffordSelected && (
                     <div className="text-sm text-red-400 flex items-center gap-1 mt-1">
                       <AlertCircle className="w-4 h-4" />
-                      Need £{(totalCost - userBalance).toFixed(2)} more —{' '}
+                      Need £{Math.max(0, totalCost - userBalance).toFixed(2)} more —{' '}
                       <Link to="/wallet" className="underline">top up wallet</Link>
                     </div>
                   )}
@@ -1134,8 +1484,9 @@ const LibraryImport: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
+                          setTipMode('fixed');
                           const cur = parseFloat(tipAmounts[item.key] ?? bulkTip);
-                          setTipAmounts((p) => ({ ...p, [item.key]: Math.max(0.01, cur - 0.01).toFixed(2) }));
+                          setTipAmounts((p) => ({ ...p, [item.key]: Math.max(MIN_TIP_POUNDS, cur - 0.01).toFixed(2) }));
                         }}
                         className="p-1 bg-gray-700 rounded"
                       >
@@ -1143,15 +1494,19 @@ const LibraryImport: React.FC = () => {
                       </button>
                       <input
                         type="number"
-                        min={0.01}
+                        min={MIN_TIP_POUNDS}
                         step={0.01}
                         value={tipAmounts[item.key] ?? bulkTip}
-                        onChange={(e) => setTipAmounts((p) => ({ ...p, [item.key]: e.target.value }))}
+                        onChange={(e) => {
+                          setTipMode('fixed');
+                          setTipAmounts((p) => ({ ...p, [item.key]: e.target.value }));
+                        }}
                         className="w-16 text-center bg-gray-900 border border-gray-600 rounded px-1 py-1 text-sm"
                       />
                       <button
                         type="button"
                         onClick={() => {
+                          setTipMode('fixed');
                           const cur = parseFloat(tipAmounts[item.key] ?? bulkTip);
                           setTipAmounts((p) => ({ ...p, [item.key]: (cur + 0.01).toFixed(2) }));
                         }}
