@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, MapPin, Navigation, User, X, CheckCircle } from 'lucide-react';
 import { emailAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { hasCustomProfilePic } from '../constants';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { formatLocation } from '../utils/locationHelpers';
 
@@ -130,7 +130,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
   }
 
   // Profile picture prompt
-  if (!user.profilePic || user.profilePic === DEFAULT_PROFILE_PIC) {
+  if (!hasCustomProfilePic(user.profilePic)) {
     prompts.push({
       id: 'profilePic',
       title: 'Add Profile Picture',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
 import { 
   Coins, 
   Music, 
@@ -27,7 +27,9 @@ import {
   Minus,
   Tag,
   Undo2,
-  Crown
+  Crown,
+  Camera,
+  Trash2
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 
@@ -323,7 +325,7 @@ const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user: currentUser, token: authToken, handleOAuthCallback, updateBalance } = useAuth();
+  const { user: currentUser, token: authToken, handleOAuthCallback, updateBalance, refreshUser } = useAuth();
   
   // Web player store for playing media
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
@@ -442,6 +444,7 @@ const UserProfile: React.FC = () => {
   // Edit profile state (kept for potential revert)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRemovingPic, setIsRemovingPic] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Username validation state
@@ -1960,11 +1963,12 @@ const UserProfile: React.FC = () => {
 
     try {
       setIsUploading(true);
-      await authAPI.uploadProfilePic(file);
+      const response = await authAPI.uploadProfilePic(file);
       toast.success('Profile picture updated!');
-      
-      // Refresh user data
-      await fetchUserProfile();
+      setUser((prev) =>
+        prev ? { ...prev, profilePic: response.user.profilePic || prev.profilePic } : prev
+      );
+      await refreshUser();
     } catch (err: any) {
       console.error('Error uploading profile pic:', err);
       toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to upload profile picture');
@@ -1974,6 +1978,29 @@ const UserProfile: React.FC = () => {
       if (e.target) {
         e.target.value = '';
       }
+    }
+  };
+
+  const handleRemoveProfilePic = async () => {
+    if (!hasCustomProfilePic(user?.profilePic)) return;
+
+    if (!window.confirm('Remove your profile picture and use the default avatar? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsRemovingPic(true);
+      const response = await authAPI.removeProfilePic();
+      toast.success('Profile picture removed');
+      setUser((prev) =>
+        prev ? { ...prev, profilePic: response.user.profilePic || DEFAULT_PROFILE_PIC } : prev
+      );
+      await refreshUser();
+    } catch (err: any) {
+      console.error('Error removing profile pic:', err);
+      toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to remove profile picture');
+    } finally {
+      setIsRemovingPic(false);
     }
   };
 
@@ -2072,7 +2099,7 @@ const UserProfile: React.FC = () => {
                   e.currentTarget.src = DEFAULT_PROFILE_PIC;
                 }}
               />
-              {isUploading && (
+              {(isUploading || isRemovingPic) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
                 </div>
@@ -3562,6 +3589,64 @@ const UserProfile: React.FC = () => {
             {settingsTab === 'profile' && (
               <div className="card p-6">
                 <h2 className="text-2xl font-bold text-white mb-6">Edit Profile</h2>
+
+                {/* Profile Picture */}
+                <div className="mb-6">
+                  <label className="block text-white font-medium mb-3">Profile Picture</label>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={user.profilePic || DEFAULT_PROFILE_PIC}
+                      alt={`${user.username} profile`}
+                      className="w-20 h-20 rounded-full object-cover shadow-lg"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                      }}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleProfilePicClick}
+                        disabled={isUploading || isRemovingPic}
+                        className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="h-4 w-4" />
+                            <span>{hasCustomProfilePic(user.profilePic) ? 'Change' : 'Upload'}</span>
+                          </>
+                        )}
+                      </button>
+                      {hasCustomProfilePic(user.profilePic) && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveProfilePic}
+                          disabled={isUploading || isRemovingPic}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
+                        >
+                          {isRemovingPic ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Removing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4" />
+                              <span>Remove</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    JPG or PNG, up to 5MB. Removing your picture restores the default avatar.
+                  </p>
+                </div>
                 
                 {/* Username */}
                 <div className="mb-4">

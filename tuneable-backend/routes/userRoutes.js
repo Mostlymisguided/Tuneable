@@ -2954,6 +2954,40 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (r
   }
 });
 
+const DEFAULT_PROFILE_PIC =
+  'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
+
+// @route   DELETE /api/users/profile-pic
+// @desc    Remove profile picture and reset to the default avatar
+// @access  Private
+router.delete('/profile-pic', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!user.profilePic || user.profilePic === DEFAULT_PROFILE_PIC) {
+      return res.json({
+        message: 'Profile picture already using default',
+        user: { _id: user._id, profilePic: DEFAULT_PROFILE_PIC }
+      });
+    }
+
+    user.profilePic = DEFAULT_PROFILE_PIC;
+    await user.save();
+
+    console.log(`✅ Profile picture removed for user ${req.user.userId || req.user._id}`);
+    res.json({
+      message: 'Profile picture removed successfully',
+      user: { _id: user._id, profilePic: user.profilePic }
+    });
+  } catch (error) {
+    console.error('Error removing profile picture:', error.message);
+    res.status(500).json({ error: 'Error removing profile picture', details: error.message });
+  }
+});
+
 // Temporary route to make a user admin (for testing)
 router.post('/make-admin/:userId', async (req, res) => {
   try {

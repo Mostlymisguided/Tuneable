@@ -2,6 +2,9 @@
 
 export const DEFAULT_PROFILE_PIC = 'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
 
+export const hasCustomProfilePic = (profilePic?: string | null) =>
+  Boolean(profilePic && profilePic !== DEFAULT_PROFILE_PIC);
+
 /** Default tip amount in pounds for new users / fallbacks */
 export const DEFAULT_TIP_POUNDS = 1.11;
 

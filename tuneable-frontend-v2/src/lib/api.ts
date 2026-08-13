@@ -222,6 +222,11 @@ export const authAPI = {
     const response = await api.put('/users/profile-pic', formData);
     return response.data;
   },
+
+  removeProfilePic: async () => {
+    const response = await api.delete('/users/profile-pic');
+    return response.data;
+  },
   
   refreshToken: async () => {
     const response = await api.post('/auth/refresh');
