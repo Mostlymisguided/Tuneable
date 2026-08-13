@@ -446,6 +446,7 @@ const UserProfile: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isRemovingPic, setIsRemovingPic] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const openedUploadPickerRef = useRef(false);
   
   // Username validation state
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -976,6 +977,24 @@ const UserProfile: React.FC = () => {
       }
     }
   }, [currentUser, user, searchParams, handleOAuthCallback, fetchUserProfile, setSearchParams]);
+
+  // Dashboard "Add Profile Picture" prompt lands here with action=uploadPic
+  useEffect(() => {
+    if (searchParams.get('action') !== 'uploadPic') return;
+    if (!isOwnProfile || loading || !user) return;
+    if (openedUploadPickerRef.current) return;
+
+    openedUploadPickerRef.current = true;
+    const openPicker = () => {
+      fileInputRef.current?.click();
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('action');
+      setSearchParams(newParams, { replace: true });
+    };
+
+    const frameId = requestAnimationFrame(openPicker);
+    return () => cancelAnimationFrame(frameId);
+  }, [isOwnProfile, loading, user, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!championScopePicks.length) {

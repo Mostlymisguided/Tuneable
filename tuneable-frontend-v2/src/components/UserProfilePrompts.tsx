@@ -71,7 +71,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
   const handleAddProfilePicture = () => {
     const userId = user._id || user.id || user.uuid;
     if (userId) {
-      navigate(`/user/${userId}`);
+      navigate(`/user/${userId}?settings=true&tab=profile&action=uploadPic`);
     } else {
       toast.error('Unable to navigate to profile');
     }
