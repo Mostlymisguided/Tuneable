@@ -11,6 +11,7 @@ const {
 const { generateSlug, getExistingTagParty } = require('./tagPartyService');
 const { loadBidsByMediaId } = require('./relatedMediaService');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
+const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const SKIP_PLACE_FEATURE_TYPES = new Set(['continent', 'earth', 'world']);
@@ -455,7 +456,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const period = VALID_TIME_PERIODS.has(timePeriod) ? timePeriod : 'all-time';
   const startDate = getPeriodStartDate(period);
 
-  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation';
+  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared';
 
   let matched;
 
@@ -540,6 +541,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
     ...m,
+    ...enrichMediaWithPlayability(m),
     bids: bidsByMediaId.get(m._id.toString()) || [],
   }));
 

@@ -227,6 +227,7 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
+const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -787,7 +788,7 @@ async function fetchTuneLibraryForUser(user) {
     
     // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources')
+      .select('title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources rightsStatus rightsCleared')
       .populate('globalMediaAggregateTopUser', 'username uuid _id')
       .lean();
     
@@ -903,6 +904,7 @@ async function fetchTuneLibraryForUser(user) {
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
         let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, contentForm, sources;
+        let playability = {};
 
         if (media) {
           let artistName = 'Unknown Artist';
@@ -923,7 +925,8 @@ async function fetchTuneLibraryForUser(user) {
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
           contentForm = media.contentForm || [];
-          sources = media.sources || {};
+          playability = enrichMediaWithPlayability(media);
+          sources = playability.sources || {};
         } else {
           // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
           console.warn('Media not found for mediaId:', aggregate.mediaId, '- using bid denormalized data');
@@ -962,6 +965,9 @@ async function fetchTuneLibraryForUser(user) {
             tags,
             contentForm: contentForm || [],
             sources,
+            rightsStatus: media?.rightsStatus,
+            rightsCleared: media?.rightsCleared,
+            ...playability,
             globalMediaAggregate,
             globalMediaAggregateAvg,
             globalMediaAggregateTop: media?.globalMediaAggregateTop || 0,
@@ -1028,7 +1034,7 @@ async function buildPlaybackQueueResponse(user) {
     .map((mediaId) => mediaId.toString());
 
   const mediaDocs = await Media.find({ _id: { $in: mediaIds } })
-    .select('title artist creatorDisplay coverArt duration uuid _id tags contentForm sources')
+    .select('title artist creatorDisplay coverArt duration uuid _id tags contentForm sources rightsStatus rightsCleared')
     .lean();
 
   const mediaLookup = new Map(mediaDocs.map((media) => [media._id.toString(), media]));
@@ -1038,6 +1044,7 @@ async function buildPlaybackQueueResponse(user) {
       const media = mediaLookup.get(entry.mediaId?.toString());
       if (!media) return null;
 
+      const playability = enrichMediaWithPlayability(media);
       return {
         index,
         addedAt: entry.addedAt,
@@ -1051,7 +1058,10 @@ async function buildPlaybackQueueResponse(user) {
         duration: media.duration || null,
         tags: media.tags || [],
         contentForm: media.contentForm || [],
-        sources: media.sources || {},
+        sources: playability.sources || {},
+        rightsStatus: media.rightsStatus,
+        rightsCleared: media.rightsCleared,
+        ...playability,
       };
     })
     .filter(Boolean);

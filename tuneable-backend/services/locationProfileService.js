@@ -10,6 +10,7 @@ const { loadBidsByMediaId } = require('./relatedMediaService');
 const mapboxGeocoding = require('./mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
+const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const VALID_TIME_PERIODS = new Set([
@@ -21,7 +22,7 @@ const VALID_TIME_PERIODS = new Set([
 ]);
 
 const MEDIA_FIELDS =
-  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation';
+  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared';
 
 /**
  * Normalize a Mapbox placeId from a URL/path segment.
@@ -356,6 +357,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
     ...m,
+    ...enrichMediaWithPlayability(m),
     bids: bidsByMediaId.get(m._id.toString()) || [],
   }));
 

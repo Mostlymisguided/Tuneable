@@ -982,6 +982,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 
       // Rights confirmation (assumed true when uploaded via checkbox)
       rightsCleared: true,
+      rightsStatus: 'cleared',
       rightsConfirmedBy: userId,
       rightsConfirmedAt: new Date(),
       
@@ -1200,6 +1201,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
     media.sources.set('upload', fileUrl);
     media.rightsCleared = true;
+    media.rightsStatus = 'cleared';
     media.rightsConfirmedBy = userId;
     media.rightsConfirmedAt = new Date();
     if (!media.mediaType?.includes('mp3')) {
@@ -1382,7 +1384,10 @@ router.get('/', async (req, res) => {
     const total = await Media.countDocuments(query);
 
     res.json({
-      media,
+      media: media.map((item) => ({
+        ...item,
+        ...enrichMediaWithPlayability(item),
+      })),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -1450,7 +1455,10 @@ router.get('/public', async (req, res) => {
     const total = await Media.countDocuments(query);
 
     res.json({
-      media,
+      media: media.map((item) => ({
+        ...item,
+        ...enrichMediaWithPlayability(item),
+      })),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

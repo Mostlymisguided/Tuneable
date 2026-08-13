@@ -41,7 +41,7 @@ async function uploadToR2(filePath, media, username) {
 
 /**
  * Attach local MP3 to existing media.
- * Default: pending rights (playable, tips in escrow). Pass pendingRights: false for legacy cleared-rights attach.
+ * Default: pending rights (not playable; tips in escrow until claimed). Pass pendingRights: false for legacy cleared-rights attach.
  */
 async function attachToMedia(media, filePath, user, options = {}) {
   const { pendingRights = true, rekordboxMeta = null, importSource = 'library_import' } = options;

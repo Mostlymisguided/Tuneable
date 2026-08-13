@@ -2,6 +2,7 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
 const DEFAULT_OPTIONS = {
   candidatePoolSize: 120,
@@ -41,17 +42,6 @@ const getPrimaryArtistName = (media) => {
     return media.artist.trim() || null;
   }
   return null;
-};
-
-const flattenStringMap = (value) => {
-  if (!value) return {};
-  if (value instanceof Map) {
-    return Object.fromEntries(value.entries());
-  }
-  if (typeof value === 'object') {
-    return { ...value };
-  }
-  return {};
 };
 
 const buildTagCountMap = async (sourceTags) => {
@@ -182,6 +172,7 @@ const limitPerPrimaryArtist = (records, limit, maxPerPrimaryArtist) => {
 
 const formatMediaEntry = (record) => {
   const media = record.media;
+  const playability = enrichMediaWithPlayability(media);
   return {
     _id: media._id.toString(),
     uuid: media.uuid,
@@ -200,11 +191,14 @@ const formatMediaEntry = (record) => {
     sharedTags: record.sharedTags || [],
     reasons: record.reasons || [],
     score: Number((record.score || 0).toFixed(2)),
-    sources: flattenStringMap(media.sources),
+    sources: playability.sources,
     contentType: media.contentType || [],
     contentForm: media.contentForm || [],
     creatorDisplay: media.creatorDisplay || null,
     fanContext: record.fanContext || null,
+    rightsStatus: media.rightsStatus,
+    rightsCleared: media.rightsCleared,
+    ...playability,
     bids: [],
   };
 };
@@ -305,7 +299,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   }
 
   const candidateMedia = await Media.find(candidateQuery)
-    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay')
+    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay rightsStatus rightsCleared')
     .populate('globalMediaAggregateTopUser', 'username uuid _id')
     .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
     .limit(settings.candidatePoolSize)

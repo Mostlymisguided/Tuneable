@@ -52,6 +52,8 @@ export interface ChartMediaItem {
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
   isPlayable?: boolean;
+  hasHostedAudio?: boolean;
+  playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
   addedBy?: {
     _id?: string;
     username?: string;

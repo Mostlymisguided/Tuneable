@@ -1,5 +1,8 @@
 /**
  * Client-side playability checks (mirrors tuneable-backend/utils/mediaPlayability.js).
+ *
+ * Pending-rights uploads are not playable. Direct audio URLs should already be
+ * stripped by the API; the client still refuses to play pending/disputed tracks.
  */
 
 export type SupportMode = 'tip';
@@ -13,7 +16,10 @@ export interface PlayabilityFields {
   isYouTubeOnly?: boolean;
   awaitingUpload?: boolean;
   playabilityBlockReason?: PlayabilityBlockReason;
+  hasHostedAudio?: boolean;
 }
+
+const DIRECT_AUDIO_SOURCE_KEYS = ['upload', 'audio_direct', 'audio', 'enclosure'] as const;
 
 type MediaLike = PlayabilityFields & {
   sources?: Record<string, string> | Array<{ platform?: string; url?: string; youtube?: string }> | null;
@@ -60,12 +66,15 @@ export function isPodcastLike(media: MediaLike | null | undefined): boolean {
 }
 
 function hasDirectAudioSource(sources: Record<string, string>): boolean {
-  return !!(
-    sources.upload ||
-    sources.audio_direct ||
-    sources.audio ||
-    sources.enclosure
-  );
+  return DIRECT_AUDIO_SOURCE_KEYS.some((key) => !!sources[key]);
+}
+
+function stripDirectAudioSources(sources: Record<string, string>): Record<string, string> {
+  const stripped = { ...sources };
+  for (const key of DIRECT_AUDIO_SOURCE_KEYS) {
+    delete stripped[key];
+  }
+  return stripped;
 }
 
 export function isYouTubeOnly(media: MediaLike | null | undefined): boolean {
@@ -76,28 +85,19 @@ export function isYouTubeOnly(media: MediaLike | null | undefined): boolean {
 export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
   if (!media) return false;
 
-  if (typeof media.isPlayable === 'boolean') {
-    return media.isPlayable;
-  }
-
   const sources = normalizeSources(media.sources);
 
   if (isPodcastLike(media)) {
     return hasDirectAudioSource(sources);
   }
 
-  if (isPodcastLike(media)) {
-    return hasDirectAudioSource(sources);
-  }
-
-  if (media.rightsStatus === 'disputed') {
+  if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
     return false;
   }
-  if (media.rightsStatus === 'pending') {
-    return !!sources.upload;
-  }
 
-  return !!(sources.upload && (media.rightsCleared ?? true));
+  if (media.isPlayable === false) return false;
+
+  return !!(sources.upload && media.rightsCleared === true);
 }
 
 export function getSupportMode(media: MediaLike | null | undefined): SupportMode {
@@ -106,7 +106,7 @@ export function getSupportMode(media: MediaLike | null | undefined): SupportMode
 }
 
 /**
- * Classify why a track cannot play. Prefer rights over missing audio when both apply.
+ * Classify why a non-podcast track is not playable. Prefer rights over missing audio when both apply.
  */
 export function getPlayabilityBlockReason(
   media: MediaLike | null | undefined
@@ -114,10 +114,11 @@ export function getPlayabilityBlockReason(
   if (!media || isMediaPlayable(media) || isPodcastLike(media)) return null;
 
   if (media.rightsStatus === 'disputed') return 'disputed';
-  if (media.rightsStatus === 'pending' && !media.rightsCleared) return 'rights';
+  if (media.rightsStatus === 'pending') return 'rights';
 
   const sources = normalizeSources(media.sources);
   if (!hasDirectAudioSource(sources)) return 'audio';
+  if (media.rightsCleared === false) return 'rights';
 
   return 'audio';
 }
@@ -130,14 +131,27 @@ export function isRightsPendingClaimable(
 }
 
 export function enrichMediaWithPlayability<T extends MediaLike>(media: T): T & PlayabilityFields {
-  const playable = isMediaPlayable(media);
-  const playabilityBlockReason = getPlayabilityBlockReason(media);
+  const originalSources = normalizeSources(media.sources);
+  const playable = isMediaPlayable({ ...media, sources: originalSources });
+  const podcast = isPodcastLike(media);
+  const hasHostedAudio = typeof media.hasHostedAudio === 'boolean'
+    ? media.hasHostedAudio
+    : (!podcast && hasDirectAudioSource(originalSources));
+  const clientSources = playable || podcast
+    ? originalSources
+    : stripDirectAudioSources(originalSources);
+  const playabilityBlockReason = getPlayabilityBlockReason({
+    ...media,
+    sources: originalSources,
+  });
   return {
     ...media,
+    sources: clientSources,
     isPlayable: playable,
     supportMode: getSupportMode(media),
-    isYouTubeOnly: isYouTubeOnly(media),
-    awaitingUpload: !playable && !isPodcastLike(media),
+    isYouTubeOnly: isYouTubeOnly({ ...media, sources: originalSources }),
+    awaitingUpload: !playable && !podcast && !hasHostedAudio,
     playabilityBlockReason,
+    hasHostedAudio,
   };
 }

@@ -269,6 +269,9 @@ export interface Media {
   // Rights clearance (library import limbo vs cleared ownership)
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  isPlayable?: boolean;
+  hasHostedAudio?: boolean;
+  playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
   
   // Video/Image metadata
   resolution?: string;

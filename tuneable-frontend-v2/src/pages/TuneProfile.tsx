@@ -128,6 +128,7 @@ interface Media {
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  hasHostedAudio?: boolean;
   tipCount?: number;
   bids?: Bid[];
   comments?: Comment[];
@@ -3986,11 +3987,15 @@ const TuneProfile: React.FC = () => {
                 {canReplaceAudio() && (
                   <div>
                     <label className="block text-white font-medium mb-2">Audio file</label>
-                    {normalizeSources(media.sources).upload && (
+                    {normalizeSources(media.sources).upload ? (
                       <div className="mb-2 text-sm text-gray-400 break-all">
                         Current: {normalizeSources(media.sources).upload}
                       </div>
-                    )}
+                    ) : media.hasHostedAudio ? (
+                      <div className="mb-2 text-sm text-gray-400">
+                        An audio file is stored but hidden until rights are cleared.
+                      </div>
+                    ) : null}
                     <button
                       type="button"
                       onClick={(e) => handleAttachAudioClick(e, true)}

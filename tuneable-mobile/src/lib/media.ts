@@ -27,6 +27,8 @@ export function normalizeSources(sources: MediaSources): Record<string, string> 
 /** Direct upload / MP3 URL only — YouTube is catalog-only in mobile P0. */
 export function getUploadUrl(media: ChartMediaItem | null | undefined): string | null {
   if (!media) return null;
+  if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') return null;
+  if (media.rightsCleared === false) return null;
   const sources = normalizeSources(media.sources);
   const url = sources.upload || sources.audio_direct || sources.audio || null;
   return url || null;
@@ -34,11 +36,14 @@ export function getUploadUrl(media: ChartMediaItem | null | undefined): string |
 
 export function isUploadPlayable(media: ChartMediaItem | null | undefined): boolean {
   if (!media) return false;
-  if (typeof media.isPlayable === 'boolean') {
-    return media.isPlayable && Boolean(getUploadUrl(media));
+  if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
+    return false;
   }
-  if (media.rightsStatus === 'disputed') return false;
-  return Boolean(getUploadUrl(media));
+  if (media.isPlayable === false) return false;
+  const url = getUploadUrl(media);
+  if (!url) return false;
+  if (media.isPlayable === true) return true;
+  return media.rightsCleared === true;
 }
 
 export function isRightsPendingClaimable(
@@ -54,7 +59,13 @@ export function getPlayabilityBlockReason(
 ): 'rights' | 'audio' | 'disputed' | null {
   if (!media || isUploadPlayable(media)) return null;
   if (media.rightsStatus === 'disputed') return 'disputed';
-  if (isRightsPendingClaimable(media)) return 'rights';
+  if (
+    isRightsPendingClaimable(media) ||
+    media.rightsStatus === 'pending'
+  ) {
+    return 'rights';
+  }
+  if (media.hasHostedAudio && media.rightsCleared === false) return 'rights';
   return 'audio';
 }
 

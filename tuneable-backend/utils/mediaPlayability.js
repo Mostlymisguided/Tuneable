@@ -1,10 +1,13 @@
 /**
  * Media playability helpers for the metadata/import → upload transition.
  *
- * Playable music requires an uploaded file (sources.upload) and either cleared
- * rights or pending library-import rights (tips held in escrow until claimed).
+ * Playable music requires an uploaded file (sources.upload) AND cleared rights.
+ * Pending library-import audio stays hosted for a later claim, but is not
+ * streamed and direct audio URLs are stripped from public API responses.
  * Podcast/spoken content may use other direct audio source keys.
  */
+
+const DIRECT_AUDIO_SOURCE_KEYS = ['upload', 'audio_direct', 'audio', 'enclosure'];
 
 function normalizeSources(sources) {
   if (!sources) return {};
@@ -45,12 +48,19 @@ function isPodcastLike(media) {
 }
 
 function hasDirectAudioSource(sources) {
-  return !!(
-    sources.upload ||
-    sources.audio_direct ||
-    sources.audio ||
-    sources.enclosure
-  );
+  const normalized = sources && typeof sources === 'object' && !Array.isArray(sources)
+    ? sources
+    : normalizeSources(sources);
+  return DIRECT_AUDIO_SOURCE_KEYS.some((key) => !!normalized[key]);
+}
+
+function stripDirectAudioSources(sources) {
+  const normalized = normalizeSources(sources);
+  const stripped = { ...normalized };
+  for (const key of DIRECT_AUDIO_SOURCE_KEYS) {
+    delete stripped[key];
+  }
+  return stripped;
 }
 
 function isYouTubeOnly(media) {
@@ -67,18 +77,11 @@ function isMediaPlayable(media) {
     return hasDirectAudioSource(sources);
   }
 
-  if (isPodcastLike(media)) {
-    return hasDirectAudioSource(sources);
-  }
-
-  if (media.rightsStatus === 'disputed') {
+  if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
     return false;
   }
-  if (media.rightsStatus === 'pending') {
-    return !!sources.upload;
-  }
 
-  return !!(sources.upload && (media.rightsCleared ?? true));
+  return !!(sources.upload && media.rightsCleared === true);
 }
 
 function getSupportMode(media) {
@@ -93,10 +96,11 @@ function getPlayabilityBlockReason(media) {
   if (!media || isMediaPlayable(media) || isPodcastLike(media)) return null;
 
   if (media.rightsStatus === 'disputed') return 'disputed';
-  if (media.rightsStatus === 'pending' && !media.rightsCleared) return 'rights';
+  if (media.rightsStatus === 'pending') return 'rights';
 
   const sources = normalizeSources(media.sources);
   if (!hasDirectAudioSource(sources)) return 'audio';
+  if (media.rightsCleared === false) return 'rights';
 
   return 'audio';
 }
@@ -106,25 +110,61 @@ function isRightsPendingClaimable(media) {
   return media.rightsStatus === 'pending' && !media.rightsCleared;
 }
 
-function enrichMediaWithPlayability(media) {
-  const playable = isMediaPlayable(media);
+/**
+ * Playability fields plus public-safe sources.
+ * Direct audio URLs are omitted unless the track is actually playable
+ * (or options.exposeDirectAudio is set for trusted admin responses).
+ */
+function enrichMediaWithPlayability(media, options = {}) {
+  const originalSources = normalizeSources(media?.sources);
+  const playable = isMediaPlayable({ ...media, sources: originalSources });
+  const podcast = isPodcastLike(media);
+  const hasHostedAudio = typeof media?.hasHostedAudio === 'boolean'
+    ? media.hasHostedAudio
+    : (!podcast && hasDirectAudioSource(originalSources));
+  const exposeDirectAudio = options.exposeDirectAudio === true || playable || podcast;
+  const clientSources = exposeDirectAudio
+    ? originalSources
+    : stripDirectAudioSources(originalSources);
+
   return {
     isPlayable: playable,
     supportMode: getSupportMode(media),
-    isYouTubeOnly: isYouTubeOnly(media),
-    awaitingUpload: !playable && !isPodcastLike(media),
-    playabilityBlockReason: getPlayabilityBlockReason(media),
+    isYouTubeOnly: isYouTubeOnly({ ...media, sources: originalSources }),
+    awaitingUpload: !playable && !podcast && !hasHostedAudio,
+    playabilityBlockReason: getPlayabilityBlockReason({ ...media, sources: originalSources }),
+    hasHostedAudio,
+    sources: clientSources,
   };
 }
 
+function availablePlatformsFromSources(sources) {
+  return Object.entries(sources || {})
+    .filter(([, url]) => !!url)
+    .map(([platform, url]) => ({ platform, url }));
+}
+
+/**
+ * Spread onto a media payload so callers cannot forget to sanitize sources.
+ */
+function toClientMedia(media, extra = {}, options = {}) {
+  if (!media) return media;
+  const playability = enrichMediaWithPlayability(media, options);
+  return { ...media, ...playability, ...extra };
+}
+
 module.exports = {
+  DIRECT_AUDIO_SOURCE_KEYS,
   normalizeSources,
   isPodcastLike,
   hasDirectAudioSource,
+  stripDirectAudioSources,
   isYouTubeOnly,
   isMediaPlayable,
   getSupportMode,
   getPlayabilityBlockReason,
   isRightsPendingClaimable,
   enrichMediaWithPlayability,
+  availablePlatformsFromSources,
+  toClientMedia,
 };

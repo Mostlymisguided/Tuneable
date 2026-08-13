@@ -14,7 +14,11 @@ const { getVideoDetails } = require('../services/youtubeService');
 const { isValidObjectId } = require('../utils/validators');
 const { broadcastToParty } = require('../utils/socketIO');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
-// const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
+const {
+  enrichMediaWithPlayability,
+  availablePlatformsFromSources,
+  normalizeSources,
+} = require('../utils/mediaPlayability');
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
@@ -1076,7 +1080,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay', // ✅ Updated to schema grammar field names
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay rightsStatus rightsCleared contentType contentForm', // ✅ Updated to schema grammar field names
                 populate: [
                     {
                         path: 'bids',
@@ -1183,18 +1187,14 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             if (!entry.mediaId) return null; // Edge case: skip invalid entries
 
             // ✅ Convert sources Map to plain object (for consistent frontend handling)
-            let sourcesObj = {};
-            if (entry.mediaId.sources) {
-                if (entry.mediaId.sources instanceof Map) {
-                    entry.mediaId.sources.forEach((value, key) => {
-                        if (value) sourcesObj[key] = value;
-                    });
-                } else if (typeof entry.mediaId.sources === 'object') {
-                    Object.entries(entry.mediaId.sources).forEach(([key, value]) => {
-                        if (value) sourcesObj[key] = value;
-                    });
-                }
-            }
+            const sourcesObj = normalizeSources(entry.mediaId.sources);
+            const playability = enrichMediaWithPlayability({
+              ...(typeof entry.mediaId.toObject === 'function' ? entry.mediaId.toObject() : entry.mediaId),
+              sources: sourcesObj,
+              rightsStatus: entry.mediaId.rightsStatus,
+              rightsCleared: entry.mediaId.rightsCleared,
+              contentForm: entry.mediaId.contentForm,
+            });
 
             return {
                 _id: entry.mediaId?._id || null,
@@ -1209,7 +1209,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 creatorDisplay: entry.mediaId.creatorDisplay, // Creator display string
                 duration: entry.mediaId.duration || '666',
                 coverArt: entry.mediaId.coverArt || DEFAULT_COVER_ART,
-                sources: sourcesObj, // ✅ Store sources as object { youtube: '...', upload: '...' }
+                sources: playability.sources,
                 globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0, // Global total (schema grammar)
                 partyMediaAggregate: entry.partyMediaAggregate || 0, // ✅ Party-media aggregate (schema grammar)
                 bids: entry.partyBids || [], // ✅ Use party-specific bids (PartyUserMediaAggregate) instead of global bids
@@ -1243,6 +1243,10 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 vetoedBy: entry.vetoedBy ? (typeof entry.vetoedBy === 'object' ? entry.vetoedBy.username : entry.vetoedBy) : null,
                 vetoedBy_uuid: entry.vetoedBy && typeof entry.vetoedBy === 'object' ? entry.vetoedBy.uuid : null,
                 vetoedReason: entry.vetoedReason,
+                rightsStatus: entry.mediaId.rightsStatus,
+                rightsCleared: entry.mediaId.rightsCleared,
+                contentForm: entry.mediaId.contentForm,
+                ...playability,
             };
         }).filter(Boolean); // ✅ Remove null entries (but keep vetoed media for frontend to display)
 
@@ -1531,7 +1535,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear primaryLocation'
+                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared'
                 });
         }
 
@@ -1565,6 +1569,10 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
             });
 
             if (hasMatch) {
+                const playability = enrichMediaWithPlayability({
+                    ...media,
+                    sources: normalizeSources(media.sources),
+                });
                 matchingMedia.push({
                     id: media._id,
                     uuid: media.uuid,
@@ -1574,12 +1582,15 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                         : 'Unknown Artist',
                     coverArt: media.coverArt,
                     duration: media.duration,
-                    sources: media.sources,
+                    sources: playability.sources,
                     globalMediaAggregate: media.globalMediaAggregate || 0,
                     partyMediaAggregate: mediaEntry.partyMediaAggregate || 0,
                     tags: media.tags,
                     category: media.category,
-                    status: mediaEntry.status
+                    status: mediaEntry.status,
+                    rightsStatus: media.rightsStatus,
+                    rightsCleared: media.rightsCleared,
+                    ...playability,
                 });
             }
         });
@@ -3847,7 +3858,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid featuring creatorDisplay',
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid featuring creatorDisplay rightsStatus rightsCleared contentType contentForm',
                     populate: [
                         {
                             path: 'bids',
@@ -3932,9 +3943,11 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 .map((entry) => {
                     if (!entry.mediaId) return null;
 
-                    const availablePlatforms = Object.entries(entry.mediaId.sources || {})
-                        .filter(([key, value]) => value)
-                        .map(([key, value]) => ({ platform: key, url: value }));
+                    const playability = enrichMediaWithPlayability({
+                        ...(typeof entry.mediaId.toObject === 'function' ? entry.mediaId.toObject() : entry.mediaId),
+                        sources: normalizeSources(entry.mediaId.sources),
+                    });
+                    const availablePlatforms = availablePlatformsFromSources(playability.sources);
 
                     const timePeriodBidValue = mediaBidValues[entry.mediaId._id.toString()] || 0;
 
@@ -3953,7 +3966,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                         creatorDisplay: entry.mediaId.creatorDisplay,
                         duration: entry.mediaId.duration,
                         coverArt: entry.mediaId.coverArt,
-                        sources: entry.mediaId.sources,
+                        sources: playability.sources,
                         availablePlatforms,
                         globalMediaAggregate: entry.mediaId.globalMediaAggregate || 0,
                         partyMediaAggregate: entry.partyMediaAggregate || 0,
@@ -3972,7 +3985,11 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                         completedAt: entry.completedAt,
                         vetoedAt: entry.vetoedAt,
                         vetoedBy: entry.vetoedBy,
-                        contentType: entry.contentType || 'music'
+                        contentType: entry.contentType || 'music',
+                        contentForm: entry.mediaId.contentForm,
+                        rightsStatus: entry.mediaId.rightsStatus,
+                        rightsCleared: entry.mediaId.rightsCleared,
+                        ...playability,
                     };
                 })
                 .filter(media => media !== null)

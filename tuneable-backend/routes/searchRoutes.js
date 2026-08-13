@@ -8,6 +8,7 @@ const { getQuotaStatus, getQuotaHistory, resetQuota } = require('../services/quo
 const authMiddleware = require('../middleware/authMiddleware');
 const { getCoverArtUrl, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { extractYouTubeVideoId, getYouTubeThumbnail } = require('../utils/youtubeUtils');
+const { enrichMediaWithPlayability, normalizeSources } = require('../utils/mediaPlayability');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
@@ -64,22 +65,11 @@ const searchLocalDatabase = async (query, source = 'musicbrainz', limit = 20) =>
 
         // Format results to match external API format
         const formattedResults = media.map(mediaItem => {
-            // Handle sources - it could be a Map, plain object, or undefined
-            let sources = {};
-            if (mediaItem.sources) {
-                try {
-                    // Try to convert to object if it's iterable
-                    if (typeof mediaItem.sources[Symbol.iterator] === 'function') {
-                        sources = Object.fromEntries(mediaItem.sources);
-                    } else if (typeof mediaItem.sources === 'object') {
-                        sources = mediaItem.sources;
-                    }
-                } catch (error) {
-                    console.log('Error processing sources for media:', mediaItem._id, error);
-                    // Fallback: try to access as plain object
-                    sources = mediaItem.sources || {};
-                }
-            }
+            const sources = normalizeSources(mediaItem.sources);
+            const playability = enrichMediaWithPlayability({
+                ...mediaItem,
+                sources,
+            });
 
             // Get primary artist name
             const artistName = Array.isArray(mediaItem.artist) && mediaItem.artist.length > 0
@@ -91,12 +81,15 @@ const searchLocalDatabase = async (query, source = 'musicbrainz', limit = 20) =>
                 uuid: mediaItem.uuid, // Include UUID for frontend
                 title: mediaItem.title,
                 artist: artistName,
-                coverArt: getCoverArtUrl(mediaItem, sources),
+                coverArt: getCoverArtUrl(mediaItem, playability.sources),
                 duration: mediaItem.duration || 0,
-                sources: sources,
+                sources: playability.sources,
                 globalMediaAggregate: mediaItem.globalMediaAggregate || 0,
                 addedBy: mediaItem.addedBy?.username || 'Unknown',
-                isLocal: true // Flag to indicate this is from our database
+                isLocal: true, // Flag to indicate this is from our database
+                rightsStatus: mediaItem.rightsStatus,
+                rightsCleared: mediaItem.rightsCleared,
+                ...playability,
             };
         });
 

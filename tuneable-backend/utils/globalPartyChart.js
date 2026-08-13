@@ -7,6 +7,10 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const { DEFAULT_COVER_ART } = require('./coverArtUtils');
+const {
+  enrichMediaWithPlayability,
+  availablePlatformsFromSources,
+} = require('./mediaPlayability');
 
 const GLOBAL_PARTY_TUNES_FILTER = {
   contentType: { $in: ['music'] },
@@ -39,6 +43,8 @@ const MEDIA_CHART_SELECT = [
   'contentType',
   'contentForm',
   'aiUsage',
+  'rightsStatus',
+  'rightsCleared',
 ].join(' ');
 
 const USER_PUBLIC_SELECT = 'username profilePic uuid homeLocation secondaryLocation';
@@ -64,6 +70,16 @@ function artistNameFromMedia(media) {
     return media.artist[0].name;
   }
   return media.artist || 'Unknown Artist';
+}
+
+function withPublicPlayability(media, sourcesObj) {
+  return enrichMediaWithPlayability({
+    ...media,
+    sources: sourcesObj,
+    contentForm: media.contentForm,
+    rightsStatus: media.rightsStatus,
+    rightsCleared: media.rightsCleared,
+  });
 }
 
 /**
@@ -505,11 +521,7 @@ async function fetchAllTimeGlobalChart({
   const chartMedia = mediaList.map((media) => {
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
     const aggregate = media.globalMediaAggregate || 0;
-    const sourcesObj = sourcesToObject(media.sources);
-    const availablePlatforms = Object.entries(sourcesObj).map(([platform, url]) => ({
-      platform,
-      url,
-    }));
+    const playability = withPublicPlayability(media, sourcesToObject(media.sources));
 
     return {
       _id: media._id,
@@ -522,8 +534,8 @@ async function fetchAllTimeGlobalChart({
       creatorDisplay: media.creatorDisplay,
       duration: media.duration || '666',
       coverArt: media.coverArt || DEFAULT_COVER_ART,
-      sources: sourcesObj,
-      availablePlatforms,
+      sources: playability.sources,
+      availablePlatforms: availablePlatformsFromSources(playability.sources),
       globalMediaAggregate: aggregate,
       partyMediaAggregate: aggregate,
       timePeriodBidValue: aggregate,
@@ -553,6 +565,10 @@ async function fetchAllTimeGlobalChart({
       vetoedBy_uuid: null,
       vetoedReason: null,
       contentType: media.contentType || 'music',
+      contentForm: media.contentForm,
+      rightsStatus: media.rightsStatus,
+      rightsCleared: media.rightsCleared,
+      ...playability,
     };
   });
 
@@ -743,11 +759,7 @@ async function fetchPeriodGlobalChart({
 
   const chartMedia = mediaList.map(({ media, timePeriodBidValue }) => {
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
-    const sourcesObj = sourcesToObject(media.sources);
-    const availablePlatforms = Object.entries(sourcesObj).map(([platform, url]) => ({
-      platform,
-      url,
-    }));
+    const playability = withPublicPlayability(media, sourcesToObject(media.sources));
 
     return {
       _id: media._id,
@@ -760,8 +772,8 @@ async function fetchPeriodGlobalChart({
       creatorDisplay: media.creatorDisplay,
       duration: media.duration,
       coverArt: media.coverArt || DEFAULT_COVER_ART,
-      sources: sourcesObj,
-      availablePlatforms,
+      sources: playability.sources,
+      availablePlatforms: availablePlatformsFromSources(playability.sources),
       globalMediaAggregate: media.globalMediaAggregate || 0,
       partyMediaAggregate: timePeriodBidValue,
       timePeriodBidValue,
@@ -790,6 +802,10 @@ async function fetchPeriodGlobalChart({
       vetoedAt: null,
       vetoedBy: null,
       contentType: media.contentType || 'music',
+      contentForm: media.contentForm,
+      rightsStatus: media.rightsStatus,
+      rightsCleared: media.rightsCleared,
+      ...playability,
     };
   });
 
