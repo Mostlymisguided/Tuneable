@@ -131,7 +131,7 @@ export function ChartTrackRow({
             {formatArtist(item.artist)}
           </Text>
           {showHint ? (
-            <Text style={styles.hint}>Catalog only — no upload yet</Text>
+            <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>
           ) : null}
         </Pressable>
         <View style={styles.right}>
@@ -234,7 +234,7 @@ export function ChartTrackRow({
                 {formatArtist(item.artist)}
               </Text>
               {showHint ? (
-                <Text style={styles.hint}>Catalog only — no upload yet</Text>
+                <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>
               ) : null}
             </Pressable>
             <Pressable
