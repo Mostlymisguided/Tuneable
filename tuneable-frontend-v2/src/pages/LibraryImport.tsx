@@ -396,23 +396,18 @@ const LibraryImport: React.FC = () => {
         toast.error('Upload a Rekordbox XML export first');
         return;
       }
-      if (selectedPlaylistPaths.length === 0 && rekordboxTrackCount > 200) {
-        toast.error('Select one or more playlists — this library is too large to scan in full');
-        return;
-      }
       setIsLoading(true);
       setProgressMessage('Starting Rekordbox scan…');
       setProgressCurrent(0);
       setProgressTotal(0);
       try {
-        const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
-        setLimit(capped);
         const started = await userAPI.startRekordboxImportPreview(
           rekordboxFile,
-          selectedPlaylistPaths,
-          capped
+          selectedPlaylistPaths
         );
-        const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress);
+        const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress, {
+          timeoutMs: 60 * 60 * 1000,
+        });
         setItems(data.items || []);
         setSummary(data.summary || null);
         setTipAmounts({});
@@ -512,7 +507,7 @@ const LibraryImport: React.FC = () => {
         failed: number;
         totalSpent: number;
         updatedBalance: number;
-      }>(started.jobId, applyJobProgress);
+      }>(started.jobId, applyJobProgress, source === 'rekordbox' ? { timeoutMs: 60 * 60 * 1000 } : undefined);
       setExecuteResult({
         tipped: result.tipped,
         skipped: result.skipped,
@@ -786,7 +781,7 @@ const LibraryImport: React.FC = () => {
       toast.error('Select at least one track');
       return;
     }
-    if (selectedItems.length > 100) {
+    if (source !== 'rekordbox' && selectedItems.length > 100) {
       toast.error('Maximum 100 tracks per import batch — deselect some and import the rest next');
       return;
     }
@@ -865,7 +860,7 @@ const LibraryImport: React.FC = () => {
     })));
     applyTipsToTargets(targets, tip);
 
-    if (targets.length > 100) {
+    if (source !== 'rekordbox' && targets.length > 100) {
       toast.error('Maximum 100 tracks per import batch — deselect some via Review');
       return;
     }
@@ -1086,8 +1081,8 @@ const LibraryImport: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
-                        disabled={isLoading || (selectedPlaylistPaths.length === 0 && rekordboxTrackCount > 200)}
+                        onClick={() => void scanLikes()}
+                        disabled={isLoading}
                         className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
                       >
                         {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
@@ -1473,7 +1468,7 @@ const LibraryImport: React.FC = () => {
 
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <div className="flex flex-wrap items-center gap-3">
-                {limit < MAX_SCAN_LIMIT ? (
+                {!isRekordbox && limit < MAX_SCAN_LIMIT ? (
                   <button
                     type="button"
                     onClick={() => void scanLikes(Math.min(MAX_SCAN_LIMIT, limit + SCAN_STEP))}
@@ -1483,6 +1478,7 @@ const LibraryImport: React.FC = () => {
                     {isLoading ? 'Scanning…' : `Load ${Math.min(SCAN_STEP, MAX_SCAN_LIMIT - limit)} more likes`}
                   </button>
                 ) : null}
+                {!isRekordbox ? (
                 <button
                   type="button"
                   onClick={() => setShowAdvancedLimit((v) => !v)}
@@ -1490,6 +1486,7 @@ const LibraryImport: React.FC = () => {
                 >
                   {showAdvancedLimit ? 'Hide scan options' : 'Custom scan limit'}
                 </button>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -1500,7 +1497,7 @@ const LibraryImport: React.FC = () => {
               </button>
             </div>
 
-            {showAdvancedLimit && (
+            {showAdvancedLimit && !isRekordbox && (
               <div className="bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-wrap items-end gap-3">
                 <label className="text-sm text-gray-400">
                   Likes to scan (max {MAX_SCAN_LIMIT})

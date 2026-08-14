@@ -24,7 +24,6 @@ const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 4000;
 const MATCH_CONCURRENCY = 8;
-const REKORDBOX_MAX_SCAN = 200;
 
 async function mapWithConcurrency(items, concurrency, mapper) {
   const list = items || [];
@@ -586,7 +585,7 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
     err.status = 400;
     throw err;
   }
-  if (selected.length > MAX_BATCH) {
+  if (selected.length > MAX_BATCH && importSource !== 'rekordbox') {
     const err = new Error(`Maximum ${MAX_BATCH} tracks per import batch`);
     err.status = 400;
     throw err;
@@ -952,7 +951,6 @@ async function attachLocalRekordboxAssets(items = []) {
 
 async function previewRekordboxImport(userId, xmlContent, {
   playlists = [],
-  limit = 50,
   onProgress,
 } = {}) {
   const report = typeof onProgress === 'function' ? onProgress : () => {};
@@ -973,18 +971,10 @@ async function previewRekordboxImport(userId, xmlContent, {
     throw err;
   }
 
-  const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), REKORDBOX_MAX_SCAN);
-  if (!playlists?.length && resolved.tracks.length > cappedLimit) {
-    const err = new Error(
-      `This XML has ${resolved.tracks.length} tracks. Select one or more playlists (or export a smaller playlist).`
-    );
-    err.status = 400;
-    throw err;
-  }
-
-  const sliced = resolved.tracks.slice(0, cappedLimit);
-  const tracks = sliced.map(convertRekordboxTrack).filter((t) => t.title && t.artist);
-  const skippedIncomplete = sliced.length - tracks.length;
+  const tracks = resolved.tracks
+    .map(convertRekordboxTrack)
+    .filter((t) => t.title && t.artist);
+  const skippedIncomplete = resolved.tracks.length - tracks.length;
 
   report({
     stage: 'fetching',
@@ -1020,5 +1010,4 @@ module.exports = {
   convertRekordboxTrack,
   MIN_TIP,
   MAX_BATCH,
-  REKORDBOX_MAX_SCAN,
 };

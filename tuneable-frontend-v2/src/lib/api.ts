@@ -1634,13 +1634,11 @@ export const userAPI = {
 
   startRekordboxImportPreview: async (
     libraryXmlFile: File,
-    playlists: string[],
-    limit = 50
+    playlists: string[]
   ) => {
     const formData = new FormData();
     formData.append('libraryXmlFile', libraryXmlFile);
     formData.append('playlists', JSON.stringify(playlists));
-    formData.append('limit', String(limit));
     const response = await api.post('/users/me/import/rekordbox/preview/start', formData);
     return response.data as { jobId: string; status: string };
   },

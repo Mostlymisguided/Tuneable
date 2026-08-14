@@ -1788,12 +1788,10 @@ router.post(
         return res.status(400).json({ error: 'libraryXmlFile is required' });
       }
       const playlists = parseRekordboxPlaylistsField(req.body?.playlists);
-      const limit = req.body?.limit ?? req.query.limit;
       const libraryImportJobService = require('../services/libraryImportJobService');
       const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'rekordbox', {
         xmlContent: req.file.buffer.toString('utf8'),
         playlists,
-        limit,
       });
       res.status(202).json({ jobId, status: 'queued' });
     } catch (error) {
