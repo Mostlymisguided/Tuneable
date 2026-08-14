@@ -98,6 +98,10 @@ const DEFAULT_SCAN_LIMIT = 50;
 const SCAN_STEP = 50;
 const MAX_SCAN_LIMIT = 200;
 
+function importAutoScanStorageKey(source: ImportSource) {
+  return `tuneable:import-autoscanned:${source}`;
+}
+
 const STATUS_LABELS: Record<MatchStatus, string> = {
   in_library: 'In your library',
   on_catalog: 'On Tuneable',
@@ -208,6 +212,10 @@ const LibraryImport: React.FC = () => {
   const isRekordbox = source === 'rekordbox';
   const isConnected = source === 'spotify' ? spotifyConnected : source === 'soundcloud' ? soundcloudConnected : true;
   const oauthHandledRef = React.useRef(false);
+  const autoScanStartedRef = React.useRef(false);
+  const [shouldAutoScan, setShouldAutoScan] = useState(
+    () => searchParams.get('autoScan') === '1' || searchParams.get('oauth_success') === 'true'
+  );
 
   const checkConnections = useCallback(async () => {
     try {
@@ -215,11 +223,17 @@ const LibraryImport: React.FC = () => {
         userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
         userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
       ]);
-      setSpotifyConnected(!!spotify.connected);
-      setSoundcloudConnected(!!soundcloud.connected);
+      const next = {
+        spotify: !!spotify.connected,
+        soundcloud: !!soundcloud.connected,
+      };
+      setSpotifyConnected(next.spotify);
+      setSoundcloudConnected(next.soundcloud);
+      return next;
     } catch {
       setSpotifyConnected(false);
       setSoundcloudConnected(false);
+      return { spotify: false, soundcloud: false };
     }
   }, []);
 
@@ -254,8 +268,10 @@ const LibraryImport: React.FC = () => {
         const next = new URLSearchParams(searchParams);
         next.delete('token');
         next.delete('oauth_success');
+        if (!next.get('autoScan')) next.set('autoScan', '1');
         setSearchParams(next, { replace: true });
-        toast.success('Account connected — ready to scan your likes');
+        setShouldAutoScan(true);
+        toast.success('Account connected — scanning your likes');
       })
       .catch(() => {
         oauthHandledRef.current = false;
@@ -328,8 +344,13 @@ const LibraryImport: React.FC = () => {
 
   const connectSource = () => {
     if (source === 'rekordbox') return;
+    try {
+      sessionStorage.removeItem(importAutoScanStorageKey(source));
+    } catch {
+      // ignore
+    }
     const token = localStorage.getItem('token') || undefined;
-    const returnPath = `/import?source=${source}`;
+    const returnPath = `/import?source=${source}&autoScan=1`;
     const redirect = `${window.location.origin}/auth/callback?oauth_success=true&returnUrl=${encodeURIComponent(returnPath)}`;
 
     if (source === 'soundcloud') {
@@ -450,6 +471,29 @@ const LibraryImport: React.FC = () => {
       setProgressTotal(0);
     }
   };
+
+  useEffect(() => {
+    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox) return;
+    if (autoScanStartedRef.current || isLoading) return;
+    try {
+      if (sessionStorage.getItem(importAutoScanStorageKey(source))) return;
+      sessionStorage.setItem(importAutoScanStorageKey(source), '1');
+    } catch {
+      // Private mode — fall through with the in-memory ref only
+    }
+    autoScanStartedRef.current = true;
+    setShouldAutoScan(false);
+    const next = new URLSearchParams(searchParams);
+    if (next.has('autoScan') || next.has('oauth_success') || next.has('token')) {
+      next.delete('autoScan');
+      next.delete('oauth_success');
+      next.delete('token');
+      setSearchParams(next, { replace: true });
+    }
+    void scanLikes(DEFAULT_SCAN_LIMIT);
+    // scanLikes is recreated each render; autoScanStartedRef prevents a loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldAutoScan, isConnected, step, isRekordbox, isLoading, source]);
 
   const runExecuteJob = async (payload: Array<Record<string, unknown>>, tip: number) => {
     setIsExecuting(true);

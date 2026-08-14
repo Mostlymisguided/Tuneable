@@ -165,6 +165,7 @@ const OnboardingRedirect = () => {
 
   const exemptPrefixes = [
     '/onboarding',
+    '/import',
     '/login',
     '/register',
     '/auth/callback',

@@ -61,6 +61,21 @@ export function needsOnboarding(user: OnboardingUser | null | undefined): boolea
   return true;
 }
 
+/** Map an /import return into the onboarding import step so OAuth does not restart the wizard. */
+function importReturnToOnboarding(returnUrl: string): string {
+  try {
+    const parsed = new URL(returnUrl, 'http://local.invalid');
+    const params = new URLSearchParams({ step: 'import' });
+    const source = parsed.searchParams.get('source');
+    if (source === 'spotify' || source === 'soundcloud') {
+      params.set('source', source);
+    }
+    return `${ONBOARDING_PATH}?${params.toString()}`;
+  } catch {
+    return `${ONBOARDING_PATH}?step=import`;
+  }
+}
+
 export function getPostAuthPath(
   user: OnboardingUser | null | undefined,
   returnUrl?: string | null
@@ -68,6 +83,9 @@ export function getPostAuthPath(
   if (needsOnboarding(user)) {
     if (returnUrl && returnUrl.startsWith('/onboarding')) {
       return sanitizeReturnUrl(returnUrl, ONBOARDING_PATH);
+    }
+    if (returnUrl && returnUrl.startsWith('/import')) {
+      return importReturnToOnboarding(returnUrl);
     }
     return ONBOARDING_PATH;
   }

@@ -1070,9 +1070,9 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
     (req, res, next) => {
       passport.authenticate('spotify', { session: false }, (err, user) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const baseRedirect = req.session?.oauthRedirect
-          ? decodeURIComponent(req.session.oauthRedirect)
-          : `${frontendUrl}/auth/callback`;
+        // Express already decodes query params once — do not decodeURIComponent again
+        // or nested returnUrl values (%2Fonboarding%3Fstep%3Dimport%26source%3Dspotify) get corrupted.
+        const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
         const clearSpotifySession = () => {
           if (!req.session) return;
           delete req.session.oauthRedirect;
@@ -1117,9 +1117,7 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           SECRET_KEY,
           { expiresIn: '24h' }
         );
-        const baseRedirect = req.session?.oauthRedirect
-          ? decodeURIComponent(req.session.oauthRedirect)
-          : `${frontendUrl}/auth/callback`;
+        const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
         if (req.session) {
           delete req.session.oauthRedirect;
           delete req.session.linkAccount;

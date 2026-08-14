@@ -355,6 +355,20 @@ export default function OnboardingScreen() {
     }
   };
 
+  const handleImportSourcePress = (source: ImportSource) => {
+    const connected =
+      source === 'soundcloud' ? soundcloudConnected : spotifyConnected;
+    if (connected) {
+      if (importSource === source) {
+        void loadImportPreview(source);
+        return;
+      }
+      goToStep('import', source);
+      return;
+    }
+    void connectImportSource(source);
+  };
+
   const runQuickImport = async () => {
     setImportLoading(true);
     setImportProgress('Preparing import…');
@@ -668,27 +682,33 @@ export default function OnboardingScreen() {
                   </View>
                 </View>
 
-                {!params.source ? (
+                {!importLoading && !importPreview && !params.source ? (
                   <View style={styles.importGrid}>
                     <Pressable
                       style={[styles.importCard, styles.spotifyCard]}
                       disabled={busy}
-                      onPress={() => void connectImportSource('spotify')}>
-                      <Text style={styles.importTitle}>Connect Spotify</Text>
+                      onPress={() => handleImportSourcePress('spotify')}>
+                      <Text style={styles.importTitle}>
+                        {spotifyConnected ? 'Import from Spotify' : 'Connect Spotify'}
+                      </Text>
                       <Text style={styles.importSub}>
                         {spotifyConnected
-                          ? 'Connected — tap to reconnect'
+                          ? 'Connected — tap to scan your likes'
                           : 'Import your saved tracks'}
                       </Text>
                     </Pressable>
                     <Pressable
                       style={[styles.importCard, styles.soundcloudCard]}
                       disabled={busy}
-                      onPress={() => void connectImportSource('soundcloud')}>
-                      <Text style={styles.importTitleSc}>Connect SoundCloud</Text>
+                      onPress={() => handleImportSourcePress('soundcloud')}>
+                      <Text style={styles.importTitleSc}>
+                        {soundcloudConnected
+                          ? 'Import from SoundCloud'
+                          : 'Connect SoundCloud'}
+                      </Text>
                       <Text style={styles.importSub}>
                         {soundcloudConnected
-                          ? 'Connected — tap to reconnect'
+                          ? 'Connected — tap to scan your likes'
                           : 'Import your liked tracks'}
                       </Text>
                     </Pressable>
@@ -733,13 +753,16 @@ export default function OnboardingScreen() {
                         </Pressable>
                       </>
                     ) : (
-                      <Text style={styles.hint}>
-                        Connect{' '}
-                        {importSource === 'soundcloud'
-                          ? 'SoundCloud'
-                          : 'Spotify'}{' '}
-                        to preview your import.
-                      </Text>
+                      <View style={styles.previewLoading}>
+                        <ActivityIndicator color={colors.accentLight} />
+                        <Text style={styles.hint}>
+                          Scanning your{' '}
+                          {importSource === 'soundcloud'
+                            ? 'SoundCloud'
+                            : 'Spotify'}{' '}
+                          likes…
+                        </Text>
+                      </View>
                     )}
                   </View>
                 )}

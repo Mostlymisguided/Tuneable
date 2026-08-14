@@ -180,13 +180,13 @@ const Onboarding: React.FC = () => {
   useEffect(() => {
     if (step !== 'import') return;
     const sourceParam = searchParams.get('source');
-    if (!sourceParam) return;
+    if (sourceParam !== 'spotify' && sourceParam !== 'soundcloud') return;
 
     void (async () => {
       const connections = await checkConnections();
       const connected = sourceParam === 'soundcloud' ? connections.soundcloud : connections.spotify;
       if (connected) {
-        await loadImportPreview(sourceParam as ImportSource);
+        await loadImportPreview(sourceParam);
       }
     })();
   }, [step, searchParams, checkConnections, loadImportPreview]);
@@ -310,6 +310,26 @@ const Onboarding: React.FC = () => {
       || 'http://localhost:8000';
     const redirectUrl = encodeURIComponent(redirect);
     window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+  };
+
+  const startImportFromSource = (source: ImportSource) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('step', 'import');
+    params.set('source', source);
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleSourceCardClick = (source: ImportSource) => {
+    const connected = source === 'soundcloud' ? soundcloudConnected : spotifyConnected;
+    if (connected) {
+      if (searchParams.get('source') === source) {
+        void loadImportPreview(source);
+        return;
+      }
+      startImportFromSource(source);
+      return;
+    }
+    connectImportSource(source);
   };
 
   const runQuickImport = async () => {
@@ -592,34 +612,38 @@ const Onboarding: React.FC = () => {
               </div>
             </div>
 
-            {!searchParams.get('source') && (
+            {!isImportLoading && !importPreview && !searchParams.get('source') && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => connectImportSource('spotify')}
+                  onClick={() => handleSourceCardClick('spotify')}
                   disabled={isSaving || isImportLoading}
                   className="rounded-xl border border-green-700/50 bg-green-900/20 p-5 text-left transition-colors hover:bg-green-900/30"
                 >
-                  <p className="font-semibold text-green-300">Connect Spotify</p>
+                  <p className="font-semibold text-green-300">
+                    {spotifyConnected ? 'Import from Spotify' : 'Connect Spotify'}
+                  </p>
                   <p className="mt-1 text-sm text-gray-400">
-                    {spotifyConnected ? 'Connected — tap to reconnect' : 'Import your saved tracks'}
+                    {spotifyConnected ? 'Connected — tap to scan your likes' : 'Import your saved tracks'}
                   </p>
                 </button>
                 <button
                   type="button"
-                  onClick={() => connectImportSource('soundcloud')}
+                  onClick={() => handleSourceCardClick('soundcloud')}
                   disabled={isSaving || isImportLoading}
                   className="rounded-xl border border-orange-700/50 bg-orange-900/20 p-5 text-left transition-colors hover:bg-orange-900/30"
                 >
-                  <p className="font-semibold text-orange-300">Connect SoundCloud</p>
+                  <p className="font-semibold text-orange-300">
+                    {soundcloudConnected ? 'Import from SoundCloud' : 'Connect SoundCloud'}
+                  </p>
                   <p className="mt-1 text-sm text-gray-400">
-                    {soundcloudConnected ? 'Connected — tap to reconnect' : 'Import your liked tracks'}
+                    {soundcloudConnected ? 'Connected — tap to scan your likes' : 'Import your liked tracks'}
                   </p>
                 </button>
               </div>
             )}
 
-            {searchParams.get('source') && (
+            {(isImportLoading || importPreview || searchParams.get('source')) && (
               <div className="rounded-xl border border-gray-700 bg-black/30 p-5">
                 {isImportLoading && !importPreview ? (
                   <div className="flex items-center gap-2 text-gray-400">
@@ -667,10 +691,25 @@ const Onboarding: React.FC = () => {
                       Review all tracks before importing →
                     </button>
                   </div>
+                ) : (importSource === 'soundcloud' ? soundcloudConnected : spotifyConnected) ? (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Scanning your {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} likes…
+                  </div>
                 ) : (
-                  <p className="text-sm text-gray-400">
-                    Connect {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} to preview your import.
-                  </p>
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-400">
+                      Connect {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} to preview your import.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => connectImportSource(importSource)}
+                      disabled={isSaving || isImportLoading}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+                    >
+                      Connect {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
