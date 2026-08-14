@@ -120,6 +120,79 @@ function mediaMatchesBpmFilter(item: any, range: BpmFilterRange): boolean {
   return true;
 }
 
+function partyItemMedia(item: any) {
+  return item?.mediaId || item;
+}
+
+function normalizePlayerSources(raw: any): Record<string, string> {
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    const sources: Record<string, string> = {};
+    for (const source of raw) {
+      if (!source) continue;
+      if (source.platform === '$__parent' && source.url?.sources) {
+        return normalizePlayerSources(source.url.sources);
+      }
+      if (source.platform && source.url) {
+        sources[source.platform] = source.url;
+      } else if (source.youtube) {
+        sources.youtube = source.youtube;
+      } else if (source.upload) {
+        sources.upload = source.upload;
+      }
+    }
+    return sources;
+  }
+  if (typeof raw === 'object') {
+    return { ...raw };
+  }
+  return {};
+}
+
+/** Map a party/chart row into web-player shape, keeping playability fields the player checks. */
+function toPlayerQueueItem(item: any) {
+  const mediaData = partyItemMedia(item);
+  const sources = normalizePlayerSources(mediaData?.sources);
+  return {
+    id: mediaData?._id || mediaData?.id || mediaData?.uuid,
+    _id: mediaData?._id || mediaData?.id || mediaData?.uuid,
+    title: mediaData?.title,
+    artist: Array.isArray(mediaData?.artist)
+      ? mediaData.artist[0]?.name || 'Unknown Artist'
+      : mediaData?.artist,
+    artists: Array.isArray(mediaData?.artist) ? mediaData.artist : (mediaData?.artists || []),
+    featuring: mediaData?.featuring || [],
+    creatorDisplay: mediaData?.creatorDisplay,
+    duration: mediaData?.duration,
+    coverArt: mediaData?.coverArt,
+    sources,
+    globalMediaAggregate: typeof mediaData?.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
+    partyMediaAggregate: typeof item?.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+    totalBidValue: typeof item?.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
+    // Never copy bid arrays into the player — all-time charts make this huge and loop-prone
+    bids: [],
+    addedBy: typeof mediaData?.addedBy === 'object'
+      ? mediaData.addedBy?.username || 'Unknown'
+      : mediaData?.addedBy,
+    rightsCleared: mediaData?.rightsCleared,
+    rightsStatus: mediaData?.rightsStatus,
+    isPlayable: mediaData?.isPlayable,
+    contentForm: mediaData?.contentForm,
+  };
+}
+
+function isPartyItemPlayable(item: any): boolean {
+  return isMediaPlayable(enrichMediaWithPlayability(partyItemMedia(item)));
+}
+
+function buildPlayablePlayerQueue(items: any[]) {
+  return items.filter(isPartyItemPlayable).map(toPlayerQueueItem);
+}
+
+function playerQueueKey(queue: Array<{ id?: string; _id?: string }>) {
+  return queue.map((m) => String(m._id || m.id || '')).join('|');
+}
+
 function getPeriodStartDate(period: string): Date | null {
   const now = Date.now();
   const day = 24 * 60 * 60 * 1000;
@@ -263,19 +336,16 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Scroll helper removed (no longer used)
 
-  // Use global WebPlayer store
-  const {
-    setCurrentMedia,
-    isHost,
-    setIsHost,
-    setQueue,
-    setWebSocketSender,
-    setCurrentPartyId,
-    setGlobalPlayerActive,
-    currentPartyId,
-    currentMedia,
-    play,
-  } = useWebPlayerStore();
+  // Subscribe only to the slices this page reads — the full store also ticks currentTime
+  const isHost = useWebPlayerStore((s) => s.isHost);
+  const currentMedia = useWebPlayerStore((s) => s.currentMedia);
+  const setCurrentMedia = useWebPlayerStore((s) => s.setCurrentMedia);
+  const setIsHost = useWebPlayerStore((s) => s.setIsHost);
+  const setQueue = useWebPlayerStore((s) => s.setQueue);
+  const setWebSocketSender = useWebPlayerStore((s) => s.setWebSocketSender);
+  const setCurrentPartyId = useWebPlayerStore((s) => s.setCurrentPartyId);
+  const setGlobalPlayerActive = useWebPlayerStore((s) => s.setGlobalPlayerActive);
+  const play = useWebPlayerStore((s) => s.play);
 
   // Use Socket.IO for real-time party updates
   const { sendMessage } = useSocketIOParty({
@@ -523,109 +593,21 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Manual refresh only for remote parties (no automatic polling)
   // Remote parties will refresh on user actions (bids, adds, skips) and manual refresh button
 
-  // Set current media and host status when party loads
+  // Host + player party context only. Queue sync lives in the display-media effect
+  // so we don't dump the unfiltered all-time chart into the player (and loop).
   useEffect(() => {
-    console.log('Party useEffect triggered - party:', !!party, 'media:', party?.media?.length, 'currentPartyId:', currentPartyId, 'partyId:', partyId);
-    
-    if (party && getPartyMedia().length > 0) {
-      // Always update the global player queue when party data loads
-      // This ensures the queue is updated even if it's the "same" party (e.g., on page reload)
-      console.log('Updating global player queue for party:', partyId);
-        
-        // Filter to only include active, playable media for the WebPlayer
-        const queuedMedia = getPartyMedia().filter((item: any) => {
-          if (item.status !== 'active') return false;
-          const actualMedia = item.mediaId || item;
-          return isMediaPlayable(enrichMediaWithPlayability(actualMedia));
-        });
-        console.log('Queued media for WebPlayer:', queuedMedia.length);
-        console.log('All party media statuses:', getPartyMedia().map((s: any) => ({ title: s.mediaId?.title, status: s.status })));
-        
-        // Clean and set the queue in global store
-        const cleanedQueue = queuedMedia.map((item: any) => {
-          const actualMedia = item.mediaId || item;
-          let sources = {};
-          
-          if (actualMedia.sources) {
-            if (Array.isArray(actualMedia.sources)) {
-              for (const source of actualMedia.sources) {
-                if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                  // Handle Mongoose metadata corruption
-                  sources = source.url.sources;
-                  break;
-                } else if (source && source.platform === 'youtube' && source.url) {
-                  (sources as any).youtube = source.url;
-                } else if (source?.youtube) {
-                  (sources as any).youtube = source.youtube;
-                }
-              }
-            } else if (typeof actualMedia.sources === 'object') {
-              // Preserve the original sources object
-              sources = actualMedia.sources;
-            }
-          }
-          
-          return {
-            id: actualMedia._id || actualMedia.id || actualMedia.uuid, // Prefer ObjectId first
-            title: actualMedia.title,
-            artist: Array.isArray(actualMedia.artist) ? actualMedia.artist[0]?.name || 'Unknown Artist' : actualMedia.artist,
-            artists: Array.isArray(actualMedia.artist) ? actualMedia.artist : (actualMedia.artists || []), // Preserve full artist array with userIds for ClickableArtistDisplay
-            featuring: actualMedia.featuring || [],
-            creatorDisplay: actualMedia.creatorDisplay,
-            duration: actualMedia.duration,
-            coverArt: actualMedia.coverArt,
-            sources: sources,
-            globalMediaAggregate: typeof actualMedia.globalMediaAggregate === 'number' ? actualMedia.globalMediaAggregate : 0,
-            globalMediaAggregateTop: typeof actualMedia.globalMediaAggregateTop === 'number' ? actualMedia.globalMediaAggregateTop : (typeof item.globalMediaAggregateTop === 'number' ? item.globalMediaAggregateTop : 0),
-            globalMediaAggregateTopUser: actualMedia.globalMediaAggregateTopUser || item.globalMediaAggregateTopUser || null,
-            partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-            totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0, // Use partyMediaAggregate as totalBidValue
-            bids: item.partyBids || item.bids || actualMedia.bids || [], // Use party-specific bids (PartyUserMediaAggregate) if available, fallback to global bids
-            addedBy: typeof actualMedia.addedBy === 'object' ? actualMedia.addedBy?.username || 'Unknown' : actualMedia.addedBy
-          };
-        });
-        
-        setQueue(cleanedQueue);
-        setCurrentPartyId(partyId!);
-        setGlobalPlayerActive(true);
-        
-      // Only set media if web player is empty (no current media)
-      // This preserves playback across page loads/navigation
-      // No autoplay - user must manually start playback
-      if (cleanedQueue.length > 0) {
-        if (!currentMedia) {
-          // Web player is empty - set media but don't autoplay
-          console.log('Web player is empty, setting current media to:', cleanedQueue[0].title);
-          setCurrentMedia(cleanedQueue[0], 0); // No autoplay - user starts manually
-        } else {
-          // Web player already has media - preserve it, don't interrupt
-          console.log('Web player already has media, preserving playback:', currentMedia.title);
-          // Queue is still updated above, so when current media ends, party queue will continue
-        }
-      } else {
-        // If no queued media, only clear if web player is empty
-        // Don't interrupt existing playback from other parties/sources
-        if (!currentMedia) {
-          console.log('No queued media and web player is empty, clearing WebPlayer');
-          setCurrentMedia(null, 0);
-        } else {
-          console.log('No queued media but web player is active, preserving playback:', currentMedia.title);
-        }
-      }
-    }
-    
-    if (user && party) {
-      // Use UUID comparison for consistency
-      // Now that backend populates host.uuid, we can directly access it
-      const hostUuid = typeof party.host === 'object' && party.host.uuid 
-                       ? party.host.uuid 
-                       : party.host;
+    if (!party || !partyId) return;
+    setCurrentPartyId(partyId);
+    setGlobalPlayerActive(true);
+
+    if (user) {
+      const hostUuid = typeof party.host === 'object' && party.host.uuid
+        ? party.host.uuid
+        : party.host;
       const userUuid = user._id || user.id || (user as any).uuid;
-      const checkIsHost = userUuid === hostUuid;
-      setIsHost(checkIsHost);
-      console.log('🔍 isHost check:', { userUuid, hostUuid, isHost: checkIsHost, partyHost: party.host });
+      setIsHost(userUuid === hostUuid);
     }
-  }, [party, user, partyId, currentPartyId, currentMedia, setQueue, setCurrentMedia, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
+  }, [party, user, partyId, setIsHost, setCurrentPartyId, setGlobalPlayerActive]);
 
   // Clear library search results when search query is cleared
   useEffect(() => {
@@ -639,76 +621,27 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Update WebPlayer queue when sorting or tag filtering changes
   useEffect(() => {
-    if (party) {
-      // Use getDisplayMedia() to respect both time sorting AND tag filtering;
-      // only enqueue playable tracks so auto-advance never stalls.
-      const displayMedia = getDisplayMedia().filter((item: any) => {
-        const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
-        return isMediaPlayable(enrichMediaWithPlayability(mediaData));
-      });
-      
-      if (displayMedia.length > 0) {
-        console.log('Updating WebPlayer queue with filtered display media:', displayMedia.length);
-        
-        // Clean and set the queue in global store
-        const cleanedQueue = displayMedia.map((item: any) => {
-          // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
-          const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
-          
-          // Clean and format sources
-          let sources = {};
-          
-          if (mediaData.sources) {
-            if (Array.isArray(mediaData.sources)) {
-              for (const source of mediaData.sources) {
-                if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-                  // Handle Mongoose metadata corruption
-                  sources = source.url.sources;
-                  break;
-                } else if (source && source.platform === 'youtube' && source.url) {
-                  (sources as any).youtube = source.url;
-                } else if (source?.youtube) {
-                  (sources as any).youtube = source.youtube;
-                }
-              }
-            } else if (typeof mediaData.sources === 'object') {
-              sources = mediaData.sources;
-            }
-          }
-          
-          return {
-            id: mediaData._id || mediaData.id || mediaData.uuid,
-            _id: mediaData._id || mediaData.id || mediaData.uuid,
-            title: mediaData.title,
-            artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
-            artists: Array.isArray(mediaData.artist) ? mediaData.artist : (mediaData.artists || []),
-            featuring: mediaData.featuring || [],
-            creatorDisplay: mediaData.creatorDisplay,
-            duration: mediaData.duration,
-            coverArt: mediaData.coverArt,
-            sources: sources,
-            globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
-            partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-            totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-            bids: item.partyBids || item.bids || mediaData.bids || [],
-            addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
-          };
-        });
-        
-        setQueue(cleanedQueue);
-        
-        // If there is media and no current media, set the first one
-        if (cleanedQueue.length > 0 && !currentMedia) {
-          setCurrentMedia(cleanedQueue[0], 0);
-        }
-      } else {
-        // If no display media, clear queue only if web player is empty
-        if (!currentMedia) {
-          setQueue([]);
-        }
+    if (!party) return;
+    // Don't wipe the player while the period/location chart is still loading
+    if (useSortedQueue && isLoadingSortedMedia && sortedMedia.length === 0) return;
+
+    const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
+    const store = useWebPlayerStore.getState();
+
+    if (playerQueueKey(store.queue) !== playerQueueKey(cleanedQueue)) {
+      setQueue(cleanedQueue);
+    }
+
+    // Only seed the player with a track the player itself considers playable.
+    // Dropping rightsCleared on mapped items used to ping-pong with ensureCurrentPlayable
+    // (React error #185 / blank screen on all-time global).
+    if (cleanedQueue.length > 0 && !store.currentMedia) {
+      const firstPlayableIndex = cleanedQueue.findIndex((m) => isMediaPlayable(m));
+      if (firstPlayableIndex >= 0) {
+        setCurrentMedia(cleanedQueue[firstPlayableIndex], firstPlayableIndex);
       }
     }
-  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, bpmFilterRange, setQueue, setCurrentMedia, currentMedia]);
+  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, bpmFilterRange, useSortedQueue, isLoadingSortedMedia, setQueue, setCurrentMedia]);
 
   const fetchPartyDetails = async () => {
     try {
@@ -1608,81 +1541,58 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Removed TuneBytes/user profile fetch for simplicity and performance
 
   // Get media to display based on selected time period and search terms
-  const getDisplayMedia = () => {
+  const displayMedia = useMemo(() => {
     let media;
     if (useSortedQueue) {
-      // Time-sorted queue, or all-time with a location filter (server re-aggregates tips)
-      media = sortedMedia.filter((item: any) => {
-        const isActive = item.status === 'active';
-        if (!isActive && item.status === 'vetoed') {
-          console.log('🚫 Filtering out vetoed sorted media:', item.title, 'status:', item.status);
-        }
-        return isActive;
-      });
+      media = sortedMedia.filter((item: any) => item.status === 'active');
     } else {
-      // All-time without location filter — use full party queue
-      const allMedia = getPartyMedia();
-      media = allMedia.filter((item: any) => {
-        const isActive = item.status === 'active';
-        if (!isActive && item.status === 'vetoed') {
-          console.log('🚫 Filtering out vetoed media:', (item.mediaId || item)?.title, 'status:', item.status);
-        }
-        return isActive;
-      });
+      media = getPartyMedia().filter((item: any) => item.status === 'active');
     }
-    
-    // Live searchQuery filters the queue below; library results use explicit Search library / Enter
-    // Apply search filter: stored terms (pills) + current typing (live filter)
+
     const liveTerm = searchQuery.trim();
     const allTerms = liveTerm ? [...queueSearchTerms, liveTerm] : queueSearchTerms;
-    
+
     if (allTerms.length > 0) {
       media = media.filter((item: any) => {
         const mediaItem = item.mediaId || item;
-        
-        // Separate regular search terms and tag search terms
+
         const regularTerms = allTerms.filter(term => !term.startsWith('#'));
         const tagTerms = allTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
-        
-        // Check if ANY regular search term matches title, artist, or category
+
         const matchesRegularSearch = regularTerms.length === 0 || regularTerms.some(term => {
           const lowerTerm = term.toLowerCase();
           const title = (mediaItem.title || '').toLowerCase();
-          const artist = Array.isArray(mediaItem.artist) 
+          const artist = Array.isArray(mediaItem.artist)
             ? mediaItem.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
             : (mediaItem.artist || '').toLowerCase();
           const category = (mediaItem.category || '').toLowerCase();
-          
-          return title.includes(lowerTerm) || 
-                 artist.includes(lowerTerm) || 
+
+          return title.includes(lowerTerm) ||
+                 artist.includes(lowerTerm) ||
                  category.includes(lowerTerm);
         });
-        
-        // Check if ANY tag search term matches tags (using canonical tag matching)
+
         const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
           const canonicalSearchTag = getCanonicalTag(tagTerm);
-          const tags = Array.isArray(mediaItem.tags) 
+          const tags = Array.isArray(mediaItem.tags)
             ? mediaItem.tags.map((tag: any) => tag && typeof tag === 'string' ? getCanonicalTag(tag) : '').filter((t: string) => t)
             : [];
-          
+
           return tags.some((tag: string) => tag === canonicalSearchTag);
         });
-        
-        // Both regular search and tag search must match (if they exist)
+
         return matchesRegularSearch && matchesTagSearch;
       });
-      
-      if (queueSearchTerms.length > 0 || liveTerm) {
-        console.log(`🔍 Filtered queue: ${media.length} media items match search terms:`, allTerms);
-      }
     }
 
     if (bpmFilterRange !== 'all') {
       media = media.filter((item: any) => mediaMatchesBpmFilter(item, bpmFilterRange));
     }
-    
+
     return media;
-  };
+  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange]);
+
+  const getDisplayMedia = () => displayMedia;
 
   // Helper function to calculate average bid for media (returns in pounds)
   // Uses PartyMediaBidAvg (party-specific average) when partyMediaEntry is provided
@@ -2157,145 +2067,47 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Handle clicking play button on media in the queue
   const handlePlayMedia = (item: any, index: number) => {
-    // Get the filtered display media to set as the queue
-    const displayMedia = getDisplayMedia().filter((displayItem: any) => {
-      const mediaData = selectedTimePeriod === 'all-time' ? (displayItem.mediaId || displayItem) : displayItem;
-      return isMediaPlayable(enrichMediaWithPlayability(mediaData));
-    });
-    
-    if (displayMedia.length === 0) {
+    const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
+
+    if (cleanedQueue.length === 0) {
       toast.info('No playable tracks in this list — tip on tracks awaiting rights or audio, or wait for audio to be added.');
       return;
     }
-    
-    // Format all displayed media into queue format (same as handlePlayQueue)
-    const cleanedQueue = displayMedia.map((displayItem: any) => {
-      // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
-      const mediaData = selectedTimePeriod === 'all-time' ? (displayItem.mediaId || displayItem) : displayItem;
-      
-      // Clean and format sources
-      let sources = {};
-      
-      if (mediaData.sources) {
-        if (Array.isArray(mediaData.sources)) {
-          for (const source of mediaData.sources) {
-            if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-              // Handle Mongoose metadata corruption
-              sources = source.url.sources;
-              break;
-            } else if (source && source.platform === 'youtube' && source.url) {
-              (sources as any).youtube = source.url;
-            } else if (source?.youtube) {
-              (sources as any).youtube = source.youtube;
-            }
-          }
-        } else if (typeof mediaData.sources === 'object') {
-          sources = mediaData.sources;
-        }
-      }
-      
-      return {
-        id: mediaData._id || mediaData.id || mediaData.uuid,
-        _id: mediaData._id || mediaData.id || mediaData.uuid,
-        title: mediaData.title,
-        artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
-        artists: Array.isArray(mediaData.artist) ? mediaData.artist : (mediaData.artists || []),
-        featuring: mediaData.featuring || [],
-        creatorDisplay: mediaData.creatorDisplay,
-        duration: mediaData.duration,
-        coverArt: mediaData.coverArt,
-        sources: sources,
-        globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
-        partyMediaAggregate: typeof displayItem.partyMediaAggregate === 'number' ? displayItem.partyMediaAggregate : 0,
-        totalBidValue: typeof displayItem.partyMediaAggregate === 'number' ? displayItem.partyMediaAggregate : 0,
-        bids: displayItem.partyBids || displayItem.bids || mediaData.bids || [],
-        addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
-      };
-    });
-    
-    // Clear podcast player so PlayerRenderer switches to web player
+
     usePodcastPlayerStore.getState().clear();
-    // Set the queue to the filtered display media
     setQueue(cleanedQueue);
-    
-    // Find the correct index in the cleaned queue for the clicked item
-    const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
+
+    const mediaData = partyItemMedia(item);
     const itemId = mediaData._id || mediaData.id || mediaData.uuid;
     const queueIndex = cleanedQueue.findIndex((q: any) => (q.id || q._id) === itemId);
     const finalIndex = queueIndex !== -1 ? queueIndex : index;
-    
-    // Set the media in the webplayer and start playback
+
+    if (!cleanedQueue[finalIndex] || !isMediaPlayable(cleanedQueue[finalIndex])) {
+      toast.info('This track is not playable yet — tip to support adding audio to Tuneable.');
+      return;
+    }
+
     setCurrentMedia(cleanedQueue[finalIndex], finalIndex);
-    play(); // Explicitly start playback when user clicks play button
-    
+    play();
+
     toast.success(`Now playing: ${cleanedQueue[finalIndex].title}`);
   };
 
   // Handle playing the entire displayed queue from the top
   const handlePlayQueue = () => {
-    const displayMedia = getDisplayMedia().filter((item: any) => {
-      const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
-      return isMediaPlayable(enrichMediaWithPlayability(mediaData));
-    });
-    
-    if (displayMedia.length === 0) {
+    const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
+
+    if (cleanedQueue.length === 0) {
       toast.info('No playable tracks in this list — tip on tracks awaiting rights or audio, or wait for audio to be added.');
       return;
     }
-    
-    // Format all displayed media into queue format
-    const cleanedQueue = displayMedia.map((item: any) => {
-      // For sorted media, the data is already flattened, for regular party media it's nested under mediaId
-      const mediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
-      
-      // Clean and format sources
-      let sources = {};
-      
-      if (mediaData.sources) {
-        if (Array.isArray(mediaData.sources)) {
-          for (const source of mediaData.sources) {
-            if (source && source.platform === '$__parent' && source.url && source.url.sources) {
-              // Handle Mongoose metadata corruption
-              sources = source.url.sources;
-              break;
-            } else if (source && source.platform === 'youtube' && source.url) {
-              (sources as any).youtube = source.url;
-            } else if (source?.youtube) {
-              (sources as any).youtube = source.youtube;
-            }
-          }
-        } else if (typeof mediaData.sources === 'object') {
-          sources = mediaData.sources;
-        }
-      }
-      
-      return {
-        id: mediaData._id || mediaData.id || mediaData.uuid,
-        _id: mediaData._id || mediaData.id || mediaData.uuid,
-        title: mediaData.title,
-        artist: Array.isArray(mediaData.artist) ? mediaData.artist[0]?.name || 'Unknown Artist' : mediaData.artist,
-        artists: Array.isArray(mediaData.artist) ? mediaData.artist : (mediaData.artists || []),
-        featuring: mediaData.featuring || [],
-        creatorDisplay: mediaData.creatorDisplay,
-        duration: mediaData.duration,
-        coverArt: mediaData.coverArt,
-        sources: sources,
-        globalMediaAggregate: typeof mediaData.globalMediaAggregate === 'number' ? mediaData.globalMediaAggregate : 0,
-        partyMediaAggregate: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-        totalBidValue: typeof item.partyMediaAggregate === 'number' ? item.partyMediaAggregate : 0,
-        bids: item.partyBids || item.bids || mediaData.bids || [],
-        addedBy: typeof mediaData.addedBy === 'object' ? mediaData.addedBy?.username || 'Unknown' : mediaData.addedBy
-      };
-    });
-    
-    // Clear podcast player so PlayerRenderer switches to web player
+
     usePodcastPlayerStore.getState().clear();
-    // Set the queue and start playing from the top
     setQueue(cleanedQueue);
     setCurrentMedia(cleanedQueue[0], 0);
     setGlobalPlayerActive(true);
-    play(); // Start playback immediately
-    
+    play();
+
     toast.success(`Playing queue: ${cleanedQueue.length} track${cleanedQueue.length !== 1 ? 's' : ''}`);
   };
 

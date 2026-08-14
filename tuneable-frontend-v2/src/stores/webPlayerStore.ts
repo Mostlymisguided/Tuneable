@@ -21,6 +21,7 @@ interface PlayerMedia {
   isPlayable?: boolean;
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  contentForm?: string | string[];
 }
 
 function mediaKey(media: PlayerMedia | null | undefined): string {
@@ -163,6 +164,11 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       },
       
       setCurrentMedia: (media, index = 0) => {
+        const { currentMedia, currentMediaIndex } = get();
+        // Same track at the same index — skip so callers cannot nested-update in a loop
+        if (mediaKey(currentMedia) === mediaKey(media) && (media == null || currentMediaIndex === index)) {
+          return;
+        }
         set({ 
           currentMedia: media, 
           currentMediaIndex: index,
@@ -290,17 +296,21 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       },
       
       setIsHost: (isHost) => {
+        if (get().isHost === isHost) return;
         set({ isHost });
       },
       
       setQueue: (queue) => {
-        const { currentMedia, currentMediaIndex } = get();
+        const { currentMedia, currentMediaIndex, queue: prev } = get();
         let nextIndex = currentMediaIndex;
         const key = mediaKey(currentMedia);
         if (key && queue.length > 0) {
           const found = queue.findIndex((m) => mediaKey(m) === key);
           if (found >= 0) nextIndex = found;
         }
+        const prevKey = prev.map(mediaKey).join('|');
+        const nextKey = queue.map(mediaKey).join('|');
+        if (prevKey === nextKey && nextIndex === currentMediaIndex) return;
         set({ queue, currentMediaIndex: nextIndex });
       },
 
@@ -327,23 +337,34 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       
       // Party management
       setCurrentPartyId: (partyId) => {
+        if (get().currentPartyId === partyId) return;
         set({ currentPartyId: partyId });
       },
       
       // Global player control
       setGlobalPlayerActive: (active) => {
+        if (get().isGlobalPlayerActive === active) return;
         set({ isGlobalPlayerActive: active });
       },
     }),
     {
       name: 'webplayer-storage',
-      // Only persist essential state, not functions
+      // v2: never persist the party queue — all-time global charts overflow localStorage
+      version: 2,
+      migrate: (persistedState: any) => {
+        if (!persistedState || typeof persistedState !== 'object') return persistedState;
+        const currentMedia = persistedState.currentMedia
+          ? { ...persistedState.currentMedia, bids: [] }
+          : null;
+        return { ...persistedState, queue: [], currentMedia };
+      },
       partialize: (state) => ({
         volume: state.volume,
         isMuted: state.isMuted,
-        currentMedia: state.currentMedia,
+        currentMedia: state.currentMedia
+          ? { ...state.currentMedia, bids: [] }
+          : null,
         currentMediaIndex: state.currentMediaIndex,
-        queue: state.queue,
         currentPartyId: state.currentPartyId,
         isGlobalPlayerActive: state.isGlobalPlayerActive,
         showVideo: state.showVideo,
