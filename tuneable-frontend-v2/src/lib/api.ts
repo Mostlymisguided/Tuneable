@@ -1614,6 +1614,45 @@ export const userAPI = {
     return response.data as { jobId: string; status: string };
   },
 
+  listRekordboxPlaylists: async (libraryXmlFile: File) => {
+    const formData = new FormData();
+    formData.append('libraryXmlFile', libraryXmlFile);
+    const response = await api.post('/users/me/import/rekordbox/playlists', formData);
+    return response.data as {
+      source: 'rekordbox';
+      trackCount: number;
+      playlistCount: number;
+      playlists: Array<{
+        name: string;
+        fullPath: string;
+        trackCount: number;
+        missingFiles: number;
+        localFiles: number;
+      }>;
+    };
+  },
+
+  startRekordboxImportPreview: async (
+    libraryXmlFile: File,
+    playlists: string[],
+    limit = 50
+  ) => {
+    const formData = new FormData();
+    formData.append('libraryXmlFile', libraryXmlFile);
+    formData.append('playlists', JSON.stringify(playlists));
+    formData.append('limit', String(limit));
+    const response = await api.post('/users/me/import/rekordbox/preview/start', formData);
+    return response.data as { jobId: string; status: string };
+  },
+
+  startRekordboxImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/rekordbox/execute/start', { items, defaultTip });
+    return response.data as { jobId: string; status: string };
+  },
+
   getImportJob: async (jobId: string) => {
     const response = await api.get(`/users/me/import/jobs/${jobId}`);
     return response.data as ImportJobStatus;

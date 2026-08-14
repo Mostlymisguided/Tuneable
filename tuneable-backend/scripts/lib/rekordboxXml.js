@@ -18,8 +18,7 @@ function normalizePlaylistName(name) {
 /**
  * Parse Rekordbox XML export into collection + playlist tree.
  */
-async function parseRekordboxXml(xmlPath) {
-  const xml = fs.readFileSync(xmlPath, 'utf8');
+async function parseRekordboxXmlFromContent(xml) {
   const collectionTracks = await parseRekordboxXmlContent(xml);
 
   const trackById = new Map();
@@ -68,26 +67,52 @@ async function parseRekordboxXml(xmlPath) {
   return { collectionTracks, trackById, trackByPath, playlists };
 }
 
+async function parseRekordboxXml(xmlPath) {
+  const xml = fs.readFileSync(xmlPath, 'utf8');
+  return parseRekordboxXmlFromContent(xml);
+}
+
 /**
  * List all playlist names (leaf playlists only).
  */
-async function listPlaylists(xmlPath) {
-  const { playlists } = await parseRekordboxXml(xmlPath);
+async function listPlaylistsFromContent(xml) {
+  const { playlists } = await parseRekordboxXmlFromContent(xml);
   return playlists.map((p) => ({
     name: p.name,
     fullPath: p.fullPath,
     trackCount: p.trackCount,
     missingFiles: p.tracks.filter((t) => !t.fileExists).length,
+    localFiles: p.tracks.filter((t) => t.fileExists).length,
   }));
+}
+
+async function listPlaylists(xmlPath) {
+  const xml = fs.readFileSync(xmlPath, 'utf8');
+  return listPlaylistsFromContent(xml);
 }
 
 /**
  * Resolve tracks for named playlists (case-insensitive match on name or fullPath).
+ * Empty playlistNames uses the full collection (caller should cap).
  */
-async function getTracksFromPlaylists(xmlPath, playlistNames) {
-  const { playlists } = await parseRekordboxXml(xmlPath);
+async function getTracksFromPlaylistsFromContent(xml, playlistNames) {
+  const { playlists, collectionTracks } = await parseRekordboxXmlFromContent(xml);
   if (!playlistNames?.length) {
-    return { playlists: [], tracks: [], unmatchedPlaylists: [] };
+    return {
+      playlists: [{
+        name: 'Collection',
+        fullPath: 'Collection',
+        trackCount: collectionTracks.length,
+        tracks: collectionTracks,
+      }],
+      tracks: collectionTracks.map((track) => ({
+        ...track,
+        playlistName: 'Collection',
+        playlistPath: 'Collection',
+      })),
+      unmatchedPlaylists: [],
+      usedFullCollection: true,
+    };
   }
 
   const wanted = new Set(playlistNames.map(normalizePlaylistName));
@@ -113,12 +138,20 @@ async function getTracksFromPlaylists(xmlPath, playlistNames) {
     }
   }
 
-  return { playlists: matchedPlaylists, tracks, unmatchedPlaylists };
+  return { playlists: matchedPlaylists, tracks, unmatchedPlaylists, usedFullCollection: false };
+}
+
+async function getTracksFromPlaylists(xmlPath, playlistNames) {
+  const xml = fs.readFileSync(xmlPath, 'utf8');
+  return getTracksFromPlaylistsFromContent(xml, playlistNames);
 }
 
 module.exports = {
   decodeRekordboxLocation,
   parseRekordboxXml,
+  parseRekordboxXmlFromContent,
   listPlaylists,
+  listPlaylistsFromContent,
   getTracksFromPlaylists,
+  getTracksFromPlaylistsFromContent,
 };

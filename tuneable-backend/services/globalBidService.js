@@ -74,6 +74,9 @@ async function placeGlobalBid(userId, {
       isrc: externalIsrc,
       identityConfidence,
       identityConfidenceSource,
+      bpm: externalBpm,
+      key: externalKey,
+      importSource,
     } = externalMedia;
 
     if (!title || !artist) {
@@ -120,6 +123,12 @@ async function placeGlobalBid(userId, {
       );
 
       const resolvedIsrc = normalizeIsrc(externalIsrc || externalIds?.isrc);
+      const resolvedBpm = Number.isFinite(Number(externalBpm)) && Number(externalBpm) > 0
+        ? Number(externalBpm)
+        : undefined;
+      const resolvedKey = externalKey && String(externalKey).trim()
+        ? String(externalKey).trim()
+        : undefined;
 
       media = new Media({
         title,
@@ -138,6 +147,9 @@ async function placeGlobalBid(userId, {
           : [],
         category: category || 'Music',
         album: album || null,
+        bpm: resolvedBpm,
+        key: resolvedKey,
+        importSource: importSource || null,
         releaseDate: parsedRelease.releaseDate,
         releaseYear: parsedRelease.releaseYear || releaseYear || null,
         releaseDatePrecision: parsedRelease.precision,

@@ -3,6 +3,7 @@
  */
 
 const mongoose = require('mongoose');
+const fs = require('fs');
 const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
@@ -23,6 +24,7 @@ const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 25000;
 const MATCH_CONCURRENCY = 8;
+const REKORDBOX_MAX_SCAN = 200;
 
 async function mapWithConcurrency(items, concurrency, mapper) {
   const list = items || [];
@@ -76,6 +78,10 @@ function buildExternalMediaFromTrack(track, {
     : (track.genre ? [String(track.genre).trim()].filter(Boolean) : []);
 
   const isrc = normalizeIsrc(track.externalIds?.isrc);
+  const bpm = Number.isFinite(Number(track.bpm)) && Number(track.bpm) > 0
+    ? Number(track.bpm)
+    : null;
+  const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
 
   return {
     title: track.title,
@@ -90,6 +96,10 @@ function buildExternalMediaFromTrack(track, {
     sources: track.sources || {},
     externalIds: track.externalIds || {},
     isrc: isrc || null,
+    bpm,
+    key,
+    localFilePath: track.filePath || null,
+    importSource: track.importSource || null,
     tags,
     genres,
     identityConfidence: identityConfidence || null,
@@ -117,12 +127,14 @@ async function findExactCatalogMedia(track) {
   const spotifyId = track.externalIds?.spotify || (track.sourceLabel === 'Spotify Likes' ? track.id : null);
   const soundcloudId = track.externalIds?.soundcloud
     || (track.sourceLabel === 'SoundCloud Likes' ? track.id : null);
+  const rekordboxId = track.externalIds?.rekordbox;
   const isrc = normalizeIsrc(track.externalIds?.isrc);
   const soundcloudUrl = track.sources?.soundcloud;
 
   const or = [];
   if (spotifyId) or.push({ 'externalIds.spotify': String(spotifyId) });
   if (soundcloudId) or.push({ 'externalIds.soundcloud': String(soundcloudId) });
+  if (rekordboxId) or.push({ 'externalIds.rekordbox': String(rekordboxId) });
   if (isrc) or.push({ isrc });
   if (soundcloudUrl) {
     or.push({ 'sources.soundcloud': soundcloudUrl });
@@ -166,7 +178,7 @@ async function loadFuzzyCatalogIndexes() {
       { contentType: { $size: 0 } },
     ],
   })
-    .select('title artist duration coverArt uuid externalIds isrc sources globalMediaAggregate')
+    .select('title artist duration coverArt uuid externalIds isrc sources bpm key globalMediaAggregate')
     .limit(FUZZY_CATALOG_LIMIT)
     .lean();
 
@@ -266,6 +278,21 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
     changed = true;
   }
 
+  const incomingBpm = Number(externalMedia.bpm);
+  if ((!media.bpm || media.bpm === 0) && Number.isFinite(incomingBpm) && incomingBpm > 0) {
+    media.bpm = incomingBpm;
+    changed = true;
+  }
+  const incomingKey = externalMedia.key && String(externalMedia.key).trim();
+  if ((!media.key || !String(media.key).trim()) && incomingKey) {
+    media.key = incomingKey;
+    changed = true;
+  }
+  if (externalMedia.coverArt && !media.coverArt) {
+    media.coverArt = externalMedia.coverArt;
+    changed = true;
+  }
+
   if (changed) await media.save();
 }
 
@@ -282,6 +309,9 @@ function mediaToPlayabilityFields(media) {
 function trackKey(track, source) {
   if (source === 'soundcloud') {
     return String(track.externalIds?.soundcloud || track.id || `${track.title}-${track.artist}`);
+  }
+  if (source === 'rekordbox') {
+    return String(track.externalIds?.rekordbox || track.id || `${track.title}-${track.artist}`);
   }
   return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
 }
@@ -392,6 +422,9 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       useSuggestedMatch,
       isPlayable: catalogMedia ? play.isPlayable : false,
       awaitingUpload: catalogMedia ? play.awaitingUpload : true,
+      bpm: track.bpm || catalogMedia?.bpm || null,
+      key: track.key || catalogMedia?.key || null,
+      hasLocalFile: Boolean(track.fileExists),
       userBidTotalPence: catalogId ? (userBidTotals[catalogId] || 0) : 0,
       defaultTip,
       minTip: MIN_TIP,
@@ -806,12 +839,180 @@ async function executeSoundCloudImport(userId, opts) {
   return executeLibraryImport(userId, { ...opts, importSource: 'soundcloud_likes' });
 }
 
+function convertRekordboxTrack(track) {
+  const title = (track.title || track.name || '').trim();
+  const artist = (track.artist || '').trim();
+  const trackId = track.trackId ? String(track.trackId) : '';
+  const catalogId = trackId || `name:${title}::${artist}`;
+  const bpm = Number.isFinite(Number(track.bpm)) && Number(track.bpm) > 0
+    ? Number(track.bpm)
+    : null;
+  const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
+  const genre = track.genre && String(track.genre).trim() ? String(track.genre).trim() : null;
+
+  return {
+    id: catalogId,
+    title,
+    artist,
+    album: track.album || null,
+    duration: track.duration || track.totalTime || 0,
+    coverArt: null,
+    genres: genre ? [genre] : [],
+    genre,
+    bpm,
+    key,
+    releaseYear: track.year || null,
+    sourceLabel: 'Rekordbox',
+    category: 'Music',
+    importSource: 'rekordbox',
+    externalIds: {
+      rekordbox: catalogId,
+    },
+    sources: {},
+    tags: [],
+    filePath: track.filePath || null,
+    fileExists: Boolean(track.fileExists),
+    playlistName: track.playlistName || null,
+  };
+}
+
+async function listRekordboxPlaylists(xmlContent) {
+  const { parseRekordboxXmlFromContent } = require('../scripts/lib/rekordboxXml');
+  const parsed = await parseRekordboxXmlFromContent(xmlContent);
+  const playlists = parsed.playlists.map((p) => ({
+    name: p.name,
+    fullPath: p.fullPath,
+    trackCount: p.trackCount,
+    missingFiles: p.tracks.filter((t) => !t.fileExists).length,
+    localFiles: p.tracks.filter((t) => t.fileExists).length,
+  }));
+  return {
+    source: 'rekordbox',
+    trackCount: parsed.collectionTracks.length,
+    playlistCount: playlists.length,
+    playlists,
+  };
+}
+
+async function extractLocalRekordboxAssets(filePath, slug) {
+  if (!filePath || !fs.existsSync(filePath)) return {};
+  try {
+    const { parseFile } = require('music-metadata');
+    const metadata = await parseFile(filePath, { duration: true });
+    const pictures = metadata.common?.picture || [];
+    let coverArt = null;
+    if (pictures.length > 0) {
+      const MetadataExtractor = require('../utils/metadataExtractor');
+      coverArt = await MetadataExtractor.processArtwork(pictures, slug || 'rekordbox');
+    }
+    return {
+      coverArt,
+      isrc: normalizeIsrc(metadata.common?.isrc),
+      duration: metadata.format?.duration ? Math.round(metadata.format.duration) : null,
+    };
+  } catch (err) {
+    console.warn('Rekordbox local metadata extract skipped:', err.message);
+    return {};
+  }
+}
+
+async function attachLocalRekordboxAssets(items = []) {
+  const enriched = [];
+  for (const item of items) {
+    const externalMedia = { ...(item.externalMedia || {}) };
+    const filePath = externalMedia.localFilePath;
+    const slug = externalMedia.externalIds?.rekordbox || item.key || 'rekordbox';
+    if (filePath) {
+      const extracted = await extractLocalRekordboxAssets(filePath, String(slug));
+      if (extracted.coverArt && !externalMedia.coverArt) {
+        externalMedia.coverArt = extracted.coverArt;
+      }
+      if (extracted.isrc && !externalMedia.isrc) {
+        externalMedia.isrc = extracted.isrc;
+        externalMedia.externalIds = {
+          ...(externalMedia.externalIds || {}),
+          isrc: extracted.isrc,
+        };
+      }
+      if (extracted.duration && !externalMedia.duration) {
+        externalMedia.duration = extracted.duration;
+      }
+    }
+    delete externalMedia.localFilePath;
+    enriched.push({ ...item, externalMedia });
+  }
+  return enriched;
+}
+
+async function previewRekordboxImport(userId, xmlContent, {
+  playlists = [],
+  limit = 50,
+  onProgress,
+} = {}) {
+  const report = typeof onProgress === 'function' ? onProgress : () => {};
+  const { getTracksFromPlaylistsFromContent } = require('../scripts/lib/rekordboxXml');
+
+  const user = await User.findById(userId).select('preferences balance role');
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  report({ stage: 'parsing', message: 'Parsing Rekordbox XML…', current: 0, total: 0 });
+  const resolved = await getTracksFromPlaylistsFromContent(xmlContent, playlists);
+  if (resolved.unmatchedPlaylists?.length) {
+    const err = new Error(`Playlists not found: ${resolved.unmatchedPlaylists.join(', ')}`);
+    err.status = 400;
+    throw err;
+  }
+
+  const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), REKORDBOX_MAX_SCAN);
+  if (!playlists?.length && resolved.tracks.length > cappedLimit) {
+    const err = new Error(
+      `This XML has ${resolved.tracks.length} tracks. Select one or more playlists (or export a smaller playlist).`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  const sliced = resolved.tracks.slice(0, cappedLimit);
+  const tracks = sliced.map(convertRekordboxTrack).filter((t) => t.title && t.artist);
+  const skippedIncomplete = sliced.length - tracks.length;
+
+  report({
+    stage: 'fetching',
+    message: `Loaded ${tracks.length} Rekordbox track${tracks.length === 1 ? '' : 's'}`,
+    current: tracks.length,
+    total: tracks.length,
+  });
+
+  return previewImportFromTracks(userId, 'rekordbox', tracks, user, {
+    scanned: resolved.tracks.length,
+    playlistCount: resolved.playlists.length,
+    playlists: resolved.playlists.map((p) => p.fullPath || p.name),
+    usedFullCollection: Boolean(resolved.usedFullCollection),
+    skippedIncomplete,
+    localFiles: tracks.filter((t) => t.fileExists).length,
+  }, onProgress);
+}
+
+async function executeRekordboxImport(userId, opts = {}) {
+  const items = await attachLocalRekordboxAssets(opts.items || []);
+  return executeLibraryImport(userId, { ...opts, items, importSource: 'rekordbox' });
+}
+
 module.exports = {
   previewSpotifyImport,
   previewSoundCloudImport,
+  previewRekordboxImport,
+  listRekordboxPlaylists,
   executeSpotifyImport,
   executeSoundCloudImport,
+  executeRekordboxImport,
   executeLibraryImport,
+  convertRekordboxTrack,
   MIN_TIP,
   MAX_BATCH,
+  REKORDBOX_MAX_SCAN,
 };

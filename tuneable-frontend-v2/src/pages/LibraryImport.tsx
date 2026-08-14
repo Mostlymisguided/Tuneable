@@ -19,8 +19,9 @@ import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { buildOAuthStartUrl } from '../utils/platform';
 import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
+import { isAdmin } from '../utils/permissionHelpers';
 
-type ImportSource = 'spotify' | 'soundcloud';
+type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
 type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
 type IdentityConfidence = 'verified' | 'catalog' | 'likely' | 'unverified';
@@ -59,6 +60,9 @@ interface ImportItem {
   useSuggestedMatch?: boolean;
   isPlayable: boolean;
   awaitingUpload: boolean;
+  bpm?: number | null;
+  key?: string | null;
+  hasLocalFile?: boolean;
   userBidTotalPence: number;
   defaultTip: number;
   minTip: number;
@@ -81,6 +85,10 @@ interface ImportSummary {
   skippedMixes?: number;
   skippedUnplayable?: number;
   scanned?: number;
+  playlistCount?: number;
+  playlists?: string[];
+  localFiles?: number;
+  usedFullCollection?: boolean;
   crossRefVerified?: number;
   crossRefWithIsrc?: number;
   crossRefNoIsrc?: number;
@@ -139,10 +147,19 @@ const SOURCE_META: Record<ImportSource, {
     accentHover: 'hover:bg-orange-500',
     badge: 'bg-orange-600',
   },
+  rekordbox: {
+    label: 'Rekordbox',
+    likesLabel: 'Rekordbox playlists',
+    accent: 'bg-red-600',
+    accentHover: 'hover:bg-red-500',
+    badge: 'bg-red-600',
+  },
 };
 
 function parseSource(value: string | null): ImportSource {
-  return value === 'soundcloud' ? 'soundcloud' : 'spotify';
+  if (value === 'soundcloud') return 'soundcloud';
+  if (value === 'rekordbox') return 'rekordbox';
+  return 'spotify';
 }
 
 const LibraryImport: React.FC = () => {
@@ -173,9 +190,23 @@ const LibraryImport: React.FC = () => {
     totalSpent: number;
     updatedBalance: number;
   } | null>(null);
+  const [rekordboxFile, setRekordboxFile] = useState<File | null>(null);
+  const [rekordboxPlaylists, setRekordboxPlaylists] = useState<Array<{
+    name: string;
+    fullPath: string;
+    trackCount: number;
+    missingFiles: number;
+    localFiles: number;
+  }>>([]);
+  const [selectedPlaylistPaths, setSelectedPlaylistPaths] = useState<string[]>([]);
+  const [rekordboxTrackCount, setRekordboxTrackCount] = useState(0);
+  const [isParsingXml, setIsParsingXml] = useState(false);
+  const rekordboxFileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const adminUser = isAdmin(user);
   const meta = SOURCE_META[source];
-  const isConnected = source === 'spotify' ? spotifyConnected : soundcloudConnected;
+  const isRekordbox = source === 'rekordbox';
+  const isConnected = source === 'spotify' ? spotifyConnected : source === 'soundcloud' ? soundcloudConnected : true;
   const oauthHandledRef = React.useRef(false);
 
   const checkConnections = useCallback(async () => {
@@ -252,6 +283,14 @@ const LibraryImport: React.FC = () => {
     setProgressTotal(0);
   };
 
+  const resetRekordboxState = () => {
+    setRekordboxFile(null);
+    setRekordboxPlaylists([]);
+    setSelectedPlaylistPaths([]);
+    setRekordboxTrackCount(0);
+    if (rekordboxFileInputRef.current) rekordboxFileInputRef.current.value = '';
+  };
+
   const applyJobProgress = useCallback((job: {
     message?: string;
     current?: number;
@@ -269,15 +308,26 @@ const LibraryImport: React.FC = () => {
   }, []);
 
   const selectSource = (next: ImportSource) => {
+    if (next === 'rekordbox' && !adminUser) return;
     setSource(next);
     setStep('connect');
     resetScanState();
+    if (next !== 'rekordbox') resetRekordboxState();
     const params = new URLSearchParams(searchParams);
     params.set('source', next);
     setSearchParams(params, { replace: true });
   };
 
+  useEffect(() => {
+    if (source === 'rekordbox' && user && !adminUser) {
+      toast.error('Rekordbox import is admin-only');
+      selectSource('spotify');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, adminUser, user]);
+
   const connectSource = () => {
+    if (source === 'rekordbox') return;
     const token = localStorage.getItem('token') || undefined;
     const returnPath = `/import?source=${source}`;
     const redirect = `${window.location.origin}/auth/callback?oauth_success=true&returnUrl=${encodeURIComponent(returnPath)}`;
@@ -298,7 +348,67 @@ const LibraryImport: React.FC = () => {
     window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
   };
 
+  const loadRekordboxPlaylists = async (file: File) => {
+    setIsParsingXml(true);
+    setRekordboxFile(file);
+    setRekordboxPlaylists([]);
+    setSelectedPlaylistPaths([]);
+    try {
+      const data = await userAPI.listRekordboxPlaylists(file);
+      setRekordboxTrackCount(data.trackCount || 0);
+      setRekordboxPlaylists(data.playlists || []);
+      if ((data.playlists || []).length === 1) {
+        setSelectedPlaylistPaths([data.playlists[0].fullPath || data.playlists[0].name]);
+      }
+      toast.success(`Loaded ${data.playlistCount} playlist${data.playlistCount === 1 ? '' : 's'} (${data.trackCount} tracks)`);
+    } catch (error: any) {
+      setRekordboxFile(null);
+      toast.error(error?.response?.data?.error || error?.message || 'Failed to parse Rekordbox XML');
+    } finally {
+      setIsParsingXml(false);
+    }
+  };
+
   const scanLikes = async (scanLimit = limit) => {
+    if (source === 'rekordbox') {
+      if (!rekordboxFile) {
+        toast.error('Upload a Rekordbox XML export first');
+        return;
+      }
+      if (selectedPlaylistPaths.length === 0 && rekordboxTrackCount > 200) {
+        toast.error('Select one or more playlists — this library is too large to scan in full');
+        return;
+      }
+      setIsLoading(true);
+      setProgressMessage('Starting Rekordbox scan…');
+      setProgressCurrent(0);
+      setProgressTotal(0);
+      try {
+        const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
+        setLimit(capped);
+        const started = await userAPI.startRekordboxImportPreview(
+          rekordboxFile,
+          selectedPlaylistPaths,
+          capped
+        );
+        const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress);
+        setItems(data.items || []);
+        setSummary(data.summary || null);
+        setTipAmounts({});
+        setTipMode('fixed');
+        setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+        setStep('summary');
+      } catch (error: any) {
+        toast.error(error?.response?.data?.error || error?.message || 'Failed to scan Rekordbox playlists');
+      } finally {
+        setIsLoading(false);
+        setProgressMessage(null);
+        setProgressCurrent(0);
+        setProgressTotal(0);
+      }
+      return;
+    }
+
     if (!isConnected) {
       connectSource();
       return;
@@ -347,9 +457,11 @@ const LibraryImport: React.FC = () => {
     setProgressCurrent(0);
     setProgressTotal(payload.length);
     try {
-      const started = source === 'soundcloud'
-        ? await userAPI.startSoundCloudImportExecute(payload, tip)
-        : await userAPI.startSpotifyImportExecute(payload, tip);
+      const started = source === 'rekordbox'
+        ? await userAPI.startRekordboxImportExecute(payload, tip)
+        : source === 'soundcloud'
+          ? await userAPI.startSoundCloudImportExecute(payload, tip)
+          : await userAPI.startSpotifyImportExecute(payload, tip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
         skipped: number;
@@ -630,6 +742,10 @@ const LibraryImport: React.FC = () => {
       toast.error('Select at least one track');
       return;
     }
+    if (selectedItems.length > 100) {
+      toast.error('Maximum 100 tracks per import batch — deselect some and import the rest next');
+      return;
+    }
     if (tipMode === 'spread' && selectedSpreadTip == null) {
       toast.error(`Need at least £${MIN_TIP_POUNDS.toFixed(2)} per track — select fewer or top up`);
       return;
@@ -705,6 +821,11 @@ const LibraryImport: React.FC = () => {
     })));
     applyTipsToTargets(targets, tip);
 
+    if (targets.length > 100) {
+      toast.error('Maximum 100 tracks per import batch — deselect some via Review');
+      return;
+    }
+
     const payloadItems = targets.map((item) => ({
       key: item.key,
       title: item.title,
@@ -762,7 +883,9 @@ const LibraryImport: React.FC = () => {
             Import &amp; Support
           </h1>
           <p className="text-gray-400 mt-2 max-w-2xl">
-            Scan your likes, see what&apos;s playable vs awaiting audio, then tip to add them to your library.
+            {isRekordbox
+              ? 'Admin: upload a Rekordbox XML export, pick playlists, then tip catalog entries into your library. Audio is not uploaded.'
+              : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
           </p>
           <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">{stepLabel}</p>
         </div>
@@ -770,7 +893,11 @@ const LibraryImport: React.FC = () => {
         {step === 'connect' && (
           <div className="space-y-4">
             <div className="flex gap-2">
-              {(['spotify', 'soundcloud'] as ImportSource[]).map((s) => {
+              {([
+                'spotify',
+                'soundcloud',
+                ...(adminUser ? ['rekordbox'] as const : []),
+              ] as ImportSource[]).map((s) => {
                 const sMeta = SOURCE_META[s];
                 const connected = s === 'spotify' ? spotifyConnected : soundcloudConnected;
                 const active = source === s;
@@ -792,7 +919,9 @@ const LibraryImport: React.FC = () => {
                       <div>
                         <div className="font-semibold">{sMeta.label}</div>
                         <div className="text-xs text-gray-400">
-                          {connected ? 'Connected' : 'Not connected'}
+                          {s === 'rekordbox'
+                            ? 'Admin catalog import'
+                            : connected ? 'Connected' : 'Not connected'}
                         </div>
                       </div>
                     </div>
@@ -809,14 +938,133 @@ const LibraryImport: React.FC = () => {
                 <div>
                   <h2 className="text-xl font-semibold">{meta.likesLabel}</h2>
                   <p className="text-gray-400 text-sm">
-                    {isConnected
-                      ? 'We\'ll match against the Tuneable catalog and skip mixes/sets'
-                      : `Connect ${meta.label} to scan your likes`}
+                    {isRekordbox
+                      ? 'Catalog-only: title, artist, BPM, key, duration, and cover art from local files. No MP3s uploaded.'
+                      : isConnected
+                        ? 'We\'ll match against the Tuneable catalog and skip mixes/sets'
+                        : `Connect ${meta.label} to scan your likes`}
                   </p>
                 </div>
               </div>
 
-              {!isConnected ? (
+              {isRekordbox ? (
+                <div className="space-y-4">
+                  <input
+                    ref={rekordboxFileInputRef}
+                    type="file"
+                    accept=".xml,text/xml,application/xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void loadRekordboxPlaylists(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => rekordboxFileInputRef.current?.click()}
+                    disabled={isParsingXml}
+                    className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                  >
+                    {isParsingXml ? <Loader2 className="w-5 h-5 animate-spin" /> : <Music className="w-5 h-5" />}
+                    {isParsingXml
+                      ? 'Parsing XML…'
+                      : rekordboxFile
+                        ? rekordboxFile.name
+                        : 'Upload Rekordbox XML'}
+                  </button>
+
+                  {rekordboxPlaylists.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-300">
+                          {rekordboxPlaylists.length} playlist{rekordboxPlaylists.length === 1 ? '' : 's'}
+                          {' · '}{rekordboxTrackCount} tracks in collection
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (selectedPlaylistPaths.length === rekordboxPlaylists.length) {
+                              setSelectedPlaylistPaths([]);
+                            } else {
+                              setSelectedPlaylistPaths(rekordboxPlaylists.map((p) => p.fullPath || p.name));
+                            }
+                          }}
+                          className="text-purple-400 hover:underline"
+                        >
+                          {selectedPlaylistPaths.length === rekordboxPlaylists.length ? 'Clear' : 'Select all'}
+                        </button>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border border-gray-700 p-2">
+                        {rekordboxPlaylists.map((playlist) => {
+                          const id = playlist.fullPath || playlist.name;
+                          const checked = selectedPlaylistPaths.includes(id);
+                          return (
+                            <label
+                              key={id}
+                              className={`flex items-center gap-3 rounded-md px-2 py-1.5 text-sm cursor-pointer ${
+                                checked ? 'bg-gray-700/80' : 'hover:bg-gray-700/40'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setSelectedPlaylistPaths((prev) => (
+                                    e.target.checked
+                                      ? [...prev, id]
+                                      : prev.filter((p) => p !== id)
+                                  ));
+                                }}
+                              />
+                              <span className="flex-1 min-w-0 truncate">{playlist.fullPath || playlist.name}</span>
+                              <span className="text-xs text-gray-500 tabular-nums flex-shrink-0">
+                                {playlist.trackCount}
+                                {playlist.localFiles > 0 ? ` · ${playlist.localFiles} local` : ''}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
+                        disabled={isLoading || (selectedPlaylistPaths.length === 0 && rekordboxTrackCount > 200)}
+                        className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                        {isLoading ? 'Scanning…' : 'Scan selected playlists'}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {isLoading && progressMessage ? (
+                    <div className="rounded-lg border border-gray-700 bg-gray-900/60 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 text-xs text-gray-300">
+                        <span>{progressMessage}</span>
+                        {progressTotal > 0 ? (
+                          <span className="text-gray-500 tabular-nums">
+                            {progressCurrent}/{progressTotal}
+                          </span>
+                        ) : null}
+                      </div>
+                      {progressTotal > 0 ? (
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-700">
+                          <div
+                            className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                            style={{
+                              width: `${Math.min(100, Math.round((progressCurrent / progressTotal) * 100))}%`,
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center">
+                      Export a playlist (or the library) from Rekordbox as XML. Cover art is read from files on this machine when Location paths are reachable.
+                    </p>
+                  )}
+                </div>
+              ) : !isConnected ? (
                 <button
                   type="button"
                   onClick={connectSource}
@@ -884,6 +1132,11 @@ const LibraryImport: React.FC = () => {
               {typeof summary.skippedUnplayable === 'number' && summary.skippedUnplayable > 0 ? (
                 <span className="ml-1 text-amber-300/90">
                   · skipped {summary.skippedUnplayable} private/unplayable
+                </span>
+              ) : null}
+              {typeof summary.localFiles === 'number' && source === 'rekordbox' ? (
+                <span className="ml-1 text-gray-400">
+                  · {summary.localFiles} local file{summary.localFiles === 1 ? '' : 's'} for artwork
                 </span>
               ) : null}
               {typeof summary.crossRefVerified === 'number' && summary.crossRefVerified > 0 ? (
@@ -1397,7 +1650,15 @@ const LibraryImport: React.FC = () => {
                   />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{item.title}</div>
-                    <div className="text-sm text-gray-400 truncate">{item.artist}</div>
+                    <div className="text-sm text-gray-400 truncate">
+                      {item.artist}
+                      {item.bpm || item.key ? (
+                        <span className="text-gray-500">
+                          {item.bpm ? ` · ${Math.round(Number(item.bpm))} BPM` : ''}
+                          {item.key ? ` · ${item.key}` : ''}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded border ${STATUS_COLORS[item.matchStatus]}`}>
                         {STATUS_LABELS[item.matchStatus]}

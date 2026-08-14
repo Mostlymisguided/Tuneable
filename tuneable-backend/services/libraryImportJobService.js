@@ -114,19 +114,28 @@ function completeJob(jobId, result) {
   });
 }
 
-function startPreviewJob(userId, source, { limit, crossRefMode } = {}) {
+function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists } = {}) {
   const job = createJob({ userId, type: 'preview', source });
   const onProgress = progressReporter(job.id);
 
   setImmediate(async () => {
     try {
       patchJob(job.id, { status: 'running', stage: 'starting', message: 'Starting scan…' });
-      const preview = source === 'soundcloud'
-        ? await libraryImportService.previewSoundCloudImport(userId, limit, {
+      let preview;
+      if (source === 'rekordbox') {
+        preview = await libraryImportService.previewRekordboxImport(userId, xmlContent, {
+          playlists,
+          limit,
+          onProgress,
+        });
+      } else if (source === 'soundcloud') {
+        preview = await libraryImportService.previewSoundCloudImport(userId, limit, {
           onProgress,
           crossRefMode: crossRefMode || 'spotify_only',
-        })
-        : await libraryImportService.previewSpotifyImport(userId, limit, { onProgress });
+        });
+      } else {
+        preview = await libraryImportService.previewSpotifyImport(userId, limit, { onProgress });
+      }
       completeJob(job.id, preview);
     } catch (error) {
       console.error(`[libraryImportJob] preview ${source} failed:`, error.message);
@@ -144,9 +153,14 @@ function startExecuteJob(userId, source, { items, defaultTip } = {}) {
   setImmediate(async () => {
     try {
       patchJob(job.id, { status: 'running', stage: 'starting', message: 'Starting import…' });
-      const results = source === 'soundcloud'
-        ? await libraryImportService.executeSoundCloudImport(userId, { items, defaultTip, onProgress })
-        : await libraryImportService.executeSpotifyImport(userId, { items, defaultTip, onProgress });
+      let results;
+      if (source === 'rekordbox') {
+        results = await libraryImportService.executeRekordboxImport(userId, { items, defaultTip, onProgress });
+      } else if (source === 'soundcloud') {
+        results = await libraryImportService.executeSoundCloudImport(userId, { items, defaultTip, onProgress });
+      } else {
+        results = await libraryImportService.executeSpotifyImport(userId, { items, defaultTip, onProgress });
+      }
 
       completeJob(job.id, {
         success: true,

@@ -234,6 +234,24 @@ const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
 // Configure upload using R2 or local fallback
 const upload = createProfilePictureUpload();
+
+const rekordboxXmlUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    if (
+      ext === '.xml'
+      || mime === 'text/xml'
+      || mime === 'application/xml'
+      || mime === 'application/octet-stream'
+    ) {
+      return cb(null, true);
+    }
+    return cb(new Error('Only XML library export files are allowed'));
+  },
+});
     
 // Generate unique personal invite code
 const deriveCodeFromUserId = (userId) => {
@@ -1681,6 +1699,88 @@ router.post('/me/import/soundcloud/execute/start', authMiddleware, async (req, r
   } catch (error) {
     console.error('SoundCloud import execute start error:', error);
     res.status(500).json({ error: error.message || 'Failed to start import' });
+  }
+});
+
+function parseRekordboxPlaylistsField(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+  if (typeof raw !== 'string') return [];
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) return parsed.map((s) => String(s).trim()).filter(Boolean);
+  } catch {
+    // comma-separated fallback
+  }
+  return trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+// @route   POST /api/users/me/import/rekordbox/playlists
+// @desc    Parse Rekordbox XML and list playlists (admin catalog import)
+// @access  Private (admin)
+router.post(
+  '/me/import/rekordbox/playlists',
+  authMiddleware,
+  adminMiddleware,
+  rekordboxXmlUpload.single('libraryXmlFile'),
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: 'libraryXmlFile is required' });
+      }
+      const libraryImportService = require('../services/libraryImportService');
+      const result = await libraryImportService.listRekordboxPlaylists(req.file.buffer.toString('utf8'));
+      res.json(result);
+    } catch (error) {
+      console.error('Rekordbox playlist parse error:', error);
+      res.status(error.status || 400).json({ error: error.message || 'Failed to parse Rekordbox XML' });
+    }
+  }
+);
+
+// @route   POST /api/users/me/import/rekordbox/preview/start
+// @desc    Start async Rekordbox catalog preview (poll GET /me/import/jobs/:jobId)
+// @access  Private (admin)
+router.post(
+  '/me/import/rekordbox/preview/start',
+  authMiddleware,
+  adminMiddleware,
+  rekordboxXmlUpload.single('libraryXmlFile'),
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: 'libraryXmlFile is required' });
+      }
+      const playlists = parseRekordboxPlaylistsField(req.body?.playlists);
+      const limit = req.body?.limit ?? req.query.limit;
+      const libraryImportJobService = require('../services/libraryImportJobService');
+      const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'rekordbox', {
+        xmlContent: req.file.buffer.toString('utf8'),
+        playlists,
+        limit,
+      });
+      res.status(202).json({ jobId, status: 'queued' });
+    } catch (error) {
+      console.error('Rekordbox import preview start error:', error);
+      res.status(error.status || 500).json({ error: error.message || 'Failed to start Rekordbox preview' });
+    }
+  }
+);
+
+// @route   POST /api/users/me/import/rekordbox/execute/start
+// @desc    Start async Rekordbox catalog import/tip (poll GET /me/import/jobs/:jobId)
+// @access  Private (admin)
+router.post('/me/import/rekordbox/execute/start', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startExecuteJob(req.user._id, 'rekordbox', { items, defaultTip });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('Rekordbox import execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start Rekordbox import' });
   }
 });
 
