@@ -423,7 +423,7 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       isPlayable: catalogMedia ? play.isPlayable : false,
       awaitingUpload: catalogMedia ? play.awaitingUpload : true,
       bpm: track.bpm || catalogMedia?.bpm || null,
-      key: track.key || catalogMedia?.key || null,
+      musicalKey: track.key || catalogMedia?.key || null,
       hasLocalFile: Boolean(track.fileExists),
       userBidTotalPence: catalogId ? (userBidTotals[catalogId] || 0) : 0,
       defaultTip,

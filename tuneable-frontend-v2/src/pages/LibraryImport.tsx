@@ -61,7 +61,7 @@ interface ImportItem {
   isPlayable: boolean;
   awaitingUpload: boolean;
   bpm?: number | null;
-  key?: string | null;
+  musicalKey?: string | null;
   hasLocalFile?: boolean;
   userBidTotalPence: number;
   defaultTip: number;
@@ -1652,10 +1652,10 @@ const LibraryImport: React.FC = () => {
                     <div className="font-medium truncate">{item.title}</div>
                     <div className="text-sm text-gray-400 truncate">
                       {item.artist}
-                      {item.bpm || item.key ? (
+                      {item.bpm || item.musicalKey ? (
                         <span className="text-gray-500">
                           {item.bpm ? ` · ${Math.round(Number(item.bpm))} BPM` : ''}
-                          {item.key ? ` · ${item.key}` : ''}
+                          {item.musicalKey ? ` · ${item.musicalKey}` : ''}
                         </span>
                       ) : null}
                     </div>
