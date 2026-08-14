@@ -1603,6 +1603,53 @@ router.get('/me/soundcloud-status', authMiddleware, async (req, res) => {
   }
 });
 
+// How many library tunes came from each likes-import source
+router.get('/me/import-stats', authMiddleware, async (req, res) => {
+  try {
+    const Bid = require('../models/Bid');
+    const Media = require('../models/Media');
+    const user = await User.findById(req.user._id)
+      .select('spotifyId soundcloudId')
+      .lean();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const mediaIds = await Bid.distinct('mediaId', {
+      userId: req.user._id,
+      status: 'active',
+    });
+
+    const countFor = (importSource, sourceKey) => {
+      if (!mediaIds.length) return Promise.resolve(0);
+      return Media.countDocuments({
+        _id: { $in: mediaIds },
+        $or: [
+          { importSource },
+          { [`sources.${sourceKey}`]: { $exists: true, $nin: [null, ''] } },
+        ],
+      });
+    };
+
+    const [spotifyImported, soundcloudImported] = await Promise.all([
+      countFor('spotify_likes', 'spotify'),
+      countFor('soundcloud_likes', 'soundcloud'),
+    ]);
+
+    res.json({
+      spotify: {
+        connected: Boolean(user.spotifyId),
+        imported: spotifyImported,
+      },
+      soundcloud: {
+        connected: Boolean(user.soundcloudId),
+        imported: soundcloudImported,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching import stats:', error);
+    res.status(500).json({ error: 'Failed to fetch import stats' });
+  }
+});
+
 // @route   GET /api/users/me/import/soundcloud/preview
 // @desc    Preview SoundCloud likes import with catalog match + cost estimate
 // @access  Private

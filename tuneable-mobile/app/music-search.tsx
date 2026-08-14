@@ -11,14 +11,16 @@ import {
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
 import { searchAPI } from '@/src/api/search';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
+import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { canUploadMedia } from '@/src/lib/permissions';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, GLOBAL_PARTY_ID } from '@/src/types/media';
 import {
@@ -67,6 +69,8 @@ function mergeUnique(
 
 export default function MusicSearchScreen() {
   const { user, updateBalance } = useAuth();
+  const { contentPaddingBottom } = usePlayerDockState();
+  const canUpload = canUploadMedia(user);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -84,7 +88,8 @@ export default function MusicSearchScreen() {
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
-  const [libraryTotal, setLibraryTotal] = useState<number | null>(null);
+  const [spotifyImported, setSpotifyImported] = useState(0);
+  const [soundcloudImported, setSoundcloudImported] = useState(0);
   const [importStatusLoading, setImportStatusLoading] = useState(false);
 
   const defaultTip = useMemo(
@@ -95,16 +100,18 @@ export default function MusicSearchScreen() {
   const refreshImportStatus = useCallback(async () => {
     setImportStatusLoading(true);
     try {
-      const [spotify, soundcloud, library] = await Promise.all([
+      const stats = await userAPI.getImportStats();
+      setSpotifyConnected(Boolean(stats.spotify?.connected));
+      setSoundcloudConnected(Boolean(stats.soundcloud?.connected));
+      setSpotifyImported(stats.spotify?.imported ?? 0);
+      setSoundcloudImported(stats.soundcloud?.imported ?? 0);
+    } catch {
+      const [spotify, soundcloud] = await Promise.all([
         userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
         userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
-        userAPI.getTuneLibrary().catch(() => null),
       ]);
       setSpotifyConnected(Boolean(spotify?.connected));
       setSoundcloudConnected(Boolean(soundcloud?.connected));
-      setLibraryTotal(
-        typeof library?.total === 'number' ? library.total : null
-      );
     } finally {
       setImportStatusLoading(false);
     }
@@ -116,23 +123,16 @@ export default function MusicSearchScreen() {
     }, [refreshImportStatus])
   );
 
-  const importSubtitle = useCallback(
-    (connected: boolean, providerLabel: string) => {
-      if (!connected) {
-        return providerLabel === 'Spotify'
-          ? 'Import your saved tracks'
-          : 'Import your liked tracks';
-      }
-      if (libraryTotal != null && libraryTotal > 0) {
-        return `Connected · ${libraryTotal} in library · Import more`;
-      }
-      if (user?.onboarding?.importPromptSeenAt && !user?.onboarding?.importSkipped) {
-        return 'Connected · Import more';
-      }
-      return 'Connected · Ready to import';
-    },
-    [libraryTotal, user?.onboarding?.importPromptSeenAt, user?.onboarding?.importSkipped]
-  );
+  const importSubtitle = (
+    connected: boolean,
+    imported: number,
+    disconnectedHint: string
+  ) => {
+    if (importStatusLoading) return 'Checking…';
+    if (!connected) return disconnectedHint;
+    if (imported > 0) return `${imported} in your library`;
+    return 'Connected · none imported yet';
+  };
 
   const filteredResults = useMemo(() => {
     if (filter === 'library') return results.filter(isLibraryResult);
@@ -306,22 +306,33 @@ export default function MusicSearchScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
-        <Text style={styles.title}>Add Music</Text>
+        <Text style={styles.title}>Add music</Text>
+        <Pressable
+          style={styles.walletChip}
+          onPress={() => router.push('/wallet')}
+          accessibilityLabel="Open wallet">
+          <Text style={styles.walletChipValue}>
+            {formatPoundsFromPence(user?.balance)}
+          </Text>
+        </Pressable>
       </View>
 
       <View style={styles.searchRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Search for music"
-          placeholderTextColor={colors.textMuted}
-          value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={() => void performSearch()}
-          editable={!busy}
-        />
+        <View style={styles.searchField}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="Search title or artist"
+            placeholderTextColor={colors.textMuted}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={() => void performSearch()}
+            editable={!busy}
+          />
+        </View>
         <Pressable
           style={[styles.searchBtn, busy && styles.disabled]}
           onPress={() => void performSearch()}
@@ -329,18 +340,14 @@ export default function MusicSearchScreen() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Ionicons name="search" size={22} color="#fff" />
+            <Text style={styles.searchBtnText}>Search</Text>
           )}
         </Pressable>
       </View>
 
-      <Text style={styles.balance}>
-        Balance {formatPoundsFromPence(user?.balance)}
-      </Text>
-
       {!hasSearched ? (
         <View style={styles.importSection}>
-          <Text style={styles.importSectionLabel}>Import likes</Text>
+          <Text style={styles.importSectionLabel}>Bring in your library</Text>
           <View style={styles.importGrid}>
             <Pressable
               style={[styles.importCard, styles.spotifyCard]}
@@ -352,11 +359,26 @@ export default function MusicSearchScreen() {
               }
               accessibilityRole="button"
               accessibilityLabel="Import from Spotify">
-              <Text style={styles.importTitle}>Spotify</Text>
+              <View style={styles.importIconRow}>
+                <Ionicons name="logo-spotify" size={20} color="#86efac" />
+                <Text style={styles.importTitle}>Spotify</Text>
+              </View>
+              <Text style={styles.importCount}>
+                {importStatusLoading
+                  ? '—'
+                  : spotifyConnected
+                    ? String(spotifyImported)
+                    : '—'}
+              </Text>
               <Text style={styles.importSub}>
-                {importStatusLoading && !spotifyConnected
-                  ? 'Checking…'
-                  : importSubtitle(spotifyConnected, 'Spotify')}
+                {importSubtitle(
+                  spotifyConnected,
+                  spotifyImported,
+                  'Import your saved tracks'
+                )}
+              </Text>
+              <Text style={styles.importCta}>
+                {spotifyConnected ? 'Import more →' : 'Connect →'}
               </Text>
             </Pressable>
             <Pressable
@@ -369,14 +391,55 @@ export default function MusicSearchScreen() {
               }
               accessibilityRole="button"
               accessibilityLabel="Import from SoundCloud">
-              <Text style={styles.importTitleSc}>SoundCloud</Text>
+              <View style={styles.importIconRow}>
+                <FontAwesome name="soundcloud" size={18} color="#fdba74" />
+                <Text style={styles.importTitleSc}>SoundCloud</Text>
+              </View>
+              <Text style={styles.importCountSc}>
+                {importStatusLoading
+                  ? '—'
+                  : soundcloudConnected
+                    ? String(soundcloudImported)
+                    : '—'}
+              </Text>
               <Text style={styles.importSub}>
-                {importStatusLoading && !soundcloudConnected
-                  ? 'Checking…'
-                  : importSubtitle(soundcloudConnected, 'SoundCloud')}
+                {importSubtitle(
+                  soundcloudConnected,
+                  soundcloudImported,
+                  'Import your liked tracks'
+                )}
+              </Text>
+              <Text style={styles.importCtaSc}>
+                {soundcloudConnected ? 'Import more →' : 'Connect →'}
               </Text>
             </Pressable>
           </View>
+          {canUpload ? (
+            <Pressable
+              style={styles.uploadCard}
+              onPress={() => router.push('/upload')}
+              accessibilityRole="button"
+              accessibilityLabel="Upload a track">
+              <View style={styles.uploadIcon}>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={20}
+                  color={colors.accentLight}
+                />
+              </View>
+              <View style={styles.uploadCopy}>
+                <Text style={styles.uploadTitle}>Upload a track</Text>
+                <Text style={styles.uploadSub}>
+                  MP3 you own or have rights to
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={colors.textMuted}
+              />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -414,7 +477,10 @@ export default function MusicSearchScreen() {
       <FlatList
         data={filteredResults}
         keyExtractor={(item, index) => searchResultId(item) || String(index)}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: Math.max(24, contentPaddingBottom) },
+        ]}
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator
@@ -450,18 +516,9 @@ export default function MusicSearchScreen() {
               ) : null}
             </View>
           ) : (
-            <View style={styles.emptyBlock}>
-              <Ionicons
-                name="search-outline"
-                size={40}
-                color={colors.textMuted}
-              />
-              <Text style={styles.emptyTitle}>Search for Music</Text>
-              <Text style={styles.empty}>
-                Tip tracks into the chart from Tuneable’s library or MusicBrainz.
-                Catalog tips stay tippable until someone uploads playable audio.
-              </Text>
-            </View>
+            <Text style={styles.emptyQuiet}>
+              Or search Tuneable’s library and MusicBrainz.
+            </Text>
           )
         }
         ListFooterComponent={
@@ -587,59 +644,81 @@ const styles = StyleSheet.create({
   },
   back: { marginLeft: -2 },
   title: {
+    flex: 1,
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.text,
+    letterSpacing: -0.3,
+  },
+  walletChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(126, 34, 206, 0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  walletChipValue: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
   },
   searchRow: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  input: {
+  searchField: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+  },
+  input: {
+    flex: 1,
     paddingVertical: 12,
     color: colors.text,
     fontSize: 15,
   },
   searchBtn: {
-    width: 48,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  balance: {
     paddingHorizontal: 16,
-    marginBottom: 4,
-    color: colors.textMuted,
-    fontSize: 13,
+  },
+  searchBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   importSection: {
     paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 4,
-    gap: 8,
+    marginBottom: 8,
+    gap: 10,
   },
   importSectionLabel: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   importGrid: {
+    flexDirection: 'row',
     gap: 8,
   },
   importCard: {
-    borderRadius: 12,
+    flex: 1,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   spotifyCard: {
     borderColor: 'rgba(34, 197, 94, 0.4)',
@@ -649,21 +728,84 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.4)',
     backgroundColor: 'rgba(249, 115, 22, 0.1)',
   },
+  importIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   importTitle: {
     color: '#86efac',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   importTitleSc: {
     color: '#fdba74',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  importCount: {
+    marginTop: 10,
+    color: '#bbf7d0',
+    fontSize: 28,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  importCountSc: {
+    marginTop: 10,
+    color: '#fed7aa',
+    fontSize: 28,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  importSub: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  importCta: {
+    marginTop: 10,
+    color: '#86efac',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  importCtaSc: {
+    marginTop: 10,
+    color: '#fdba74',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  uploadCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  uploadIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(147, 51, 234, 0.25)',
+  },
+  uploadCopy: {
+    flex: 1,
+  },
+  uploadTitle: {
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
-  importSub: {
-    marginTop: 3,
+  uploadSub: {
+    marginTop: 2,
     color: colors.textMuted,
     fontSize: 12,
-    lineHeight: 17,
   },
   status: {
     paddingHorizontal: 16,
@@ -724,6 +866,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     lineHeight: 22,
+  },
+  emptyQuiet: {
+    marginTop: 16,
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
   },
   footer: {
     paddingTop: 8,

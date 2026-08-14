@@ -100,6 +100,17 @@ export const userAPI = {
     return response.data;
   },
 
+  getImportStats: async (): Promise<{
+    spotify: { connected: boolean; imported: number };
+    soundcloud: { connected: boolean; imported: number };
+  }> => {
+    const response = await api.get<{
+      spotify: { connected: boolean; imported: number };
+      soundcloud: { connected: boolean; imported: number };
+    }>('/users/me/import-stats');
+    return response.data;
+  },
+
   startSpotifyImportPreview: async (
     limit = 50
   ): Promise<{ jobId: string; status: string }> => {
