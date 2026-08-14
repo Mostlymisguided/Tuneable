@@ -8,14 +8,14 @@ import { colors } from '@/src/theme/colors';
 type Props = {
   children: ReactNode;
   style?: ViewStyle;
-  /** Clear space for the sticky player dock on stack screens (default true). */
+  /** Clear space for the sticky player dock and tab bar on stack screens (default true). */
   padForPlayer?: boolean;
 };
 
 /** Full-screen purple gradient matching web / iOS. */
 export function Screen({ children, style, padForPlayer = true }: Props) {
   const { contentPaddingBottom, onTabs } = usePlayerDockState();
-  // Tab screens usually pad FlatLists themselves; stack screens need Screen padding.
+  // Tab screens pad FlatLists themselves; stack screens need Screen padding.
   const bottomPad = padForPlayer && !onTabs ? contentPaddingBottom : 0;
 
   return (

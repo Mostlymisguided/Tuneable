@@ -277,7 +277,7 @@ export default function TagProfileScreen() {
   );
 
   return (
-    <Screen>
+    <Screen padForPlayer={false}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />

@@ -4,6 +4,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -297,6 +298,9 @@ export default function WalletScreen() {
 
   return (
     <Screen style={styles.pad}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}>
       <View style={styles.headerRow}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
@@ -403,12 +407,14 @@ export default function WalletScreen() {
       ) : null}
 
       {statusMessage ? <Text style={styles.status}>{statusMessage}</Text> : null}
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   pad: { paddingHorizontal: 20, paddingTop: 8 },
+  scrollContent: { paddingBottom: 24, flexGrow: 1 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

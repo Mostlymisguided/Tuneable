@@ -1,5 +1,4 @@
 import { Redirect, Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import { useAuth } from '@/src/auth/AuthContext';
 import { needsOnboarding } from '@/src/lib/onboarding';
@@ -19,56 +18,19 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Tabs
+        tabBar={() => null}
         screenOptions={{
           headerStyle: { backgroundColor: colors.gradientStart },
           headerTintColor: colors.text,
           headerShadowVisible: false,
-          tabBarStyle: {
-            backgroundColor: colors.tabBar,
-            borderTopColor: colors.cardBorder,
-          },
-          tabBarActiveTintColor: colors.accentLight,
-          tabBarInactiveTintColor: colors.textMuted,
         }}>
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="music"
-          options={{
-            title: 'Music',
-            headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="musical-notes" size={size} color={color} />
-            ),
-          }}
-        />
+        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="music" options={{ title: 'Music', headerShown: false }} />
         <Tabs.Screen
           name="podcasts"
-          options={{
-            title: 'Podcasts',
-            headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="mic" size={size} color={color} />
-            ),
-          }}
+          options={{ title: 'Podcasts', headerShown: false }}
         />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person" size={size} color={color} />
-            ),
-          }}
-        />
+        <Tabs.Screen name="profile" options={{ title: 'Profile', headerShown: false }} />
       </Tabs>
     </View>
   );

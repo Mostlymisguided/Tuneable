@@ -5,8 +5,8 @@ import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { colors } from '@/src/theme/colors';
 
 /**
- * Sticky bottom player chrome — above the tab bar on tabs,
- * above the home indicator on stack screens. Hidden on auth + Now Playing.
+ * Sticky bottom player chrome — above the persistent tab bar when it is
+ * visible, above the home indicator otherwise. Hidden on auth + Now Playing.
  */
 export function PlayerDock() {
   const { mode, bottomOffset, visible } = usePlayerDockState();
