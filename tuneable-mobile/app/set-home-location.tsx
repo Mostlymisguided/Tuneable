@@ -9,11 +9,17 @@ import {
   View,
 } from 'react-native';
 import { Redirect, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
+import {
+  getCurrentLocationStatus,
+  refreshCurrentLocation,
+} from '@/src/lib/currentLocation';
+import { formatLocationLabel } from '@/src/lib/location';
 import { hasHomeLocation } from '@/src/lib/onboarding';
 import { colors } from '@/src/theme/colors';
 import type { ResolvedLocation } from '@/src/types/user';
@@ -25,7 +31,10 @@ export default function SetHomeLocationScreen() {
     user?.homeLocation ?? null
   );
   const [saving, setSaving] = useState(false);
+  const [requestingGps, setRequestingGps] = useState(false);
+  const [locationFromGps, setLocationFromGps] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const busy = saving || requestingGps;
 
   if (!isLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
@@ -34,6 +43,29 @@ export default function SetHomeLocationScreen() {
   if (!isLoading && user && hasHomeLocation(user.homeLocation)) {
     return <Redirect href="/(tabs)" />;
   }
+
+  const requestDeviceLocation = async () => {
+    setRequestingGps(true);
+    setError(null);
+    try {
+      const location = await refreshCurrentLocation({ force: true });
+      if (location) {
+        setHomeLocation(location);
+        setLocationFromGps(true);
+        return;
+      }
+      const status = getCurrentLocationStatus();
+      if (status === 'denied') {
+        setError(
+          'Location access was blocked. Search for your city, or enable it in Settings.'
+        );
+        return;
+      }
+      setError('Could not detect your location. Search for your city instead.');
+    } finally {
+      setRequestingGps(false);
+    }
+  };
 
   const onSave = async () => {
     if (!hasHomeLocation(homeLocation)) {
@@ -63,20 +95,64 @@ export default function SetHomeLocationScreen() {
         </Pressable>
         <Text style={styles.title}>Where are you based?</Text>
         <Text style={styles.lede}>
-          Your home location connects you to local parties and charts.
+          Allow location so we can connect you to local parties and charts. If
+          you&apos;re traveling or it isn&apos;t home, search instead.
         </Text>
+
+        <Pressable
+          style={[
+            homeLocation?.placeId ? styles.gpsBtnOutline : styles.button,
+            busy && styles.buttonDisabled,
+          ]}
+          disabled={busy}
+          onPress={() => void requestDeviceLocation()}>
+          {requestingGps ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <View style={styles.gpsBtnInner}>
+              <Ionicons
+                name="navigate-outline"
+                size={18}
+                color={homeLocation?.placeId ? colors.accentLight : '#fff'}
+              />
+              <Text
+                style={
+                  homeLocation?.placeId ? styles.gpsBtnOutlineText : styles.buttonText
+                }>
+                {locationFromGps ? 'Detect again' : 'Use my current location'}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+
+        {locationFromGps && homeLocation ? (
+          <Text style={styles.successHint}>
+            Detected {formatLocationLabel(homeLocation)}. Confirm below, or
+            search if that&apos;s not home.
+          </Text>
+        ) : null}
+
+        <View style={styles.orRow}>
+          <View style={styles.orLine} />
+          <Text style={styles.orText}>or search</Text>
+          <View style={styles.orLine} />
+        </View>
 
         <LocationAutocomplete
           value={homeLocation}
-          onChange={setHomeLocation}
+          onChange={(location) => {
+            setLocationFromGps(false);
+            setHomeLocation(location);
+          }}
           label="Home location"
+          disabled={busy}
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Pressable
-          style={[styles.button, saving && styles.buttonDisabled]}
-          disabled={saving}
+          style={[styles.button, busy && styles.buttonDisabled]}
+          disabled={busy}
           onPress={() => void onSave()}>
           {saving ? (
             <ActivityIndicator color="#fff" />
@@ -112,6 +188,48 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 4,
+  },
+  gpsBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  gpsBtnOutline: {
+    marginTop: 8,
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.5)',
+  },
+  gpsBtnOutlineText: {
+    color: colors.accentLight,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  orLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.cardBorder,
+  },
+  orText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  successHint: {
+    color: '#86efac',
+    fontSize: 13,
+    lineHeight: 18,
   },
   error: {
     color: '#fca5a5',

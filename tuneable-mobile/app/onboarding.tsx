@@ -21,6 +21,13 @@ import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatPoundsFromPence } from '@/src/lib/format';
+import { formatLocationLabel } from '@/src/lib/location';
+import {
+  getCurrentLocationStatus,
+  getTipCurrentLocation,
+  maybeRefreshCurrentLocationIfGranted,
+  refreshCurrentLocation,
+} from '@/src/lib/currentLocation';
 import {
   DEFAULT_TIP_POUNDS,
   hasHomeLocation,
@@ -75,6 +82,8 @@ export default function OnboardingScreen() {
   const [defaultTip, setDefaultTip] = useState(DEFAULT_TIP_POUNDS.toFixed(2));
   const [homeLocation, setHomeLocation] = useState<ResolvedLocation | null>(null);
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [requestingGps, setRequestingGps] = useState(false);
+  const [locationFromGps, setLocationFromGps] = useState(false);
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
@@ -109,6 +118,19 @@ export default function OnboardingScreen() {
 
     let cancelled = false;
     const detect = async () => {
+      try {
+        await maybeRefreshCurrentLocationIfGranted();
+        if (cancelled) return;
+        const gpsLocation = getTipCurrentLocation();
+        if (gpsLocation) {
+          setHomeLocation((prev) => (hasHomeLocation(prev) ? prev : gpsLocation));
+          setLocationFromGps(true);
+          return;
+        }
+      } catch {
+        // Fall through to optional IP hint
+      }
+
       setDetectingLocation(true);
       try {
         const response = await userAPI.detectLocation();
@@ -185,6 +207,29 @@ export default function OnboardingScreen() {
       setError(getApiErrorMessage(err, 'Failed to continue.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const requestDeviceLocation = async () => {
+    setRequestingGps(true);
+    setError(null);
+    try {
+      const location = await refreshCurrentLocation({ force: true });
+      if (location) {
+        setHomeLocation(location);
+        setLocationFromGps(true);
+        return;
+      }
+      const status = getCurrentLocationStatus();
+      if (status === 'denied') {
+        setError(
+          'Location access was blocked. Search for your city, or enable it in Settings.'
+        );
+        return;
+      }
+      setError('Could not detect your location. Search for your city instead.');
+    } finally {
+      setRequestingGps(false);
     }
   };
 
@@ -465,7 +510,7 @@ export default function OnboardingScreen() {
   const tunesCoveredLabel =
     tunesCovered == null ? null : tunesCovered >= 100 ? '100+' : String(tunesCovered);
 
-  const busy = saving || importLoading;
+  const busy = saving || importLoading || requestingGps;
 
   if (authLoading) {
     return (
@@ -609,15 +654,60 @@ export default function OnboardingScreen() {
                   <View style={styles.stepHeaderCopy}>
                     <Text style={styles.stepTitle}>Where are you based?</Text>
                     <Text style={styles.stepText}>
-                      Connect to local parties and charts. Skip and we&apos;ll
-                      remind you on Home until you set it.
+                      Allow location so we can connect you to local parties and
+                      charts. If you&apos;re traveling or it isn&apos;t home,
+                      search instead.
                     </Text>
                   </View>
                 </View>
 
+                <Pressable
+                  style={[
+                    homeLocation?.placeId ? styles.gpsBtnOutline : styles.primaryBtn,
+                    busy && styles.btnDisabled,
+                  ]}
+                  disabled={busy}
+                  onPress={() => void requestDeviceLocation()}>
+                  {requestingGps ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <View style={styles.gpsBtnInner}>
+                      <Ionicons
+                        name="navigate-outline"
+                        size={18}
+                        color={homeLocation?.placeId ? colors.accentLight : '#fff'}
+                      />
+                      <Text
+                        style={
+                          homeLocation?.placeId
+                            ? styles.gpsBtnOutlineText
+                            : styles.primaryBtnText
+                        }>
+                        {locationFromGps ? 'Detect again' : 'Use my current location'}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+
+                {locationFromGps && homeLocation ? (
+                  <Text style={styles.successHint}>
+                    Detected {formatLocationLabel(homeLocation)}. Confirm below,
+                    or search if that&apos;s not home.
+                  </Text>
+                ) : null}
+
+                <View style={styles.orRow}>
+                  <View style={styles.orLine} />
+                  <Text style={styles.orText}>or search</Text>
+                  <View style={styles.orLine} />
+                </View>
+
                 <LocationAutocomplete
                   value={homeLocation}
-                  onChange={setHomeLocation}
+                  onChange={(location) => {
+                    setLocationFromGps(false);
+                    setHomeLocation(location);
+                  }}
                   disabled={busy}
                 />
                 {detectingLocation ? (
@@ -931,6 +1021,47 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     lineHeight: 18,
+  },
+  successHint: {
+    color: '#86efac',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  gpsBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  gpsBtnOutline: {
+    marginTop: 4,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.5)',
+  },
+  gpsBtnOutlineText: {
+    color: colors.accentLight,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  orLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.cardBorder,
+  },
+  orText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   error: {
     color: '#fca5a5',

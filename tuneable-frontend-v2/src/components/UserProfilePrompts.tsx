@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, MapPin, Navigation, User, X, CheckCircle } from 'lucide-react';
-import { emailAPI } from '../lib/api';
+import { emailAPI, authAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { hasCustomProfilePic } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { formatLocation } from '../utils/locationHelpers';
 
@@ -42,6 +43,7 @@ interface Prompt {
 
 const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss }) => {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const {
     currentLocation,
     status: currentLocationStatus,
@@ -77,12 +79,28 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     }
   };
 
-  const handleAddLocation = () => {
-    const userId = user._id || user.id || user.uuid;
-    if (userId) {
-      navigate(`/user/${userId}`);
-    } else {
-      toast.error('Unable to navigate to profile');
+  const handleAddLocation = async () => {
+    setIsEnablingLocation(true);
+    try {
+      const location = await enableCurrentLocation();
+      if (location) {
+        await authAPI.updateProfile({ homeLocation: location });
+        await refreshUser();
+        toast.success(`Home location set to ${formatLocation(location)}`);
+        return;
+      }
+      const { getCurrentLocationStatus } = await import('../utils/currentLocationCache');
+      if (getCurrentLocationStatus() === 'denied') {
+        toast.error('Location permission denied. Search for your city on your profile.');
+      }
+      const userId = user._id || user.id || user.uuid;
+      if (userId) {
+        navigate(`/user/${userId}?settings=true&tab=profile`);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Could not set home location');
+    } finally {
+      setIsEnablingLocation(false);
     }
   };
 
@@ -146,10 +164,10 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     prompts.push({
       id: 'location',
       title: 'Add Home Location',
-      description: 'Add your home location so tips influence local parties and charts where you\'re from',
+      description: 'Use your current location so tips influence local parties and charts. You can change it on your profile if this isn\'t home.',
       icon: MapPin,
       action: handleAddLocation,
-      actionLabel: 'Add location',
+      actionLabel: isEnablingLocation ? 'Detecting...' : 'Use current location',
       priority: 1,
       persistent: true,
     });
@@ -200,7 +218,8 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
           const Icon = prompt.icon;
           const isBusy =
             (isSendingEmail && prompt.id === 'email') ||
-            (isEnablingLocation && prompt.id === 'currentLocation');
+            (isEnablingLocation &&
+              (prompt.id === 'currentLocation' || prompt.id === 'location'));
           return (
             <div
               key={prompt.id}

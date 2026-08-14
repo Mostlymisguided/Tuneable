@@ -6,6 +6,7 @@ import {
   Loader2,
   MapPin,
   Music,
+  Navigation,
   Sparkles,
   CheckCircle2,
 } from 'lucide-react';
@@ -17,7 +18,13 @@ import { buildOAuthStartUrl } from '../utils/platform';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_TIP_POUNDS } from '../constants';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import type { ResolvedLocation } from '../utils/locationHelpers';
+import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
+import {
+  getCurrentLocationStatus,
+  getTipCurrentLocation,
+  maybeRefreshCurrentLocationIfGranted,
+  refreshCurrentLocation,
+} from '../utils/currentLocationCache';
 
 type OnboardingStep = 'tip' | 'location' | 'import';
 type ImportSource = 'spotify' | 'soundcloud';
@@ -46,6 +53,9 @@ const Onboarding: React.FC = () => {
 
   const [homeLocation, setHomeLocation] = useState<ResolvedLocation | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [isRequestingGps, setIsRequestingGps] = useState(false);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [locationFromGps, setLocationFromGps] = useState(false);
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
@@ -93,6 +103,19 @@ const Onboarding: React.FC = () => {
 
     let cancelled = false;
     const detectUserLocation = async () => {
+      try {
+        await maybeRefreshCurrentLocationIfGranted();
+        if (cancelled) return;
+        const gpsLocation = getTipCurrentLocation();
+        if (gpsLocation) {
+          setHomeLocation((prev) => (prev?.placeId || prev?.city ? prev : gpsLocation));
+          setLocationFromGps(true);
+          return;
+        }
+      } catch {
+        // Fall through to optional IP hint
+      }
+
       setIsDetectingLocation(true);
       try {
         const response = await userAPI.detectLocation();
@@ -110,7 +133,7 @@ const Onboarding: React.FC = () => {
           });
         }
       } catch {
-        // IP hint is optional — user can still search manually
+        // IP hint is optional — user can still search or use GPS
       } finally {
         if (!cancelled) setIsDetectingLocation(false);
       }
@@ -242,6 +265,29 @@ const Onboarding: React.FC = () => {
       toast.error(message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const requestDeviceLocation = async () => {
+    setIsRequestingGps(true);
+    setGpsError(null);
+    try {
+      const location = await refreshCurrentLocation({ force: true });
+      if (location) {
+        setHomeLocation(location);
+        setLocationFromGps(true);
+        return;
+      }
+      const status = getCurrentLocationStatus();
+      if (status === 'denied') {
+        setGpsError(
+          'Location access was blocked. Search for your city, or enable it in your browser settings.'
+        );
+        return;
+      }
+      setGpsError('Could not detect your location. Search for your city instead.');
+    } finally {
+      setIsRequestingGps(false);
     }
   };
 
@@ -540,18 +586,55 @@ const Onboarding: React.FC = () => {
               <div>
                 <h2 className="text-xl font-semibold text-white">Where are you based?</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Your home location connects you to local parties and charts. You can skip and set it
-                  later — we&apos;ll remind you on your dashboard until you do.
+                  Allow location so we can connect you to local parties and charts. If you&apos;re
+                  traveling or it isn&apos;t home, search instead. You can skip and set it later.
                 </p>
               </div>
             </div>
 
-            <div>
+            <button
+              type="button"
+              onClick={() => void requestDeviceLocation()}
+              disabled={isSaving || isRequestingGps}
+              className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 font-semibold disabled:opacity-50 ${
+                homeLocation?.placeId
+                  ? 'border border-purple-500/50 text-purple-200 hover:bg-purple-600/20'
+                  : 'bg-purple-600 text-white hover:bg-purple-500'
+              }`}
+            >
+              {isRequestingGps ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Navigation className="h-5 w-5" />
+              )}
+              {isRequestingGps
+                ? 'Detecting your location…'
+                : locationFromGps
+                  ? 'Detect again'
+                  : 'Use my current location'}
+            </button>
+
+            {gpsError && <p className="text-sm text-amber-300/90">{gpsError}</p>}
+            {locationFromGps && homeLocation && (
+              <p className="text-sm text-green-300">
+                Detected {formatLocation(homeLocation)}. Confirm below, or search if that&apos;s not home.
+              </p>
+            )}
+
+            <div className="relative">
+              <div className="mb-3 flex items-center gap-3 text-xs uppercase tracking-wide text-gray-500">
+                <span className="h-px flex-1 bg-gray-700" />
+                or search
+                <span className="h-px flex-1 bg-gray-700" />
+              </div>
               <LocationAutocomplete
                 variant="dark"
                 label="Home location"
                 value={homeLocation}
-                onChange={setHomeLocation}
+                onChange={(location) => {
+                  setLocationFromGps(false);
+                  setHomeLocation(location);
+                }}
                 placeholder="Search for your home city or town"
               />
               {isDetectingLocation && (
