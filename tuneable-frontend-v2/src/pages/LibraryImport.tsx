@@ -893,11 +893,7 @@ const LibraryImport: React.FC = () => {
         {step === 'connect' && (
           <div className="space-y-4">
             <div className="flex gap-2">
-              {([
-                'spotify',
-                'soundcloud',
-                ...(adminUser ? ['rekordbox'] as const : []),
-              ] as ImportSource[]).map((s) => {
+              {(['spotify', 'soundcloud'] as ImportSource[]).map((s) => {
                 const sMeta = SOURCE_META[s];
                 const connected = s === 'spotify' ? spotifyConnected : soundcloudConnected;
                 const active = source === s;
@@ -919,9 +915,7 @@ const LibraryImport: React.FC = () => {
                       <div>
                         <div className="font-semibold">{sMeta.label}</div>
                         <div className="text-xs text-gray-400">
-                          {s === 'rekordbox'
-                            ? 'Admin catalog import'
-                            : connected ? 'Connected' : 'Not connected'}
+                          {connected ? 'Connected' : 'Not connected'}
                         </div>
                       </div>
                     </div>
@@ -929,6 +923,27 @@ const LibraryImport: React.FC = () => {
                 );
               })}
             </div>
+            {adminUser ? (
+              <button
+                type="button"
+                onClick={() => selectSource('rekordbox')}
+                className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                  source === 'rekordbox'
+                    ? 'border-red-500 bg-gray-800'
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-500'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full ${SOURCE_META.rekordbox.badge} flex items-center justify-center`}>
+                    <Music className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-semibold">{SOURCE_META.rekordbox.label}</div>
+                    <div className="text-xs text-gray-400">Admin catalog import — XML playlists, no audio upload</div>
+                  </div>
+                </div>
+              </button>
+            ) : null}
 
             <div className="bg-gray-800 rounded-xl p-8 border border-gray-700">
               <div className="flex items-center gap-4 mb-6">

@@ -37,7 +37,15 @@ interface Media {
  * Check if user is a platform administrator
  */
 export function isAdmin(user: User | null | undefined): boolean {
-  return user?.role?.includes('admin') ?? false;
+  const role = (user as { role?: unknown } | null | undefined)?.role;
+  if (Array.isArray(role)) {
+    return role.some((entry) => String(entry).toLowerCase() === 'admin');
+  }
+  if (typeof role === 'string') {
+    return role.toLowerCase() === 'admin'
+      || role.toLowerCase().split(/[\s,]+/).includes('admin');
+  }
+  return false;
 }
 
 /**
