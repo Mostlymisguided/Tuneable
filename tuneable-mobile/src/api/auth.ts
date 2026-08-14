@@ -62,4 +62,9 @@ export const authAPI = {
     );
     return response.data;
   },
+
+  resendVerification: async (): Promise<{ message?: string }> => {
+    const response = await api.post<{ message?: string }>('/email/verify/send');
+    return response.data;
+  },
 };

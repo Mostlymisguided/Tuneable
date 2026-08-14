@@ -43,6 +43,10 @@ export interface User {
 export const DEFAULT_PROFILE_PIC =
   'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
 
+export function hasCustomProfilePic(profilePic?: string | null): boolean {
+  return Boolean(profilePic && profilePic !== DEFAULT_PROFILE_PIC);
+}
+
 export interface LocationAncestor {
   placeId?: string;
   placetype?: string;

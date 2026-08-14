@@ -24,7 +24,7 @@ export default function TabLayout() {
           headerTintColor: colors.text,
           headerShadowVisible: false,
         }}>
-        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="index" options={{ title: 'Home', headerShown: false }} />
         <Tabs.Screen name="music" options={{ title: 'Music', headerShown: false }} />
         <Tabs.Screen
           name="podcasts"
