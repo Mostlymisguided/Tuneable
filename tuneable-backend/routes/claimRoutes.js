@@ -184,7 +184,9 @@ router.get('/all', authMiddleware, adminMiddleware, async (req, res) => {
     const claims = await Claim.find(filter)
       .populate('mediaId', 'title artist coverArt rightsStatus rightsCleared')
       .populate('userId', 'username email profilePic')
-      .sort({ submittedAt: -1 });
+      .sort({ submittedAt: -1 })
+      .limit(100)
+      .lean();
 
     res.json({ claims });
   } catch (error) {

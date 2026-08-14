@@ -47,8 +47,17 @@ const MEDIA_CHART_SELECT = [
   'rightsCleared',
 ].join(' ');
 
-const USER_PUBLIC_SELECT = 'username profilePic uuid homeLocation secondaryLocation';
+const USER_PUBLIC_SELECT = 'username profilePic uuid';
 const DEFAULT_SUPPORTERS_LIMIT = 5;
+const DEFAULT_CHART_LIMIT = 250;
+const MAX_CHART_LIMIT = 500;
+
+function effectiveChartLimit(limit) {
+  if (typeof limit === 'number' && limit > 0) {
+    return Math.min(limit, MAX_CHART_LIMIT);
+  }
+  return DEFAULT_CHART_LIMIT;
+}
 
 function sourcesToObject(sources) {
   const sourcesObj = {};
@@ -314,6 +323,7 @@ async function computeTopLocations({
       },
     },
     { $sort: { total: -1, count: -1 } },
+    { $limit: Math.max(limitCountries + limitPlaces, 20) * 3 },
   ]);
 
   // Enrich place rows missing country placeId (legacy snapshots)
@@ -504,12 +514,11 @@ async function fetchAllTimeGlobalChart({
     .populate('addedBy', 'username profilePic uuid')
     .lean();
 
+  const chartLimit = effectiveChartLimit(limit);
   if (typeof offset === 'number' && offset > 0) {
     query.skip(offset);
   }
-  if (typeof limit === 'number' && limit > 0) {
-    query.limit(limit);
-  }
+  query.limit(chartLimit);
 
   const mediaList = await query;
   const mediaIds = mediaList.map((m) => m._id);
@@ -581,7 +590,7 @@ async function fetchAllTimeGlobalChart({
       count: chartMedia.length,
       processingTimeMs: Date.now() - startTime,
       supportersLimit,
-      limited: typeof limit === 'number' && limit > 0,
+      limited: true,
       offset: offset || 0,
     },
   };
@@ -668,7 +677,7 @@ async function fetchPeriodGlobalChart({
         count: 0,
         processingTimeMs: Date.now() - startTime,
         supportersLimit,
-        limited: typeof limit === 'number' && limit > 0,
+        limited: true,
         offset: offset || 0,
       },
     };
@@ -688,64 +697,70 @@ async function fetchPeriodGlobalChart({
       rankBidQuery.createdAt = { $gte: startDate };
     }
 
-    const rankingBids = await Bid.find(rankBidQuery)
-      .select('mediaId amount')
-      .lean();
-
-    for (const bid of rankingBids) {
-      const mediaId = bid.mediaId?.toString();
+    const grouped = await Bid.aggregate([
+      { $match: rankBidQuery },
+      { $group: { _id: '$mediaId', total: { $sum: '$amount' } } },
+    ]);
+    for (const row of grouped) {
+      const mediaId = row._id?.toString();
       if (!mediaId) continue;
-      mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
+      mediaBidValues[mediaId] = row.total;
     }
   }
 
-  let mediaList = await Media.find({
-    ...GLOBAL_PARTY_TUNES_FILTER,
-    _id: { $in: matchingMediaIds },
-    status: { $ne: 'vetoed' },
-  })
-    .select(MEDIA_CHART_SELECT)
-    .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
-    .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
-    .populate('addedBy', 'username profilePic uuid')
-    .populate({
-      path: 'artist.userId',
-      model: 'User',
-      select: 'username profilePic uuid creatorProfile.artistName',
-    })
-    .populate({
-      path: 'artist.collectiveId',
-      model: 'Collective',
-      select: 'name slug profilePicture verificationStatus',
-    })
-    .populate({
-      path: 'featuring.userId',
-      model: 'User',
-      select: 'username profilePic uuid creatorProfile.artistName',
-    })
-    .lean();
+  const chartLimit = effectiveChartLimit(limit);
+  const startOffset = typeof offset === 'number' && offset > 0 ? offset : 0;
 
-  mediaList = mediaList
-    .map((media) => {
-      const id = media._id.toString();
-      const timePeriodBidValue = useStoredGlobalAggregate
-        ? (media.globalMediaAggregate || 0)
-        : (mediaBidValues[id] || 0);
-      return { media, timePeriodBidValue };
+  let mediaList;
+  if (useStoredGlobalAggregate) {
+    mediaList = await Media.find({
+      ...GLOBAL_PARTY_TUNES_FILTER,
+      _id: { $in: matchingMediaIds },
+      status: { $ne: 'vetoed' },
     })
-    // Keep origin-only rows even with zero tips in-period (they still match the place)
-    .filter((row) => placeId || row.timePeriodBidValue > 0)
-    .sort((a, b) => {
-      const diff = b.timePeriodBidValue - a.timePeriodBidValue;
-      if (diff !== 0) return diff;
-      return (b.media.globalMediaAggregate || 0) - (a.media.globalMediaAggregate || 0);
-    });
+      .select(MEDIA_CHART_SELECT)
+      .sort({ globalMediaAggregate: -1 })
+      .skip(startOffset)
+      .limit(chartLimit)
+      .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
+      .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
+      .populate('addedBy', 'username profilePic uuid')
+      .lean();
+    mediaList = mediaList.map((media) => ({
+      media,
+      timePeriodBidValue: media.globalMediaAggregate || 0,
+    }));
+  } else {
+    const idSet = new Set(Object.keys(mediaBidValues));
+    if (placeId) {
+      for (const id of matchingMediaIds) idSet.add(id);
+    }
+    const rankedIds = [...idSet]
+      .sort((a, b) => (mediaBidValues[b] || 0) - (mediaBidValues[a] || 0))
+      .slice(startOffset, startOffset + chartLimit);
 
-  if (typeof offset === 'number' && offset > 0) {
-    mediaList = mediaList.slice(offset);
-  }
-  if (typeof limit === 'number' && limit > 0) {
-    mediaList = mediaList.slice(0, limit);
+    mediaList = await Media.find({
+      ...GLOBAL_PARTY_TUNES_FILTER,
+      _id: { $in: rankedIds },
+      status: { $ne: 'vetoed' },
+    })
+      .select(MEDIA_CHART_SELECT)
+      .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
+      .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
+      .populate('addedBy', 'username profilePic uuid')
+      .lean();
+
+    mediaList = mediaList
+      .map((media) => {
+        const id = media._id.toString();
+        return { media, timePeriodBidValue: mediaBidValues[id] || 0 };
+      })
+      .filter((row) => placeId || row.timePeriodBidValue > 0)
+      .sort((a, b) => {
+        const diff = b.timePeriodBidValue - a.timePeriodBidValue;
+        if (diff !== 0) return diff;
+        return (b.media.globalMediaAggregate || 0) - (a.media.globalMediaAggregate || 0);
+      });
   }
 
   const pageMediaIds = mediaList.map((row) => row.media._id);
@@ -816,7 +831,7 @@ async function fetchPeriodGlobalChart({
       count: chartMedia.length,
       processingTimeMs: Date.now() - startTime,
       supportersLimit,
-      limited: typeof limit === 'number' && limit > 0,
+      limited: true,
       offset: offset || 0,
     },
   };

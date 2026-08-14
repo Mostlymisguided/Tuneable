@@ -177,7 +177,9 @@ router.get('/applications', authMiddleware, adminMiddleware, async (req, res) =>
 
     const applications = await User.find(filter)
       .select('_id username email profilePic creatorProfile role createdAt')
-      .sort({ 'creatorProfile.submittedAt': -1 });
+      .sort({ 'creatorProfile.submittedAt': -1 })
+      .limit(100)
+      .lean();
 
     res.json({ applications });
   } catch (error) {

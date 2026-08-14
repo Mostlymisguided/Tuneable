@@ -22,7 +22,7 @@ const {
 const DEFAULT_TIP = 1.11;
 const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
-const FUZZY_CATALOG_LIMIT = 25000;
+const FUZZY_CATALOG_LIMIT = 4000;
 const MATCH_CONCURRENCY = 8;
 const REKORDBOX_MAX_SCAN = 200;
 
@@ -879,16 +879,22 @@ function convertRekordboxTrack(track) {
 async function listRekordboxPlaylists(xmlContent) {
   const { parseRekordboxXmlFromContent } = require('../scripts/lib/rekordboxXml');
   const parsed = await parseRekordboxXmlFromContent(xmlContent);
-  const playlists = parsed.playlists.map((p) => ({
-    name: p.name,
-    fullPath: p.fullPath,
-    trackCount: p.trackCount,
-    missingFiles: p.tracks.filter((t) => !t.fileExists).length,
-    localFiles: p.tracks.filter((t) => t.fileExists).length,
-  }));
+  const playlists = parsed.playlists.map((p) => {
+    const tracks = p.tracks || [];
+    return {
+      name: p.name,
+      fullPath: p.fullPath,
+      trackCount: p.trackCount || tracks.length,
+      missingFiles: tracks.reduce((n, t) => n + (t.fileExists ? 0 : 1), 0),
+      localFiles: tracks.reduce((n, t) => n + (t.fileExists ? 1 : 0), 0),
+    };
+  });
+  const trackCount = parsed.collectionTracks?.length || 0;
+  parsed.playlists = null;
+  parsed.collectionTracks = null;
   return {
     source: 'rekordbox',
-    trackCount: parsed.collectionTracks.length,
+    trackCount,
     playlistCount: playlists.length,
     playlists,
   };

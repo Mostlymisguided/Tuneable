@@ -237,7 +237,7 @@ const upload = createProfilePictureUpload();
 
 const rekordboxXmlUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     const mime = (file.mimetype || '').toLowerCase();
@@ -3712,6 +3712,8 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
     }
 
     const { limit = 100, skip = 0, search } = req.query;
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 100);
+    const safeSkip = Math.max(parseInt(skip, 10) || 0, 0);
     
     // Build query
     const query = {};
@@ -3727,8 +3729,8 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       .select('-passwordResetToken -passwordResetExpires') // Exclude reset tokens
       .select('-emailVerificationToken -emailVerificationExpires') // Exclude verification tokens
       .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(parseInt(skip))
+      .limit(safeLimit)
+      .skip(safeSkip)
       .lean();
 
     const total = await User.countDocuments(query);
@@ -3736,8 +3738,8 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
     res.json({
       users,
       total,
-      limit: parseInt(limit),
-      skip: parseInt(skip)
+      limit: safeLimit,
+      skip: safeSkip
     });
   } catch (error) {
     console.error('Error fetching all users:', error);

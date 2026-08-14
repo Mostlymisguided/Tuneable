@@ -246,12 +246,9 @@ const Admin: React.FC = () => {
       if (userData.role && userData.role.includes('admin')) {
         setIsAdmin(true);
         loadUsers();
-        loadCreatorApplications();
-        loadClaims();
         loadOverviewStats();
         loadQuotaStatus();
         loadAdminSettings();
-        loadLabels();
         refreshReportCounts();
         loadPendingRefundCount();
         mediaAPI.getEnrichments({ status: 'needs_review', limit: 1 })
