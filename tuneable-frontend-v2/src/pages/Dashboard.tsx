@@ -48,7 +48,8 @@ const Dashboard: React.FC = () => {
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
-  const [isInvitedUsersCollapsed, setIsInvitedUsersCollapsed] = useState(false);
+  const [isInviteCodesCollapsed, setIsInviteCodesCollapsed] = useState(true);
+  const [isInvitedUsersCollapsed, setIsInvitedUsersCollapsed] = useState(true);
   
   // Increase tip modal (Dashboard tune library)
   const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
@@ -2670,6 +2671,79 @@ Join here: ${inviteLink}`.trim();
         <UserProfilePrompts user={user} />
       </div>
 
+      {/* Invite Codes Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <button
+          onClick={() => setIsInviteCodesCollapsed(prev => !prev)}
+          className="card w-full flex items-center justify-between mb-4 hover:bg-gray-800/50 transition-colors"
+        >
+          <div className="flex items-center">
+            <Gift className="h-6 w-6 text-purple-400 mr-2" />
+            <h2 className="text-2xl font-semibold text-white">Invite Codes</h2>
+            {(user?.primaryInviteCode || user?.personalInviteCode) && (
+              <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full font-mono">
+                {user?.primaryInviteCode || user?.personalInviteCode}
+              </span>
+            )}
+          </div>
+          {isInviteCodesCollapsed ? (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+
+        {!isInviteCodesCollapsed && (
+          <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <div>
+                <p className="text-sm text-gray-300">Share your invite link</p>
+                <p className="text-xs text-gray-500 mt-1 break-all">
+                  {inviteLink}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleCopyInvite}
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy Invite
+                </button>
+                <button
+                  onClick={handleEmailInvite}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Mail className="h-4 w-4" />
+                  Email
+                </button>
+                <button
+                  onClick={handleFacebookShare}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Facebook className="h-4 w-4" />
+                  Facebook
+                </button>
+                <button
+                  onClick={handleInstagramShare}
+                  className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Instagram
+                </button>
+                <button
+                  onClick={handleSystemShare}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Invited Users Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
         <button
@@ -2678,7 +2752,7 @@ Join here: ${inviteLink}`.trim();
         >
           <div className="flex items-center">
             <Users className="h-6 w-6 text-purple-400 mr-2" />
-            <h2 className="text-2xl font-semibold text-white">Invited Users</h2>
+            <h2 className="text-2xl font-semibold text-white">People You've Invited</h2>
             <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
               {invitedUsers.length}
             </span>
@@ -2692,57 +2766,6 @@ Join here: ${inviteLink}`.trim();
 
         {!isInvitedUsersCollapsed && (
           <>
-            {/* Invite Sharing Section - Always visible when expanded */}
-            {!isLoadingInvited && (
-              <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4 mb-4">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-gray-300">Share your invite link</p>
-                    <p className="text-xs text-gray-500 mt-1 break-all">
-                      {inviteLink}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={handleCopyInvite}
-                      className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copy Invite
-                    </button>
-                    <button
-                      onClick={handleEmailInvite}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </button>
-                    <button
-                      onClick={handleFacebookShare}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Facebook className="h-4 w-4" />
-                      Facebook
-                    </button>
-                    <button
-                      onClick={handleInstagramShare}
-                      className="flex items-center gap-2 px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Instagram className="h-4 w-4" />
-                      Instagram
-                    </button>
-                    <button
-                      onClick={handleSystemShare}
-                      className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Share2 className="h-4 w-4" />
-                      Share
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {isLoadingInvited && (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
