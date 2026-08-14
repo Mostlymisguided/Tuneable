@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
@@ -46,115 +46,57 @@ const SoundCloudIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const BADGE_ROW_TOLERANCE_PX = 2;
+const DEFAULT_COLLAPSED_BADGES = 3;
 
-/** Clamps a flex-wrap badge list to N rows by default, with Show all / Show less. */
+/** Shows 3 badges by default; heading +/− expands to the full list. */
 const CollapsibleBadgeWrap: React.FC<{
   children: React.ReactNode;
-  maxRows?: number;
+  title: string;
+  icon: React.ReactNode;
+  maxVisible?: number;
+  extra?: React.ReactNode;
   className?: string;
-}> = ({ children, maxRows = 2, className = '' }) => {
+}> = ({
+  children,
+  title,
+  icon,
+  maxVisible = DEFAULT_COLLAPSED_BADGES,
+  extra,
+  className = '',
+}) => {
   const [expanded, setExpanded] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
-  const [hiddenCount, setHiddenCount] = useState(0);
-
-  const measure = useCallback(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    // Measure unrestricted so row positions aren't affected by the clamp.
-    const prevMaxHeight = el.style.maxHeight;
-    const prevOverflow = el.style.overflow;
-    el.style.maxHeight = 'none';
-    el.style.overflow = 'visible';
-
-    const items = Array.from(el.children) as HTMLElement[];
-    if (items.length === 0) {
-      el.style.maxHeight = prevMaxHeight;
-      el.style.overflow = prevOverflow;
-      setCollapsedHeight(null);
-      setHiddenCount(0);
-      return;
-    }
-
-    const containerTop = el.getBoundingClientRect().top;
-    const rowTops: number[] = [];
-    for (const item of items) {
-      const top = item.getBoundingClientRect().top - containerTop;
-      if (!rowTops.some((t) => Math.abs(t - top) < BADGE_ROW_TOLERANCE_PX)) {
-        rowTops.push(top);
-      }
-    }
-    rowTops.sort((a, b) => a - b);
-
-    if (rowTops.length <= maxRows) {
-      el.style.maxHeight = prevMaxHeight;
-      el.style.overflow = prevOverflow;
-      setCollapsedHeight(null);
-      setHiddenCount(0);
-      return;
-    }
-
-    const cutoffTop = rowTops[maxRows - 1];
-    const height = Math.ceil(
-      Math.max(
-        ...items
-          .map((item) => {
-            const rect = item.getBoundingClientRect();
-            const top = rect.top - containerTop;
-            return Math.abs(top - cutoffTop) < BADGE_ROW_TOLERANCE_PX
-              ? rect.bottom - containerTop
-              : 0;
-          })
-      )
-    );
-    const hidden = items.filter((item) => {
-      const bottom = item.getBoundingClientRect().bottom - containerTop;
-      return bottom > height + 1;
-    }).length;
-
-    el.style.maxHeight = prevMaxHeight;
-    el.style.overflow = prevOverflow;
-    setCollapsedHeight(height);
-    setHiddenCount(hidden);
-  }, [maxRows]);
-
-  useLayoutEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    measure();
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [children, measure]);
-
-  const overflows = collapsedHeight != null && hiddenCount > 0;
-  const clamped = overflows && !expanded;
+  const items = React.Children.toArray(children);
+  const hiddenCount = Math.max(0, items.length - maxVisible);
+  const overflows = hiddenCount > 0;
+  const visible = expanded || !overflows ? items : items.slice(0, maxVisible);
 
   return (
     <div>
-      <div
-        ref={wrapRef}
-        className={`relative flex flex-wrap gap-2 ${className}`.trim()}
-        style={
-          clamped
-            ? { maxHeight: collapsedHeight ?? undefined, overflow: 'hidden' }
-            : undefined
-        }
-      >
-        {children}
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <h3 className="text-sm font-semibold text-white">
+          {overflows ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="inline-flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+              aria-expanded={expanded}
+              aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`}
+            >
+              {title}
+              {expanded ? (
+                <Minus className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" aria-hidden />
+              ) : (
+                <Plus className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" aria-hidden />
+              )}
+            </button>
+          ) : (
+            title
+          )}
+        </h3>
       </div>
-      {overflows && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-2 text-xs text-gray-400 hover:text-gray-200 transition-colors"
-        >
-          {expanded ? 'Show less' : `Show all (${hiddenCount} more)`}
-        </button>
-      )}
+      {extra}
+      <div className={`flex flex-wrap gap-2 ${className}`.trim()}>{visible}</div>
     </div>
   );
 };
@@ -2250,14 +2192,11 @@ const UserProfile: React.FC = () => {
               {tipTagChampions.length > 0 &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
                 <div className="mb-4 w-full max-w-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Crown className="h-4 w-4 text-amber-400 flex-shrink-0" />
-                    <h3 className="text-sm font-semibold text-white">
-                      {isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}
-                    </h3>
-                  </div>
-                  <CollapsibleBadgeWrap>
-                    {tipTagChampions.slice(0, 8).map((ranking) => (
+                  <CollapsibleBadgeWrap
+                    title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}
+                    icon={<Crown className="h-4 w-4 text-amber-400 flex-shrink-0" />}
+                  >
+                    {tipTagChampions.map((ranking) => (
                       <Link
                         key={`tip-${ranking.tag}-${ranking.rank}`}
                         to={getTagProfilePath(ranking.tag)}
@@ -2265,7 +2204,7 @@ const UserProfile: React.FC = () => {
                         title={`#${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.totalAmount)} tipped · ${ranking.totalUsers} tippers`}
                       >
                         <Crown className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span>#{ranking.rank} Champion</span>
+                        <span>#{ranking.rank}</span>
                         <span className="opacity-90">#{ranking.tag}</span>
                       </Link>
                     ))}
@@ -2277,14 +2216,11 @@ const UserProfile: React.FC = () => {
               {mediaChampionTitles.length > 0 &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
                 <div className="mb-4 w-full max-w-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Music className="h-4 w-4 text-amber-400 flex-shrink-0" />
-                    <h3 className="text-sm font-semibold text-white">
-                      {isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}
-                    </h3>
-                  </div>
-                  <CollapsibleBadgeWrap>
-                    {mediaChampionTitles.slice(0, 8).map((title) => (
+                  <CollapsibleBadgeWrap
+                    title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}
+                    icon={<Music className="h-4 w-4 text-amber-400 flex-shrink-0" />}
+                  >
+                    {mediaChampionTitles.map((title) => (
                       <Link
                         key={`media-${title.mediaId}-${title.rank}`}
                         to={`/tune/${title.uuid || title.mediaId}`}
@@ -2305,35 +2241,37 @@ const UserProfile: React.FC = () => {
                 (scopedTipTagChampions.length > 0 || scopedMediaChampionTitles.length > 0) &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
                 <div className="mb-4 w-full max-w-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                    <h3 className="text-sm font-semibold text-white">
-                      {selectedChampionScope?.label
+                  <CollapsibleBadgeWrap
+                    key={selectedChampionScopePlaceId}
+                    title={
+                      selectedChampionScope?.label
                         ? `${selectedChampionScope.label} Champion Badges`
-                        : 'Local Champion Badges'}
-                    </h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {championScopePicks.map((pick) => {
-                      const isActive = pick.placeId === selectedChampionScopePlaceId;
-                      return (
-                        <button
-                          key={pick.placeId}
-                          type="button"
-                          onClick={() => setSelectedChampionScopePlaceId(pick.placeId)}
-                          className={`px-3 py-1.5 rounded-full border text-xs sm:text-sm transition-all ${
-                            isActive
-                              ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-100'
-                              : 'bg-black/20 border-white/10 text-gray-300 hover:border-emerald-400/30'
-                          }`}
-                        >
-                          {pick.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <CollapsibleBadgeWrap key={selectedChampionScopePlaceId}>
-                    {scopedTipTagChampions.slice(0, 6).map((ranking) => (
+                        : 'Local Champion Badges'
+                    }
+                    icon={<MapPin className="h-4 w-4 text-emerald-400 flex-shrink-0" />}
+                    extra={
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {championScopePicks.map((pick) => {
+                          const isActive = pick.placeId === selectedChampionScopePlaceId;
+                          return (
+                            <button
+                              key={pick.placeId}
+                              type="button"
+                              onClick={() => setSelectedChampionScopePlaceId(pick.placeId)}
+                              className={`px-3 py-1.5 rounded-full border text-xs sm:text-sm transition-all ${
+                                isActive
+                                  ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-100'
+                                  : 'bg-black/20 border-white/10 text-gray-300 hover:border-emerald-400/30'
+                              }`}
+                            >
+                              {pick.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    }
+                  >
+                    {scopedTipTagChampions.map((ranking) => (
                       <Link
                         key={`scoped-tip-${selectedChampionScopePlaceId}-${ranking.tag}-${ranking.rank}`}
                         to={getTagProfilePath(ranking.tag)}
@@ -2342,10 +2280,10 @@ const UserProfile: React.FC = () => {
                       >
                         <Crown className="h-3.5 w-3.5 flex-shrink-0" />
                         <span>#{ranking.rank}</span>
-                        <span className="opacity-90">{ranking.tag}</span>
+                        <span className="opacity-90">#{ranking.tag}</span>
                       </Link>
                     ))}
-                    {scopedMediaChampionTitles.slice(0, 4).map((title) => (
+                    {scopedMediaChampionTitles.map((title) => (
                       <Link
                         key={`scoped-media-${selectedChampionScopePlaceId}-${title.mediaId}-${title.rank}`}
                         to={`/tune/${title.uuid || title.mediaId}`}
@@ -2365,14 +2303,11 @@ const UserProfile: React.FC = () => {
               {tuneBytesTagRankings.length > 0 &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
                 <div className="mb-4 w-full max-w-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Award className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                    <h3 className="text-sm font-semibold text-white">
-                      {isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}
-                    </h3>
-                  </div>
-                  <CollapsibleBadgeWrap>
-                    {tuneBytesTagRankings.slice(0, 5).map((ranking) => (
+                  <CollapsibleBadgeWrap
+                    title={isOwnProfile ? 'Your Discovery Badges' : 'Discovery Badges'}
+                    icon={<Award className="h-4 w-4 text-purple-400 flex-shrink-0" />}
+                  >
+                    {tuneBytesTagRankings.map((ranking) => (
                       <Link
                         key={ranking.tag}
                         to={getTagProfilePath(ranking.tag)}
