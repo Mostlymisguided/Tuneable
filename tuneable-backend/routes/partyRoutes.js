@@ -1472,15 +1472,15 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
             return res.status(400).json({ error: 'Search query (q) is required' });
         }
 
-        // Check if this is the Global Party
-        const isGlobalParty = await Party.getGlobalParty();
-        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
+        const partyStub = await Party.findById(partyId).select('type tags');
+        if (!partyStub) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
 
-        let party;
-        
-        // Check if this is a tag party
-        party = await Party.findById(partyId);
-        const isTagParty = party && party.type === 'tag';
+        const isRequestingGlobalParty = partyStub.type === 'global';
+        const isTagParty = partyStub.type === 'tag';
+
+        let party = partyStub;
         
         if (isRequestingGlobalParty) {
             // For Global Party, search through ALL media with ANY bids (tunes only)
@@ -2139,19 +2139,24 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
             return res.status(400).json({ error: 'Bid amount must be greater than 0' });
         }
 
-        // Get party and check if media exists in party
-        let party = await Party.findById(partyId).populate('media.mediaId');
-        if (!party) {
+        // Virtual parties (global/tag/location) do not use embedded media[].
+        // Never populate that array here — it OOMs the process on Global Party.
+        const partyMeta = await Party.findById(partyId).select('-media');
+        if (!partyMeta) {
             return res.status(404).json({ error: 'Party not found' });
         }
 
-        // Check if this is the Global Party
-        const isGlobalParty = await Party.getGlobalParty();
-        const isRequestingGlobalParty = isGlobalParty && isGlobalParty._id.toString() === partyId;
+        const isRequestingGlobalParty = partyMeta.type === 'global';
+        const isTagParty = partyMeta.type === 'tag';
+        const isLocationParty = partyMeta.type === 'location';
 
-        // Check if this is a tag party or location party
-        const isTagParty = party && party.type === 'tag';
-        const isLocationParty = party && party.type === 'location';
+        let party = partyMeta;
+        if (!isRequestingGlobalParty && !isTagParty && !isLocationParty) {
+            party = await Party.findById(partyId).populate('media.mediaId');
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+        }
 
         let partyMediaEntry;
         let actualMediaId;
@@ -2975,14 +2980,17 @@ router.post('/:partyId/skip-next', authMiddleware, resolvePartyId(), async (req,
         const { mediaId } = req.body; // Current media being skipped
         const userId = req.user._id;
 
+        const partyTypeCheck = await Party.findById(partyId).select('type host');
+        if (!partyTypeCheck) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        if (partyTypeCheck.type !== 'remote') {
+            return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
+        }
+
         const party = await Party.findById(partyId).populate('media.mediaId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
-        }
-
-        // Only allow for remote parties
-        if (party.type !== 'remote') {
-            return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
         }
 
         // Check if user is the host
@@ -3034,14 +3042,17 @@ router.post('/:partyId/skip-previous', authMiddleware, resolvePartyId(), async (
         const { mediaId } = req.body; // Current media being skipped
         const userId = req.user._id;
 
+        const partyTypeCheck = await Party.findById(partyId).select('type host');
+        if (!partyTypeCheck) {
+            return res.status(404).json({ error: 'Party not found' });
+        }
+        if (partyTypeCheck.type !== 'remote') {
+            return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
+        }
+
         const party = await Party.findById(partyId).populate('media.mediaId');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
-        }
-
-        // Only allow for remote parties
-        if (party.type !== 'remote') {
-            return res.status(400).json({ error: 'Skip functionality only available for remote parties' });
         }
 
         // Check if user is the host
@@ -3149,8 +3160,8 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
             return res.status(400).json({ error: 'mediaId is required in request body' });
         }
 
-        // Find the party
-        const party = await Party.findById(partyId);
+        // Exclude embedded media[] until we know this is not Global Party
+        let party = await Party.findById(partyId).select('-media');
         if (!party) {
             return res.status(404).json({ error: 'Party not found' });
         }
@@ -3201,6 +3212,11 @@ router.post('/:partyId/media/veto', authMiddleware, resolvePartyId(), async (req
                 }
                 throw axiosError;
             }
+        }
+
+        party = await Party.findById(partyId);
+        if (!party) {
+            return res.status(404).json({ error: 'Party not found' });
         }
 
         // PARTY VETO: Handle party-specific veto logic

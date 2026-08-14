@@ -272,9 +272,9 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       throw policyErr;
     }
     
-    // Get Global Party for global bids
+    // Get Global Party for global bids (never load embedded media[])
     const Party = require('../models/Party');
-    const globalParty = await Party.findOne({ type: 'global' });
+    const globalParty = await Party.getGlobalPartyForBid();
     
     if (!globalParty) {
       return res.status(500).json({ error: 'Global party not found' });

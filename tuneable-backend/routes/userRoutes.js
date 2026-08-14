@@ -492,21 +492,8 @@ router.post(
       // Auto-join new user to Global Party
       try {
         const Party = require('../models/Party');
-        const globalParty = await Party.getGlobalParty();
-        if (globalParty && !globalParty.partiers.includes(user._id)) {
-          // Add user to Global Party's partiers array
-          globalParty.partiers.push(user._id);
-          await globalParty.save();
-          
-          // Add Global Party to user's joinedParties array
-          user.joinedParties.push({
-            partyId: globalParty._id, // Using ObjectId directly
-            role: 'partier'
-          });
-          await user.save();
-          
-          console.log('✅ Auto-joined new user to Global Party:', user.username);
-        }
+        await Party.joinUserToGlobalParty(user);
+        console.log('✅ Auto-joined new user to Global Party:', user.username);
       } catch (globalPartyError) {
         console.error('Failed to auto-join user to Global Party:', globalPartyError);
         // Don't fail registration if Global Party join fails

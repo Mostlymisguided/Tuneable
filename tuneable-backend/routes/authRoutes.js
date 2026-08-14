@@ -1324,14 +1324,7 @@ router.post('/apple', async (req, res) => {
 
     try {
       const Party = require('../models/Party');
-      const globalParty = await Party.getGlobalParty();
-      if (globalParty && !globalParty.partiers.includes(user._id)) {
-        globalParty.partiers.push(user._id);
-        await globalParty.save();
-        user.joinedParties = user.joinedParties || [];
-        user.joinedParties.push({ partyId: globalParty._id, role: 'partier' });
-        await user.save();
-      }
+      await Party.joinUserToGlobalParty(user);
     } catch (globalPartyError) {
       console.error('Failed to auto-join Apple user to Global Party:', globalPartyError);
     }

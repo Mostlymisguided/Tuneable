@@ -25,6 +25,16 @@ const connectDB = async () => {
     
     await mongoose.connect(mongoURI, options);
     console.log('✅ MongoDB connected successfully');
+
+    mongoose.connection.on('error', (error) => {
+      console.error('❌ MongoDB connection error (runtime):', error.message);
+    });
+    mongoose.connection.on('disconnected', () => {
+      console.error('⚠️ MongoDB disconnected');
+    });
+    mongoose.connection.on('reconnected', () => {
+      console.log('✅ MongoDB reconnected');
+    });
   } catch (err) {
     console.error('❌ MongoDB connection error:', err.message);
     

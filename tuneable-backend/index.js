@@ -44,6 +44,7 @@ console.log('Initializing server...');
 db.connectDB()
   .then(() => {
     console.log('Connected to the database successfully.');
+    logMemory('mongo-connected');
     const { recoverPendingBidWork } = require('./services/bidBackgroundRecoveryService');
     setImmediate(() => {
       recoverPendingBidWork().catch((error) => {
@@ -111,7 +112,8 @@ app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 console.log('CORS enabled for allowed origins:', allowedOrigins);
 
 // Middleware to parse JSON bodies (exclude webhook route which needs raw body)
-// IMPORTANT: Check both req.path and req.originalUrl to catch the webhook route
+// Reuse one parser instance — calling express.json() per request leaks memory.
+const jsonParser = express.json();
 app.use((req, res, next) => {
   // Skip JSON parsing for Stripe webhook (needs raw body for signature verification)
   const isWebhook = req.path === '/api/payments/webhook' || 
@@ -123,7 +125,7 @@ app.use((req, res, next) => {
     console.log('⚠️ Skipping JSON parsing for webhook route');
     return next();
   }
-  express.json()(req, res, next);
+  return jsonParser(req, res, next);
 });
 console.log('JSON body parsing middleware added (webhook excluded).');
 
@@ -695,12 +697,38 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start the server only if this file is run directly
+function logMemory(label) {
+  const mem = process.memoryUsage();
+  const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+  console.log(`🧠 ${label}: rss=${mb(mem.rss)} heap=${mb(mem.heapUsed)}/${mb(mem.heapTotal)}`);
+}
+
 let server;
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught exception:', error);
+  logMemory('uncaughtException');
+  process.exit(1);
+});
+
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM received, shutting down');
+  logMemory('SIGTERM');
+  if (server) server.close(() => process.exit(0));
+  else process.exit(0);
+});
+
+// Start the server only if this file is run directly
 if (require.main === module) {
   console.log(`Node.js version: ${process.version}`);
+  logMemory('boot');
   server = app.listen(PORT, () => {
     console.log(`Server running on PORT ${PORT}`);
+    logMemory('listen');
     
     // Set up Socket.IO server for real-time notifications and party updates
     initializeSocketIO(server);

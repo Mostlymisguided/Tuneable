@@ -1,7 +1,14 @@
-const { parseFile } = require('music-metadata');
 const { createMediaUpload, getPublicUrl } = require('./r2Upload');
 const { normalizeIsrc } = require('./mediaMatchUtils');
 const crypto = require('crypto');
+
+let musicMetadataPromise;
+function loadMusicMetadata() {
+  if (!musicMetadataPromise) {
+    musicMetadataPromise = import('music-metadata');
+  }
+  return musicMetadataPromise;
+}
 
 /**
  * Metadata Extractor Service
@@ -19,9 +26,7 @@ class MetadataExtractor {
     try {
       console.log(`🔍 Extracting metadata from: ${filename}`);
       
-      // Parse the audio file - parseFile expects a file path, not a buffer
-      // We need to use parseBuffer for buffer input
-      const { parseBuffer } = require('music-metadata');
+      const { parseBuffer } = await loadMusicMetadata();
       const metadata = await parseBuffer(fileBuffer);
       
       // Extract basic metadata

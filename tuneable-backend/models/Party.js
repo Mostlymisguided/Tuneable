@@ -207,9 +207,42 @@ PartySchema.statics.updateAllStatuses = async function() {
   return updates.length;
 };
 
-// Static method to get Global Party
+// Static method to get Global Party.
+// Never pull embedded media[] — that array can be tens of MB and OOM the process.
 PartySchema.statics.getGlobalParty = async function() {
-  return await this.findOne({ type: 'global' });
+  return await this.findOne({ type: 'global' }).select('-media');
+};
+
+// Add a user to a party's partiers without loading or rewriting media[].
+PartySchema.statics.addPartier = async function(partyId, userId) {
+  if (!partyId || !userId) return false;
+  const result = await this.updateOne(
+    { _id: partyId },
+    { $addToSet: { partiers: userId } }
+  );
+  return result.modifiedCount > 0;
+};
+
+// Auto-join a user to Global Party without loading embedded media[].
+PartySchema.statics.joinUserToGlobalParty = async function(user) {
+  if (!user) return null;
+  const globalParty = await this.getGlobalPartyForBid();
+  if (!globalParty) return null;
+
+  await this.addPartier(globalParty._id, user._id);
+
+  user.joinedParties = user.joinedParties || [];
+  const alreadyJoined = user.joinedParties.some(
+    (jp) => jp.partyId && jp.partyId.toString() === globalParty._id.toString()
+  );
+  if (!alreadyJoined) {
+    user.joinedParties.push({
+      partyId: globalParty._id,
+      role: 'partier',
+    });
+    await user.save();
+  }
+  return globalParty;
 };
 
 // Lightweight Global Party lookup for tip placement. The embedded media array
