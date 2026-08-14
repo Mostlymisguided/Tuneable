@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  StyleSheet,
+  ScrollView,
   Text,
   TextInput,
   View,
@@ -12,8 +12,14 @@ import {
 import { Redirect, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { Screen } from '@/src/components/Screen';
+import {
+  AuthHero,
+  AuthSocialButton,
+  authStyles,
+} from '@/src/components/AuthChrome';
 import { LegalLinks } from '@/src/components/LegalLinks';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
@@ -44,6 +50,7 @@ export default function LoginScreen() {
   } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<
     'google' | 'facebook' | 'apple' | null
@@ -147,61 +154,90 @@ export default function LoginScreen() {
   return (
     <Screen>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={authStyles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.hero}>
-          <Text style={styles.brand}>Tuneable</Text>
-          <Text style={styles.subtitle}>Sign in to listen and tip</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={authStyles.scroll}
+          keyboardShouldPersistTaps="handled">
+          <AuthHero subtitle="Tip the music you love" />
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Email or username</Text>
-          <TextInput
-            style={styles.input}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            textContentType="username"
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.textMuted}
-            value={identifier}
-            onChangeText={setIdentifier}
-            editable={!busy}
-          />
+          <View style={authStyles.card}>
+            <Text style={[authStyles.label, { marginTop: 0 }]}>
+              Email or username
+            </Text>
+            <TextInput
+              style={authStyles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+              keyboardType="email-address"
+              placeholder="you@example.com"
+              placeholderTextColor={colors.textMuted}
+              value={identifier}
+              onChangeText={setIdentifier}
+              editable={!busy}
+            />
 
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            textContentType="password"
-            placeholder="••••••••"
-            placeholderTextColor={colors.textMuted}
-            value={password}
-            onChangeText={setPassword}
-            editable={!busy}
-            onSubmitEditing={() => void onSubmit()}
-          />
+            <Text style={authStyles.label}>Password</Text>
+            <View style={authStyles.inputWrap}>
+              <TextInput
+                style={authStyles.inputBare}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="password"
+                textContentType="password"
+                placeholder="••••••••"
+                placeholderTextColor={colors.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                editable={!busy}
+                onSubmitEditing={() => void onSubmit()}
+              />
+              <Pressable
+                style={authStyles.eyeBtn}
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={6}
+                accessibilityLabel={
+                  showPassword ? 'Hide password' : 'Show password'
+                }>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </Pressable>
+            </View>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+            <Pressable
+              onPress={() =>
+                void WebBrowser.openBrowserAsync(
+                  'https://tuneable.stream/forgot-password'
+                )
+              }
+              hitSlop={6}
+              style={{ alignSelf: 'flex-end', marginTop: 10 }}>
+              <Text style={authStyles.switchAuthLink}>Forgot password?</Text>
+            </Pressable>
 
-          <Pressable
-            style={[styles.button, busy && styles.buttonDisabled]}
-            onPress={() => void onSubmit()}
-            disabled={busy}>
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
-            )}
-          </Pressable>
+            {error ? <Text style={authStyles.error}>{error}</Text> : null}
 
-          <View style={styles.dividerRow}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.divider} />
+            <Pressable
+              style={[authStyles.primaryBtn, busy && authStyles.disabled]}
+              onPress={() => void onSubmit()}
+              disabled={busy}>
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={authStyles.primaryBtnText}>Sign in</Text>
+              )}
+            </Pressable>
+          </View>
+
+          <View style={authStyles.dividerRow}>
+            <View style={authStyles.divider} />
+            <Text style={authStyles.dividerText}>or</Text>
+            <View style={authStyles.divider} />
           </View>
 
           {appleAvailable ? (
@@ -212,156 +248,43 @@ export default function LoginScreen() {
               buttonStyle={
                 AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
               }
-              cornerRadius={12}
-              style={styles.appleBtn}
+              cornerRadius={14}
+              style={authStyles.appleBtn}
               onPress={() => void onApple()}
             />
           ) : null}
 
-          <Pressable
-            style={[styles.googleBtn, busy && styles.buttonDisabled]}
+          <AuthSocialButton
+            icon="logo-google"
+            label="Continue with Google"
             onPress={() => void onOAuth('google')}
-            disabled={busy}>
-            {oauthLoading === 'google' ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.googleText}>Continue with Google</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={[styles.googleBtn, busy && styles.buttonDisabled]}
+            loading={oauthLoading === 'google'}
+            disabled={busy}
+          />
+          <AuthSocialButton
+            icon="logo-facebook"
+            label="Continue with Facebook"
             onPress={() => void onOAuth('facebook')}
-            disabled={busy}>
-            {oauthLoading === 'facebook' ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Text style={styles.googleText}>Continue with Facebook</Text>
-            )}
-          </Pressable>
+            loading={oauthLoading === 'facebook'}
+            disabled={busy}
+          />
 
           <Pressable
-            style={styles.linkBtn}
             onPress={() => router.push('/register')}
-            disabled={busy}>
-            <Text style={styles.linkText}>New here? Create an account</Text>
+            disabled={busy}
+            style={{ marginTop: 8 }}>
+            <Text style={authStyles.switchAuth}>
+              New here?{' '}
+              <Text style={authStyles.switchAuthLink}>Create an account</Text>
+            </Text>
           </Pressable>
 
           <LegalLinks />
-          {__DEV__ ? <Text style={styles.hint}>API: {API_ORIGIN}</Text> : null}
-        </View>
+          {__DEV__ ? (
+            <Text style={authStyles.hint}>API: {API_ORIGIN}</Text>
+          ) : null}
+        </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  hero: {
-    marginBottom: 36,
-  },
-  brand: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  form: {
-    gap: 8,
-  },
-  label: {
-    marginTop: 12,
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  input: {
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    color: colors.text,
-    fontSize: 16,
-  },
-  button: {
-    marginTop: 20,
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 18,
-    marginBottom: 4,
-  },
-  divider: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.cardBorder,
-  },
-  dividerText: {
-    color: colors.textMuted,
-    fontSize: 13,
-  },
-  appleBtn: {
-    width: '100%',
-    height: 52,
-    marginTop: 8,
-  },
-  googleBtn: {
-    marginTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  googleText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  linkBtn: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: colors.accentLight,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  error: {
-    marginTop: 12,
-    color: '#fca5a5',
-    fontSize: 14,
-  },
-  hint: {
-    marginTop: 16,
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-});

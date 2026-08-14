@@ -13,7 +13,13 @@ import {
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import {
+  AuthHero,
+  AuthSocialButton,
+  authStyles,
+} from '@/src/components/AuthChrome';
 import { LegalLinks } from '@/src/components/LegalLinks';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -60,6 +66,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<
     'google' | 'facebook' | 'apple' | null
@@ -239,22 +246,21 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={authStyles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={authStyles.scrollTop}
           keyboardShouldPersistTaps="handled">
-          <View style={styles.hero}>
-            <Text style={styles.brand}>Tuneable</Text>
-            <Text style={styles.subtitle}>Create your account</Text>
-          </View>
+          <AuthHero subtitle="Join the social chart" />
 
-          <View style={styles.form}>
+          <View style={authStyles.card}>
             {showInviteField ? (
               <>
-                <Text style={styles.label}>Invite code (optional)</Text>
+                <Text style={[authStyles.label, { marginTop: 0 }]}>
+                  Invite code (optional)
+                </Text>
                 <TextInput
-                  style={styles.input}
+                  style={authStyles.input}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   maxLength={5}
@@ -278,9 +284,15 @@ export default function RegisterScreen() {
               </>
             ) : null}
 
-            <Text style={styles.label}>Username *</Text>
+            <Text
+              style={[
+                authStyles.label,
+                !showInviteField && { marginTop: 0 },
+              ]}>
+              Username
+            </Text>
             <TextInput
-              style={styles.input}
+              style={authStyles.input}
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="username"
@@ -292,9 +304,9 @@ export default function RegisterScreen() {
               editable={!busy}
             />
 
-            <Text style={styles.label}>Email *</Text>
+            <Text style={authStyles.label}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={authStyles.input}
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="email"
@@ -307,24 +319,39 @@ export default function RegisterScreen() {
               editable={!busy}
             />
 
-            <Text style={styles.label}>Password *</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              autoCapitalize="none"
-              autoComplete="new-password"
-              textContentType="newPassword"
-              placeholder="At least 6 characters"
-              placeholderTextColor={colors.textMuted}
-              value={password}
-              onChangeText={setPassword}
-              editable={!busy}
-            />
+            <Text style={authStyles.label}>Password</Text>
+            <View style={authStyles.inputWrap}>
+              <TextInput
+                style={authStyles.inputBare}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoComplete="new-password"
+                textContentType="newPassword"
+                placeholder="At least 6 characters"
+                placeholderTextColor={colors.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                editable={!busy}
+              />
+              <Pressable
+                style={authStyles.eyeBtn}
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={6}
+                accessibilityLabel={
+                  showPassword ? 'Hide password' : 'Show password'
+                }>
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </Pressable>
+            </View>
 
-            <Text style={styles.label}>Confirm password *</Text>
+            <Text style={authStyles.label}>Confirm password</Text>
             <TextInput
-              style={styles.input}
-              secureTextEntry
+              style={authStyles.input}
+              secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoComplete="new-password"
               textContentType="newPassword"
@@ -335,59 +362,55 @@ export default function RegisterScreen() {
               editable={!busy}
             />
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text style={authStyles.error}>{error}</Text> : null}
 
             <Pressable
-              style={[styles.primaryBtn, busy && styles.btnDisabled]}
+              style={[authStyles.primaryBtn, busy && authStyles.disabled]}
               onPress={() => void onSubmit()}
               disabled={busy}>
               {submitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.primaryBtnText}>Create account</Text>
+                <Text style={authStyles.primaryBtnText}>Create account</Text>
               )}
             </Pressable>
-
-            <Text style={styles.or}>or</Text>
-
-            <Pressable
-              style={[styles.oauthBtn, busy && styles.btnDisabled]}
-              onPress={() => void onOAuth('google')}
-              disabled={busy}>
-              {oauthLoading === 'google' ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <Text style={styles.oauthBtnText}>Continue with Google</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={[styles.oauthBtn, styles.facebookBtn, busy && styles.btnDisabled]}
-              onPress={() => void onOAuth('facebook')}
-              disabled={busy}>
-              {oauthLoading === 'facebook' ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={[styles.oauthBtnText, styles.facebookBtnText]}>
-                  Continue with Facebook
-                </Text>
-              )}
-            </Pressable>
-
-            {appleAvailable ? (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                cornerRadius={10}
-                style={styles.appleBtn}
-                onPress={() => void onApple()}
-              />
-            ) : null}
           </View>
 
+          <View style={authStyles.dividerRow}>
+            <View style={authStyles.divider} />
+            <Text style={authStyles.dividerText}>or</Text>
+            <View style={authStyles.divider} />
+          </View>
+
+          {appleAvailable ? (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={14}
+              style={authStyles.appleBtn}
+              onPress={() => void onApple()}
+            />
+          ) : null}
+
+          <AuthSocialButton
+            icon="logo-google"
+            label="Continue with Google"
+            onPress={() => void onOAuth('google')}
+            loading={oauthLoading === 'google'}
+            disabled={busy}
+          />
+          <AuthSocialButton
+            icon="logo-facebook"
+            label="Continue with Facebook"
+            onPress={() => void onOAuth('facebook')}
+            loading={oauthLoading === 'facebook'}
+            disabled={busy}
+          />
+
           <Pressable onPress={() => router.replace('/login')} disabled={busy}>
-            <Text style={styles.switchAuth}>
-              Already have an account? <Text style={styles.switchAuthLink}>Sign in</Text>
+            <Text style={authStyles.switchAuth}>
+              Already have an account?{' '}
+              <Text style={authStyles.switchAuthLink}>Sign in</Text>
             </Text>
           </Pressable>
 
@@ -399,78 +422,19 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
-    paddingBottom: 40,
-  },
-  hero: { marginBottom: 28 },
-  brand: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 16,
-    color: colors.textMuted,
-  },
-  form: { gap: 10 },
-  label: {
+  inviteHint: {
     marginTop: 6,
     fontSize: 13,
-    fontWeight: '600',
     color: colors.textMuted,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.text,
-    backgroundColor: colors.surface,
-  },
-  inviteHint: { fontSize: 13, color: colors.textMuted },
-  inviteValid: { fontSize: 13, color: '#22c55e' },
-  inviteInvalid: { fontSize: 13, color: '#ef4444' },
-  error: { marginTop: 4, color: '#ef4444', fontSize: 14 },
-  primaryBtn: {
-    marginTop: 12,
-    backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  btnDisabled: { opacity: 0.6 },
-  or: {
-    textAlign: 'center',
-    marginVertical: 8,
-    color: colors.textMuted,
+  inviteValid: {
+    marginTop: 6,
     fontSize: 13,
+    color: colors.success,
   },
-  oauthBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
+  inviteInvalid: {
+    marginTop: 6,
+    fontSize: 13,
+    color: colors.danger,
   },
-  oauthBtnText: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  facebookBtn: { backgroundColor: '#1877F2', borderColor: '#1877F2' },
-  facebookBtnText: { color: '#fff' },
-  appleBtn: { width: '100%', height: 48, marginTop: 4 },
-  switchAuth: {
-    marginTop: 28,
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  switchAuthLink: { color: colors.accent, fontWeight: '600' },
 });
