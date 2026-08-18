@@ -3762,10 +3762,12 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
     
     // Build query
     const query = {};
-    if (search) {
+    if (search && String(search).trim()) {
+      const searchRegex = { $regex: String(search).trim(), $options: 'i' };
       query.$or = [
-        { username: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { username: searchRegex },
+        { email: searchRegex },
+        { 'creatorProfile.artistName': searchRegex }
       ];
     }
 

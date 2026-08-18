@@ -80,6 +80,9 @@ const Admin: React.FC = () => {
     return tab || 'overview';
   });
   const [users, setUsers] = useState<User[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [usersTotal, setUsersTotal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [creatorApplications, setCreatorApplications] = useState<any[]>([]);
   const [claims, setClaims] = useState<any[]>([]);
@@ -266,15 +269,32 @@ const Admin: React.FC = () => {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async (searchOverride?: string) => {
     try {
-      const data = await userAPI.getAllUsers();
+      setIsLoadingUsers(true);
+      const search = (searchOverride !== undefined ? searchOverride : userSearchQuery).trim();
+      const data = await userAPI.getAllUsers(100, 0, search || undefined);
       setUsers(data.users || []);
+      setUsersTotal(data.total ?? data.users?.length ?? 0);
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error('Failed to load users');
+    } finally {
+      setIsLoadingUsers(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'users-labels' && usersLabelsSubTab === 'users' && isAdmin) {
+      const timeoutId = setTimeout(() => {
+        if (userSearchQuery.length === 0 || userSearchQuery.length >= 2) {
+          loadUsers();
+        }
+      }, userSearchQuery.length > 0 ? 500 : 0);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [userSearchQuery, activeTab, usersLabelsSubTab, isAdmin]);
 
   const refreshReportCounts = useCallback(async () => {
     if (!isAdmin) return;
@@ -641,7 +661,13 @@ const Admin: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'users-labels' && usersLabelsSubTab === 'labels' && isAdmin) {
-      loadLabels();
+      const timeoutId = setTimeout(() => {
+        if (labelSearchQuery.length === 0 || labelSearchQuery.length >= 2) {
+          loadLabels();
+        }
+      }, labelSearchQuery.length > 0 ? 500 : 0);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [labelSortField, labelSortDirection, labelFilterStatus, labelSearchQuery, activeTab, usersLabelsSubTab]);
 
@@ -681,7 +707,13 @@ const Admin: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'users-labels' && usersLabelsSubTab === 'collectives' && isAdmin) {
-      loadCollectives();
+      const timeoutId = setTimeout(() => {
+        if (collectiveSearchQuery.length === 0 || collectiveSearchQuery.length >= 2) {
+          loadCollectives();
+        }
+      }, collectiveSearchQuery.length > 0 ? 500 : 0);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [collectiveSortField, collectiveSortDirection, collectiveFilterStatus, collectiveSearchQuery, activeTab, usersLabelsSubTab]);
 
@@ -1537,12 +1569,53 @@ const Admin: React.FC = () => {
             {/* Users Content */}
             {usersLabelsSubTab === 'users' && (
               <div className="space-y-6">
-                <h2 className="text-2xl font-bold text-white">User Management</h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-white">User Management</h2>
+                  <button
+                    onClick={() => loadUsers()}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="bg-gray-800 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Search
+                      </label>
+                      <input
+                        type="text"
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                        placeholder="Username, email, or artist name..."
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+                </div>
             
             <div className="bg-gray-800 rounded-lg overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-700">
-                <h3 className="text-lg font-semibold text-white">All Users</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  {userSearchQuery.trim()
+                    ? `${usersTotal} matching user${usersTotal === 1 ? '' : 's'}`
+                    : 'All Users'}
+                </h3>
               </div>
+              {isLoadingUsers ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Users className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                  <p className="text-gray-400">
+                    {userSearchQuery.trim() ? 'No users match your search' : 'No users found'}
+                  </p>
+                </div>
+              ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-700">
                   <thead className="bg-gray-700">
@@ -1829,6 +1902,7 @@ const Admin: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
               </div>
             )}
@@ -1856,12 +1930,7 @@ const Admin: React.FC = () => {
                       <input
                         type="text"
                         value={labelSearchQuery}
-                        onChange={(e) => {
-                          setLabelSearchQuery(e.target.value);
-                          if (e.target.value.length === 0 || e.target.value.length >= 2) {
-                            loadLabels();
-                          }
-                        }}
+                        onChange={(e) => setLabelSearchQuery(e.target.value)}
                         placeholder="Search labels..."
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
                       />
@@ -1872,10 +1941,7 @@ const Admin: React.FC = () => {
                       </label>
                       <select
                         value={labelFilterStatus}
-                        onChange={(e) => {
-                          setLabelFilterStatus(e.target.value);
-                          loadLabels();
-                        }}
+                        onChange={(e) => setLabelFilterStatus(e.target.value)}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                       >
                         <option value="">All Statuses</option>
@@ -1895,7 +1961,9 @@ const Admin: React.FC = () => {
                 ) : labels.length === 0 ? (
                   <div className="bg-gray-800 rounded-lg p-8 text-center">
                     <Building className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-400">No labels found</p>
+                    <p className="text-gray-400">
+                      {labelSearchQuery.trim() ? 'No labels match your search' : 'No labels found'}
+                    </p>
                   </div>
                 ) : (
                   <div className="bg-gray-800 rounded-lg overflow-hidden">
@@ -2090,12 +2158,7 @@ const Admin: React.FC = () => {
                       <input
                         type="text"
                         value={collectiveSearchQuery}
-                        onChange={(e) => {
-                          setCollectiveSearchQuery(e.target.value);
-                          if (e.target.value.length === 0 || e.target.value.length >= 2) {
-                            loadCollectives();
-                          }
-                        }}
+                        onChange={(e) => setCollectiveSearchQuery(e.target.value)}
                         placeholder="Search collectives..."
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
                       />
@@ -2106,10 +2169,7 @@ const Admin: React.FC = () => {
                       </label>
                       <select
                         value={collectiveFilterStatus}
-                        onChange={(e) => {
-                          setCollectiveFilterStatus(e.target.value);
-                          loadCollectives();
-                        }}
+                        onChange={(e) => setCollectiveFilterStatus(e.target.value)}
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                       >
                         <option value="">All Statuses</option>
@@ -2129,7 +2189,9 @@ const Admin: React.FC = () => {
                 ) : collectives.length === 0 ? (
                   <div className="bg-gray-800 rounded-lg p-8 text-center">
                     <Users className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-                    <p className="text-gray-400">No collectives found</p>
+                    <p className="text-gray-400">
+                      {collectiveSearchQuery.trim() ? 'No collectives match your search' : 'No collectives found'}
+                    </p>
                   </div>
                 ) : (
                   <div className="bg-gray-800 rounded-lg overflow-hidden">
