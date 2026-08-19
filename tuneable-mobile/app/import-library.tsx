@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import * as Linking from 'expo-linking';
@@ -21,7 +22,7 @@ import { colors } from '@/src/theme/colors';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type ImportSource = 'spotify' | 'soundcloud';
+type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
 
 const IMPORT_LIMIT = 25;
 
@@ -29,7 +30,7 @@ function parseSource(
   value: string | string[] | undefined
 ): ImportSource | null {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'soundcloud' || raw === 'spotify') return raw;
+  if (raw === 'soundcloud' || raw === 'spotify' || raw === 'youtube') return raw;
   return null;
 }
 
@@ -47,6 +48,12 @@ export default function ImportLibraryScreen() {
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
+  const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
+  const [spotifyRequestStatus, setSpotifyRequestStatus] = useState<
+    'pending' | 'allowlisted' | 'rejected' | null
+  >(null);
+  const [spotifyAccountInput, setSpotifyAccountInput] = useState('');
+  const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
   const [activeSource, setActiveSource] = useState<ImportSource | null>(
     sourceParam
   );
@@ -57,6 +64,8 @@ export default function ImportLibraryScreen() {
     estimatedCost: number;
     userBalance: number;
     inLibraryCount: number;
+    possibleMatchCount: number;
+    skippedCount: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,19 +83,22 @@ export default function ImportLibraryScreen() {
       const next = {
         spotify: Boolean(spotify?.connected),
         soundcloud: Boolean(soundcloud?.connected),
+        oauthAvailable: Boolean(spotify?.oauthAvailable) || Boolean(spotify?.connected),
       };
       setSpotifyConnected(next.spotify);
       setSoundcloudConnected(next.soundcloud);
+      setSpotifyOauthAvailable(next.oauthAvailable);
+      setSpotifyRequestStatus(spotify?.request?.status ?? null);
       return next;
     } catch {
-      return { spotify: false, soundcloud: false };
+      return { spotify: false, soundcloud: false, oauthAvailable: false };
     }
   }, []);
 
   const loadImportPreview = useCallback(
-    async (source: ImportSource) => {
+    async (source: ImportSource, playlistUrl?: string) => {
       setImportLoading(true);
-      setImportProgress('Scanning your likes…');
+      setImportProgress(source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…');
       setImportPreview(null);
       setError(null);
       try {
@@ -96,31 +108,48 @@ export default function ImportLibraryScreen() {
                 IMPORT_LIMIT,
                 'spotify_only'
               )
+            : source === 'youtube'
+              ? await userAPI.startYouTubeImportPreview(
+                  playlistUrl || youtubePlaylistUrl,
+                  IMPORT_LIMIT
+                )
             : await userAPI.startSpotifyImportPreview(IMPORT_LIMIT);
         const data = await userAPI.waitForImportJob<{
-          items?: Array<{ matchStatus: string }>;
+          items?: Array<{ matchStatus: string; selected?: boolean }>;
           summary?: {
             userBalance?: number;
             inLibrary?: number;
+            selectedCount?: number;
+            possibleMatches?: number;
+            skippedJunk?: number;
+            skippedUnparsed?: number;
+            skippedNoMatch?: number;
           };
         }>(started.jobId, (job) => {
-          setImportProgress(job.message || 'Scanning your likes…');
+          setImportProgress(job.message || (source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…'));
         });
 
         const items = data.items || [];
-        const actionable = items.filter((i) => i.matchStatus !== 'in_library');
+        const ready = items.filter((i) => i.selected !== false && i.matchStatus !== 'in_library');
         const inLibrary =
           data.summary?.inLibrary ??
           items.filter((i) => i.matchStatus === 'in_library').length;
         const balance =
           data.summary?.userBalance ??
           (user?.balance != null ? user.balance / 100 : 0);
+        const skipped =
+          (data.summary?.skippedJunk || 0)
+          + (data.summary?.skippedUnparsed || 0)
+          + (data.summary?.skippedNoMatch || 0);
 
         setImportPreview({
-          actionableCount: actionable.length,
-          estimatedCost: actionable.length * defaultTip,
+          actionableCount: data.summary?.selectedCount ?? ready.length,
+          estimatedCost: (data.summary?.selectedCount ?? ready.length) * defaultTip,
           userBalance: balance,
           inLibraryCount: inLibrary,
+          possibleMatchCount: data.summary?.possibleMatches
+            ?? items.filter((i) => i.matchStatus === 'possible_match').length,
+          skippedCount: skipped,
         });
       } catch (err) {
         setError(getApiErrorMessage(err, 'Could not preview your library.'));
@@ -130,7 +159,7 @@ export default function ImportLibraryScreen() {
         setImportProgress(null);
       }
     },
-    [defaultTip, user?.balance]
+    [defaultTip, user?.balance, youtubePlaylistUrl]
   );
 
   useEffect(() => {
@@ -145,7 +174,10 @@ export default function ImportLibraryScreen() {
       const connected =
         sourceParam === 'soundcloud'
           ? connections.soundcloud
+          : sourceParam === 'youtube'
+            ? true
           : connections.spotify;
+      if (sourceParam === 'youtube') return;
       if (connected) {
         await loadImportPreview(sourceParam);
       }
@@ -212,6 +244,8 @@ export default function ImportLibraryScreen() {
               IMPORT_LIMIT,
               'spotify_only'
             )
+          : activeSource === 'youtube'
+            ? await userAPI.startYouTubeImportPreview(youtubePlaylistUrl, IMPORT_LIMIT)
           : await userAPI.startSpotifyImportPreview(IMPORT_LIMIT);
       const data = await userAPI.waitForImportJob<{
         items?: Array<{
@@ -221,14 +255,17 @@ export default function ImportLibraryScreen() {
           matchStatus?: string;
           useSuggestedMatch?: boolean;
           crossRefStatus?: string;
+          identityConfidence?: string;
+          selected?: boolean;
           externalMedia?: Record<string, unknown>;
         }>;
       }>(previewStarted.jobId, (job) => {
-        setImportProgress(job.message || 'Scanning your likes…');
+        setImportProgress(job.message || 'Scanning…');
       });
 
       const items = (data.items || [])
         .filter((i) => i.matchStatus !== 'in_library')
+        .filter((i) => activeSource !== 'youtube' || i.selected !== false)
         .slice(0, IMPORT_LIMIT)
         .map((i) => ({
           key: i.key,
@@ -238,6 +275,7 @@ export default function ImportLibraryScreen() {
           matchStatus: i.matchStatus,
           useSuggestedMatch: i.useSuggestedMatch,
           crossRefStatus: i.crossRefStatus,
+          identityConfidence: i.identityConfidence,
           amount: defaultTip,
           externalMedia: i.externalMedia,
           skipIfInLibrary: true,
@@ -255,6 +293,8 @@ export default function ImportLibraryScreen() {
       const executeStarted =
         activeSource === 'soundcloud'
           ? await userAPI.startSoundCloudImportExecute(items, defaultTip)
+          : activeSource === 'youtube'
+            ? await userAPI.startYouTubeImportExecute(items, defaultTip)
           : await userAPI.startSpotifyImportExecute(items, defaultTip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
@@ -279,6 +319,10 @@ export default function ImportLibraryScreen() {
   };
 
   const startSource = async (source: ImportSource) => {
+    if (source === 'youtube') {
+      goToSource(source);
+      return;
+    }
     const connections = await checkConnections();
     const connected =
       source === 'soundcloud' ? connections.soundcloud : connections.spotify;
@@ -287,12 +331,39 @@ export default function ImportLibraryScreen() {
       await loadImportPreview(source);
       return;
     }
+    if (source === 'spotify' && !connections.oauthAvailable) {
+      goToSource(source);
+      return;
+    }
     await connectImportSource(source);
+  };
+
+  const submitSpotifyRequest = async () => {
+    const account = spotifyAccountInput.trim();
+    if (!account) {
+      setError('Enter the email on your Spotify account (spotify.com/account/overview).');
+      return;
+    }
+    setImportLoading(true);
+    setError(null);
+    try {
+      const result = await userAPI.requestSpotifyImport(account);
+      showToast(result.message);
+      await checkConnections();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not submit request.'));
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const busy = importLoading;
   const sourceLabel =
-    activeSource === 'soundcloud' ? 'SoundCloud' : 'Spotify';
+    activeSource === 'soundcloud'
+      ? 'SoundCloud'
+      : activeSource === 'youtube'
+        ? 'YouTube'
+        : 'Spotify';
 
   if (!authLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
@@ -311,8 +382,8 @@ export default function ImportLibraryScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <Text style={styles.lede}>
-          Tip tracks from your Spotify or SoundCloud likes into your Tuneable
-          library at your default (£{defaultTip.toFixed(2)}).
+          Tip tracks from Spotify, SoundCloud, or a public YouTube playlist into
+          your Tuneable library at your default (£{defaultTip.toFixed(2)}).
         </Text>
 
         {!activeSource ? (
@@ -325,7 +396,9 @@ export default function ImportLibraryScreen() {
               <Text style={styles.importSub}>
                 {spotifyConnected
                   ? 'Connected — tap to import'
-                  : 'Import your saved tracks'}
+                  : spotifyOauthAvailable
+                    ? 'Import your saved tracks'
+                    : 'Request tester access'}
               </Text>
             </Pressable>
             <Pressable
@@ -339,11 +412,65 @@ export default function ImportLibraryScreen() {
                   : 'Import your liked tracks'}
               </Text>
             </Pressable>
+            <Pressable
+              style={[styles.importCard, styles.youtubeCard]}
+              disabled={busy}
+              onPress={() => void startSource('youtube')}>
+              <Text style={styles.importTitleYt}>YouTube playlist</Text>
+              <Text style={styles.importSub}>
+                Paste a public playlist — MusicBrainz confirms matches
+              </Text>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.previewBox}>
             <Text style={styles.previewHeading}>{sourceLabel}</Text>
-            {importLoading && !importPreview ? (
+            {activeSource === 'youtube' && !importPreview && !importLoading ? (
+              <View style={styles.previewActions}>
+                <TextInput
+                  value={youtubePlaylistUrl}
+                  onChangeText={setYoutubePlaylistUrl}
+                  placeholder="https://www.youtube.com/playlist?list=…"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={styles.input}
+                />
+                <Pressable
+                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                  disabled={busy || !youtubePlaylistUrl.trim()}
+                  onPress={() => void loadImportPreview('youtube', youtubePlaylistUrl)}>
+                  <Text style={styles.primaryBtnText}>Scan playlist</Text>
+                </Pressable>
+              </View>
+            ) : activeSource === 'spotify' && !spotifyConnected && !spotifyOauthAvailable && !importPreview ? (
+              <View style={styles.previewActions}>
+                <Text style={styles.hint}>
+                  {spotifyRequestStatus === 'pending'
+                    ? 'Request pending — we will enable Connect after adding your Spotify account to the tester list.'
+                    : 'Spotify import is in tester mode. Request access with the email on your Spotify account.'}
+                </Text>
+                <TextInput
+                  value={spotifyAccountInput}
+                  onChangeText={setSpotifyAccountInput}
+                  placeholder="Spotify account email"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={styles.input}
+                />
+                <Pressable
+                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => void submitSpotifyRequest()}>
+                  {importLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Request Spotify import</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : importLoading && !importPreview ? (
               <View style={styles.previewLoading}>
                 <ActivityIndicator color={colors.accentLight} />
                 <Text style={styles.hint}>
@@ -356,7 +483,13 @@ export default function ImportLibraryScreen() {
                   {importPreview.inLibraryCount > 0
                     ? `${importPreview.inLibraryCount} already in your library · `
                     : ''}
-                  {importPreview.actionableCount} new to tip
+                  {importPreview.actionableCount} ready to import
+                  {importPreview.possibleMatchCount > 0
+                    ? ` · ${importPreview.possibleMatchCount} to review on web`
+                    : ''}
+                  {importPreview.skippedCount > 0
+                    ? ` · ${importPreview.skippedCount} skipped`
+                    : ''}
                   {importPreview.actionableCount > 0
                     ? ` · ~£${importPreview.estimatedCost.toFixed(2)}`
                     : ''}
@@ -460,6 +593,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.4)',
     backgroundColor: 'rgba(249, 115, 22, 0.1)',
   },
+  youtubeCard: {
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
   importTitle: {
     color: '#86efac',
     fontSize: 16,
@@ -467,6 +604,11 @@ const styles = StyleSheet.create({
   },
   importTitleSc: {
     color: '#fdba74',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  importTitleYt: {
+    color: '#fca5a5',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -500,6 +642,15 @@ const styles = StyleSheet.create({
   },
   previewActions: {
     gap: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 14,
   },
   hint: {
     color: colors.textMuted,

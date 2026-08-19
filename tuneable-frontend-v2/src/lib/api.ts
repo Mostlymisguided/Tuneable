@@ -1501,7 +1501,18 @@ export const userAPI = {
 
   getSpotifyStatus: async () => {
     const response = await api.get('/users/me/spotify-status');
-    return response.data as { connected: boolean };
+    return response.data as {
+      connected: boolean;
+      oauthAvailable?: boolean;
+      publicImport?: boolean;
+      request?: {
+        id?: string;
+        status: 'pending' | 'allowlisted' | 'rejected';
+        spotifyAccount?: string | null;
+        createdAt?: string | null;
+        rejectedReason?: string | null;
+      } | null;
+    };
   },
 
   getSpotifyLikedTracks: async (limit = 50) => {
@@ -1649,6 +1660,43 @@ export const userAPI = {
   ) => {
     const response = await api.post('/users/me/import/rekordbox/execute/start', { items, defaultTip });
     return response.data as { jobId: string; status: string };
+  },
+
+  requestSpotifyImport: async (spotifyAccount: string, note?: string) => {
+    const response = await api.post('/users/me/import/spotify/request', { spotifyAccount, note });
+    return response.data as {
+      message: string;
+      request: { id: string; status: string; spotifyAccount: string; createdAt?: string };
+    };
+  },
+
+  startYouTubeImportPreview: async (playlistUrl: string, limit = 50) => {
+    const response = await api.post('/users/me/import/youtube/preview/start', { playlistUrl, limit });
+    return response.data as { jobId: string; status: string };
+  },
+
+  startYouTubeImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/youtube/execute/start', { items, defaultTip });
+    return response.data as { jobId: string; status: string };
+  },
+
+  getSpotifyImportRequests: async (status?: string) => {
+    const params = status ? { status } : {};
+    const response = await api.get('/users/admin/spotify-import-requests', { params });
+    return response.data as { requests: any[]; count: number };
+  },
+
+  allowlistSpotifyImportRequest: async (requestId: string) => {
+    const response = await api.patch(`/users/admin/spotify-import-requests/${requestId}/allowlist`);
+    return response.data;
+  },
+
+  rejectSpotifyImportRequest: async (requestId: string, reason?: string) => {
+    const response = await api.patch(`/users/admin/spotify-import-requests/${requestId}/reject`, { reason });
+    return response.data;
   },
 
   getImportJob: async (jobId: string) => {

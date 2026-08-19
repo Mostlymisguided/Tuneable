@@ -25,6 +25,7 @@ import {
   Undo2
 } from 'lucide-react';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
+import SpotifyImportRequestsAdmin from '../components/SpotifyImportRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
@@ -3572,6 +3573,7 @@ const Admin: React.FC = () => {
                     }))
                   }
                 />
+                <SpotifyImportRequestsAdmin />
               </div>
             ) : reportsSubTab === 'claims' ? (
               <div className="space-y-6">

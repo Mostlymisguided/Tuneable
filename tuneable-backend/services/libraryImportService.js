@@ -53,6 +53,8 @@ function identityConfidenceSourceFrom({ matchStatus, matchType, crossRef }) {
     if (sources.includes('musicbrainz')) return 'isrc-musicbrainz';
     return 'isrc';
   }
+  if (crossRef?.status === 'musicbrainz_verified') return 'musicbrainz';
+  if (crossRef?.status === 'musicbrainz_likely') return 'musicbrainz-likely';
   if (crossRef?.status === 'spotify_catalog' || (
     crossRef?.identityConfidence === 'verified' && (crossRef.sources || []).includes('spotify')
   )) {
@@ -127,14 +129,20 @@ async function findExactCatalogMedia(track) {
   const soundcloudId = track.externalIds?.soundcloud
     || (track.sourceLabel === 'SoundCloud Likes' ? track.id : null);
   const rekordboxId = track.externalIds?.rekordbox;
+  const youtubeId = track.externalIds?.youtube;
+  const musicbrainzId = track.externalIds?.musicbrainz;
   const isrc = normalizeIsrc(track.externalIds?.isrc);
   const soundcloudUrl = track.sources?.soundcloud;
+  const youtubeUrl = track.sources?.youtube;
 
   const or = [];
   if (spotifyId) or.push({ 'externalIds.spotify': String(spotifyId) });
   if (soundcloudId) or.push({ 'externalIds.soundcloud': String(soundcloudId) });
   if (rekordboxId) or.push({ 'externalIds.rekordbox': String(rekordboxId) });
+  if (youtubeId) or.push({ 'externalIds.youtube': String(youtubeId) });
+  if (musicbrainzId) or.push({ 'externalIds.musicbrainz': String(musicbrainzId) });
   if (isrc) or.push({ isrc });
+  if (youtubeUrl) or.push({ 'sources.youtube': youtubeUrl });
   if (soundcloudUrl) {
     or.push({ 'sources.soundcloud': soundcloudUrl });
     const normalized = normalizePermalink(soundcloudUrl);
@@ -312,7 +320,14 @@ function trackKey(track, source) {
   if (source === 'rekordbox') {
     return String(track.externalIds?.rekordbox || track.id || `${track.title}-${track.artist}`);
   }
+  if (source === 'youtube') {
+    return String(track.externalIds?.youtube || track.id || `${track.title}-${track.artist}`);
+  }
   return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
+}
+
+function isYoutubeSource(source) {
+  return source === 'youtube' || source === 'youtube_playlist';
 }
 
 async function previewImportFromTracks(userId, source, tracks, user, extraSummary = {}, onProgress = null) {
@@ -373,9 +388,14 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
     if (inLibrary) matchStatus = 'in_library';
     else if (catalogMedia && matchConfidence === 'exact') matchStatus = 'on_catalog';
     else if (catalogMedia && matchConfidence === 'fuzzy') matchStatus = 'possible_match';
+    else if (!catalogMedia && (crossRef?.identityConfidence === 'likely' || crossRef?.status === 'musicbrainz_likely')) {
+      matchStatus = 'possible_match';
+      matchType = matchType || crossRef?.matchType || 'musicbrainz-likely';
+    }
 
-    // Fuzzy suggestions default to accepted (user can opt out in UI)
-    const useSuggestedMatch = matchStatus === 'possible_match';
+    const youtubeLike = isYoutubeSource(source);
+    // Fuzzy catalog suggestions default to accepted except YouTube, which needs explicit confirm
+    const useSuggestedMatch = matchStatus === 'possible_match' && !youtubeLike;
 
     const identityConfidence = importCrossRefService.resolveIdentityConfidence({
       matchStatus,
@@ -386,6 +406,12 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       matchType,
       crossRef,
     });
+
+    const autoSelect = matchStatus !== 'in_library' && (
+      !youtubeLike
+      || matchStatus === 'on_catalog'
+      || identityConfidence === 'verified'
+    );
 
     matched += 1;
     if (matched === tracks.length || matched % 5 === 0) {
@@ -414,9 +440,11 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       originalArtist: crossRef?.originalArtist || null,
       mediaId: catalogId || null,
       mediaUuid: catalogMedia?.uuid || null,
-      suggestedTitle: catalogMedia && matchStatus === 'possible_match' ? catalogMedia.title : null,
-      suggestedArtist: catalogMedia && matchStatus === 'possible_match'
-        ? mediaPrimaryArtistName(catalogMedia)
+      suggestedTitle: matchStatus === 'possible_match'
+        ? (catalogMedia?.title || track.suggestedTitle || null)
+        : null,
+      suggestedArtist: matchStatus === 'possible_match'
+        ? (catalogMedia ? mediaPrimaryArtistName(catalogMedia) : (track.suggestedArtist || null))
         : null,
       useSuggestedMatch,
       isPlayable: catalogMedia ? play.isPlayable : false,
@@ -427,7 +455,7 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       userBidTotalPence: catalogId ? (userBidTotals[catalogId] || 0) : 0,
       defaultTip,
       minTip: MIN_TIP,
-      selected: matchStatus !== 'in_library',
+      selected: autoSelect,
       externalMedia: buildExternalMediaFromTrack(track, {
         identityConfidence,
         identityConfidenceSource,
@@ -435,8 +463,8 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
     };
   });
 
-  const selectable = items.filter((i) => i.matchStatus !== 'in_library');
-  const estimatedTotal = selectable.reduce((sum, i) => sum + i.defaultTip, 0);
+  const selectedItems = items.filter((i) => i.selected);
+  const estimatedTotal = selectedItems.reduce((sum, i) => sum + i.defaultTip, 0);
 
   report({
     stage: 'matching',
@@ -456,7 +484,7 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       newTracks: items.filter((i) => i.matchStatus === 'new').length,
       identityVerified: items.filter((i) => i.identityConfidence === 'verified').length,
       identityUnverified: items.filter((i) => i.identityConfidence === 'unverified').length,
-      selectedCount: selectable.length,
+      selectedCount: selectedItems.length,
       estimatedTotal,
       userBalance: (user.balance || 0) / 100,
       defaultTip,
@@ -701,7 +729,60 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
         }
       }
 
+      const youtubeImport = importSource === 'youtube_playlist' || item.externalMedia?.importSource === 'youtube_playlist';
       const rejectedFuzzy = item.matchStatus === 'possible_match' && item.useSuggestedMatch === false;
+      if (youtubeImport && rejectedFuzzy) {
+        results.skipped++;
+        results.items.push({
+          key: item.key,
+          title: label,
+          status: 'skipped',
+          reason: 'rejected_youtube_match',
+        });
+        report({
+          stage: 'tipping',
+          message: `Importing track ${index + 1} of ${total}…`,
+          current: index + 1,
+          total,
+          partial: {
+            tipped: results.tipped,
+            skipped: results.skipped,
+            failed: results.failed,
+            totalSpentPence: results.totalSpentPence,
+          },
+        });
+        continue;
+      }
+
+      const verifiedYoutubeIdentity = item.identityConfidence === 'verified'
+        || item.crossRefStatus === 'musicbrainz_verified'
+        || item.crossRefStatus === 'isrc_verified'
+        || item.matchStatus === 'on_catalog'
+        || item.matchStatus === 'in_library'
+        || (item.matchStatus === 'possible_match' && item.useSuggestedMatch === true);
+      if (youtubeImport && !item.mediaId && !verifiedYoutubeIdentity) {
+        results.skipped++;
+        results.items.push({
+          key: item.key,
+          title: label,
+          status: 'skipped',
+          reason: 'unverified_youtube',
+        });
+        report({
+          stage: 'tipping',
+          message: `Importing track ${index + 1} of ${total}…`,
+          current: index + 1,
+          total,
+          partial: {
+            tipped: results.tipped,
+            skipped: results.skipped,
+            failed: results.failed,
+            totalSpentPence: results.totalSpentPence,
+          },
+        });
+        continue;
+      }
+
       const mediaId = !rejectedFuzzy
         && item.mediaId
         && mongoose.Types.ObjectId.isValid(item.mediaId)
@@ -998,14 +1079,109 @@ async function executeRekordboxImport(userId, opts = {}) {
   return executeLibraryImport(userId, { ...opts, items, importSource: 'rekordbox' });
 }
 
+function filterYouTubePreview(preview, extraSummary = {}) {
+  const kept = [];
+  let skippedNoMatch = 0;
+  for (const item of preview.items || []) {
+    if (item.matchStatus === 'new' && item.identityConfidence !== 'verified') {
+      skippedNoMatch += 1;
+      continue;
+    }
+    kept.push(item);
+  }
+  const selectedForImport = kept.filter((i) => i.selected);
+  return {
+    ...preview,
+    source: 'youtube',
+    items: kept,
+    summary: {
+      ...preview.summary,
+      total: kept.length,
+      inLibrary: kept.filter((i) => i.matchStatus === 'in_library').length,
+      onCatalog: kept.filter((i) => i.matchStatus === 'on_catalog').length,
+      possibleMatches: kept.filter((i) => i.matchStatus === 'possible_match').length,
+      newTracks: kept.filter((i) => i.matchStatus === 'new').length,
+      identityVerified: kept.filter((i) => i.identityConfidence === 'verified').length,
+      identityUnverified: kept.filter((i) => i.identityConfidence === 'unverified').length,
+      selectedCount: selectedForImport.length,
+      estimatedTotal: selectedForImport.reduce((sum, i) => sum + i.defaultTip, 0),
+      skippedNoMatch,
+      ...extraSummary,
+    },
+  };
+}
+
+async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+  const report = onProgress || (() => {});
+  const youtubePlaylistService = require('./youtubePlaylistService');
+  const youtubeImportMatchService = require('./youtubeImportMatchService');
+
+  const user = await User.findById(userId).select('preferences balance');
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const fetched = await youtubePlaylistService.fetchPublicPlaylist(playlistUrl, {
+    limit: opts.limit,
+    onProgress,
+  });
+
+  report({
+    stage: 'cross_ref',
+    message: 'Cross-referencing MusicBrainz…',
+    current: 0,
+    total: fetched.tracks.length,
+  });
+
+  const enriched = await youtubeImportMatchService.enrichYouTubeTracksViaMusicBrainz(fetched.tracks, {
+    onProgress: (update) => report({
+      stage: 'cross_ref',
+      current: update.current,
+      total: update.total,
+      message: update.message,
+    }),
+  });
+
+  const preview = await previewImportFromTracks(
+    userId,
+    'youtube',
+    enriched.tracks,
+    user,
+    {},
+    onProgress
+  );
+
+  return filterYouTubePreview(preview, {
+    scanned: fetched.scanned,
+    skippedJunk: fetched.skipped.filter((s) => s.reason === 'junk_channel').length,
+    skippedUnparsed: fetched.skipped.filter((s) => s.reason !== 'junk_channel' && s.reason !== 'unavailable').length,
+    skippedUnavailable: fetched.skipped.filter((s) => s.reason === 'unavailable').length,
+    skippedPlaylistItems: fetched.skipped.length,
+    mbHigh: enriched.stats.high,
+    mbMedium: enriched.stats.medium,
+    mbNone: enriched.stats.none,
+    playlistId: fetched.playlistId,
+    playlistTitle: fetched.playlistTitle,
+  });
+}
+
+async function executeYouTubePlaylistImport(userId, opts) {
+  return executeLibraryImport(userId, { ...opts, importSource: 'youtube_playlist' });
+}
+
 module.exports = {
   previewSpotifyImport,
   previewSoundCloudImport,
   previewRekordboxImport,
+  previewYouTubePlaylistImport,
   listRekordboxPlaylists,
   executeSpotifyImport,
   executeSoundCloudImport,
   executeRekordboxImport,
+  executeYouTubePlaylistImport,
   executeLibraryImport,
   convertRekordboxTrack,
   MIN_TIP,

@@ -21,7 +21,7 @@ import { buildOAuthStartUrl } from '../utils/platform';
 import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
 import { isAdmin } from '../utils/permissionHelpers';
 
-type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox';
+type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox' | 'youtube';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
 type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
 type IdentityConfidence = 'verified' | 'catalog' | 'likely' | 'unverified';
@@ -84,6 +84,13 @@ interface ImportSummary {
   defaultTip: number;
   skippedMixes?: number;
   skippedUnplayable?: number;
+  skippedJunk?: number;
+  skippedUnparsed?: number;
+  skippedNoMatch?: number;
+  skippedUnavailable?: number;
+  mbHigh?: number;
+  mbMedium?: number;
+  playlistTitle?: string;
   scanned?: number;
   playlistCount?: number;
   playlists?: string[];
@@ -158,11 +165,19 @@ const SOURCE_META: Record<ImportSource, {
     accentHover: 'hover:bg-red-500',
     badge: 'bg-red-600',
   },
+  youtube: {
+    label: 'YouTube',
+    likesLabel: 'YouTube playlist',
+    accent: 'bg-red-600',
+    accentHover: 'hover:bg-red-500',
+    badge: 'bg-red-700',
+  },
 };
 
 function parseSource(value: string | null): ImportSource {
   if (value === 'soundcloud') return 'soundcloud';
   if (value === 'rekordbox') return 'rekordbox';
+  if (value === 'youtube') return 'youtube';
   return 'spotify';
 }
 
@@ -206,11 +221,25 @@ const LibraryImport: React.FC = () => {
   const [rekordboxTrackCount, setRekordboxTrackCount] = useState(0);
   const [isParsingXml, setIsParsingXml] = useState(false);
   const rekordboxFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
+  const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
+  const [spotifyRequest, setSpotifyRequest] = useState<{
+    status: 'pending' | 'allowlisted' | 'rejected';
+    spotifyAccount?: string | null;
+  } | null>(null);
+  const [spotifyAccountInput, setSpotifyAccountInput] = useState('');
+  const [spotifyRequestNote, setSpotifyRequestNote] = useState('');
+  const [spotifyRequestSubmitting, setSpotifyRequestSubmitting] = useState(false);
 
   const adminUser = isAdmin(user);
   const meta = SOURCE_META[source];
   const isRekordbox = source === 'rekordbox';
-  const isConnected = source === 'spotify' ? spotifyConnected : source === 'soundcloud' ? soundcloudConnected : true;
+  const isYouTube = source === 'youtube';
+  const isConnected = source === 'spotify'
+    ? spotifyConnected
+    : source === 'soundcloud'
+      ? soundcloudConnected
+      : true;
   const oauthHandledRef = React.useRef(false);
   const autoScanStartedRef = React.useRef(false);
   const [shouldAutoScan, setShouldAutoScan] = useState(
@@ -229,6 +258,8 @@ const LibraryImport: React.FC = () => {
       };
       setSpotifyConnected(next.spotify);
       setSoundcloudConnected(next.soundcloud);
+      setSpotifyOauthAvailable(Boolean(spotify.oauthAvailable) || next.spotify);
+      setSpotifyRequest(spotify.request || null);
       return next;
     } catch {
       setSpotifyConnected(false);
@@ -343,7 +374,7 @@ const LibraryImport: React.FC = () => {
   }, [source, adminUser, user]);
 
   const connectSource = () => {
-    if (source === 'rekordbox') return;
+    if (source === 'rekordbox' || source === 'youtube') return;
     try {
       sessionStorage.removeItem(importAutoScanStorageKey(source));
     } catch {
@@ -367,6 +398,24 @@ const LibraryImport: React.FC = () => {
       || 'http://localhost:8000';
     const redirectUrl = encodeURIComponent(redirect);
     window.location.href = `${baseUrl}/api/auth/spotify?link_account=true&redirect=${redirectUrl}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+  };
+
+  const submitSpotifyImportRequest = async () => {
+    const account = spotifyAccountInput.trim();
+    if (!account) {
+      toast.error('Enter the email on your Spotify account (spotify.com/account/overview)');
+      return;
+    }
+    setSpotifyRequestSubmitting(true);
+    try {
+      const result = await userAPI.requestSpotifyImport(account, spotifyRequestNote.trim() || undefined);
+      toast.success(result.message);
+      await checkConnections();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || error?.message || 'Failed to submit request');
+    } finally {
+      setSpotifyRequestSubmitting(false);
+    }
   };
 
   const loadRekordboxPlaylists = async (file: File) => {
@@ -425,6 +474,40 @@ const LibraryImport: React.FC = () => {
       return;
     }
 
+    if (source === 'youtube') {
+      const playlistUrl = youtubePlaylistUrl.trim();
+      if (!playlistUrl) {
+        toast.error('Paste a public YouTube playlist URL');
+        return;
+      }
+      setIsLoading(true);
+      setProgressMessage('Starting YouTube playlist scan…');
+      setProgressCurrent(0);
+      setProgressTotal(0);
+      try {
+        const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
+        setLimit(capped);
+        const started = await userAPI.startYouTubeImportPreview(playlistUrl, capped);
+        const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress, {
+          timeoutMs: 20 * 60 * 1000,
+        });
+        setItems(data.items || []);
+        setSummary(data.summary || null);
+        setTipAmounts({});
+        setTipMode('fixed');
+        setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+        setStep('summary');
+      } catch (error: any) {
+        toast.error(error?.response?.data?.error || error?.message || 'Failed to scan YouTube playlist');
+      } finally {
+        setIsLoading(false);
+        setProgressMessage(null);
+        setProgressCurrent(0);
+        setProgressTotal(0);
+      }
+      return;
+    }
+
     if (!isConnected) {
       connectSource();
       return;
@@ -468,7 +551,7 @@ const LibraryImport: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox) return;
+    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox || isYouTube) return;
     if (autoScanStartedRef.current || isLoading) return;
     try {
       if (sessionStorage.getItem(importAutoScanStorageKey(source))) return;
@@ -500,6 +583,8 @@ const LibraryImport: React.FC = () => {
         ? await userAPI.startRekordboxImportExecute(payload, tip)
         : source === 'soundcloud'
           ? await userAPI.startSoundCloudImportExecute(payload, tip)
+          : source === 'youtube'
+            ? await userAPI.startYouTubeImportExecute(payload, tip)
           : await userAPI.startSpotifyImportExecute(payload, tip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
@@ -806,6 +891,7 @@ const LibraryImport: React.FC = () => {
       matchStatus: item.matchStatus,
       useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
       crossRefStatus: item.crossRefStatus || undefined,
+      identityConfidence: item.identityConfidence || undefined,
       amount: tipMode === 'spread' && selectedSpreadTip != null
         ? selectedSpreadTip
         : parseFloat(tipAmounts[item.key] ?? bulkTip),
@@ -829,6 +915,9 @@ const LibraryImport: React.FC = () => {
 
     let tip = cost.tip;
     let targets = scope === 'playable' ? [...playableItems] : [...selectableItems];
+    if (isYouTube && scope === 'all') {
+      targets = items.filter((i) => i.selected && i.matchStatus !== 'in_library');
+    }
 
     if (tipMode === 'spread') {
       if (!cost.spreadOk) {
@@ -873,6 +962,7 @@ const LibraryImport: React.FC = () => {
       matchStatus: item.matchStatus,
       useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
       crossRefStatus: item.crossRefStatus || undefined,
+      identityConfidence: item.identityConfidence || undefined,
       amount: tip,
       externalMedia: item.externalMedia,
       skipIfInLibrary: true,
@@ -924,6 +1014,8 @@ const LibraryImport: React.FC = () => {
           <p className="text-gray-400 mt-2 max-w-2xl">
             {isRekordbox
               ? 'Admin: upload a Rekordbox XML export, pick playlists, then tip catalog entries into your library. Audio is not uploaded.'
+              : isYouTube
+                ? 'Paste a public YouTube playlist. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm.'
               : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
           </p>
           <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">{stepLabel}</p>
@@ -931,8 +1023,8 @@ const LibraryImport: React.FC = () => {
 
         {step === 'connect' && (
           <div className="space-y-4">
-            <div className="flex gap-2">
-              {(['spotify', 'soundcloud'] as ImportSource[]).map((s) => {
+            <div className="flex gap-2 flex-wrap">
+              {(['spotify', 'soundcloud', 'youtube'] as ImportSource[]).map((s) => {
                 const sMeta = SOURCE_META[s];
                 const connected = s === 'spotify' ? spotifyConnected : soundcloudConnected;
                 const active = source === s;
@@ -954,7 +1046,9 @@ const LibraryImport: React.FC = () => {
                       <div>
                         <div className="font-semibold">{sMeta.label}</div>
                         <div className="text-xs text-gray-400">
-                          {connected ? 'Connected' : 'Not connected'}
+                          {s === 'youtube'
+                            ? 'Public playlist'
+                            : connected ? 'Connected' : 'Not connected'}
                         </div>
                       </div>
                     </div>
@@ -994,6 +1088,8 @@ const LibraryImport: React.FC = () => {
                   <p className="text-gray-400 text-sm">
                     {isRekordbox
                       ? 'Catalog-only: title, artist, BPM, key, duration, and cover art from local files. No MP3s uploaded.'
+                      : isYouTube
+                        ? 'Paste a public playlist URL. We match tracks against MusicBrainz and skip unreliable channels.'
                       : isConnected
                         ? 'We\'ll match against the Tuneable catalog and skip mixes/sets'
                         : `Connect ${meta.label} to scan your likes`}
@@ -1118,6 +1214,73 @@ const LibraryImport: React.FC = () => {
                     </p>
                   )}
                 </div>
+              ) : isYouTube ? (
+                <div className="space-y-3">
+                  <label className="text-sm text-gray-400 block">
+                    Public playlist URL
+                    <input
+                      type="url"
+                      value={youtubePlaylistUrl}
+                      onChange={(e) => setYoutubePlaylistUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/playlist?list=…"
+                      className="mt-1 w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
+                    disabled={isLoading || !youtubePlaylistUrl.trim()}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                  >
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                    {isLoading ? 'Matching…' : 'Scan playlist'}
+                  </button>
+                  {isLoading && progressMessage ? (
+                    <p className="text-xs text-gray-400">{progressMessage}</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center">
+                      Confident MusicBrainz matches are ready to import. Weaker matches go to review. Junk/lyric channels are skipped.
+                    </p>
+                  )}
+                </div>
+              ) : source === 'spotify' && !isConnected && !spotifyOauthAvailable ? (
+                <div className="space-y-3">
+                  {spotifyRequest?.status === 'pending' ? (
+                    <p className="text-sm text-amber-200">
+                      Request pending for {spotifyRequest.spotifyAccount}. We&apos;ll enable Connect once your Spotify account is on the tester list.
+                    </p>
+                  ) : spotifyRequest?.status === 'rejected' ? (
+                    <p className="text-sm text-red-300">
+                      Previous request was declined{spotifyRequest.spotifyAccount ? ` for ${spotifyRequest.spotifyAccount}` : ''}. You can submit again.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Spotify import is in tester mode (limited allowlist). Request access with the email on your Spotify account.
+                    </p>
+                  )}
+                  <input
+                    type="email"
+                    value={spotifyAccountInput}
+                    onChange={(e) => setSpotifyAccountInput(e.target.value)}
+                    placeholder="Spotify account email"
+                    className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
+                  />
+                  <input
+                    type="text"
+                    value={spotifyRequestNote}
+                    onChange={(e) => setSpotifyRequestNote(e.target.value)}
+                    placeholder="Optional note"
+                    className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void submitSpotifyImportRequest()}
+                    disabled={spotifyRequestSubmitting}
+                    className="w-full py-3 bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded-lg font-medium"
+                  >
+                    {spotifyRequestSubmitting ? 'Submitting…' : 'Request Spotify import'}
+                  </button>
+                </div>
               ) : !isConnected ? (
                 <button
                   type="button"
@@ -1193,6 +1356,21 @@ const LibraryImport: React.FC = () => {
                   · {summary.localFiles} local file{summary.localFiles === 1 ? '' : 's'} for artwork
                 </span>
               ) : null}
+              {typeof summary.skippedNoMatch === 'number' && summary.skippedNoMatch > 0 ? (
+                <span className="ml-1 text-amber-300/90">
+                  · skipped {summary.skippedNoMatch} unmatched
+                </span>
+              ) : null}
+              {typeof summary.skippedJunk === 'number' && summary.skippedJunk > 0 ? (
+                <span className="ml-1 text-amber-300/90">
+                  · skipped {summary.skippedJunk} unreliable channel{summary.skippedJunk === 1 ? '' : 's'}
+                </span>
+              ) : null}
+              {typeof summary.skippedUnparsed === 'number' && summary.skippedUnparsed > 0 ? (
+                <span className="ml-1 text-gray-400">
+                  · skipped {summary.skippedUnparsed} unparsed
+                </span>
+              ) : null}
               {typeof summary.crossRefVerified === 'number' && summary.crossRefVerified > 0 ? (
                 <span className="ml-1 text-emerald-300/90">
                   · {summary.crossRefVerified} verified via ISRC
@@ -1225,11 +1403,15 @@ const LibraryImport: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-800/80 rounded-lg p-3 border border-emerald-800/50">
+                <div className="text-lg font-semibold text-emerald-200">{summary.selectedCount ?? selectedItems.length}</div>
+                <div className="text-xs text-gray-400 mt-0.5">Ready to import</div>
+              </div>
               <div className="bg-gray-800/80 rounded-lg p-3 border border-gray-700">
                 <div className="text-lg font-semibold text-amber-200">{possibleMatchCount}</div>
                 <div className="text-xs text-gray-400 mt-0.5">Possible matches</div>
               </div>
-              <div className="bg-gray-800/80 rounded-lg p-3 border border-gray-700">
+              <div className="bg-gray-800/80 rounded-lg p-3 border border-gray-700 col-span-2 md:col-span-1">
                 <div className="text-lg font-semibold text-purple-300">{newTrackCount}</div>
                 <div className="text-xs text-gray-400 mt-0.5">New to Tuneable</div>
               </div>
@@ -1468,7 +1650,7 @@ const LibraryImport: React.FC = () => {
 
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <div className="flex flex-wrap items-center gap-3">
-                {!isRekordbox && limit < MAX_SCAN_LIMIT ? (
+                {!isRekordbox && !isYouTube && limit < MAX_SCAN_LIMIT ? (
                   <button
                     type="button"
                     onClick={() => void scanLikes(Math.min(MAX_SCAN_LIMIT, limit + SCAN_STEP))}
@@ -1500,7 +1682,7 @@ const LibraryImport: React.FC = () => {
             {showAdvancedLimit && !isRekordbox && (
               <div className="bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-wrap items-end gap-3">
                 <label className="text-sm text-gray-400">
-                  Likes to scan (max {MAX_SCAN_LIMIT})
+                  {isYouTube ? 'Tracks to scan' : 'Likes to scan'} (max {MAX_SCAN_LIMIT})
                   <input
                     type="number"
                     min={1}
@@ -1766,7 +1948,9 @@ const LibraryImport: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setItems((prev) => prev.map((i) => (
-                                i.key === item.key ? { ...i, useSuggestedMatch: true } : i
+                                i.key === item.key
+                                  ? { ...i, useSuggestedMatch: true, selected: true }
+                                  : i
                               )));
                             }}
                             className={`px-2 py-0.5 rounded border ${
@@ -1781,7 +1965,13 @@ const LibraryImport: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setItems((prev) => prev.map((i) => (
-                                i.key === item.key ? { ...i, useSuggestedMatch: false } : i
+                                i.key === item.key
+                                  ? {
+                                    ...i,
+                                    useSuggestedMatch: false,
+                                    selected: isYouTube ? false : i.selected,
+                                  }
+                                  : i
                               )));
                             }}
                             className={`px-2 py-0.5 rounded border ${
@@ -1790,7 +1980,7 @@ const LibraryImport: React.FC = () => {
                                 : 'bg-gray-900 border-gray-600 text-gray-300 hover:border-purple-600'
                             }`}
                           >
-                            Create as new
+                            {isYouTube ? 'Skip' : 'Create as new'}
                           </button>
                         </div>
                       </div>

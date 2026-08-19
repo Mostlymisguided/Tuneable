@@ -216,7 +216,7 @@ async function enrichTracksViaIsrc(tracks, opts = {}) {
  * @returns {IdentityConfidence}
  */
 function resolveIdentityConfidence({ matchStatus, crossRef }) {
-  if (crossRef?.identityConfidence === 'verified' || crossRef?.status === 'isrc_verified') {
+  if (crossRef?.identityConfidence === 'verified' || crossRef?.status === 'isrc_verified' || crossRef?.status === 'musicbrainz_verified') {
     return 'verified';
   }
   if (matchStatus === 'on_catalog' || matchStatus === 'in_library') {

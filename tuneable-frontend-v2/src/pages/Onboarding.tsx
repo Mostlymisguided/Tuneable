@@ -59,6 +59,9 @@ const Onboarding: React.FC = () => {
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
+  const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
+  const [spotifyRequestStatus, setSpotifyRequestStatus] = useState<string | null>(null);
+  const [spotifyAccountInput, setSpotifyAccountInput] = useState('');
   const [importPreview, setImportPreview] = useState<{
     actionableCount: number;
     estimatedCost: number;
@@ -153,12 +156,15 @@ const Onboarding: React.FC = () => {
       ]);
       setSpotifyConnected(Boolean(spotify?.connected));
       setSoundcloudConnected(Boolean(soundcloud?.connected));
+      setSpotifyOauthAvailable(Boolean(spotify?.oauthAvailable) || Boolean(spotify?.connected));
+      setSpotifyRequestStatus(spotify?.request?.status || null);
       return {
         spotify: Boolean(spotify?.connected),
         soundcloud: Boolean(soundcloud?.connected),
+        oauthAvailable: Boolean(spotify?.oauthAvailable) || Boolean(spotify?.connected),
       };
     } catch {
-      return { spotify: false, soundcloud: false };
+      return { spotify: false, soundcloud: false, oauthAvailable: false };
     }
   }, []);
 
@@ -375,7 +381,31 @@ const Onboarding: React.FC = () => {
       startImportFromSource(source);
       return;
     }
+    if (source === 'spotify' && !spotifyOauthAvailable) {
+      startImportFromSource(source);
+      return;
+    }
     connectImportSource(source);
+  };
+
+  const submitSpotifyImportRequest = async () => {
+    const account = spotifyAccountInput.trim();
+    if (!account) {
+      toast.error('Enter the email on your Spotify account (spotify.com/account/overview)');
+      return;
+    }
+    setIsImportLoading(true);
+    try {
+      const result = await userAPI.requestSpotifyImport(account);
+      toast.success(result.message);
+      await checkConnections();
+    } catch (error: unknown) {
+      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to submit request';
+      toast.error(message);
+    } finally {
+      setIsImportLoading(false);
+    }
   };
 
   const runQuickImport = async () => {
@@ -704,10 +734,18 @@ const Onboarding: React.FC = () => {
                   className="rounded-xl border border-green-700/50 bg-green-900/20 p-5 text-left transition-colors hover:bg-green-900/30"
                 >
                   <p className="font-semibold text-green-300">
-                    {spotifyConnected ? 'Import from Spotify' : 'Connect Spotify'}
+                    {spotifyConnected
+                      ? 'Import from Spotify'
+                      : spotifyOauthAvailable
+                        ? 'Connect Spotify'
+                        : 'Request Spotify import'}
                   </p>
                   <p className="mt-1 text-sm text-gray-400">
-                    {spotifyConnected ? 'Connected — tap to scan your likes' : 'Import your saved tracks'}
+                    {spotifyConnected
+                      ? 'Connected — tap to scan your likes'
+                      : spotifyOauthAvailable
+                        ? 'Import your saved tracks'
+                        : 'Tester allowlist — request access'}
                   </p>
                 </button>
                 <button
@@ -772,6 +810,30 @@ const Onboarding: React.FC = () => {
                       className="text-sm text-purple-300 hover:text-purple-200"
                     >
                       Review all tracks before importing →
+                    </button>
+                  </div>
+                ) : importSource === 'spotify' && !spotifyConnected && !spotifyOauthAvailable ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-400">
+                      {spotifyRequestStatus === 'pending'
+                        ? 'Request pending — Connect will unlock after we add your Spotify account to the tester list.'
+                        : 'Spotify import is currently limited to testers. Request access with the email on your Spotify account.'}
+                    </p>
+                    <input
+                      type="email"
+                      value={spotifyAccountInput}
+                      onChange={(e) => setSpotifyAccountInput(e.target.value)}
+                      placeholder="Spotify account email"
+                      className="w-full rounded-lg border border-gray-600 bg-black/40 px-3 py-2 text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void submitSpotifyImportRequest()}
+                      disabled={isSaving || isImportLoading}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-700 py-3 font-semibold text-white hover:bg-green-600 disabled:opacity-50"
+                    >
+                      {isImportLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+                      Request Spotify import
                     </button>
                   </div>
                 ) : (importSource === 'soundcloud' ? soundcloudConnected : spotifyConnected) ? (

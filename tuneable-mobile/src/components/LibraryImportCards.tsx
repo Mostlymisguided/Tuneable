@@ -15,6 +15,8 @@ export function LibraryImportCards({ showUpload = false }: Props) {
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
   const [spotifyImported, setSpotifyImported] = useState(0);
   const [soundcloudImported, setSoundcloudImported] = useState(0);
+  const [youtubeImported, setYoutubeImported] = useState(0);
+  const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -25,13 +27,18 @@ export function LibraryImportCards({ showUpload = false }: Props) {
       setSoundcloudConnected(Boolean(stats.soundcloud?.connected));
       setSpotifyImported(stats.spotify?.imported ?? 0);
       setSoundcloudImported(stats.soundcloud?.imported ?? 0);
+      setYoutubeImported(stats.youtube?.imported ?? 0);
+      setSpotifyOauthAvailable(
+        Boolean(stats.spotify?.oauthAvailable) || Boolean(stats.spotify?.connected)
+      );
     } catch {
       const [spotify, soundcloud] = await Promise.all([
-        userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
+        userAPI.getSpotifyStatus().catch(() => ({ connected: false, oauthAvailable: false })),
         userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
       ]);
       setSpotifyConnected(Boolean(spotify?.connected));
       setSoundcloudConnected(Boolean(soundcloud?.connected));
+      setSpotifyOauthAvailable(Boolean(spotify?.oauthAvailable) || Boolean(spotify?.connected));
     } finally {
       setLoading(false);
     }
@@ -79,11 +86,17 @@ export function LibraryImportCards({ showUpload = false }: Props) {
             {subtitle(
               spotifyConnected,
               spotifyImported,
-              'Import your saved tracks'
+              spotifyOauthAvailable
+                ? 'Import your saved tracks'
+                : 'Request tester access'
             )}
           </Text>
           <Text style={styles.ctaSpotify}>
-            {spotifyConnected ? 'Import more →' : 'Connect →'}
+            {spotifyConnected
+              ? 'Import more →'
+              : spotifyOauthAvailable
+                ? 'Connect →'
+                : 'Request →'}
           </Text>
         </Pressable>
         <Pressable
@@ -119,6 +132,31 @@ export function LibraryImportCards({ showUpload = false }: Props) {
           </Text>
         </Pressable>
       </View>
+      <Pressable
+        style={styles.youtubeCard}
+        onPress={() =>
+          router.push({
+            pathname: '/import-library',
+            params: { source: 'youtube' },
+          })
+        }
+        accessibilityRole="button"
+        accessibilityLabel="Import from a YouTube playlist">
+        <View style={styles.youtubeIcon}>
+          <Ionicons name="logo-youtube" size={20} color="#fca5a5" />
+        </View>
+        <View style={styles.uploadCopy}>
+          <Text style={styles.youtubeTitle}>YouTube playlist</Text>
+          <Text style={styles.uploadSub}>
+            {loading
+              ? 'Checking…'
+              : youtubeImported > 0
+                ? `${youtubeImported} in your library · paste a public playlist`
+                : 'Match a public playlist via MusicBrainz'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Pressable>
       {showUpload ? (
         <Pressable
           style={styles.uploadCard}
@@ -218,6 +256,30 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#fdba74',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  youtubeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+  },
+  youtubeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  youtubeTitle: {
+    color: '#fca5a5',
+    fontSize: 15,
     fontWeight: '700',
   },
   uploadCard: {

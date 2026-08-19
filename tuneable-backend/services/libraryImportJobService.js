@@ -114,7 +114,7 @@ function completeJob(jobId, result) {
   });
 }
 
-function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists } = {}) {
+function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl } = {}) {
   const job = createJob({ userId, type: 'preview', source });
   const onProgress = progressReporter(job.id);
 
@@ -132,6 +132,11 @@ function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, play
         preview = await libraryImportService.previewSoundCloudImport(userId, limit, {
           onProgress,
           crossRefMode: crossRefMode || 'spotify_only',
+        });
+      } else if (source === 'youtube') {
+        preview = await libraryImportService.previewYouTubePlaylistImport(userId, playlistUrl, {
+          limit,
+          onProgress,
         });
       } else {
         preview = await libraryImportService.previewSpotifyImport(userId, limit, { onProgress });
@@ -158,6 +163,8 @@ function startExecuteJob(userId, source, { items, defaultTip } = {}) {
         results = await libraryImportService.executeRekordboxImport(userId, { items, defaultTip, onProgress });
       } else if (source === 'soundcloud') {
         results = await libraryImportService.executeSoundCloudImport(userId, { items, defaultTip, onProgress });
+      } else if (source === 'youtube') {
+        results = await libraryImportService.executeYouTubePlaylistImport(userId, { items, defaultTip, onProgress });
       } else {
         results = await libraryImportService.executeSpotifyImport(userId, { items, defaultTip, onProgress });
       }

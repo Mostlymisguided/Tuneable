@@ -218,6 +218,7 @@ const countryCodeMap = {
 }; // Added geoip-lite
 const User = require('../models/User');
 const InviteRequest = require('../models/InviteRequest');
+const SpotifyImportRequest = require('../models/SpotifyImportRequest');
 const Media = require('../models/Media');
 const ListeningHistory = require('../models/ListeningHistory');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -1475,8 +1476,15 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
 // Check whether the authenticated user has Spotify connected
 router.get('/me/spotify-status', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('spotifyId').lean();
-    res.json({ connected: !!user?.spotifyId });
+    const user = await User.findById(req.user._id).select('spotifyId email role').lean();
+    const spotifyImportAccess = require('../services/spotifyImportAccess');
+    const access = await spotifyImportAccess.getSpotifyImportAccess(user || req.user);
+    res.json({
+      connected: access.connected,
+      oauthAvailable: access.oauthAvailable,
+      publicImport: access.publicImport,
+      request: access.request,
+    });
   } catch (error) {
     console.error('Error checking Spotify status:', error);
     res.status(500).json({ error: 'Failed to check Spotify status' });
@@ -1609,7 +1617,7 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     const user = await User.findById(req.user._id)
-      .select('spotifyId soundcloudId')
+      .select('spotifyId soundcloudId email role')
       .lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -1629,19 +1637,29 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
       });
     };
 
-    const [spotifyImported, soundcloudImported] = await Promise.all([
+    const spotifyImportAccess = require('../services/spotifyImportAccess');
+    const [spotifyImported, soundcloudImported, youtubeImported, spotifyAccess] = await Promise.all([
       countFor('spotify_likes', 'spotify'),
       countFor('soundcloud_likes', 'soundcloud'),
+      countFor('youtube_playlist', 'youtube'),
+      spotifyImportAccess.getSpotifyImportAccess(user),
     ]);
 
     res.json({
       spotify: {
         connected: Boolean(user.spotifyId),
         imported: spotifyImported,
+        oauthAvailable: spotifyAccess.oauthAvailable,
+        publicImport: spotifyAccess.publicImport,
+        request: spotifyAccess.request,
       },
       soundcloud: {
         connected: Boolean(user.soundcloudId),
         imported: soundcloudImported,
+      },
+      youtube: {
+        imported: youtubeImported,
+        playlistImport: true,
       },
     });
   } catch (error) {
@@ -1733,6 +1751,119 @@ router.post('/me/import/soundcloud/execute/start', authMiddleware, async (req, r
   } catch (error) {
     console.error('SoundCloud import execute start error:', error);
     res.status(500).json({ error: error.message || 'Failed to start import' });
+  }
+});
+
+// @route   GET /api/users/me/import/spotify/request
+// @desc    Current user's Spotify import-access request
+// @access  Private
+router.get('/me/import/spotify/request', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('spotifyId email role').lean();
+    const spotifyImportAccess = require('../services/spotifyImportAccess');
+    const access = await spotifyImportAccess.getSpotifyImportAccess(user || req.user);
+    res.json(access);
+  } catch (error) {
+    console.error('Spotify import request status error:', error);
+    res.status(500).json({ error: error.message || 'Failed to load Spotify import request' });
+  }
+});
+
+// @route   POST /api/users/me/import/spotify/request
+// @desc    Request Spotify import access (development-mode allowlist waitlist)
+// @access  Private
+router.post('/me/import/spotify/request', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('spotifyId email role username');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const spotifyAccount = String(req.body?.spotifyAccount || '').trim();
+    const note = String(req.body?.note || '').trim().slice(0, 500) || null;
+    if (!spotifyAccount) {
+      return res.status(400).json({
+        error: 'Spotify account email is required (from spotify.com/account/overview).',
+      });
+    }
+
+    const existing = await SpotifyImportRequest.findOne({ userId: user._id }).sort({ createdAt: -1 });
+    if (existing?.status === 'pending') {
+      return res.status(200).json({
+        message: 'You already have a pending Spotify import request.',
+        request: {
+          id: existing._id,
+          status: existing.status,
+          spotifyAccount: existing.spotifyAccount,
+          createdAt: existing.createdAt,
+        },
+      });
+    }
+    if (existing?.status === 'allowlisted') {
+      return res.status(200).json({
+        message: 'You are already on the Spotify import allowlist — connect Spotify to import.',
+        request: {
+          id: existing._id,
+          status: existing.status,
+          spotifyAccount: existing.spotifyAccount,
+        },
+      });
+    }
+
+    const created = await SpotifyImportRequest.create({
+      userId: user._id,
+      email: user.email,
+      spotifyAccount,
+      note,
+    });
+
+    res.status(201).json({
+      message: 'Request submitted. We will add your Spotify account to the tester list and you can connect after that.',
+      request: {
+        id: created._id,
+        status: created.status,
+        spotifyAccount: created.spotifyAccount,
+        createdAt: created.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Spotify import request error:', error);
+    res.status(500).json({ error: error.message || 'Failed to submit Spotify import request' });
+  }
+});
+
+// @route   POST /api/users/me/import/youtube/preview/start
+// @desc    Start async public YouTube playlist preview (poll GET /me/import/jobs/:jobId)
+// @access  Private
+router.post('/me/import/youtube/preview/start', authMiddleware, async (req, res) => {
+  try {
+    const playlistUrl = req.body?.playlistUrl || req.body?.url || req.query.playlistUrl;
+    const limit = req.body?.limit ?? req.query.limit;
+    if (!playlistUrl) {
+      return res.status(400).json({ error: 'playlistUrl is required' });
+    }
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'youtube', {
+      playlistUrl,
+      limit,
+    });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('YouTube import preview start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start YouTube playlist scan' });
+  }
+});
+
+// @route   POST /api/users/me/import/youtube/execute/start
+// @desc    Start async YouTube playlist import/tip job
+// @access  Private
+router.post('/me/import/youtube/execute/start', authMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startExecuteJob(req.user._id, 'youtube', { items, defaultTip });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('YouTube import execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start YouTube import' });
   }
 });
 
@@ -4378,6 +4509,60 @@ router.patch('/admin/invite-requests/:id/reject', authMiddleware, async (req, re
   } catch (error) {
     console.error('Error rejecting invite request:', error);
     res.status(500).json({ error: 'Failed to reject invite request' });
+  }
+});
+
+// @route   GET /api/users/admin/spotify-import-requests
+// @desc    List Spotify import allowlist requests
+// @access  Private (Admin)
+router.get('/admin/spotify-import-requests', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+    const requests = await SpotifyImportRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('userId', 'username email')
+      .lean();
+    res.json({ requests, count: requests.length });
+  } catch (error) {
+    console.error('Error fetching Spotify import requests:', error);
+    res.status(500).json({ error: 'Failed to fetch Spotify import requests' });
+  }
+});
+
+// @route   PATCH /api/users/admin/spotify-import-requests/:id/allowlist
+// @desc    Mark a Spotify import request as added to the developer allowlist
+// @access  Private (Admin)
+router.patch('/admin/spotify-import-requests/:id/allowlist', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const request = await SpotifyImportRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    request.status = 'allowlisted';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.rejectedReason = null;
+    await request.save();
+    res.json({ message: 'Marked allowlisted — user can now connect Spotify', request });
+  } catch (error) {
+    console.error('Error allowlisting Spotify import request:', error);
+    res.status(500).json({ error: 'Failed to update request' });
+  }
+});
+
+// @route   PATCH /api/users/admin/spotify-import-requests/:id/reject
+router.patch('/admin/spotify-import-requests/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const request = await SpotifyImportRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    request.status = 'rejected';
+    request.reviewedBy = req.user._id;
+    request.reviewedAt = new Date();
+    request.rejectedReason = req.body?.reason || null;
+    await request.save();
+    res.json({ message: 'Spotify import request rejected', request });
+  } catch (error) {
+    console.error('Error rejecting Spotify import request:', error);
+    res.status(500).json({ error: 'Failed to reject request' });
   }
 });
 

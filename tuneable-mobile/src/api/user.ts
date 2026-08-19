@@ -16,6 +16,18 @@ export type ImportJobStatus = {
   result?: unknown;
 };
 
+export type SpotifyImportAccess = {
+  connected: boolean;
+  oauthAvailable?: boolean;
+  publicImport?: boolean;
+  request?: {
+    id?: string;
+    status: 'pending' | 'allowlisted' | 'rejected';
+    spotifyAccount?: string | null;
+    createdAt?: string | null;
+  } | null;
+};
+
 export type ImportPreviewItem = {
   key: string;
   title?: string;
@@ -23,6 +35,8 @@ export type ImportPreviewItem = {
   matchStatus?: string;
   useSuggestedMatch?: boolean;
   crossRefStatus?: string;
+  identityConfidence?: string;
+  selected?: boolean;
   externalMedia?: Record<string, unknown>;
 };
 
@@ -88,8 +102,8 @@ export const userAPI = {
     return response.data;
   },
 
-  getSpotifyStatus: async (): Promise<{ connected: boolean }> => {
-    const response = await api.get<{ connected: boolean }>('/users/me/spotify-status');
+  getSpotifyStatus: async (): Promise<SpotifyImportAccess> => {
+    const response = await api.get<SpotifyImportAccess>('/users/me/spotify-status');
     return response.data;
   },
 
@@ -101,12 +115,26 @@ export const userAPI = {
   },
 
   getImportStats: async (): Promise<{
-    spotify: { connected: boolean; imported: number };
+    spotify: {
+      connected: boolean;
+      imported: number;
+      oauthAvailable?: boolean;
+      publicImport?: boolean;
+      request?: SpotifyImportAccess['request'];
+    };
     soundcloud: { connected: boolean; imported: number };
+    youtube?: { imported: number; playlistImport?: boolean };
   }> => {
     const response = await api.get<{
-      spotify: { connected: boolean; imported: number };
+      spotify: {
+        connected: boolean;
+        imported: number;
+        oauthAvailable?: boolean;
+        publicImport?: boolean;
+        request?: SpotifyImportAccess['request'];
+      };
       soundcloud: { connected: boolean; imported: number };
+      youtube?: { imported: number; playlistImport?: boolean };
     }>('/users/me/import-stats');
     return response.data;
   },
@@ -149,6 +177,39 @@ export const userAPI = {
   ): Promise<{ jobId: string; status: string }> => {
     const response = await api.post<{ jobId: string; status: string }>(
       '/users/me/import/soundcloud/execute/start',
+      { items, defaultTip }
+    );
+    return response.data;
+  },
+
+  requestSpotifyImport: async (
+    spotifyAccount: string,
+    note?: string
+  ): Promise<{ message: string; request: { status: string } }> => {
+    const response = await api.post<{ message: string; request: { status: string } }>(
+      '/users/me/import/spotify/request',
+      { spotifyAccount, note }
+    );
+    return response.data;
+  },
+
+  startYouTubeImportPreview: async (
+    playlistUrl: string,
+    limit = 50
+  ): Promise<{ jobId: string; status: string }> => {
+    const response = await api.post<{ jobId: string; status: string }>(
+      '/users/me/import/youtube/preview/start',
+      { playlistUrl, limit }
+    );
+    return response.data;
+  },
+
+  startYouTubeImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ): Promise<{ jobId: string; status: string }> => {
+    const response = await api.post<{ jobId: string; status: string }>(
+      '/users/me/import/youtube/execute/start',
       { items, defaultTip }
     );
     return response.data;
