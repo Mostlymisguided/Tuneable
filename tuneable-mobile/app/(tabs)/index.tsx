@@ -7,26 +7,34 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { CoverRail, type CoverRailItem } from '@/src/components/CoverRail';
 import { DashboardPrompts } from '@/src/components/DashboardPrompts';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
+import { LibraryImportCards } from '@/src/components/LibraryImportCards';
 import { partyAPI } from '@/src/api/party';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import {
+  formatLocationLabel,
+  getPlaceProfileHref,
+} from '@/src/lib/location';
+import {
   formatArtist,
   getChartTipPence,
   mediaId,
 } from '@/src/lib/media';
-import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
+import { hasHomeLocation } from '@/src/lib/onboarding';
 import { canUploadMedia } from '@/src/lib/permissions';
+import { getTagProfileHref } from '@/src/lib/tagNormalizer';
+import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import {
   GLOBAL_PARTY_ID,
@@ -34,19 +42,21 @@ import {
 } from '@/src/types/media';
 import {
   DEFAULT_PROFILE_PIC,
+  type MediaChampionTitle,
+  type TipTagChampion,
   type UserLibraryItem,
   type UserStats,
 } from '@/src/types/user';
 
 const RISING_PREVIEW_COUNT = 10;
 const LIBRARY_PREVIEW_COUNT = 10;
+const HOME_BADGE_VISIBLE = 3;
 
-function greetingForNow(): string {
-  const hour = new Date().getHours();
-  if (hour < 5) return 'Hey';
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+function badgeColors(rank: number) {
+  if (rank === 1) return { border: '#f59e0b', bg: '#fcd34d', text: '#fde68a' };
+  if (rank === 2) return { border: '#94a3b8', bg: '#cbd5e1', text: '#e2e8f0' };
+  if (rank === 3) return { border: '#b45309', bg: '#fdba74', text: '#fdba74' };
+  return { border: '#7c3aed', bg: '#a855f7', text: '#ddd6fe' };
 }
 
 function libraryToChartItem(item: UserLibraryItem): ChartMediaItem {
@@ -68,6 +78,13 @@ function libraryToChartItem(item: UserLibraryItem): ChartMediaItem {
   };
 }
 
+type HomeBadge = {
+  key: string;
+  rank: number;
+  label: string;
+  href: Href;
+};
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
@@ -77,6 +94,9 @@ export default function HomeScreen() {
   const [rising, setRising] = useState<ChartMediaItem[]>([]);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
+  const [mediaChampions, setMediaChampions] = useState<MediaChampionTitle[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +136,29 @@ export default function HomeScreen() {
     [rising]
   );
 
+  const homeBadges = useMemo<HomeBadge[]>(() => {
+    const tags: HomeBadge[] = tipTagChampions.map((ranking) => ({
+      key: `tip-${ranking.tag}-${ranking.rank}`,
+      rank: ranking.rank,
+      label: `#${ranking.tag}`,
+      href: getTagProfileHref(ranking.tag),
+    }));
+    const media: HomeBadge[] = mediaChampions.map((title) => ({
+      key: `media-${title.mediaId}-${title.rank}`,
+      rank: title.rank,
+      label: title.title,
+      href: `/tune/${title.uuid || title.mediaId}` as Href,
+    }));
+    return [...tags, ...media];
+  }, [tipTagChampions, mediaChampions]);
+
+  const visibleBadges = homeBadges.slice(0, HOME_BADGE_VISIBLE);
+  const extraBadgeCount = Math.max(0, homeBadges.length - visibleBadges.length);
+
+  const homeLabel = formatLocationLabel(user?.homeLocation);
+  const locationSet = hasHomeLocation(user?.homeLocation);
+  const placeHref = getPlaceProfileHref(user?.homeLocation?.placeId);
+
   const load = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
@@ -123,16 +166,27 @@ export default function HomeScreen() {
       setError(null);
       try {
         const userId = user?.uuid || user?.id;
-        const [chartRes, libraryRes, profileRes] = await Promise.all([
-          partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today'),
-          userAPI.getTuneLibrary().catch(() => ({ library: [], total: 0 })),
-          userId
-            ? userAPI.getProfileById(userId).catch(() => null)
-            : Promise.resolve(null),
-        ]);
+        const [chartRes, libraryRes, profileRes, championsRes] =
+          await Promise.all([
+            partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today'),
+            userAPI.getTuneLibrary().catch(() => ({ library: [], total: 0 })),
+            userId
+              ? userAPI.getProfileById(userId).catch(() => null)
+              : Promise.resolve(null),
+            userId
+              ? userAPI
+                  .getChampionTitles(userId, {
+                    mediaLimit: 8,
+                    checkMediaLimit: 40,
+                  })
+                  .catch(() => ({ tags: [], media: [] }))
+              : Promise.resolve({ tags: [], media: [] }),
+          ]);
         setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
         setLibrary(libraryRes.library ?? []);
         setStats(profileRes?.stats ?? null);
+        setTipTagChampions(championsRes.tags ?? []);
+        setMediaChampions(championsRes.media ?? []);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Failed to load home';
@@ -160,6 +214,23 @@ export default function HomeScreen() {
     void setQueueAndPlay(queue, index);
   };
 
+  const openSearch = () => {
+    const q = searchQuery.trim();
+    if (q) {
+      router.push({ pathname: '/music-search', params: { q } });
+      return;
+    }
+    router.push('/music-search');
+  };
+
+  const onLocationPress = () => {
+    if (placeHref) {
+      router.push(placeHref);
+      return;
+    }
+    router.push('/set-home-location');
+  };
+
   const avgTipPence = stats?.averageBidAmount ?? 0;
   const totalTips = stats?.totalBids ?? library.length;
 
@@ -170,6 +241,7 @@ export default function HomeScreen() {
           styles.content,
           { paddingBottom: Math.max(96, contentPaddingBottom + 24) },
         ]}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -189,10 +261,43 @@ export default function HomeScreen() {
               />
             </Pressable>
             <View style={styles.heroCopy}>
-              <Text style={styles.greeting}>{greetingForNow()}</Text>
+              <Pressable
+                onPress={onLocationPress}
+                style={styles.locationRow}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  locationSet && homeLabel
+                    ? `Home location ${homeLabel}`
+                    : 'Add home location'
+                }>
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={locationSet ? colors.textMuted : colors.accentLight}
+                />
+                <Text
+                  style={[
+                    styles.location,
+                    !locationSet && styles.locationPrompt,
+                  ]}
+                  numberOfLines={1}>
+                  {locationSet && homeLabel ? homeLabel : 'Add home location'}
+                </Text>
+              </Pressable>
               <Text style={styles.name} numberOfLines={1}>
                 {user?.username ?? 'there'}
               </Text>
+              <View style={styles.tbRow}>
+                <Ionicons
+                  name="sparkles-outline"
+                  size={13}
+                  color={colors.accentLight}
+                />
+                <Text style={styles.tbValue}>
+                  {formatTuneBytes(user?.tuneBytes)}
+                </Text>
+                <Text style={styles.tbLabel}>TuneBytes</Text>
+              </View>
             </View>
             <Pressable
               style={styles.walletChip}
@@ -205,76 +310,76 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <Pressable
-            style={styles.primaryCta}
-            onPress={() => router.push('/music-search')}>
-            <Ionicons name="add" size={22} color="#fff" />
-            <Text style={styles.primaryCtaText}>Add a tune</Text>
-          </Pressable>
+          {visibleBadges.length > 0 ? (
+            <View style={styles.badgeRow}>
+              {visibleBadges.map((badge) => {
+                const palette = badgeColors(badge.rank);
+                return (
+                  <Pressable
+                    key={badge.key}
+                    onPress={() => router.push(badge.href)}
+                    style={[
+                      styles.badge,
+                      {
+                        borderColor: palette.border,
+                        backgroundColor: `${palette.bg}22`,
+                      },
+                    ]}>
+                    <Ionicons name="trophy" size={11} color={palette.border} />
+                    <Text style={styles.badgeRank}>#{badge.rank}</Text>
+                    <Text
+                      style={[styles.badgeLabel, { color: palette.text }]}
+                      numberOfLines={1}>
+                      {badge.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {extraBadgeCount > 0 ? (
+                <Pressable
+                  onPress={() => router.push('/(tabs)/profile')}
+                  style={styles.badgeMore}
+                  accessibilityLabel={`See ${extraBadgeCount} more badges`}>
+                  <Text style={styles.badgeMoreText}>+{extraBadgeCount}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
-          <View style={styles.secondaryRow}>
-            <Pressable
-              style={styles.secondaryCta}
-              onPress={() => router.push('/import-library')}>
-              <Ionicons
-                name="cloud-download-outline"
-                size={18}
-                color={colors.accentLight}
+          <View style={styles.searchRow}>
+            <View style={styles.searchField}>
+              <Ionicons name="search" size={18} color={colors.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search title or artist"
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                onSubmitEditing={openSearch}
               />
-              <Text style={styles.secondaryCtaText}>Import likes</Text>
+            </View>
+            <Pressable style={styles.searchBtn} onPress={openSearch}>
+              <Text style={styles.searchBtnText}>Search</Text>
             </Pressable>
-            {canUpload ? (
-              <Pressable
-                style={styles.secondaryCta}
-                onPress={() => router.push('/upload')}>
-                <Ionicons
-                  name="cloud-upload-outline"
-                  size={18}
-                  color={colors.accentLight}
-                />
-                <Text style={styles.secondaryCtaText}>Upload</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                style={styles.secondaryCta}
-                onPress={() => router.push('/(tabs)/music')}>
-                <Ionicons
-                  name="trending-up"
-                  size={18}
-                  color={colors.accentLight}
-                />
-                <Text style={styles.secondaryCtaText}>Music chart</Text>
-              </Pressable>
-            )}
           </View>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon="wallet-outline"
-                label="Wallet"
-                value={formatPoundsFromPence(user?.balance)}
-                onPress={() => router.push('/wallet')}
-              />
-              <StatCard
-                icon="sparkles-outline"
-                label="TuneBytes"
-                value={formatTuneBytes(user?.tuneBytes)}
-              />
-            </View>
-            <View style={styles.statsRow}>
-              <StatCard
-                icon="heart-outline"
-                label="Avg tip"
-                value={formatPoundsFromPence(avgTipPence)}
-              />
-              <StatCard
-                icon="musical-notes-outline"
-                label="Tips"
-                value={String(totalTips)}
-                onPress={() => router.push('/(tabs)/profile')}
-              />
-            </View>
+          <LibraryImportCards showUpload={canUpload} />
+
+          <View style={styles.statsRow}>
+            <StatCard
+              icon="heart-outline"
+              label="Avg tip"
+              value={formatPoundsFromPence(avgTipPence)}
+            />
+            <StatCard
+              icon="musical-notes-outline"
+              label="Tips"
+              value={String(totalTips)}
+              onPress={() => router.push('/(tabs)/profile')}
+            />
           </View>
 
           <DashboardPrompts />
@@ -378,7 +483,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   avatar: {
     width: 52,
@@ -392,10 +497,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  greeting: {
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  location: {
+    flex: 1,
     color: colors.textMuted,
     fontSize: 13,
     fontWeight: '600',
+  },
+  locationPrompt: {
+    color: colors.accentLight,
   },
   name: {
     marginTop: 1,
@@ -403,6 +517,23 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     letterSpacing: -0.4,
+  },
+  tbRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  tbValue: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  tbLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
   walletChip: {
     alignItems: 'flex-end',
@@ -426,50 +557,84 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  primaryCta: {
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.accent,
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
+    gap: 5,
+    maxWidth: '70%',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
   },
-  primaryCtaText: {
-    color: '#fff',
-    fontSize: 16,
+  badgeRank: {
+    color: colors.text,
+    fontSize: 11,
     fontWeight: '700',
   },
-  secondaryRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+  badgeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    flexShrink: 1,
   },
-  secondaryCta: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.card,
+  badgeMore: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
     borderColor: colors.cardBorder,
   },
-  secondaryCtaText: {
+  badgeMoreText: {
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  statsGrid: {
+  searchRow: {
+    flexDirection: 'row',
     gap: 8,
     marginBottom: 14,
+  },
+  searchField: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    color: colors.text,
+    fontSize: 15,
+  },
+  searchBtn: {
+    borderRadius: 14,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  searchBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',
     gap: 8,
+    marginBottom: 14,
   },
   statCard: {
     flex: 1,

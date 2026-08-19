@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,17 +10,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
-import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
 import { searchAPI } from '@/src/api/search';
-import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
-import { canUploadMedia } from '@/src/lib/permissions';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, GLOBAL_PARTY_ID } from '@/src/types/media';
 import {
@@ -70,11 +68,14 @@ function mergeUnique(
 export default function MusicSearchScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
-  const canUpload = canUploadMedia(user);
-  const [query, setQuery] = useState('');
+  const params = useLocalSearchParams<{ q?: string }>();
+  const qParam = Array.isArray(params.q) ? params.q[0] : params.q;
+  const [query, setQuery] = useState(qParam?.trim() ?? '');
+  const queryRef = useRef(query);
+  queryRef.current = query;
   const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(Boolean(qParam?.trim()));
+  const [loading, setLoading] = useState(Boolean(qParam?.trim()));
   const [loadingMore, setLoadingMore] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,53 +87,11 @@ export default function MusicSearchScreen() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [statusNote, setStatusNote] = useState<string | null>(null);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [soundcloudConnected, setSoundcloudConnected] = useState(false);
-  const [spotifyImported, setSpotifyImported] = useState(0);
-  const [soundcloudImported, setSoundcloudImported] = useState(0);
-  const [importStatusLoading, setImportStatusLoading] = useState(false);
 
   const defaultTip = useMemo(
     () => user?.preferences?.defaultTip ?? 1,
     [user?.preferences?.defaultTip]
   );
-
-  const refreshImportStatus = useCallback(async () => {
-    setImportStatusLoading(true);
-    try {
-      const stats = await userAPI.getImportStats();
-      setSpotifyConnected(Boolean(stats.spotify?.connected));
-      setSoundcloudConnected(Boolean(stats.soundcloud?.connected));
-      setSpotifyImported(stats.spotify?.imported ?? 0);
-      setSoundcloudImported(stats.soundcloud?.imported ?? 0);
-    } catch {
-      const [spotify, soundcloud] = await Promise.all([
-        userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
-        userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
-      ]);
-      setSpotifyConnected(Boolean(spotify?.connected));
-      setSoundcloudConnected(Boolean(soundcloud?.connected));
-    } finally {
-      setImportStatusLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void refreshImportStatus();
-    }, [refreshImportStatus])
-  );
-
-  const importSubtitle = (
-    connected: boolean,
-    imported: number,
-    disconnectedHint: string
-  ) => {
-    if (importStatusLoading) return 'Checking…';
-    if (!connected) return disconnectedHint;
-    if (imported > 0) return `${imported} in your library`;
-    return 'Connected · none imported yet';
-  };
 
   const filteredResults = useMemo(() => {
     if (filter === 'library') return results.filter(isLibraryResult);
@@ -146,8 +105,8 @@ export default function MusicSearchScreen() {
   );
   const catalogCount = results.length - libraryCount;
 
-  const performSearch = async () => {
-    const q = query.trim();
+  const performSearch = useCallback(async (rawQuery?: string) => {
+    const q = (rawQuery ?? queryRef.current).trim();
     if (!q) return;
     setHasSearched(true);
     setLoading(true);
@@ -182,7 +141,14 @@ export default function MusicSearchScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const q = qParam?.trim();
+    if (!q) return;
+    setQuery(q);
+    void performSearch(q);
+  }, [qParam, performSearch]);
 
   const showMoreFromCatalog = async () => {
     const q = query.trim();
@@ -328,6 +294,7 @@ export default function MusicSearchScreen() {
             onChangeText={setQuery}
             autoCapitalize="none"
             autoCorrect={false}
+            autoFocus
             returnKeyType="search"
             onSubmitEditing={() => void performSearch()}
             editable={!busy}
@@ -344,104 +311,6 @@ export default function MusicSearchScreen() {
           )}
         </Pressable>
       </View>
-
-      {!hasSearched ? (
-        <View style={styles.importSection}>
-          <Text style={styles.importSectionLabel}>Bring in your library</Text>
-          <View style={styles.importGrid}>
-            <Pressable
-              style={[styles.importCard, styles.spotifyCard]}
-              onPress={() =>
-                router.push({
-                  pathname: '/import-library',
-                  params: { source: 'spotify' },
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Import from Spotify">
-              <View style={styles.importIconRow}>
-                <Ionicons name="logo-spotify" size={20} color="#86efac" />
-                <Text style={styles.importTitle}>Spotify</Text>
-              </View>
-              <Text style={styles.importCount}>
-                {importStatusLoading
-                  ? '—'
-                  : spotifyConnected
-                    ? String(spotifyImported)
-                    : '—'}
-              </Text>
-              <Text style={styles.importSub}>
-                {importSubtitle(
-                  spotifyConnected,
-                  spotifyImported,
-                  'Import your saved tracks'
-                )}
-              </Text>
-              <Text style={styles.importCta}>
-                {spotifyConnected ? 'Import more →' : 'Connect →'}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.importCard, styles.soundcloudCard]}
-              onPress={() =>
-                router.push({
-                  pathname: '/import-library',
-                  params: { source: 'soundcloud' },
-                })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Import from SoundCloud">
-              <View style={styles.importIconRow}>
-                <FontAwesome name="soundcloud" size={18} color="#fdba74" />
-                <Text style={styles.importTitleSc}>SoundCloud</Text>
-              </View>
-              <Text style={styles.importCountSc}>
-                {importStatusLoading
-                  ? '—'
-                  : soundcloudConnected
-                    ? String(soundcloudImported)
-                    : '—'}
-              </Text>
-              <Text style={styles.importSub}>
-                {importSubtitle(
-                  soundcloudConnected,
-                  soundcloudImported,
-                  'Import your liked tracks'
-                )}
-              </Text>
-              <Text style={styles.importCtaSc}>
-                {soundcloudConnected ? 'Import more →' : 'Connect →'}
-              </Text>
-            </Pressable>
-          </View>
-          {canUpload ? (
-            <Pressable
-              style={styles.uploadCard}
-              onPress={() => router.push('/upload')}
-              accessibilityRole="button"
-              accessibilityLabel="Upload a track">
-              <View style={styles.uploadIcon}>
-                <Ionicons
-                  name="cloud-upload-outline"
-                  size={20}
-                  color={colors.accentLight}
-                />
-              </View>
-              <View style={styles.uploadCopy}>
-                <Text style={styles.uploadTitle}>Upload a track</Text>
-                <Text style={styles.uploadSub}>
-                  MP3 you own or have rights to
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={colors.textMuted}
-              />
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
 
       {statusNote ? <Text style={styles.status}>{statusNote}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -517,7 +386,7 @@ export default function MusicSearchScreen() {
             </View>
           ) : (
             <Text style={styles.emptyQuiet}>
-              Or search Tuneable’s library and MusicBrainz.
+              Search Tuneable’s library and MusicBrainz.
             </Text>
           )
         }
@@ -697,115 +566,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-  },
-  importSection: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 10,
-  },
-  importSectionLabel: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  importGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  importCard: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  spotifyCard: {
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-  },
-  soundcloudCard: {
-    borderColor: 'rgba(249, 115, 22, 0.4)',
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-  },
-  importIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  importTitle: {
-    color: '#86efac',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  importTitleSc: {
-    color: '#fdba74',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  importCount: {
-    marginTop: 10,
-    color: '#bbf7d0',
-    fontSize: 28,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  importCountSc: {
-    marginTop: 10,
-    color: '#fed7aa',
-    fontSize: 28,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  importSub: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  importCta: {
-    marginTop: 10,
-    color: '#86efac',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  importCtaSc: {
-    marginTop: 10,
-    color: '#fdba74',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  uploadCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  uploadIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(147, 51, 234, 0.25)',
-  },
-  uploadCopy: {
-    flex: 1,
-  },
-  uploadTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  uploadSub: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 12,
   },
   status: {
     paddingHorizontal: 16,

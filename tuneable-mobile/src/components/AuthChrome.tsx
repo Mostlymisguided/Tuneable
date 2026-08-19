@@ -42,11 +42,18 @@ export function BrandMark({ size = 96 }: BrandMarkProps) {
   );
 }
 
-export function AuthHero({ subtitle }: { subtitle: string }) {
+export function AuthHero({
+  subtitle,
+  tagline,
+}: {
+  subtitle: string;
+  tagline?: string;
+}) {
   return (
     <View style={styles.hero}>
       <BrandMark />
       <Text style={styles.subtitle}>{subtitle}</Text>
+      {tagline ? <Text style={styles.tagline}>{tagline}</Text> : null}
     </View>
   );
 }
@@ -226,8 +233,16 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 14,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 20,
+    lineHeight: 26,
+    color: colors.text,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  tagline: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.textSecondary,
     textAlign: 'center',
     fontWeight: '500',

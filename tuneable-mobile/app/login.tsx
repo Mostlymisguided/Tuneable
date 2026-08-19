@@ -159,7 +159,10 @@ export default function LoginScreen() {
         <ScrollView
           contentContainerStyle={authStyles.scroll}
           keyboardShouldPersistTaps="handled">
-          <AuthHero subtitle="Tip the music you love" />
+          <AuthHero
+            subtitle="Tip What You Love"
+            tagline="The Social Charting App"
+          />
 
           <View style={authStyles.card}>
             <Text style={[authStyles.label, { marginTop: 0 }]}>

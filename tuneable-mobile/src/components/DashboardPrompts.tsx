@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
-import { HomeLocationReminder } from '@/src/components/HomeLocationReminder';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
@@ -20,6 +19,8 @@ export function DashboardPrompts() {
   const showEmail = !user.emailVerified && !dismissed.has('email');
   const showPic = !hasCustomProfilePic(user.profilePic) && !dismissed.has('pic');
 
+  if (!showEmail && !showPic) return null;
+
   const sendVerification = async () => {
     setSendingEmail(true);
     try {
@@ -34,7 +35,6 @@ export function DashboardPrompts() {
 
   return (
     <View>
-      <HomeLocationReminder />
       {showEmail ? (
         <PromptCard
           icon="mail"
