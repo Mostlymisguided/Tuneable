@@ -47,6 +47,9 @@ const userSchema = new mongoose.Schema({
   // When welcome credit was granted / when unused remainder expires (auto-revoked on spend attempts).
   welcomeCreditGrantedAt: { type: Date, default: null },
   welcomeCreditExpiresAt: { type: Date, default: null },
+  // Promo terms accepted at claim time (not auto-granted on signup).
+  welcomeCreditTermsAcceptedAt: { type: Date, default: null },
+  welcomeCreditTermsVersion: { type: String, default: null },
   // Soft freeze: blocks tipping / pledges / payouts without deactivating the account.
   walletFrozenAt: { type: Date, default: null },
   walletFrozenReason: { type: String, default: null },

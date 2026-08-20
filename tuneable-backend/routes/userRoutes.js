@@ -481,15 +481,6 @@ router.post(
       
       console.log('User registered successfully:', user);
 
-      // Give beta users £11.11 credit on sign up
-      try {
-        const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
-        await giveBetaSignupCredit(user);
-      } catch (betaCreditError) {
-        console.error('Failed to give beta signup credit:', betaCreditError);
-        // Don't fail registration if beta credit fails
-      }
-
       // Auto-join new user to Global Party
       try {
         const Party = require('../models/Party');
@@ -531,10 +522,11 @@ router.post(
         { expiresIn: '24h' }
       );
 
+      const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
       res.status(201).json({
         message: 'User registered successfully',
         token,  // Include token for auto-login
-        user: user,
+        user: withWelcomeCreditOffer(user),
       });
     } catch (error) {
       console.error('Error registering user:', error.message);
@@ -654,7 +646,8 @@ router.post(
       }, SECRET_KEY, { expiresIn: '24h' });
 
       console.log(`✅ Login successful for user: ${user.username} (${user.email})`);
-      res.json({ message: 'Login successful!', token, user });
+      const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
+      res.json({ message: 'Login successful!', token, user: withWelcomeCreditOffer(user) });
     } catch (error) {
       console.error('Login error:', error);
       // Don't expose error details in production for security
@@ -686,12 +679,13 @@ router.get('/profile', authMiddleware, async (req, res) => {
     const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
     
     // Add statistics to user object
-    const userWithStats = {
+    const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
+    const userWithStats = withWelcomeCreditOffer({
       ...user.toObject(),
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
-    };
+    });
     
     res.json({ message: 'User profile', user: userWithStats });
   } catch (error) {
@@ -1074,6 +1068,40 @@ async function buildPlaybackQueueResponse(user) {
 
   return { queue, total: queue.length };
 }
+
+// @route   POST /api/users/me/welcome-credit/claim
+// @desc    Claim promotional welcome credit after accepting promo terms
+// @access  Private
+router.post('/me/welcome-credit/claim', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const { claimWelcomeCredit, withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
+    const acceptedPromoTerms = Boolean(req.body?.acceptedPromoTerms);
+    const result = await claimWelcomeCredit(user, { acceptedPromoTerms });
+
+    if (!result.ok) {
+      return res.status(result.status || 400).json({
+        error: result.message || 'Unable to claim welcome credit',
+        code: result.code,
+        welcomeCreditOffer: withWelcomeCreditOffer(user).welcomeCreditOffer,
+      });
+    }
+
+    return res.json({
+      message: result.alreadyClaimed
+        ? 'Welcome credit already claimed'
+        : 'Welcome credit claimed',
+      alreadyClaimed: Boolean(result.alreadyClaimed),
+      amountPence: result.amountPence || 0,
+      user: withWelcomeCreditOffer(result.user),
+    });
+  } catch (error) {
+    console.error('Error claiming welcome credit:', error);
+    return res.status(500).json({ error: 'Failed to claim welcome credit' });
+  }
+});
 
 // Get user's tune library (authenticated user - /me)
 // @route   GET /api/users/me/tune-library
@@ -3083,7 +3111,8 @@ router.put('/profile', authMiddleware, async (req, res) => {
     }
 
     const updatedUser = await User.findById(user._id).select('-password');
-    res.json({ message: 'Profile updated successfully', user: updatedUser });
+    const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
+    res.json({ message: 'Profile updated successfully', user: withWelcomeCreditOffer(updatedUser) });
   } catch (error) {
     console.error('Error updating profile:', error);
     res.status(500).json({ error: 'Error updating profile', details: error.message });

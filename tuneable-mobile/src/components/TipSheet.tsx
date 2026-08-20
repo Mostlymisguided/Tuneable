@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useAuth } from '@/src/auth/AuthContext';
+import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { mediaAPI } from '@/src/api/media';
 import {
   getCurrentLocationStatus,
@@ -108,6 +109,7 @@ export function TipSheet({
   onTagClaimed,
 }: Props) {
   const { user } = useAuth();
+  const liveBalancePence = user?.balance ?? balancePence;
   const [amount, setAmount] = useState(defaultTipPounds);
   const [amountText, setAmountText] = useState(defaultTipPounds.toFixed(2));
   const [submitting, setSubmitting] = useState(false);
@@ -388,9 +390,9 @@ export function TipSheet({
       return;
     }
     const neededPence = Math.round(amount * 100);
-    if (neededPence > balancePence) {
+    if (neededPence > liveBalancePence) {
       setError(
-        `Insufficient balance (${formatPoundsFromPence(balancePence)} available)`
+        `Insufficient balance (${formatPoundsFromPence(liveBalancePence)} available)`
       );
       return;
     }
@@ -521,7 +523,7 @@ export function TipSheet({
               </Text>
             ) : null}
             <Text style={styles.balance}>
-              Balance {formatPoundsFromPence(balancePence)}
+              Balance {formatPoundsFromPence(liveBalancePence)}
             </Text>
 
             <View style={styles.amountRow}>
@@ -738,6 +740,9 @@ export function TipSheet({
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
+            {liveBalancePence <= 0 || (error && error.startsWith('Insufficient')) ? (
+              <WelcomeCreditClaimCard compact />
+            ) : null}
 
             <Pressable
               style={[styles.confirm, submitting && styles.confirmDisabled]}

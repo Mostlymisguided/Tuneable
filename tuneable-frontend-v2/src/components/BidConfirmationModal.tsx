@@ -13,6 +13,7 @@ import {
   normalizeTipChipForDisplay,
 } from '../utils/elementNormalizer';
 import TipStatChips from './TipStatChips';
+import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
 
 type ProgressStep = 'placing' | 'processing' | 'updating' | null;
 
@@ -68,6 +69,8 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const [progressStep, setProgressStep] = useState<ProgressStep>(null);
   const [isEnablingCurrentLocation, setIsEnablingCurrentLocation] = useState(false);
   const { user: authUser } = useAuth();
+  const liveBalancePounds =
+    typeof authUser?.balance === 'number' ? authUser.balance / 100 : userBalance;
   // Prefer explicit prop (party tips); fall back to auth so chart influence shows everywhere
   const effectiveUser = user ?? authUser;
   const {
@@ -226,7 +229,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const hasInsufficientFunds = effectiveAmount > userBalance;
+  const hasInsufficientFunds = effectiveAmount > liveBalancePounds;
   const actionLabel = 'Tip';
   const actionLabelLower = 'tip';
 
@@ -328,10 +331,13 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             <div className="flex-1">
               <p className="text-sm font-medium text-red-300">Insufficient Funds</p>
               <p className="text-xs text-red-400 mt-1">
-                You need £{effectiveAmount.toFixed(2)} but only have £{userBalance.toFixed(2)}
+                You need £{effectiveAmount.toFixed(2)} but only have £{liveBalancePounds.toFixed(2)}
               </p>
             </div>
           </div>
+        )}
+        {(hasInsufficientFunds || liveBalancePounds <= 0) && (
+          <WelcomeCreditClaimCard variant="compact" />
         )}
 
         {/* Chart influence: home + current location */}

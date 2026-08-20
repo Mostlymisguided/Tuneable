@@ -272,15 +272,6 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 
       await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
       
-      // Give beta users £11.11 credit on sign up
-      try {
-        const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
-        await giveBetaSignupCredit(newUser);
-      } catch (betaCreditError) {
-        console.error('Failed to give beta signup credit:', betaCreditError);
-        // Don't fail registration if beta credit fails
-      }
-      
       // Auto-join new OAuth user to Global Party
       try {
         const Party = require('../models/Party');
@@ -558,16 +549,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         await newUser.save();
 
         await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
-        
-        // Give beta users £11.11 credit on sign up
-        try {
-          const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
-          await giveBetaSignupCredit(newUser);
-        } catch (betaCreditError) {
-          console.error('Failed to give beta signup credit:', betaCreditError);
-          // Don't fail registration if beta credit fails
-        }
-        
+
         // Auto-join new Google OAuth user to Global Party
         try {
           const Party = require('../models/Party');
@@ -929,16 +911,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
         await newUser.save();
 
         await applyInviteUsage({ inviter, inviteCodeObj, code: parentInviteCode, isInviterAdmin });
-        
-        // Give beta users £11.11 credit on sign up
-        try {
-          const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
-          await giveBetaSignupCredit(newUser);
-        } catch (betaCreditError) {
-          console.error('Failed to give beta signup credit:', betaCreditError);
-          // Don't fail registration if beta credit fails
-        }
-        
+
         // Auto-join new SoundCloud OAuth user to Global Party
         try {
           const Party = require('../models/Party');

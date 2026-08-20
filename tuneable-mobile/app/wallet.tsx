@@ -15,6 +15,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { paymentAPI } from '@/src/api/payments';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatPoundsFromPence } from '@/src/lib/format';
@@ -314,6 +315,8 @@ export default function WalletScreen() {
           {formatPoundsFromPence(user?.balance)}
         </Text>
       </View>
+
+      <WelcomeCreditClaimCard />
 
       {useStoreIap ? (
         <>

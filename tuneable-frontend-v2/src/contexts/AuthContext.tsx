@@ -41,6 +41,12 @@ export interface User {
   globalUserBidAvg?: number;
   globalUserBids?: number;
   emailVerified?: boolean;
+  welcomeCreditOffer?: {
+    status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+    amountPence: number;
+    remainingPence?: number;
+    expiresAt?: string | null;
+  };
   oauthVerified?: {
     facebook?: boolean;
     soundcloud?: boolean;

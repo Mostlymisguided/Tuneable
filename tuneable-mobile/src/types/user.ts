@@ -37,6 +37,12 @@ export interface User {
     importPromptSeenAt?: string;
     importSkipped?: boolean;
   };
+  welcomeCreditOffer?: {
+    status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+    amountPence: number;
+    remainingPence?: number;
+    expiresAt?: string | null;
+  };
 }
 
 /** Canonical default avatar — keep in sync with backend User.profilePic default */

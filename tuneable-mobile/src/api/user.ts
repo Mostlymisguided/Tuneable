@@ -2,6 +2,7 @@ import { api } from './client';
 import type {
   ChampionTitlesResponse,
   TuneBytesTagRankingsResponse,
+  User,
   UserLibraryResponse,
   UserProfileResponse,
 } from '@/src/types/user';
@@ -86,6 +87,21 @@ export const userAPI = {
 
   deleteAccount: async (): Promise<{ message?: string }> => {
     const response = await api.delete<{ message?: string }>('/users/me');
+    return response.data;
+  },
+
+  claimWelcomeCredit: async (): Promise<{
+    message?: string;
+    alreadyClaimed?: boolean;
+    amountPence?: number;
+    user?: User;
+  }> => {
+    const response = await api.post<{
+      message?: string;
+      alreadyClaimed?: boolean;
+      amountPence?: number;
+      user?: User;
+    }>('/users/me/welcome-credit/claim', { acceptedPromoTerms: true });
     return response.data;
   },
 

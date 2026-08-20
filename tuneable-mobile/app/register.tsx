@@ -251,10 +251,7 @@ export default function RegisterScreen() {
         <ScrollView
           contentContainerStyle={authStyles.scrollTop}
           keyboardShouldPersistTaps="handled">
-          <AuthHero
-            subtitle="Join the social chart"
-            tagline="The Social Charting App"
-          />
+          <AuthHero />
 
           <View style={authStyles.card}>
             {showInviteField ? (

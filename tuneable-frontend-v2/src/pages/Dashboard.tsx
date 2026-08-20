@@ -20,6 +20,7 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
 import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
@@ -853,6 +854,7 @@ Join here: ${inviteLink}`.trim();
             </p>
       </div>
 
+      <WelcomeCreditClaimCard />
 
         {/* Creator Dashboard */}
         {showCreatorDashboard(user) && (

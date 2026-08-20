@@ -30,6 +30,13 @@ export interface MapboxLocationFields {
   resolvedAt?: string;
 }
 
+export interface WelcomeCreditOffer {
+  status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+  amountPence: number;
+  remainingPence?: number;
+  expiresAt?: string | null;
+}
+
 export interface User {
   id: string;
   _id?: string; // MongoDB ObjectId for internal matching
@@ -88,6 +95,8 @@ export interface User {
   globalUserAggregateRank?: number;
   globalUserBidAvg?: number;
   globalUserBids?: number;
+  emailVerified?: boolean;
+  welcomeCreditOffer?: WelcomeCreditOffer;
   // Social media (now top-level, available to all users)
   socialMedia?: {
     instagram?: string;

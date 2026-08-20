@@ -33,7 +33,8 @@ export default ({ config }) => ({
       config.extra?.defaultInviteCode ||
       'PE856',
     eas: {
-      projectId: process.env.EAS_PROJECT_ID || undefined,
+      projectId:
+        process.env.EAS_PROJECT_ID || config.extra?.eas?.projectId,
     },
   },
 });

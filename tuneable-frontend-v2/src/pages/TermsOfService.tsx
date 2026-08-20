@@ -142,7 +142,7 @@ const TermsOfService: React.FC = () => {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Tipping and Wallet System</h2>
               <div className="space-y-4 text-gray-700">
-                <h3 className="text-xl font-medium text-gray-900">4.1 Digital Wallet</h3>
+                <h3 id="welcome-credit" className="text-xl font-medium text-gray-900">4.1 Digital Wallet</h3>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Users maintain a digital wallet balance for tipping on songs</li>
                   <li>Wallet funds can be added through secure payment processing via Stripe</li>

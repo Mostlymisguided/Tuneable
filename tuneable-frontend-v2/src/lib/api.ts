@@ -54,6 +54,12 @@ interface User {
   globalUserBidAvg?: number;
   globalUserBids?: number;
   emailVerified?: boolean;
+  welcomeCreditOffer?: {
+    status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+    amountPence: number;
+    remainingPence?: number;
+    expiresAt?: string | null;
+  };
   oauthVerified?: {
     facebook?: boolean;
     soundcloud?: boolean;
@@ -1250,6 +1256,14 @@ export const userAPI = {
     return response.data;
   },
   
+  // Claim promotional welcome credit (after accepting promo terms)
+  claimWelcomeCredit: async () => {
+    const response = await api.post('/users/me/welcome-credit/claim', {
+      acceptedPromoTerms: true,
+    });
+    return response.data;
+  },
+
   // Admin: Get all users (admin only)
   getAllUsers: async (limit?: number, skip?: number, search?: string) => {
     const params: any = {};

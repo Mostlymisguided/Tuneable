@@ -1175,7 +1175,7 @@ router.post('/apple', async (req, res) => {
   try {
     const { verifyAppleIdentityToken } = require('../services/appleSignInService');
     const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
-    const { giveBetaSignupCredit } = require('../utils/betaCreditHelper');
+    const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
     const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
 
     const { identityToken, invite, fullName, email: clientEmail } = req.body || {};
@@ -1233,7 +1233,7 @@ router.post('/apple', async (req, res) => {
         SECRET_KEY,
         { expiresIn: '24h' }
       );
-      return res.json({ message: 'Login successful!', token, user });
+      return res.json({ message: 'Login successful!', token, user: withWelcomeCreditOffer(user) });
     }
 
     // New user — invite optional (attribution when provided)
@@ -1313,12 +1313,6 @@ router.post('/apple', async (req, res) => {
     });
 
     try {
-      await giveBetaSignupCredit(user);
-    } catch (betaCreditError) {
-      console.error('Failed to give beta signup credit:', betaCreditError);
-    }
-
-    try {
       const Party = require('../models/Party');
       await Party.joinUserToGlobalParty(user);
     } catch (globalPartyError) {
@@ -1334,7 +1328,7 @@ router.post('/apple', async (req, res) => {
     return res.status(201).json({
       message: 'User registered successfully',
       token,
-      user,
+      user: withWelcomeCreditOffer(user),
     });
   } catch (error) {
     console.error('Apple Sign In error:', error);

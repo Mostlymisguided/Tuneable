@@ -66,7 +66,12 @@
     },
     "extra": {
       "apiUrl": "http://localhost:8000",
-      "defaultInviteCode": "PE856"
-    }
+      "defaultInviteCode": "PE856",
+      "eas": {
+        "projectId": "51cc8dd9-277c-4cf6-8a61-5e306a3b2388"
+      },
+      "router": {}
+    },
+    "owner": "tuneable"
   }
 }

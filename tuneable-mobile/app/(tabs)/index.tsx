@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { CoverRail, type CoverRailItem } from '@/src/components/CoverRail';
 import { DashboardPrompts } from '@/src/components/DashboardPrompts';
+import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LibraryImportCards } from '@/src/components/LibraryImportCards';
 import { partyAPI } from '@/src/api/party';
@@ -309,6 +310,8 @@ export default function HomeScreen() {
               <Text style={styles.walletChipLabel}>Wallet</Text>
             </Pressable>
           </View>
+
+          <WelcomeCreditClaimCard />
 
           {visibleBadges.length > 0 ? (
             <View style={styles.badgeRow}>
