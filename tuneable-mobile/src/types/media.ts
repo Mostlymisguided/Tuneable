@@ -32,6 +32,7 @@ export interface ChartMediaItem {
   primaryLocation?: import('@/src/types/user').ResolvedLocation | null;
   description?: string | null;
   tags?: string[];
+  genres?: string[];
   category?: string;
   status?: string;
   sources?: MediaSources;

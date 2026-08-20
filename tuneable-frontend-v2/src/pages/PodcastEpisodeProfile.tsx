@@ -64,6 +64,7 @@ import type { ArtistEntry } from '../components/MultiArtistInput';
 import DeleteMediaSection from '../components/DeleteMediaSection';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
+import { getTagProfilePath } from '../utils/tagNormalizer';
 
 interface Media {
   _id: string;
@@ -2382,13 +2383,14 @@ const PodcastEpisodeProfile: React.FC = () => {
                   {topTagRankings.length > 0 && (
                     <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
                       {topTagRankings.map((ranking, index) => (
-                        <span
+                        <Link
                           key={`${ranking.tag}-${index}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium"
+                          to={getTagProfilePath(ranking.tag, 'podcast')}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
                         >
                           <Tag className="h-3 w-3 text-purple-400" />
                           #{ranking.rank} {ranking.tag}
-                        </span>
+                        </Link>
                       ))}
                     </div>
                   )}

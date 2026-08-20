@@ -176,9 +176,16 @@ export function generateTagSlug(tag: string): string {
 }
 
 /** Profile path for a tag string, e.g. "Hip Hop" → "/tag/hip-hop" */
-export function getTagProfilePath(tag: string): string {
+export type TagProfileScope = 'music' | 'podcast';
+
+export function getTagProfilePath(
+  tag: string,
+  scope: TagProfileScope = 'music'
+): string {
   const slug = generateTagSlug(normalizeTagForStorage(tag) || tag);
-  return slug ? `/tag/${encodeURIComponent(slug)}` : '/tag';
+  if (!slug) return '/tag';
+  const path = `/tag/${encodeURIComponent(slug)}`;
+  return scope === 'podcast' ? `${path}?type=podcast` : path;
 }
 
 export { normalizeTagForMatching, TAG_ALIASES };

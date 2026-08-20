@@ -1,17 +1,21 @@
 import { Pressable, StyleSheet, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { router, type Href } from 'expo-router';
-import { getTagProfileHref } from '@/src/lib/tagNormalizer';
+import {
+  getTagProfileHref,
+  type TagProfileScope,
+} from '@/src/lib/tagNormalizer';
 
 type Props = {
   tag: string;
+  scope?: TagProfileScope;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 };
 
-export function TagChip({ tag, style, textStyle }: Props) {
+export function TagChip({ tag, scope = 'music', style, textStyle }: Props) {
   return (
     <Pressable
-      onPress={() => router.push(getTagProfileHref(tag) as Href)}
+      onPress={() => router.push(getTagProfileHref(tag, scope) as Href)}
       style={[styles.chip, style]}
       accessibilityRole="link"
       accessibilityLabel={`Open ${tag} tag profile`}>

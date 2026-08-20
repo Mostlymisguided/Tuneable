@@ -13,7 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { tagAPI, type TagPlaceChip } from '@/src/api/tags';
 import { mediaAPI } from '@/src/api/media';
+import { podcastsAPI } from '@/src/api/podcasts';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
+import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -21,8 +23,17 @@ import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import {
+  episodeId,
+  episodeMatchesTag,
+  isEpisodePlayable,
+  mediaToPodcastEpisode,
+  relatedPodcastTags,
+  seriesTitle,
+} from '@/src/lib/podcast';
 import { getTagProfileHref, tagsMatch } from '@/src/lib/tagNormalizer';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
+import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
 import {
   DEFAULT_COVER_ART,
@@ -30,6 +41,7 @@ import {
   type ChartMediaItem,
   type TimePeriodKey,
 } from '@/src/types/media';
+import type { PodcastTimeRangeKey } from '@/src/types/podcast';
 
 function PlaceRow({
   label,
@@ -63,12 +75,34 @@ function formatTimePeriodLabel(period: TimePeriodKey): string {
   return TIME_PERIODS.find((p) => p.key === period)?.label ?? period;
 }
 
+function toPodcastChartTimeRange(period: TimePeriodKey): PodcastTimeRangeKey {
+  switch (period) {
+    case 'today':
+      return 'day';
+    case 'this-week':
+      return 'week';
+    case 'this-month':
+      return 'month';
+    default:
+      return 'all';
+  }
+}
+
 export default function TagProfileScreen() {
-  const { slug: slugParam } = useLocalSearchParams<{ slug: string }>();
+  const { slug: slugParam, type: typeParam } = useLocalSearchParams<{
+    slug: string;
+    type?: string | string[];
+  }>();
   const slug = typeof slugParam === 'string' ? decodeURIComponent(slugParam) : '';
+  const contentScope =
+    (Array.isArray(typeParam) ? typeParam[0] : typeParam) === 'podcast'
+      ? 'podcast'
+      : 'music';
+  const isPodcast = contentScope === 'podcast';
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
+  const setPodcastQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
 
   const [tagName, setTagName] = useState(slug.replace(/-/g, ' '));
   const [tagKind, setTagKind] = useState<'tag' | 'year' | 'bpm'>('tag');
@@ -94,23 +128,56 @@ export default function TagProfileScreen() {
       else setLoading(true);
       setError(null);
       try {
-        const data = await tagAPI.getProfile(slug, { limit: 50, timePeriod: period });
-        const name = data.tag?.name || slug.replace(/-/g, ' ');
+        const data = await tagAPI.getProfile(slug, {
+          limit: 50,
+          timePeriod: period,
+          type: contentScope,
+        }).catch((err) => {
+          if (!isPodcast) throw err;
+          return null;
+        });
+        const name = data?.tag?.name || slug.replace(/-/g, ' ');
         setTagName(name);
         setTagKind(
-          data.tag?.kind ||
+          data?.tag?.kind ||
             (/^\d{4}$/.test(name)
               ? 'year'
               : /^\d{2,3}$/.test(name) && Number(name) >= 20 && Number(name) <= 400
                 ? 'bpm'
                 : 'tag')
         );
-        setTipTotal(data.stats?.globalTagAggregate ?? 0);
-        setTotal(data.pagination?.total ?? data.media?.length ?? 0);
-        setRelatedTags(data.relatedTags || []);
-        setTopOriginPlaces(data.topOriginPlaces || []);
-        setTopSupportPlaces(data.topSupportPlaces || []);
-        setMedia(data.media || []);
+
+        const profileMedia = data?.media || [];
+        const profileIsPodcastScoped =
+          data?.contentScope === 'podcast' && profileMedia.length > 0;
+
+        if (isPodcast && !profileIsPodcastScoped) {
+          const chart = await podcastsAPI.getChart({
+            limit: 200,
+            timeRange: toPodcastChartTimeRange(period),
+          });
+          const matched = (chart.episodes || []).filter((episode) =>
+            episodeMatchesTag(episode, name)
+          );
+          setMedia(matched as ChartMediaItem[]);
+          setTotal(matched.length);
+          setTipTotal(
+            matched.reduce(
+              (sum, episode) => sum + (episode.globalMediaAggregate || 0),
+              0
+            )
+          );
+          setRelatedTags(relatedPodcastTags(matched, name));
+          setTopOriginPlaces([]);
+          setTopSupportPlaces([]);
+        } else {
+          setTipTotal(data?.stats?.globalTagAggregate ?? 0);
+          setTotal(data?.pagination?.total ?? profileMedia.length);
+          setRelatedTags(data?.relatedTags || []);
+          setTopOriginPlaces(data?.topOriginPlaces || []);
+          setTopSupportPlaces(data?.topSupportPlaces || []);
+          setMedia(profileMedia);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tag not found or failed to load.');
         if (!isRefresh) {
@@ -124,7 +191,7 @@ export default function TagProfileScreen() {
         setRefreshing(false);
       }
     },
-    [slug, period]
+    [slug, period, contentScope]
   );
 
   useFocusEffect(
@@ -135,10 +202,21 @@ export default function TagProfileScreen() {
 
   const mosaicCovers = useMemo(
     () =>
-      media.slice(0, 4).map((item, index) => ({
-        id: mediaId(item) || `${item.title || 'cover'}-${index}`,
-        uri: item.coverArt || DEFAULT_COVER_ART,
-      })),
+      media.slice(0, 4).map((item, index) => {
+        const seriesCover =
+          item.podcastSeries && typeof item.podcastSeries === 'object'
+            ? item.podcastSeries.coverArt
+            : undefined;
+        return {
+          id: mediaId(item) || `${item.title || 'cover'}-${index}`,
+          uri: item.coverArt || seriesCover || DEFAULT_COVER_ART,
+        };
+      }),
+    [media]
+  );
+
+  const episodes = useMemo(
+    () => media.map((item) => mediaToPodcastEpisode(item)),
     [media]
   );
 
@@ -151,6 +229,19 @@ export default function TagProfileScreen() {
       return;
     }
     void setQueueAndPlay(playable, index);
+  };
+
+  const onPlayEpisode = (episode: ReturnType<typeof mediaToPodcastEpisode>) => {
+    const playable = episodes.filter(isEpisodePlayable);
+    const playableIndex = playable.findIndex(
+      (e) => episodeId(e) === episodeId(episode)
+    );
+    if (playableIndex >= 0) {
+      void setPodcastQueueAndPlay(playable, playableIndex);
+      return;
+    }
+    const fallback = episodes.findIndex((e) => episodeId(e) === episodeId(episode));
+    if (fallback >= 0) void setPodcastQueueAndPlay(episodes, fallback);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
@@ -192,9 +283,17 @@ export default function TagProfileScreen() {
 
       <View style={styles.statChips}>
         <View style={styles.statChip}>
-          <Ionicons name="musical-notes-outline" size={14} color={colors.textMuted} />
+          <Ionicons
+            name={isPodcast ? 'mic-outline' : 'musical-notes-outline'}
+            size={14}
+            color={colors.textMuted}
+          />
           <Text style={styles.statChipText}>
-            {loading ? '…' : `${total} ${total === 1 ? 'track' : 'tracks'}`}
+            {loading
+              ? '…'
+              : isPodcast
+                ? `${total} ${total === 1 ? 'episode' : 'episodes'}`
+                : `${total} ${total === 1 ? 'track' : 'tracks'}`}
           </Text>
         </View>
         {!loading && tipTotal > 0 ? (
@@ -215,7 +314,9 @@ export default function TagProfileScreen() {
           {relatedTags.map((related) => (
             <Pressable
               key={related.slug}
-              onPress={() => router.push(getTagProfileHref(related.name) as Href)}
+              onPress={() =>
+                router.push(getTagProfileHref(related.name, contentScope) as Href)
+              }
               style={styles.tagChip}>
               <Ionicons name="pricetag" size={12} color="#c084fc" />
               <Text style={styles.tagChipText}>{related.name}</Text>
@@ -232,7 +333,7 @@ export default function TagProfileScreen() {
       ) : null}
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Top Tunes</Text>
+        <Text style={styles.sectionTitle}>{isPodcast ? 'Top Podcasts' : 'Top Tunes'}</Text>
         <Pressable
           onPress={() => setShowTimePanel((open) => !open)}
           style={[
@@ -321,6 +422,10 @@ export default function TagProfileScreen() {
                     <>
                       No tracks from <Text style={styles.emptyStrong}>{tagName}</Text> yet.
                     </>
+                  ) : isPodcast ? (
+                    <>
+                      No podcasts tagged <Text style={styles.emptyStrong}>{tagName}</Text> yet.
+                    </>
                   ) : (
                     <>
                       No tracks tagged <Text style={styles.emptyStrong}>{tagName}</Text> yet.
@@ -338,30 +443,55 @@ export default function TagProfileScreen() {
               </Text>
             ) : null
           }
-          renderItem={({ item, index }) => (
-            <ChartTrackRow
-              rank={index + 1}
-              item={{
-                ...item,
-                tags: (item.tags || []).filter((t) => !tagsMatch(t, tagName)),
-              }}
-              tipPence={item.timePeriodBidValue ?? item.globalMediaAggregate}
-              variant="rich"
-              onOpen={() => {
-                const id = mediaId(item);
-                if (id) router.push(`/tune/${id}`);
-              }}
-              onPlay={() => onPlayItem(item)}
-              onTip={() => setTipTarget(item)}
-            />
-          )}
+          renderItem={({ item, index }) => {
+            if (isPodcast) {
+              const episode = episodes[index] ?? mediaToPodcastEpisode(item);
+              return (
+                <PodcastEpisodeRow
+                  rank={index + 1}
+                  episode={episode}
+                  tipPence={item.timePeriodBidValue ?? item.globalMediaAggregate}
+                  hideTag={tagName}
+                  onPlay={() => onPlayEpisode(episode)}
+                  onTip={() => setTipTarget(item)}
+                  onOpenProfile={() => {
+                    const id = mediaId(item);
+                    if (id) router.push(`/podcast/${id}`);
+                  }}
+                />
+              );
+            }
+            return (
+              <ChartTrackRow
+                rank={index + 1}
+                item={{
+                  ...item,
+                  tags: (item.tags || []).filter((t) => !tagsMatch(t, tagName)),
+                }}
+                tipPence={item.timePeriodBidValue ?? item.globalMediaAggregate}
+                variant="rich"
+                onOpen={() => {
+                  const id = mediaId(item);
+                  if (id) router.push(`/tune/${id}`);
+                }}
+                onPlay={() => onPlayItem(item)}
+                onTip={() => setTipTarget(item)}
+              />
+            );
+          }}
         />
       )}
 
       <TipSheet
         visible={Boolean(tipTarget)}
-        title={tipTarget?.title || 'Untitled'}
-        subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
+        title={tipTarget?.title || (isPodcast ? 'Episode' : 'Untitled')}
+        subtitle={
+          tipTarget
+            ? isPodcast
+              ? seriesTitle(mediaToPodcastEpisode(tipTarget))
+              : formatArtist(tipTarget.artist)
+            : undefined
+        }
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={tipTarget}

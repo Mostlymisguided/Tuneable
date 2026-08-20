@@ -7,6 +7,8 @@ export type TagPlaceChip = {
   featureType?: string | null;
 };
 
+export type TagProfileScope = 'music' | 'podcast';
+
 export type TagProfileResponse = {
   tag: {
     name: string;
@@ -15,6 +17,7 @@ export type TagProfileResponse = {
     kind?: 'tag' | 'year' | 'bpm';
   };
   timePeriod?: string;
+  contentScope?: TagProfileScope;
   stats?: { mediaCount?: number; globalTagAggregate?: number };
   relatedTags?: Array<{ name: string; slug: string }>;
   topOriginPlaces?: TagPlaceChip[];
@@ -27,7 +30,7 @@ export type TagProfileResponse = {
 export const tagAPI = {
   getProfile: async (
     slug: string,
-    params?: { page?: number; limit?: number; timePeriod?: string }
+    params?: { page?: number; limit?: number; timePeriod?: string; type?: TagProfileScope }
   ): Promise<TagProfileResponse> => {
     const response = await api.get<TagProfileResponse>(
       `/tags/${encodeURIComponent(slug)}/profile`,

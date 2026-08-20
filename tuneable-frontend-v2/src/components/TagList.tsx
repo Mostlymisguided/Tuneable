@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { getTagProfilePath, normalizeTagForStorage } from '../utils/tagNormalizer';
+import { getTagProfilePath, normalizeTagForStorage, tagsMatch, type TagProfileScope } from '../utils/tagNormalizer';
 
 interface TagListProps {
   tags: string[];
@@ -8,12 +8,21 @@ interface TagListProps {
   limit?: number;
   /** Optional override; by default each tag links to its tag profile */
   linkPath?: string;
+  scope?: TagProfileScope;
+  hideTag?: string;
 }
 
-const TagList: React.FC<TagListProps> = ({ tags, limit = 3, linkPath }) => {
-  if (!tags.length) return null;
-  const visible = tags.slice(0, limit);
-  const overflow = tags.length - limit;
+const TagList: React.FC<TagListProps> = ({
+  tags,
+  limit = 3,
+  linkPath,
+  scope = 'music',
+  hideTag,
+}) => {
+  const visibleTags = tags.filter((tag) => !hideTag || !tagsMatch(tag, hideTag));
+  if (!visibleTags.length) return null;
+  const visible = visibleTags.slice(0, limit);
+  const overflow = visibleTags.length - limit;
 
   return (
     <div className="flex flex-wrap gap-1">
@@ -22,7 +31,7 @@ const TagList: React.FC<TagListProps> = ({ tags, limit = 3, linkPath }) => {
         return (
           <Link
             key={`${display}-${tagIndex}`}
-            to={linkPath ?? getTagProfilePath(display)}
+            to={linkPath ?? getTagProfilePath(display, scope)}
             onClick={(e) => e.stopPropagation()}
             className="px-2 py-0.5 bg-purple-700/60 hover:bg-purple-500 text-white text-[10px] rounded-full transition-colors no-underline"
           >

@@ -1100,11 +1100,15 @@ export const tagAPI = {
     const response = await api.get('/tags/popular', { params: { limit } });
     return response.data as { tags: Array<{ tag: string; count: number; aggregate: number }> };
   },
-  getProfile: async (slug: string, params?: { page?: number; limit?: number; timePeriod?: string }) => {
+  getProfile: async (
+    slug: string,
+    params?: { page?: number; limit?: number; timePeriod?: string; type?: 'music' | 'podcast' }
+  ) => {
     const response = await api.get(`/tags/${encodeURIComponent(slug)}/profile`, { params });
     return response.data as {
-      tag: { name: string; slug: string; canonicalTag?: string };
+      tag: { name: string; slug: string; canonicalTag?: string; kind?: 'tag' | 'year' | 'bpm' };
       timePeriod?: string;
+      contentScope?: 'music' | 'podcast';
       stats?: { mediaCount?: number; globalTagAggregate?: number };
       relatedTags?: Array<{ name: string; slug: string }>;
       topOriginPlaces?: Array<{ placeId: string; name: string; featureType?: string | null }>;

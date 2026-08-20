@@ -26,6 +26,7 @@ import {
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { stripHtml } from '../utils/stripHtml';
+import { getTagProfilePath } from '../utils/tagNormalizer';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { resolveTipStatInputs } from '../utils/tipStats';
 
@@ -780,20 +781,22 @@ const PodcastSeriesProfile: React.FC = () => {
             {(series.genres && series.genres.length > 0) || (series.tags && series.tags.length > 0) ? (
               <div className="flex flex-wrap gap-2 mb-4">
                 {series.genres?.slice(0, 5).map((genre, idx) => (
-                  <span
+                  <Link
                     key={idx}
-                    className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full"
+                    to={getTagProfilePath(genre, 'podcast')}
+                    className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full hover:bg-purple-600/50 no-underline"
                   >
                     {genre}
-                  </span>
+                  </Link>
                 ))}
                 {series.tags?.slice(0, 5).map((tag, idx) => (
-                  <span
+                  <Link
                     key={idx}
-                    className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full"
+                    to={getTagProfilePath(tag, 'podcast')}
+                    className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full hover:bg-gray-600 no-underline"
                   >
                     {tag}
-                  </span>
+                  </Link>
                 ))}
               </div>
             ) : null}
@@ -903,12 +906,13 @@ const PodcastSeriesProfile: React.FC = () => {
                   <span className="text-gray-400 text-sm">iTunes Categories:</span>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {series.genres.map((genre, idx) => (
-                      <span
+                      <Link
                         key={idx}
-                        className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full"
+                        to={getTagProfilePath(genre, 'podcast')}
+                        className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full hover:bg-purple-600/50 no-underline"
                       >
                         {genre}
-                      </span>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -918,12 +922,13 @@ const PodcastSeriesProfile: React.FC = () => {
                   <span className="text-gray-400 text-sm">Keywords:</span>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {series.tags.slice(0, 10).map((tag, idx) => (
-                      <span
+                      <Link
                         key={idx}
-                        className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full"
+                        to={getTagProfilePath(tag, 'podcast')}
+                        className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full hover:bg-gray-600 no-underline"
                       >
                         {tag}
-                      </span>
+                      </Link>
                     ))}
                     {series.tags.length > 10 && (
                       <span className="text-gray-500 text-xs">+{series.tags.length - 10} more</span>
@@ -1235,20 +1240,22 @@ const PodcastSeriesProfile: React.FC = () => {
                       {(episode.tags && episode.tags.length > 0) || (episode.genres && episode.genres.length > 0) ? (
                         <div className="flex flex-wrap gap-2 mb-3">
                           {episode.genres?.slice(0, 3).map((genre, idx) => (
-                            <span
+                            <Link
                               key={idx}
-                              className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full"
+                              to={getTagProfilePath(genre, 'podcast')}
+                              className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full hover:bg-purple-600/50 no-underline"
                             >
                               {genre}
-                            </span>
+                            </Link>
                           ))}
                           {episode.tags?.slice(0, 3).map((tag, idx) => (
-                            <span
+                            <Link
                               key={idx}
-                              className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full"
+                              to={getTagProfilePath(tag, 'podcast')}
+                              className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full hover:bg-gray-600 no-underline"
                             >
                               {tag}
-                            </span>
+                            </Link>
                           ))}
                         </div>
                       ) : null}

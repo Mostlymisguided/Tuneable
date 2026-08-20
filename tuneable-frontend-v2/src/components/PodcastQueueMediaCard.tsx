@@ -4,6 +4,7 @@ import { Play, Clock, Heart, Loader } from 'lucide-react';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
+import { getEpisodeDisplayTags } from '../utils/podcastTags';
 
 function formatDuration(duration: number | string | undefined) {
   if (!duration) return '';
@@ -32,6 +33,9 @@ export interface PodcastEpisodeCardData {
   category?: string;
   podcastSeries?: { _id: string; title: string; coverArt?: string; genres?: string[]; tags?: string[] };
   podcastTitle?: string;
+  sources?: Record<string, string>;
+  audioUrl?: string;
+  enclosure?: { url?: string };
   isExternal?: boolean;
   source?: 'local' | 'podcastindex' | 'taddy' | 'apple';
   bids?: Array<{
@@ -44,26 +48,6 @@ export interface PodcastEpisodeCardData {
 }
 
 /** Category/genre tags first, then tip tags — deduped, same TagList style as global party. */
-function getDisplayTags(episode: PodcastEpisodeCardData): string[] {
-  const candidates = [
-    ...(episode.genres ?? []),
-    ...(episode.podcastSeries?.genres ?? []),
-    ...(episode.category ? [episode.category] : []),
-    ...(episode.tags ?? []),
-    ...(episode.podcastSeries?.tags ?? []),
-  ];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of candidates) {
-    const tag = typeof raw === 'string' ? raw.trim() : '';
-    if (!tag) continue;
-    const key = tag.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(tag);
-  }
-  return out;
-}
 
 export interface PodcastQueueMediaCardProps {
   episode: PodcastEpisodeCardData;
@@ -75,6 +59,7 @@ export interface PodcastQueueMediaCardProps {
   tipLabel?: string;
   /** When set, episode title/artwork render as real links to this path. */
   episodePath?: string;
+  hideTag?: string;
   onEpisodeClick: (episode: PodcastEpisodeCardData) => void;
   onSeriesClick?: (episode: PodcastEpisodeCardData, e: React.MouseEvent) => void;
   onPlay: (episode: PodcastEpisodeCardData, e: React.MouseEvent) => void;
@@ -90,18 +75,18 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   canPlay = false,
   tipLabel = 'Send a tip',
   episodePath,
+  hideTag,
   onEpisodeClick,
   onSeriesClick,
   onPlay,
   onTip,
 }) => {
-  const tags = getDisplayTags(episode);
+  const tags = getEpisodeDisplayTags(episode);
   const seriesTitle = episode.podcastSeries?.title || episode.podcastTitle;
   const coverArt =
     episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART;
   const mediaId = episode._id || episode.id;
   const durationLabel = formatDuration(episode.duration);
-  const tagListPath = mediaId ? `/podcasts/${mediaId}` : undefined;
 
   const tipButton = (
     <button
@@ -241,7 +226,8 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
                 tags={tags}
                 mediaId={mediaId ?? ''}
                 limit={5}
-                linkPath={tagListPath}
+                scope="podcast"
+                hideTag={hideTag}
               />
             </div>
           )}
@@ -270,7 +256,8 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
             tags={tags}
             mediaId={mediaId ?? ''}
             limit={3}
-            linkPath={tagListPath}
+            scope="podcast"
+            hideTag={hideTag}
           />
         </div>
       )}

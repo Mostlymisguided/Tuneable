@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
   Search, 
@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 import { stripHtml } from '../utils/stripHtml';
+import { getTagProfilePath } from '../utils/tagNormalizer';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 
 interface PodcastEpisode {
@@ -578,20 +579,22 @@ const PodcastSearch: React.FC = () => {
                     {(episode.tags && episode.tags.length > 0) || (episode.genres && episode.genres.length > 0) ? (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {episode.genres?.slice(0, 3).map((genre, idx) => (
-                          <span
+                          <Link
                             key={idx}
-                            className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full"
+                            to={getTagProfilePath(genre, 'podcast')}
+                            className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full hover:bg-purple-600/50 no-underline"
                           >
                             {genre}
-                          </span>
+                          </Link>
                         ))}
                         {episode.tags?.slice(0, 3).map((tag, idx) => (
-                          <span
+                          <Link
                             key={idx}
-                            className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full"
+                            to={getTagProfilePath(tag, 'podcast')}
+                            className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full hover:bg-gray-600 no-underline"
                           >
                             {tag}
-                          </span>
+                          </Link>
                         ))}
                       </div>
                     ) : null}

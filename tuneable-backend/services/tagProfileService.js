@@ -14,6 +14,8 @@ const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const ADDED_BY_FIELDS = 'username profilePic uuid';
+const PODCAST_SERIES_FIELDS = 'title coverArt genres tags';
 const SKIP_PLACE_FEATURE_TYPES = new Set(['continent', 'earth', 'world']);
 const CITYISH_FEATURE_TYPES = new Set([
   'place',
@@ -143,6 +145,27 @@ async function resolveTagFromSlug(rawSlug) {
 }
 
 /**
+ * URL/API scope for tag profiles. Year/BPM virtual tags stay music-only.
+ */
+function parseContentScope(raw) {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const normalized = String(value || 'music').trim().toLowerCase();
+  if (normalized === 'podcast' || normalized === 'spoken' || normalized === 'podcastepisode') {
+    return 'podcast';
+  }
+  return 'music';
+}
+
+function addVariant(variants, value) {
+  if (!value || typeof value !== 'string') return;
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  variants.add(trimmed);
+  variants.add(trimmed.toLowerCase());
+  variants.add(normalizeTagForStorage(trimmed));
+}
+
+/**
  * Build a set of plausible stored tag strings for Mongo $in lookups.
  */
 function collectTagVariants(displayName, canonicalTag) {
@@ -151,20 +174,23 @@ function collectTagVariants(displayName, canonicalTag) {
 
   for (const seed of seeds) {
     if (!seed || typeof seed !== 'string') continue;
-    variants.add(seed);
-    variants.add(seed.toLowerCase());
-    variants.add(normalizeTagForStorage(seed));
+    addVariant(variants, seed);
+
+    // Apple/iTunes categories often use "Society & Culture" while the slug is society-culture.
+    if (seed.includes('&')) {
+      addVariant(variants, seed.replace(/\s*&\s*/g, ' '));
+    } else {
+      const words = seed.trim().split(/\s+/).filter(Boolean);
+      if (words.length === 2) {
+        addVariant(variants, `${words[0]} & ${words[1]}`);
+      }
+    }
   }
 
   for (const [normKey, aliasValue] of Object.entries(TAG_ALIASES)) {
     if (tagsMatch(normKey, displayName) || tagsMatch(aliasValue, displayName)) {
-      variants.add(aliasValue);
-      variants.add(normKey);
-      variants.add(normalizeTagForStorage(normKey));
-      // Spaced guess from collapsed key (deephouse → deep house)
-      if (!normKey.includes(' ') && normKey.length > 4) {
-        // Skip inventing spaces; alias value already has correct form
-      }
+      addVariant(variants, aliasValue);
+      addVariant(variants, normKey);
     }
   }
 
@@ -172,18 +198,65 @@ function collectTagVariants(displayName, canonicalTag) {
 }
 
 /**
+ * Labels that can identify a tag on an item: tip tags, plus catalog genre/category
+ * (and series labels) when includeCatalogFields is set.
+ */
+function collectTagLabels(item, { includeCatalogFields = false } = {}) {
+  const labels = [];
+  const pushOne = (raw) => {
+    if (typeof raw === 'string' && raw.trim()) {
+      labels.push(raw);
+      return;
+    }
+    if (raw && typeof raw === 'object') {
+      const name = raw.name || raw.label || raw.title;
+      if (typeof name === 'string' && name.trim()) labels.push(name);
+    }
+  };
+  const pushAll = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const raw of arr) pushOne(raw);
+  };
+
+  pushAll(item?.tags);
+  if (!includeCatalogFields) return labels;
+
+  pushAll(item?.genres);
+  pushOne(item?.category);
+
+  const series = item?.podcastSeries;
+  if (series && typeof series === 'object') {
+    pushAll(series.tags);
+    pushAll(series.genres);
+  }
+
+  return labels;
+}
+
+function itemMatchesTag(item, displayName, options = {}) {
+  return collectTagLabels(item, options).some(
+    (label) => tagsMatch(label, displayName)
+  );
+}
+
+/**
  * Co-occurring tags across matched media, ranked by shared tip weight then count.
  * Skips the current tag (and aliases). Returns top N with display name + slug.
  */
-function computeRelatedTags(matchedMedia, currentDisplayName, { limit = 8 } = {}) {
+function computeRelatedTags(
+  matchedMedia,
+  currentDisplayName,
+  { limit = 8, includeCatalogFields = false } = {}
+) {
   const byCanonical = new Map();
 
   for (const item of matchedMedia) {
-    if (!item.tags || !Array.isArray(item.tags)) continue;
+    const labels = collectTagLabels(item, { includeCatalogFields });
+    if (labels.length === 0) continue;
     const tipWeight = typeof item.globalMediaAggregate === 'number' ? item.globalMediaAggregate : 0;
     const seenOnTrack = new Set();
 
-    for (const raw of item.tags) {
+    for (const raw of labels) {
       if (typeof raw !== 'string' || !raw.trim()) continue;
       if (tagsMatch(raw, currentDisplayName)) continue;
 
@@ -438,10 +511,143 @@ async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
     );
 }
 
+function catalogMatchOr(variants) {
+  return [
+    { tags: { $in: variants } },
+    { genres: { $in: variants } },
+    { category: { $in: variants } },
+  ];
+}
+
+async function findMusicMediaForTag({
+  releaseYear,
+  bpm,
+  displayName,
+  canonicalTag,
+  selectFields,
+}) {
+  if (typeof releaseYear === 'number') {
+    return Media.find({
+      status: 'active',
+      contentType: 'music',
+      contentForm: { $nin: PODCAST_FORMS },
+      releaseYear,
+    })
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .select(selectFields)
+      .populate('addedBy', ADDED_BY_FIELDS)
+      .lean();
+  }
+
+  if (typeof bpm === 'number') {
+    return Media.find({
+      status: 'active',
+      contentType: 'music',
+      contentForm: { $nin: PODCAST_FORMS },
+      ...mediaBpmQuery(bpm),
+    })
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .select(selectFields)
+      .populate('addedBy', ADDED_BY_FIELDS)
+      .lean();
+  }
+
+  const variants = collectTagVariants(displayName, canonicalTag);
+  const baseQuery = {
+    status: 'active',
+    contentType: 'music',
+    contentForm: { $nin: PODCAST_FORMS },
+    tags: { $exists: true, $ne: [] },
+  };
+
+  let pool = await Media.find({
+    ...baseQuery,
+    tags: { $in: variants },
+  })
+    .sort({ globalMediaAggregate: -1, createdAt: -1 })
+    .select(selectFields)
+    .populate('addedBy', ADDED_BY_FIELDS)
+    .lean();
+
+  if (pool.length === 0) {
+    pool = await Media.find(baseQuery)
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .limit(500)
+      .select(selectFields)
+      .populate('addedBy', ADDED_BY_FIELDS)
+      .lean();
+  }
+
+  return pool.filter((item) => itemMatchesTag(item, displayName));
+}
+
+async function findPodcastMediaForTag({ displayName, canonicalTag, selectFields }) {
+  const variants = collectTagVariants(displayName, canonicalTag);
+  const seriesBase = {
+    contentType: { $in: ['spoken'] },
+    contentForm: { $in: ['podcastseries'] },
+    status: { $nin: ['vetoed', 'deleted'] },
+  };
+  const episodeBase = {
+    contentType: { $in: ['spoken'] },
+    contentForm: { $in: ['podcastepisode'] },
+    status: { $nin: ['vetoed', 'deleted'] },
+  };
+
+  let seriesPool = await Media.find({
+    ...seriesBase,
+    $or: catalogMatchOr(variants),
+  })
+    .select('_id tags genres category')
+    .lean();
+
+  if (seriesPool.length === 0) {
+    seriesPool = await Media.find(seriesBase)
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .limit(400)
+      .select('_id tags genres category')
+      .lean();
+  }
+
+  const matchingSeriesIds = seriesPool
+    .filter((item) => itemMatchesTag(item, displayName, { includeCatalogFields: true }))
+    .map((item) => item._id);
+  const matchingSeriesIdSet = new Set(matchingSeriesIds.map((id) => id.toString()));
+
+  const episodeOr = catalogMatchOr(variants);
+  if (matchingSeriesIds.length > 0) {
+    episodeOr.push({ podcastSeries: { $in: matchingSeriesIds } });
+  }
+
+  let pool = await Media.find({ ...episodeBase, $or: episodeOr })
+    .sort({ globalMediaAggregate: -1, createdAt: -1 })
+    .select(selectFields)
+    .populate('addedBy', ADDED_BY_FIELDS)
+    .populate('podcastSeries', PODCAST_SERIES_FIELDS)
+    .lean();
+
+  if (pool.length === 0) {
+    pool = await Media.find(episodeBase)
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .limit(500)
+      .select(selectFields)
+      .populate('addedBy', ADDED_BY_FIELDS)
+      .populate('podcastSeries', PODCAST_SERIES_FIELDS)
+      .lean();
+  }
+
+  return pool.filter((item) => {
+    if (itemMatchesTag(item, displayName, { includeCatalogFields: true })) return true;
+    const seriesRef = item.podcastSeries;
+    const seriesId = seriesRef && (typeof seriesRef === 'object' ? seriesRef._id : seriesRef);
+    return seriesId && matchingSeriesIdSet.has(seriesId.toString());
+  });
+}
+
 /**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
-async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time' } = {}) {
+async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type } = {}) {
   const resolved = await resolveTagFromSlug(rawSlug);
   if (!resolved) {
     const err = new Error('Tag not found');
@@ -455,74 +661,26 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const skip = (pageNum - 1) * limitNum;
   const period = VALID_TIME_PERIODS.has(timePeriod) ? timePeriod : 'all-time';
   const startDate = getPeriodStartDate(period);
+  const isVirtualTag = typeof releaseYear === 'number' || typeof bpm === 'number';
+  const contentScope = isVirtualTag ? 'music' : parseContentScope(type);
 
-  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared';
+  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags genres category uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared podcastTitle podcastSeries description';
 
-  let matched;
+  const matched = contentScope === 'podcast'
+    ? await findPodcastMediaForTag({ displayName, canonicalTag, selectFields: MEDIA_FIELDS })
+    : await findMusicMediaForTag({
+        releaseYear,
+        bpm,
+        displayName,
+        canonicalTag,
+        selectFields: MEDIA_FIELDS,
+      });
 
-  if (typeof releaseYear === 'number') {
-    // Year profiles rank by Media.releaseYear (not genre tags)
-    matched = await Media.find({
-      status: 'active',
-      contentType: 'music',
-      contentForm: { $nin: PODCAST_FORMS },
-      releaseYear,
-    })
-      .sort({ globalMediaAggregate: -1, createdAt: -1 })
-      .select(MEDIA_FIELDS)
-      .populate('addedBy', 'username profilePic uuid')
-      .lean();
-  } else if (typeof bpm === 'number') {
-    // BPM profiles rank by Media.bpm (rounded integer match)
-    matched = await Media.find({
-      status: 'active',
-      contentType: 'music',
-      contentForm: { $nin: PODCAST_FORMS },
-      ...mediaBpmQuery(bpm),
-    })
-      .sort({ globalMediaAggregate: -1, createdAt: -1 })
-      .select(MEDIA_FIELDS)
-      .populate('addedBy', 'username profilePic uuid')
-      .lean();
-  } else {
-    const variants = collectTagVariants(displayName, canonicalTag);
-
-    const baseQuery = {
-      status: 'active',
-      contentType: 'music',
-      contentForm: { $nin: PODCAST_FORMS },
-      tags: { $exists: true, $ne: [] },
-    };
-
-    // Broad candidate set via indexed tags field, then fuzzy-filter
-    const candidates = await Media.find({
-      ...baseQuery,
-      tags: { $in: variants },
-    })
-      .sort({ globalMediaAggregate: -1, createdAt: -1 })
-      .select(MEDIA_FIELDS)
-      .populate('addedBy', 'username profilePic uuid')
-      .lean();
-
-    // Fallback: if $in found nothing (casing / spelling drift), scan top tipped music
-    let pool = candidates;
-    if (pool.length === 0) {
-      pool = await Media.find(baseQuery)
-        .sort({ globalMediaAggregate: -1, createdAt: -1 })
-        .limit(500)
-        .select(MEDIA_FIELDS)
-        .populate('addedBy', 'username profilePic uuid')
-        .lean();
-    }
-
-    matched = pool.filter((item) => {
-      if (!item.tags || !Array.isArray(item.tags)) return false;
-      return item.tags.some((t) => typeof t === 'string' && tagsMatch(t, displayName));
-    });
-  }
-
-  // Related chips stay all-time (stable header); Top Tunes re-rank by period
-  const relatedTags = computeRelatedTags(matched, displayName, { limit: 8 });
+  // Related chips stay all-time (stable header); ranked list re-ranks by period
+  const relatedTags = computeRelatedTags(matched, displayName, {
+    limit: 8,
+    includeCatalogFields: contentScope === 'podcast',
+  });
   const topOriginPlaces = computeTopOriginPlaces(matched, { limit: 3 });
   const topSupportPlaces = await computeTopSupportPlaces(
     matched.map((m) => m._id),
@@ -564,6 +722,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
       kind: kind || (releaseYear != null ? 'year' : bpm != null ? 'bpm' : 'tag'),
     },
     timePeriod: period,
+    contentScope,
     stats: {
       mediaCount: total,
       globalTagAggregate: tipTotal,
@@ -587,6 +746,10 @@ module.exports = {
   getTagProfile,
   generateSlug,
   collectTagVariants,
+  collectTagLabels,
+  itemMatchesTag,
+  parseContentScope,
+  computeRelatedTags,
   computeTopOriginPlaces,
   computeTopSupportPlaces,
   parseReleaseYearFromSlug,

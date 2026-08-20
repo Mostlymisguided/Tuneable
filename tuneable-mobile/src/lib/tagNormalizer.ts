@@ -147,15 +147,27 @@ export function generateTagSlug(tag: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+export type TagProfileScope = 'music' | 'podcast';
+
 /** Expo Router href for a tag, e.g. "Hip Hop" → `/tag/hip-hop` */
-export function getTagProfileHref(tag: string): `/tag/${string}` | '/tag' {
+export function getTagProfileHref(
+  tag: string,
+  scope: TagProfileScope = 'music'
+): `/tag/${string}` | '/tag' | `/tag/${string}?type=podcast` {
   const slug = generateTagSlug(normalizeTagForStorage(tag) || tag);
-  return slug ? `/tag/${encodeURIComponent(slug)}` : '/tag';
+  if (!slug) return '/tag';
+  const path = `/tag/${encodeURIComponent(slug)}` as `/tag/${string}`;
+  return scope === 'podcast'
+    ? (`${path}?type=podcast` as `/tag/${string}?type=podcast`)
+    : path;
 }
 
 /** @deprecated Prefer getTagProfileHref for typed router.push */
-export function getTagProfilePath(tag: string): string {
-  return getTagProfileHref(tag);
+export function getTagProfilePath(
+  tag: string,
+  scope: TagProfileScope = 'music'
+): string {
+  return getTagProfileHref(tag, scope);
 }
 
 export { normalizeTagForMatching, TAG_ALIASES };
