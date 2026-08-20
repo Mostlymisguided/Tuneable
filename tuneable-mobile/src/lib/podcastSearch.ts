@@ -173,6 +173,38 @@ export function buildEpisodeImportPayload(episode: PodcastEpisode): {
   };
 }
 
+export function localSeriesId(episode: PodcastEpisode): string {
+  return episode.podcastSeries?._id || '';
+}
+
+export function buildSeriesCreatePayload(
+  episode: PodcastEpisode
+): Record<string, unknown> {
+  const podcastTitle =
+    episode.podcastTitle || episode.podcastSeries?.title || '';
+  if (!podcastTitle) {
+    throw new Error('Unable to determine the podcast show.');
+  }
+  const podcastImage =
+    episode.podcastImage ||
+    episode.coverArt ||
+    episode.podcastSeries?.coverArt ||
+    null;
+  const payload: Record<string, unknown> = {
+    title: podcastTitle,
+    description: '',
+    author: episode.podcastAuthor || '',
+    image: podcastImage,
+    categories: episode.genres || [],
+    language: 'en',
+  };
+  if (episode.podcastSeriesUuid) payload.taddyUuid = episode.podcastSeriesUuid;
+  if (episode.rssUrl) payload.rssUrl = episode.rssUrl;
+  if (episode.feedId) payload.podcastIndexId = String(episode.feedId);
+  if (episode.collectionId) payload.iTunesId = episode.collectionId;
+  return payload;
+}
+
 export function importedEpisodeFromSearch(
   searchEpisode: PodcastEpisode,
   imported: PodcastEpisode

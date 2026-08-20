@@ -23,8 +23,10 @@ import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { episodeId, seriesTitle } from '@/src/lib/podcast';
 import {
   buildEpisodeImportPayload,
+  buildSeriesCreatePayload,
   importedEpisodeFromSearch,
   isExternalSearchEpisode,
+  localSeriesId,
   markSearchEpisode,
   podcastSearchCover,
   podcastSearchDedupeKey,
@@ -80,6 +82,7 @@ export default function PodcastSearchScreen() {
   const [loading, setLoading] = useState(Boolean(qParam?.trim()));
   const [loadingMore, setLoadingMore] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [openingKey, setOpeningKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tipTarget, setTipTarget] = useState<PodcastEpisode | null>(null);
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -224,6 +227,73 @@ export default function PodcastSearchScreen() {
     }
   };
 
+  const replaceResult = (original: PodcastEpisode, next: PodcastEpisode) => {
+    setResults((prev) =>
+      prev.map((ep) =>
+        podcastSearchDedupeKey(ep) === podcastSearchDedupeKey(original)
+          ? next
+          : ep
+      )
+    );
+  };
+
+  const ensureLocalEpisode = async (item: PodcastEpisode): Promise<PodcastEpisode> => {
+    if (!isExternalSearchEpisode(item) && episodeId(item)) return item;
+    const payload = buildEpisodeImportPayload(item);
+    const imported = await podcastsAPI.importSingleEpisode(payload);
+    const mediaItem = importedEpisodeFromSearch(item, imported.episode);
+    replaceResult(item, mediaItem);
+    return mediaItem;
+  };
+
+  const openEpisode = async (item: PodcastEpisode) => {
+    const key = `${podcastSearchEpisodeId(item)}:episode`;
+    setOpeningKey(key);
+    setError(null);
+    try {
+      const mediaItem = await ensureLocalEpisode(item);
+      const id = episodeId(mediaItem);
+      if (!id) throw new Error('Could not open this episode.');
+      router.push(`/podcast/${id}`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not open episode'));
+    } finally {
+      setOpeningKey(null);
+    }
+  };
+
+  const openShow = async (item: PodcastEpisode) => {
+    const key = `${podcastSearchEpisodeId(item)}:show`;
+    setOpeningKey(key);
+    setError(null);
+    try {
+      const existing = localSeriesId(item);
+      if (existing) {
+        router.push(`/show/${existing}`);
+        return;
+      }
+      const seriesData = buildSeriesCreatePayload(item);
+      const res = await podcastsAPI.createOrFindSeries(seriesData);
+      const id = res.series?._id;
+      if (!id) throw new Error('Could not open this show.');
+      replaceResult(item, {
+        ...item,
+        podcastSeries: {
+          ...(typeof item.podcastSeries === 'object' ? item.podcastSeries : {}),
+          _id: id,
+          title: res.series.title || seriesTitle(item),
+          coverArt: res.series.coverArt || item.podcastImage || item.coverArt,
+        },
+        podcastTitle: res.series.title || item.podcastTitle,
+      });
+      router.push(`/show/${id}`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not open show'));
+    } finally {
+      setOpeningKey(null);
+    }
+  };
+
   const addAndTip = async (amountPounds: number, tags: string[]) => {
     const item = tipTarget;
     if (!item) return;
@@ -232,20 +302,8 @@ export default function PodcastSearchScreen() {
     setAddingId(searchId);
     setError(null);
     try {
-      let mediaItem = item;
-      if (isExternalSearchEpisode(item) || !episodeId(item)) {
-        const payload = buildEpisodeImportPayload(item);
-        const imported = await podcastsAPI.importSingleEpisode(payload);
-        mediaItem = importedEpisodeFromSearch(item, imported.episode);
-        setTipTarget(mediaItem);
-        setResults((prev) =>
-          prev.map((ep) =>
-            podcastSearchDedupeKey(ep) === podcastSearchDedupeKey(item)
-              ? mediaItem
-              : ep
-          )
-        );
-      }
+      const mediaItem = await ensureLocalEpisode(item);
+      setTipTarget(mediaItem);
 
       const id = episodeId(mediaItem);
       if (!id) {
@@ -274,7 +332,7 @@ export default function PodcastSearchScreen() {
     }
   };
 
-  const busy = loading || loadingMore;
+  const busy = loading || loadingMore || Boolean(openingKey);
 
   return (
     <Screen>
@@ -411,22 +469,42 @@ export default function PodcastSearchScreen() {
         renderItem={({ item }) => {
           const id = podcastSearchEpisodeId(item);
           const isAdding = addingId === id;
+          const isOpening = openingKey?.startsWith(`${id}:`);
           const label = podcastSearchSourceLabel(item);
           const library = !isExternalSearchEpisode(item);
           const durationLabel = formatDuration(item.duration);
+          const showName = seriesTitle(item);
           return (
             <View style={styles.card}>
-              <Image
-                source={{ uri: podcastSearchCover(item) }}
-                style={styles.cover}
-              />
+              <Pressable
+                onPress={() => void openEpisode(item)}
+                disabled={Boolean(openingKey)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open episode ${item.title || 'episode'}`}>
+                <Image
+                  source={{ uri: podcastSearchCover(item) }}
+                  style={styles.cover}
+                />
+              </Pressable>
               <View style={styles.meta}>
-                <Text style={styles.trackTitle} numberOfLines={2}>
-                  {item.title || 'Untitled episode'}
-                </Text>
-                <Text style={styles.artist} numberOfLines={1}>
-                  {seriesTitle(item)}
-                </Text>
+                <Pressable
+                  onPress={() => void openEpisode(item)}
+                  disabled={Boolean(openingKey)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open episode ${item.title || 'episode'}`}>
+                  <Text style={styles.trackTitle} numberOfLines={2}>
+                    {item.title || 'Untitled episode'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void openShow(item)}
+                  disabled={Boolean(openingKey)}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open show ${showName}`}>
+                  <Text style={styles.showTitle} numberOfLines={1}>
+                    {showName}
+                  </Text>
+                </Pressable>
                 <View style={styles.metaRow}>
                   <Text
                     style={[
@@ -453,11 +531,11 @@ export default function PodcastSearchScreen() {
               <Pressable
                 style={styles.heartBtn}
                 hitSlop={8}
-                disabled={isAdding}
+                disabled={isAdding || isOpening}
                 accessibilityRole="button"
                 accessibilityLabel={`Tip and add ${item.title || 'episode'}`}
                 onPress={() => setTipTarget(item)}>
-                {isAdding ? (
+                {isAdding || isOpening ? (
                   <ActivityIndicator color={colors.accentLight} size="small" />
                 ) : (
                   <Ionicons name="heart" size={18} color={colors.tipHeart} />
@@ -657,10 +735,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  artist: {
+  showTitle: {
     marginTop: 2,
-    color: colors.textSecondary,
+    color: '#c4b5fd',
     fontSize: 13,
+    fontWeight: '600',
   },
   metaRow: {
     flexDirection: 'row',
