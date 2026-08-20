@@ -379,10 +379,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         console.warn('⚠️ Account linking requested but no valid user token found');
       }
     }
-    if (req.query.youtube_import === 'true') {
-      req.session.youtubeImport = true;
-    }
-    
+    // YouTube likes import is paused: youtube.readonly triggers Google's unverified-app warning.
+    delete req.session.youtubeImport;
+
     // Generate random state parameter for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
     req.session.oauthState = state;
@@ -400,16 +399,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       
       console.log('✅ Session saved with OAuth state');
 
-      const youtubeImport = req.session.youtubeImport === true;
       const scope = ['profile', 'email'];
-      if (youtubeImport) {
-        scope.push('https://www.googleapis.com/auth/youtube.readonly');
-      }
       const googleAuth = { scope, state };
-      if (youtubeImport) {
-        googleAuth.accessType = 'offline';
-        googleAuth.prompt = 'consent';
-      }
       
       passport.authenticate('google', googleAuth)(req, res, next);
     });

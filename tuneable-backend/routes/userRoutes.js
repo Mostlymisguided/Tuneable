@@ -1611,18 +1611,9 @@ router.get('/me/soundcloud-status', authMiddleware, async (req, res) => {
   }
 });
 
-// Check whether YouTube likes import OAuth is connected
+// YouTube likes import OAuth — paused (Google unverified-app warning)
 router.get('/me/youtube-status', authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id)
-      .select('oauthVerified googleAccessToken googleRefreshToken')
-      .lean();
-    const googleTokenService = require('../services/googleTokenService');
-    res.json({ connected: googleTokenService.youtubeLikesConnected(user) });
-  } catch (error) {
-    console.error('Error checking YouTube status:', error);
-    res.status(500).json({ error: 'Failed to check YouTube status' });
-  }
+  res.json({ connected: false, likesImport: false, playlistImport: true });
 });
 
 // How many library tunes came from each likes-import source
@@ -1631,7 +1622,7 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     const user = await User.findById(req.user._id)
-      .select('spotifyId soundcloudId email role oauthVerified googleAccessToken googleRefreshToken')
+      .select('spotifyId soundcloudId email role')
       .lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -1653,7 +1644,6 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
     };
 
     const spotifyImportAccess = require('../services/spotifyImportAccess');
-    const googleTokenService = require('../services/googleTokenService');
     const [spotifyImported, soundcloudImported, youtubeImported, spotifyAccess] = await Promise.all([
       countFor('spotify_likes', 'spotify'),
       countFor('soundcloud_likes', 'soundcloud'),
@@ -1674,10 +1664,10 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
         imported: soundcloudImported,
       },
       youtube: {
-        connected: googleTokenService.youtubeLikesConnected(user),
+        connected: false,
         imported: youtubeImported,
         playlistImport: true,
-        likesImport: true,
+        likesImport: false,
       },
     });
   } catch (error) {
@@ -1854,9 +1844,14 @@ router.post('/me/import/spotify/request', authMiddleware, async (req, res) => {
 router.post('/me/import/youtube/preview/start', authMiddleware, async (req, res) => {
   try {
     const mode = req.body?.mode === 'likes' || req.query?.mode === 'likes' ? 'likes' : 'playlist';
+    if (mode === 'likes') {
+      const { youtubeLikesImportDisabledError } = require('../services/youtubePlaylistService');
+      const err = youtubeLikesImportDisabledError();
+      return res.status(err.status).json({ error: err.message, code: err.code });
+    }
     const playlistUrl = req.body?.playlistUrl || req.body?.url || req.query.playlistUrl;
     const limit = req.body?.limit ?? req.query.limit;
-    if (mode !== 'likes' && !playlistUrl) {
+    if (!playlistUrl) {
       return res.status(400).json({ error: 'playlistUrl is required' });
     }
     const libraryImportJobService = require('../services/libraryImportJobService');

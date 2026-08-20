@@ -53,7 +53,6 @@ FRONTEND_URL=https://your-frontend-domain.com
    - Add scopes:
      - `profile`
      - `email`
-     - ~~`https://www.googleapis.com/auth/youtube.readonly`~~ (Optional - currently commented out to avoid verification requirement)
 
 7. Configure OAuth 2.0 Client:
    - **Name**: Tuneable OAuth Client (or your preferred name)
@@ -73,9 +72,9 @@ FRONTEND_URL=https://your-frontend-domain.com
 Our implementation requests the following Google permissions:
 - **`profile`** - User's basic profile information
 - **`email`** - User's email address
-- **`https://www.googleapis.com/auth/youtube.readonly`** - Read-only access to YouTube account (for YouTube liked videos import feature) - **Currently commented out to avoid Google verification requirement**
+- **`https://www.googleapis.com/auth/youtube.readonly`** - Read-only access to YouTube liked videos. **Not requested.** Google shows an unverified-app warning until Tuneable completes app verification. Public YouTube playlist import uses the Data API key and does not need this scope.
 
-**Note:** The YouTube scope requires Google app verification. It's currently commented out in `authRoutes.js`. If you want to enable YouTube import feature later, uncomment the scope and submit for Google verification.
+**Note:** YouTube liked-videos import is paused. To re-enable later, request `youtube.readonly` only for that flow and submit the Google OAuth app for verification.
 
 ### Testing
 
@@ -120,5 +119,5 @@ Before deploying to production:
 - [ ] Verify OAuth consent screen is configured (only profile and email scopes)
 - [ ] Publish OAuth consent screen (should work without verification for basic scopes)
 - [ ] Test the flow on production environment
-- [ ] (Optional) Uncomment YouTube scope and submit for verification if YouTube import is needed
+- [ ] (Optional) Re-enable YouTube likes import only after Google OAuth app verification
 

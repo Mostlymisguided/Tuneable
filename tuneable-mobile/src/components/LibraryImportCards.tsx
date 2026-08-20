@@ -141,7 +141,7 @@ export function LibraryImportCards({ showUpload = false }: Props) {
           })
         }
         accessibilityRole="button"
-        accessibilityLabel="Import from YouTube likes or a playlist">
+        accessibilityLabel="Import from a public YouTube playlist">
         <View style={styles.youtubeIcon}>
           <Ionicons name="logo-youtube" size={20} color="#fca5a5" />
         </View>
@@ -151,8 +151,8 @@ export function LibraryImportCards({ showUpload = false }: Props) {
             {loading
               ? 'Checking…'
               : youtubeImported > 0
-                ? `${youtubeImported} in your library · likes or a public playlist`
-                : 'Liked videos or a public playlist via MusicBrainz'}
+                ? `${youtubeImported} in your library · public playlist`
+                : 'Paste a public playlist URL'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

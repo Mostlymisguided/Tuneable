@@ -256,33 +256,22 @@ async function fetchPublicPlaylist(playlistUrlOrId, { limit = 50, onProgress } =
   });
 }
 
+const YOUTUBE_LIKES_IMPORT_DISABLED_MESSAGE =
+  'YouTube liked-videos import is paused until Google verifies the Tuneable app. Paste a public playlist URL instead.';
+
+function youtubeLikesImportDisabledError() {
+  const err = new Error(YOUTUBE_LIKES_IMPORT_DISABLED_MESSAGE);
+  err.status = 410;
+  err.code = 'YOUTUBE_LIKES_IMPORT_DISABLED';
+  return err;
+}
+
 /**
  * Fetch the authenticated user's liked videos (private LL playlist) via OAuth.
+ * Paused: Google shows an unverified-app warning for youtube.readonly.
  */
-async function fetchLikedVideos(user, { limit = 50, onProgress } = {}) {
-  const googleTokenService = require('./googleTokenService');
-  if (!googleTokenService.youtubeLikesConnected(user)) {
-    const err = new Error('Connect YouTube to import liked videos.');
-    err.status = 400;
-    err.code = 'PROVIDER_REAUTH_REQUIRED';
-    throw err;
-  }
-
-  const fetched = await fetchPlaylistTracks(LIKED_PLAYLIST_ID, {
-    limit,
-    onProgress,
-    user,
-    importSource: 'youtube_likes',
-    sourceLabel: 'YouTube Likes',
-    fetchingMessage: 'Fetching liked videos…',
-    emptyError: 'Could not read liked videos. Reconnect YouTube with permission to read likes.',
-  });
-
-  return {
-    ...fetched,
-    playlistId: LIKED_PLAYLIST_ID,
-    playlistTitle: fetched.playlistTitle || 'Liked videos',
-  };
+async function fetchLikedVideos() {
+  throw youtubeLikesImportDisabledError();
 }
 
 module.exports = {
@@ -291,4 +280,6 @@ module.exports = {
   parseYouTubePlaylistId,
   MAX_PLAYLIST_ITEMS,
   LIKED_PLAYLIST_ID,
+  YOUTUBE_LIKES_IMPORT_DISABLED_MESSAGE,
+  youtubeLikesImportDisabledError,
 };

@@ -79,7 +79,10 @@ describe('youtubePlaylistUtils', () => {
 });
 
 describe('youtube likes import', () => {
-  const { LIKED_PLAYLIST_ID } = require('../services/youtubePlaylistService');
+  const {
+    LIKED_PLAYLIST_ID,
+    fetchLikedVideos,
+  } = require('../services/youtubePlaylistService');
   const { youtubeLikesConnected } = require('../services/googleTokenService');
 
   it('uses YouTube\'s liked-videos playlist id', () => {
@@ -96,6 +99,13 @@ describe('youtube likes import', () => {
       googleAccessToken: 'ya29.token',
     })).toBe(false);
     expect(youtubeLikesConnected({ oauthVerified: { youtube: true } })).toBe(false);
+  });
+
+  it('is paused until Google app verification', async () => {
+    await expect(fetchLikedVideos()).rejects.toMatchObject({
+      status: 410,
+      code: 'YOUTUBE_LIKES_IMPORT_DISABLED',
+    });
   });
 });
 
