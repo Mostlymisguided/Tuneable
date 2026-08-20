@@ -11,7 +11,14 @@ const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSig
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
-/** OAuth callback must use the same public host as /api/auth/* (session cookie). */
+/** Persist Google tokens without wiping an existing refresh token. */
+function applyGoogleOAuthTokens(user, accessToken, refreshToken, youtubeImport) {
+  if (accessToken) user.googleAccessToken = accessToken;
+  if (refreshToken) user.googleRefreshToken = refreshToken;
+  user.oauthVerified = user.oauthVerified || {};
+  user.oauthVerified.google = true;
+  if (youtubeImport) user.oauthVerified.youtube = true;
+}
 function resolveOAuthCallbackURL(envKey, provider) {
   if (process.env[envKey]) return process.env[envKey];
   // Prefer FRONTEND_URL in production so callbacks stay on tuneable.stream (CF proxy),
@@ -313,6 +320,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         // Check if this is an account linking request
         const isLinkingAccount = req.session?.linkAccount === true;
         const linkingUserId = req.session?.linkingUserId;
+        const youtubeImport = req.session?.youtubeImport === true;
         
         // Check if user already exists with this Google ID
         let user = await User.findOne({ googleId: profile.id });
@@ -325,20 +333,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               return done(new Error('This Google account is already linked to another user account. Please use a different account.'), null);
             }
             // Google account is already linked to the current user - just update tokens
-            user.googleAccessToken = accessToken;
-            user.googleRefreshToken = refreshToken;
-            user.oauthVerified = user.oauthVerified || {};
-            user.oauthVerified.google = true;
+            applyGoogleOAuthTokens(user, accessToken, refreshToken, youtubeImport);
             await user.save();
             return done(null, user);
           }
           
           // Not linking - just log in as the existing user
-          // User exists, update their Google tokens
-          user.googleAccessToken = accessToken;
-          user.googleRefreshToken = refreshToken;
-          user.oauthVerified = user.oauthVerified || {};
-          user.oauthVerified.google = true; // Mark Google OAuth as verified
+          applyGoogleOAuthTokens(user, accessToken, refreshToken, youtubeImport);
           
           // Update profile picture from Google only if user doesn't have one
           if (profile.photos && profile.photos.length > 0 && !user.profilePic) {
@@ -385,10 +386,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
               // Email matches current user - link Google account
               const isFirstGoogleLink = !existingUser.googleId;
               existingUser.googleId = profile.id;
-              existingUser.googleAccessToken = accessToken;
-              existingUser.googleRefreshToken = refreshToken;
-              existingUser.oauthVerified = existingUser.oauthVerified || {};
-              existingUser.oauthVerified.google = true;
+              applyGoogleOAuthTokens(existingUser, accessToken, refreshToken, youtubeImport);
               
               // Update profile picture from Google only if user doesn't have one or is first time linking
               if (profile.photos && profile.photos.length > 0 && (!existingUser.profilePic || isFirstGoogleLink)) {
@@ -414,10 +412,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             
             // Not linking - Link Google account to existing user
             existingUser.googleId = profile.id;
-            existingUser.googleAccessToken = accessToken;
-            existingUser.googleRefreshToken = refreshToken;
-            existingUser.oauthVerified = existingUser.oauthVerified || {};
-            existingUser.oauthVerified.google = true; // Mark Google OAuth as verified
+            applyGoogleOAuthTokens(existingUser, accessToken, refreshToken, youtubeImport);
             
             // Update profile picture from Google only if user doesn't have one or is first time linking
             const isFirstGoogleLink = !existingUser.googleId;
@@ -457,10 +452,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             // Link Google account to current user
             const isFirstGoogleLink = !currentUser.googleId;
             currentUser.googleId = profile.id;
-            currentUser.googleAccessToken = accessToken;
-            currentUser.googleRefreshToken = refreshToken;
-            currentUser.oauthVerified = currentUser.oauthVerified || {};
-            currentUser.oauthVerified.google = true;
+            applyGoogleOAuthTokens(currentUser, accessToken, refreshToken, youtubeImport);
             
             // Update profile picture from Google only if user doesn't have one or is first time linking
             if (profile.photos && profile.photos.length > 0 && (!currentUser.profilePic || isFirstGoogleLink)) {
@@ -531,7 +523,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         const newUser = new User({
           googleId: profile.id,
           googleAccessToken: accessToken,
-          googleRefreshToken: refreshToken,
+          googleRefreshToken: refreshToken || undefined,
           email: emailValue,
           username: finalUsername,
           givenName,
@@ -555,6 +547,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           // Mark Google OAuth as verified
           oauthVerified: {
             google: true,
+            youtube: Boolean(youtubeImport),
             facebook: false,
             instagram: false,
             soundcloud: false

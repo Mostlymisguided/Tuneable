@@ -141,18 +141,18 @@ export function LibraryImportCards({ showUpload = false }: Props) {
           })
         }
         accessibilityRole="button"
-        accessibilityLabel="Import from a YouTube playlist">
+        accessibilityLabel="Import from YouTube likes or a playlist">
         <View style={styles.youtubeIcon}>
           <Ionicons name="logo-youtube" size={20} color="#fca5a5" />
         </View>
         <View style={styles.uploadCopy}>
-          <Text style={styles.youtubeTitle}>YouTube playlist</Text>
+          <Text style={styles.youtubeTitle}>YouTube</Text>
           <Text style={styles.uploadSub}>
             {loading
               ? 'Checking…'
               : youtubeImported > 0
-                ? `${youtubeImported} in your library · paste a public playlist`
-                : 'Match a public playlist via MusicBrainz'}
+                ? `${youtubeImported} in your library · likes or a public playlist`
+                : 'Liked videos or a public playlist via MusicBrainz'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

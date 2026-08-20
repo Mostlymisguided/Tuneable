@@ -17,6 +17,7 @@ export function buildOAuthStartUrl(
     linkAccount?: boolean;
     token?: string;
     customRedirect?: string;
+    youtubeImport?: boolean;
   }
 ): string {
   const params = new URLSearchParams();
@@ -24,6 +25,7 @@ export function buildOAuthStartUrl(
   if (options?.inviteCode) params.set('invite', options.inviteCode);
   if (options?.linkAccount) params.set('link_account', 'true');
   if (options?.token) params.set('token', options.token);
+  if (options?.youtubeImport) params.set('youtube_import', 'true');
   return `${API_ORIGIN}/api/auth/${provider}?${params.toString()}`;
 }
 

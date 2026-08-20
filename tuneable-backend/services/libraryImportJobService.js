@@ -114,7 +114,7 @@ function completeJob(jobId, result) {
   });
 }
 
-function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl } = {}) {
+function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl, mode } = {}) {
   const job = createJob({ userId, type: 'preview', source });
   const onProgress = progressReporter(job.id);
 
@@ -134,10 +134,17 @@ function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, play
           crossRefMode: crossRefMode || 'spotify_only',
         });
       } else if (source === 'youtube') {
-        preview = await libraryImportService.previewYouTubePlaylistImport(userId, playlistUrl, {
-          limit,
-          onProgress,
-        });
+        if (mode === 'likes') {
+          preview = await libraryImportService.previewYouTubeLikesImport(userId, {
+            limit,
+            onProgress,
+          });
+        } else {
+          preview = await libraryImportService.previewYouTubePlaylistImport(userId, playlistUrl, {
+            limit,
+            onProgress,
+          });
+        }
       } else {
         preview = await libraryImportService.previewSpotifyImport(userId, limit, { onProgress });
       }

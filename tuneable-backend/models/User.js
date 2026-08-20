@@ -270,6 +270,7 @@ const userSchema = new mongoose.Schema({
     facebook: { type: Boolean, default: false },
     soundcloud: { type: Boolean, default: false },
     google: { type: Boolean, default: false },
+    youtube: { type: Boolean, default: false },
     apple: { type: Boolean, default: false },
     spotify: { type: Boolean, default: false }
   },

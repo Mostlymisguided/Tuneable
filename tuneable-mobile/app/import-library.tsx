@@ -23,6 +23,7 @@ import { colors } from '@/src/theme/colors';
 WebBrowser.maybeCompleteAuthSession();
 
 type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
+type YoutubeMode = 'likes' | 'playlist';
 
 const IMPORT_LIMIT = 25;
 
@@ -48,6 +49,8 @@ export default function ImportLibraryScreen() {
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
+  const [youtubeMode, setYoutubeMode] = useState<YoutubeMode>('likes');
   const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
   const [spotifyRequestStatus, setSpotifyRequestStatus] = useState<
     'pending' | 'allowlisted' | 'rejected' | null
@@ -76,29 +79,36 @@ export default function ImportLibraryScreen() {
 
   const checkConnections = useCallback(async () => {
     try {
-      const [spotify, soundcloud] = await Promise.all([
+      const [spotify, soundcloud, youtube] = await Promise.all([
         userAPI.getSpotifyStatus(),
         userAPI.getSoundCloudStatus(),
+        userAPI.getYouTubeStatus().catch(() => ({ connected: false })),
       ]);
       const next = {
         spotify: Boolean(spotify?.connected),
         soundcloud: Boolean(soundcloud?.connected),
+        youtube: Boolean(youtube?.connected),
         oauthAvailable: Boolean(spotify?.oauthAvailable) || Boolean(spotify?.connected),
       };
       setSpotifyConnected(next.spotify);
       setSoundcloudConnected(next.soundcloud);
+      setYoutubeConnected(next.youtube);
       setSpotifyOauthAvailable(next.oauthAvailable);
       setSpotifyRequestStatus(spotify?.request?.status ?? null);
       return next;
     } catch {
-      return { spotify: false, soundcloud: false, oauthAvailable: false };
+      return { spotify: false, soundcloud: false, youtube: false, oauthAvailable: false };
     }
   }, []);
 
   const loadImportPreview = useCallback(
     async (source: ImportSource, playlistUrl?: string) => {
       setImportLoading(true);
-      setImportProgress(source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…');
+      setImportProgress(
+        source === 'youtube' && youtubeMode !== 'likes'
+          ? 'Matching playlist…'
+          : 'Scanning your likes…'
+      );
       setImportPreview(null);
       setError(null);
       try {
@@ -110,8 +120,11 @@ export default function ImportLibraryScreen() {
               )
             : source === 'youtube'
               ? await userAPI.startYouTubeImportPreview(
-                  playlistUrl || youtubePlaylistUrl,
-                  IMPORT_LIMIT
+                  youtubeMode === 'likes'
+                    ? undefined
+                    : playlistUrl || youtubePlaylistUrl,
+                  IMPORT_LIMIT,
+                  youtubeMode
                 )
             : await userAPI.startSpotifyImportPreview(IMPORT_LIMIT);
         const data = await userAPI.waitForImportJob<{
@@ -126,7 +139,12 @@ export default function ImportLibraryScreen() {
             skippedNoMatch?: number;
           };
         }>(started.jobId, (job) => {
-          setImportProgress(job.message || (source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…'));
+          setImportProgress(
+            job.message
+              || (source === 'youtube' && youtubeMode !== 'likes'
+                ? 'Matching playlist…'
+                : 'Scanning your likes…')
+          );
         });
 
         const items = data.items || [];
@@ -159,7 +177,7 @@ export default function ImportLibraryScreen() {
         setImportProgress(null);
       }
     },
-    [defaultTip, user?.balance, youtubePlaylistUrl]
+    [defaultTip, user?.balance, youtubePlaylistUrl, youtubeMode]
   );
 
   useEffect(() => {
@@ -175,9 +193,10 @@ export default function ImportLibraryScreen() {
         sourceParam === 'soundcloud'
           ? connections.soundcloud
           : sourceParam === 'youtube'
-            ? true
+            ? youtubeMode === 'likes' && connections.youtube
           : connections.spotify;
-      if (sourceParam === 'youtube') return;
+      if (sourceParam === 'youtube' && youtubeMode !== 'likes') return;
+      if (sourceParam === 'youtube' && !connections.youtube) return;
       if (connected) {
         await loadImportPreview(sourceParam);
       }
@@ -201,11 +220,18 @@ export default function ImportLibraryScreen() {
       const redirect = Linking.createURL('import-library', {
         queryParams: { source },
       });
-      const startUrl = buildOAuthStartUrl(source, {
-        linkAccount: true,
-        token,
-        customRedirect: redirect,
-      });
+      const startUrl = source === 'youtube'
+        ? buildOAuthStartUrl('google', {
+            linkAccount: true,
+            token,
+            customRedirect: redirect,
+            youtubeImport: true,
+          })
+        : buildOAuthStartUrl(source, {
+            linkAccount: true,
+            token,
+            customRedirect: redirect,
+          });
       const result = await WebBrowser.openAuthSessionAsync(startUrl, redirect);
       if (result.type === 'success' && result.url) {
         const oauthError = extractOAuthError(result.url);
@@ -216,12 +242,16 @@ export default function ImportLibraryScreen() {
         goToSource(source);
         const connections = await checkConnections();
         const connected =
-          source === 'soundcloud' ? connections.soundcloud : connections.spotify;
+          source === 'soundcloud'
+            ? connections.soundcloud
+            : source === 'youtube'
+              ? connections.youtube
+              : connections.spotify;
         if (connected) {
           await loadImportPreview(source);
         } else {
           setError(
-            `${source === 'soundcloud' ? 'SoundCloud' : 'Spotify'} did not connect. Try again.`
+            `${source === 'soundcloud' ? 'SoundCloud' : source === 'youtube' ? 'YouTube' : 'Spotify'} did not connect. Try again.`
           );
         }
       }
@@ -245,7 +275,11 @@ export default function ImportLibraryScreen() {
               'spotify_only'
             )
           : activeSource === 'youtube'
-            ? await userAPI.startYouTubeImportPreview(youtubePlaylistUrl, IMPORT_LIMIT)
+            ? await userAPI.startYouTubeImportPreview(
+                youtubeMode === 'likes' ? undefined : youtubePlaylistUrl,
+                IMPORT_LIMIT,
+                youtubeMode
+              )
           : await userAPI.startSpotifyImportPreview(IMPORT_LIMIT);
       const data = await userAPI.waitForImportJob<{
         items?: Array<{
@@ -382,7 +416,7 @@ export default function ImportLibraryScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <Text style={styles.lede}>
-          Tip tracks from Spotify, SoundCloud, or a public YouTube playlist into
+          Tip tracks from Spotify, SoundCloud, YouTube likes, or a public YouTube playlist into
           your Tuneable library at your default (£{defaultTip.toFixed(2)}).
         </Text>
 
@@ -416,9 +450,11 @@ export default function ImportLibraryScreen() {
               style={[styles.importCard, styles.youtubeCard]}
               disabled={busy}
               onPress={() => void startSource('youtube')}>
-              <Text style={styles.importTitleYt}>YouTube playlist</Text>
+              <Text style={styles.importTitleYt}>YouTube</Text>
               <Text style={styles.importSub}>
-                Paste a public playlist — MusicBrainz confirms matches
+                {youtubeConnected
+                  ? 'Likes connected — tap to import'
+                  : 'Liked videos or a public playlist'}
               </Text>
             </Pressable>
           </View>
@@ -427,21 +463,55 @@ export default function ImportLibraryScreen() {
             <Text style={styles.previewHeading}>{sourceLabel}</Text>
             {activeSource === 'youtube' && !importPreview && !importLoading ? (
               <View style={styles.previewActions}>
-                <TextInput
-                  value={youtubePlaylistUrl}
-                  onChangeText={setYoutubePlaylistUrl}
-                  placeholder="https://www.youtube.com/playlist?list=…"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  style={styles.input}
-                />
-                <Pressable
-                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy || !youtubePlaylistUrl.trim()}
-                  onPress={() => void loadImportPreview('youtube', youtubePlaylistUrl)}>
-                  <Text style={styles.primaryBtnText}>Scan playlist</Text>
-                </Pressable>
+                <View style={styles.modeRow}>
+                  <Pressable
+                    style={[styles.modeBtn, youtubeMode === 'likes' && styles.modeBtnActive]}
+                    onPress={() => setYoutubeMode('likes')}>
+                    <Text style={[styles.modeBtnText, youtubeMode === 'likes' && styles.modeBtnTextActive]}>
+                      Liked videos
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modeBtn, youtubeMode === 'playlist' && styles.modeBtnActive]}
+                    onPress={() => setYoutubeMode('playlist')}>
+                    <Text style={[styles.modeBtnText, youtubeMode === 'playlist' && styles.modeBtnTextActive]}>
+                      Public playlist
+                    </Text>
+                  </Pressable>
+                </View>
+                {youtubeMode === 'playlist' ? (
+                  <>
+                    <TextInput
+                      value={youtubePlaylistUrl}
+                      onChangeText={setYoutubePlaylistUrl}
+                      placeholder="https://www.youtube.com/playlist?list=…"
+                      placeholderTextColor={colors.textMuted}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={styles.input}
+                    />
+                    <Pressable
+                      style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                      disabled={busy || !youtubePlaylistUrl.trim()}
+                      onPress={() => void loadImportPreview('youtube', youtubePlaylistUrl)}>
+                      <Text style={styles.primaryBtnText}>Scan playlist</Text>
+                    </Pressable>
+                  </>
+                ) : youtubeConnected ? (
+                  <Pressable
+                    style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                    disabled={busy}
+                    onPress={() => void loadImportPreview('youtube')}>
+                    <Text style={styles.primaryBtnText}>Scan liked videos</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                    disabled={busy}
+                    onPress={() => void connectImportSource('youtube')}>
+                    <Text style={styles.primaryBtnText}>Connect YouTube</Text>
+                  </Pressable>
+                )}
               </View>
             ) : activeSource === 'spotify' && !spotifyConnected && !spotifyOauthAvailable && !importPreview ? (
               <View style={styles.previewActions}>
@@ -642,6 +712,30 @@ const styles = StyleSheet.create({
   },
   previewActions: {
     gap: 12,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modeBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modeBtnActive: {
+    borderColor: '#fca5a5',
+    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+  },
+  modeBtnText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modeBtnTextActive: {
+    color: colors.text,
   },
   input: {
     borderWidth: 1,

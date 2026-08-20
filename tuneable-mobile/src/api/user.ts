@@ -114,6 +114,13 @@ export const userAPI = {
     return response.data;
   },
 
+  getYouTubeStatus: async (): Promise<{ connected: boolean }> => {
+    const response = await api.get<{ connected: boolean }>(
+      '/users/me/youtube-status'
+    );
+    return response.data;
+  },
+
   getImportStats: async (): Promise<{
     spotify: {
       connected: boolean;
@@ -123,7 +130,12 @@ export const userAPI = {
       request?: SpotifyImportAccess['request'];
     };
     soundcloud: { connected: boolean; imported: number };
-    youtube?: { imported: number; playlistImport?: boolean };
+    youtube?: {
+      connected?: boolean;
+      imported: number;
+      playlistImport?: boolean;
+      likesImport?: boolean;
+    };
   }> => {
     const response = await api.get<{
       spotify: {
@@ -134,7 +146,12 @@ export const userAPI = {
         request?: SpotifyImportAccess['request'];
       };
       soundcloud: { connected: boolean; imported: number };
-      youtube?: { imported: number; playlistImport?: boolean };
+      youtube?: {
+        connected?: boolean;
+        imported: number;
+        playlistImport?: boolean;
+        likesImport?: boolean;
+      };
     }>('/users/me/import-stats');
     return response.data;
   },
@@ -194,12 +211,13 @@ export const userAPI = {
   },
 
   startYouTubeImportPreview: async (
-    playlistUrl: string,
-    limit = 50
+    playlistUrl?: string,
+    limit = 50,
+    mode: 'playlist' | 'likes' = 'playlist'
   ): Promise<{ jobId: string; status: string }> => {
     const response = await api.post<{ jobId: string; status: string }>(
       '/users/me/import/youtube/preview/start',
-      { playlistUrl, limit }
+      { playlistUrl, limit, mode }
     );
     return response.data;
   },

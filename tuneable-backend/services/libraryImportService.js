@@ -327,7 +327,12 @@ function trackKey(track, source) {
 }
 
 function isYoutubeSource(source) {
-  return source === 'youtube' || source === 'youtube_playlist';
+  return source === 'youtube' || source === 'youtube_playlist' || source === 'youtube_likes';
+}
+
+function isYoutubeImportSource(importSource, item) {
+  const src = importSource || item?.externalMedia?.importSource;
+  return src === 'youtube_playlist' || src === 'youtube_likes' || src === 'youtube';
 }
 
 async function previewImportFromTracks(userId, source, tracks, user, extraSummary = {}, onProgress = null) {
@@ -729,7 +734,7 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
         }
       }
 
-      const youtubeImport = importSource === 'youtube_playlist' || item.externalMedia?.importSource === 'youtube_playlist';
+      const youtubeImport = isYoutubeImportSource(importSource, item);
       const rejectedFuzzy = item.matchStatus === 'possible_match' && item.useSuggestedMatch === false;
       if (youtubeImport && rejectedFuzzy) {
         results.skipped++;
@@ -1111,23 +1116,9 @@ function filterYouTubePreview(preview, extraSummary = {}) {
   };
 }
 
-async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
-  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
-  const report = onProgress || (() => {});
-  const youtubePlaylistService = require('./youtubePlaylistService');
+async function previewYouTubeFetchedTracks(userId, user, fetched, extraSummary, onProgress) {
+  const report = typeof onProgress === 'function' ? onProgress : () => {};
   const youtubeImportMatchService = require('./youtubeImportMatchService');
-
-  const user = await User.findById(userId).select('preferences balance');
-  if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
-    throw err;
-  }
-
-  const fetched = await youtubePlaylistService.fetchPublicPlaylist(playlistUrl, {
-    limit: opts.limit,
-    onProgress,
-  });
 
   report({
     stage: 'cross_ref',
@@ -1165,11 +1156,52 @@ async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
     mbNone: enriched.stats.none,
     playlistId: fetched.playlistId,
     playlistTitle: fetched.playlistTitle,
+    ...extraSummary,
   });
 }
 
+async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
+  const youtubePlaylistService = require('./youtubePlaylistService');
+  const user = await User.findById(userId).select('preferences balance');
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const fetched = await youtubePlaylistService.fetchPublicPlaylist(playlistUrl, {
+    limit: opts.limit,
+    onProgress: opts.onProgress,
+  });
+
+  return previewYouTubeFetchedTracks(userId, user, fetched, {}, opts.onProgress);
+}
+
+async function previewYouTubeLikesImport(userId, opts = {}) {
+  const youtubePlaylistService = require('./youtubePlaylistService');
+  const user = await User.findById(userId).select(
+    'preferences balance googleAccessToken googleRefreshToken oauthVerified'
+  );
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const fetched = await youtubePlaylistService.fetchLikedVideos(user, {
+    limit: opts.limit,
+    onProgress: opts.onProgress,
+  });
+
+  return previewYouTubeFetchedTracks(userId, user, fetched, { likesImport: true }, opts.onProgress);
+}
+
 async function executeYouTubePlaylistImport(userId, opts) {
-  return executeLibraryImport(userId, { ...opts, importSource: 'youtube_playlist' });
+  const fromItems = opts.items?.find((item) => item?.externalMedia?.importSource)?.externalMedia?.importSource;
+  const importSource = opts.importSource === 'youtube_likes' || fromItems === 'youtube_likes'
+    ? 'youtube_likes'
+    : 'youtube_playlist';
+  return executeLibraryImport(userId, { ...opts, importSource });
 }
 
 module.exports = {
@@ -1177,6 +1209,7 @@ module.exports = {
   previewSoundCloudImport,
   previewRekordboxImport,
   previewYouTubePlaylistImport,
+  previewYouTubeLikesImport,
   listRekordboxPlaylists,
   executeSpotifyImport,
   executeSoundCloudImport,

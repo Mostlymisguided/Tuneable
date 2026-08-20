@@ -36,12 +36,14 @@ export function buildOAuthStartUrl(provider: 'facebook' | 'google' | 'instagram'
   linkAccount?: boolean;
   token?: string;
   customRedirect?: string;
+  youtubeImport?: boolean;
 }): string {
   const params = new URLSearchParams();
   params.set('redirect', options?.customRedirect || getOAuthCallbackRedirect());
   if (options?.inviteCode) params.set('invite', options.inviteCode);
   if (options?.linkAccount) params.set('link_account', 'true');
   if (options?.token) params.set('token', options.token);
+  if (options?.youtubeImport) params.set('youtube_import', 'true');
 
   const path = provider;
   return `${getApiBaseUrl()}/auth/${path}?${params.toString()}`;

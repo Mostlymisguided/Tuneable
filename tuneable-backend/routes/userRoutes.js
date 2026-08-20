@@ -1611,13 +1611,27 @@ router.get('/me/soundcloud-status', authMiddleware, async (req, res) => {
   }
 });
 
+// Check whether YouTube likes import OAuth is connected
+router.get('/me/youtube-status', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('oauthVerified googleAccessToken googleRefreshToken')
+      .lean();
+    const googleTokenService = require('../services/googleTokenService');
+    res.json({ connected: googleTokenService.youtubeLikesConnected(user) });
+  } catch (error) {
+    console.error('Error checking YouTube status:', error);
+    res.status(500).json({ error: 'Failed to check YouTube status' });
+  }
+});
+
 // How many library tunes came from each likes-import source
 router.get('/me/import-stats', authMiddleware, async (req, res) => {
   try {
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     const user = await User.findById(req.user._id)
-      .select('spotifyId soundcloudId email role')
+      .select('spotifyId soundcloudId email role oauthVerified googleAccessToken googleRefreshToken')
       .lean();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -1628,20 +1642,22 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
 
     const countFor = (importSource, sourceKey) => {
       if (!mediaIds.length) return Promise.resolve(0);
+      const sources = Array.isArray(importSource) ? importSource : [importSource];
       return Media.countDocuments({
         _id: { $in: mediaIds },
         $or: [
-          { importSource },
+          { importSource: { $in: sources } },
           { [`sources.${sourceKey}`]: { $exists: true, $nin: [null, ''] } },
         ],
       });
     };
 
     const spotifyImportAccess = require('../services/spotifyImportAccess');
+    const googleTokenService = require('../services/googleTokenService');
     const [spotifyImported, soundcloudImported, youtubeImported, spotifyAccess] = await Promise.all([
       countFor('spotify_likes', 'spotify'),
       countFor('soundcloud_likes', 'soundcloud'),
-      countFor('youtube_playlist', 'youtube'),
+      countFor(['youtube_playlist', 'youtube_likes'], 'youtube'),
       spotifyImportAccess.getSpotifyImportAccess(user),
     ]);
 
@@ -1658,8 +1674,10 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
         imported: soundcloudImported,
       },
       youtube: {
+        connected: googleTokenService.youtubeLikesConnected(user),
         imported: youtubeImported,
         playlistImport: true,
+        likesImport: true,
       },
     });
   } catch (error) {
@@ -1831,24 +1849,26 @@ router.post('/me/import/spotify/request', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/users/me/import/youtube/preview/start
-// @desc    Start async public YouTube playlist preview (poll GET /me/import/jobs/:jobId)
+// @desc    Start async YouTube likes or public playlist preview (poll GET /me/import/jobs/:jobId)
 // @access  Private
 router.post('/me/import/youtube/preview/start', authMiddleware, async (req, res) => {
   try {
+    const mode = req.body?.mode === 'likes' || req.query?.mode === 'likes' ? 'likes' : 'playlist';
     const playlistUrl = req.body?.playlistUrl || req.body?.url || req.query.playlistUrl;
     const limit = req.body?.limit ?? req.query.limit;
-    if (!playlistUrl) {
+    if (mode !== 'likes' && !playlistUrl) {
       return res.status(400).json({ error: 'playlistUrl is required' });
     }
     const libraryImportJobService = require('../services/libraryImportJobService');
     const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'youtube', {
       playlistUrl,
       limit,
+      mode,
     });
     res.status(202).json({ jobId, status: 'queued' });
   } catch (error) {
     console.error('YouTube import preview start error:', error);
-    res.status(500).json({ error: error.message || 'Failed to start YouTube playlist scan' });
+    res.status(500).json({ error: error.message || 'Failed to start YouTube scan' });
   }
 });
 

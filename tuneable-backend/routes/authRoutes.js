@@ -379,6 +379,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         console.warn('⚠️ Account linking requested but no valid user token found');
       }
     }
+    if (req.query.youtube_import === 'true') {
+      req.session.youtubeImport = true;
+    }
     
     // Generate random state parameter for CSRF protection
     const state = crypto.randomBytes(32).toString('hex');
@@ -396,15 +399,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       }
       
       console.log('✅ Session saved with OAuth state');
+
+      const youtubeImport = req.session.youtubeImport === true;
+      const scope = ['profile', 'email'];
+      if (youtubeImport) {
+        scope.push('https://www.googleapis.com/auth/youtube.readonly');
+      }
+      const googleAuth = { scope, state };
+      if (youtubeImport) {
+        googleAuth.accessType = 'offline';
+        googleAuth.prompt = 'consent';
+      }
       
-      passport.authenticate('google', { 
-        scope: [
-          'profile', 
-          'email',
-          // 'https://www.googleapis.com/auth/youtube.readonly'  // Commented out - requires Google verification. For YouTube import feature (admin only)
-        ],
-        state: state  // Pass state parameter for security
-      })(req, res, next);
+      passport.authenticate('google', googleAuth)(req, res, next);
     });
   });
 

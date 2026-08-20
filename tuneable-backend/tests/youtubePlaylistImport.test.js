@@ -78,6 +78,27 @@ describe('youtubePlaylistUtils', () => {
   });
 });
 
+describe('youtube likes import', () => {
+  const { LIKED_PLAYLIST_ID } = require('../services/youtubePlaylistService');
+  const { youtubeLikesConnected } = require('../services/googleTokenService');
+
+  it('uses YouTube\'s liked-videos playlist id', () => {
+    expect(LIKED_PLAYLIST_ID).toBe('LL');
+  });
+
+  it('requires youtube OAuth plus a Google token', () => {
+    expect(youtubeLikesConnected({
+      oauthVerified: { youtube: true },
+      googleAccessToken: 'ya29.token',
+    })).toBe(true);
+    expect(youtubeLikesConnected({
+      oauthVerified: { google: true },
+      googleAccessToken: 'ya29.token',
+    })).toBe(false);
+    expect(youtubeLikesConnected({ oauthVerified: { youtube: true } })).toBe(false);
+  });
+});
+
 describe('spotifyImportAccess', () => {
   const original = process.env.SPOTIFY_PUBLIC_IMPORT;
 

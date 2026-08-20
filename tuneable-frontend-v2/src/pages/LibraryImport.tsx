@@ -22,6 +22,7 @@ import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
 import { isAdmin } from '../utils/permissionHelpers';
 
 type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox' | 'youtube';
+type YoutubeMode = 'likes' | 'playlist';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
 type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
 type IdentityConfidence = 'verified' | 'catalog' | 'likely' | 'unverified';
@@ -105,8 +106,8 @@ const DEFAULT_SCAN_LIMIT = 50;
 const SCAN_STEP = 50;
 const MAX_SCAN_LIMIT = 200;
 
-function importAutoScanStorageKey(source: ImportSource) {
-  return `tuneable:import-autoscanned:${source}`;
+function importAutoScanStorageKey(source: ImportSource, mode?: string) {
+  return `tuneable:import-autoscanned:${source}${mode ? `:${mode}` : ''}`;
 }
 
 const STATUS_LABELS: Record<MatchStatus, string> = {
@@ -167,7 +168,7 @@ const SOURCE_META: Record<ImportSource, {
   },
   youtube: {
     label: 'YouTube',
-    likesLabel: 'YouTube playlist',
+    likesLabel: 'YouTube likes',
     accent: 'bg-red-600',
     accentHover: 'hover:bg-red-500',
     badge: 'bg-red-700',
@@ -187,9 +188,13 @@ const LibraryImport: React.FC = () => {
   const { user, refreshUser, handleOAuthCallback } = useAuth();
 
   const [source, setSource] = useState<ImportSource>(() => parseSource(searchParams.get('source')));
+  const [youtubeMode, setYoutubeMode] = useState<YoutubeMode>(
+    () => (searchParams.get('mode') === 'playlist' ? 'playlist' : 'likes')
+  );
   const [step, setStep] = useState<ImportStep>('connect');
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
+  const [youtubeConnected, setYoutubeConnected] = useState(false);
   const [limit, setLimit] = useState(DEFAULT_SCAN_LIMIT);
   const [showAdvancedLimit, setShowAdvancedLimit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -235,11 +240,15 @@ const LibraryImport: React.FC = () => {
   const meta = SOURCE_META[source];
   const isRekordbox = source === 'rekordbox';
   const isYouTube = source === 'youtube';
+  const isYouTubeLikes = isYouTube && youtubeMode === 'likes';
+  const isYouTubePlaylist = isYouTube && youtubeMode === 'playlist';
   const isConnected = source === 'spotify'
     ? spotifyConnected
     : source === 'soundcloud'
       ? soundcloudConnected
-      : true;
+      : isYouTubeLikes
+        ? youtubeConnected
+        : true;
   const oauthHandledRef = React.useRef(false);
   const autoScanStartedRef = React.useRef(false);
   const [shouldAutoScan, setShouldAutoScan] = useState(
@@ -248,23 +257,27 @@ const LibraryImport: React.FC = () => {
 
   const checkConnections = useCallback(async () => {
     try {
-      const [spotify, soundcloud] = await Promise.all([
+      const [spotify, soundcloud, youtube] = await Promise.all([
         userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
         userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
+        userAPI.getYouTubeStatus().catch(() => ({ connected: false })),
       ]);
       const next = {
         spotify: !!spotify.connected,
         soundcloud: !!soundcloud.connected,
+        youtube: !!youtube.connected,
       };
       setSpotifyConnected(next.spotify);
       setSoundcloudConnected(next.soundcloud);
+      setYoutubeConnected(next.youtube);
       setSpotifyOauthAvailable(Boolean(spotify.oauthAvailable) || next.spotify);
       setSpotifyRequest(spotify.request || null);
       return next;
     } catch {
       setSpotifyConnected(false);
       setSoundcloudConnected(false);
-      return { spotify: false, soundcloud: false };
+      setYoutubeConnected(false);
+      return { spotify: false, soundcloud: false, youtube: false };
     }
   }, []);
 
@@ -316,6 +329,8 @@ const LibraryImport: React.FC = () => {
   useEffect(() => {
     const fromQuery = parseSource(searchParams.get('source'));
     if (fromQuery !== source) setSource(fromQuery);
+    const modeFromQuery = searchParams.get('mode') === 'playlist' ? 'playlist' : 'likes';
+    if (fromQuery === 'youtube' && modeFromQuery !== youtubeMode) setYoutubeMode(modeFromQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync URL → state only
   }, [searchParams]);
 
@@ -362,6 +377,8 @@ const LibraryImport: React.FC = () => {
     if (next !== 'rekordbox') resetRekordboxState();
     const params = new URLSearchParams(searchParams);
     params.set('source', next);
+    if (next === 'youtube') params.set('mode', youtubeMode);
+    else params.delete('mode');
     setSearchParams(params, { replace: true });
   };
 
@@ -373,16 +390,38 @@ const LibraryImport: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, adminUser, user]);
 
+  const selectYoutubeMode = (next: YoutubeMode) => {
+    setYoutubeMode(next);
+    setStep('connect');
+    resetScanState();
+    const params = new URLSearchParams(searchParams);
+    params.set('source', 'youtube');
+    params.set('mode', next);
+    setSearchParams(params, { replace: true });
+  };
+
   const connectSource = () => {
-    if (source === 'rekordbox' || source === 'youtube') return;
+    if (source === 'rekordbox' || isYouTubePlaylist) return;
     try {
-      sessionStorage.removeItem(importAutoScanStorageKey(source));
+      sessionStorage.removeItem(importAutoScanStorageKey(source, isYouTubeLikes ? 'likes' : undefined));
     } catch {
       // ignore
     }
     const token = localStorage.getItem('token') || undefined;
-    const returnPath = `/import?source=${source}&autoScan=1`;
+    const returnPath = isYouTubeLikes
+      ? `/import?source=youtube&mode=likes&autoScan=1`
+      : `/import?source=${source}&autoScan=1`;
     const redirect = `${window.location.origin}/auth/callback?oauth_success=true&returnUrl=${encodeURIComponent(returnPath)}`;
+
+    if (isYouTubeLikes) {
+      window.location.href = buildOAuthStartUrl('google', {
+        linkAccount: true,
+        token,
+        customRedirect: redirect,
+        youtubeImport: true,
+      });
+      return;
+    }
 
     if (source === 'soundcloud') {
       window.location.href = buildOAuthStartUrl('soundcloud', {
@@ -475,6 +514,48 @@ const LibraryImport: React.FC = () => {
     }
 
     if (source === 'youtube') {
+      if (youtubeMode === 'likes') {
+        if (!youtubeConnected) {
+          connectSource();
+          return;
+        }
+        setIsLoading(true);
+        setProgressMessage('Starting YouTube likes scan…');
+        setProgressCurrent(0);
+        setProgressTotal(0);
+        try {
+          const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
+          setLimit(capped);
+          const started = await userAPI.startYouTubeImportPreview(undefined, capped, 'likes');
+          const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress, {
+            timeoutMs: 20 * 60 * 1000,
+          });
+          setItems(data.items || []);
+          setSummary(data.summary || null);
+          setTipAmounts({});
+          setTipMode('fixed');
+          setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+          setStep('summary');
+        } catch (error: any) {
+          const message = error?.response?.data?.error || error?.message || 'Failed to scan YouTube likes';
+          const needsReauth =
+            error?.response?.data?.code === 'PROVIDER_REAUTH_REQUIRED' ||
+            /reconnect|Connect YouTube/i.test(message);
+          toast.error(message);
+          if (needsReauth) {
+            setYoutubeConnected(false);
+            toast.info('Reconnect YouTube to continue');
+            setTimeout(() => connectSource(), 400);
+          }
+        } finally {
+          setIsLoading(false);
+          setProgressMessage(null);
+          setProgressCurrent(0);
+          setProgressTotal(0);
+        }
+        return;
+      }
+
       const playlistUrl = youtubePlaylistUrl.trim();
       if (!playlistUrl) {
         toast.error('Paste a public YouTube playlist URL');
@@ -487,7 +568,7 @@ const LibraryImport: React.FC = () => {
       try {
         const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
         setLimit(capped);
-        const started = await userAPI.startYouTubeImportPreview(playlistUrl, capped);
+        const started = await userAPI.startYouTubeImportPreview(playlistUrl, capped, 'playlist');
         const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress, {
           timeoutMs: 20 * 60 * 1000,
         });
@@ -551,11 +632,11 @@ const LibraryImport: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox || isYouTube) return;
+    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox || isYouTubePlaylist) return;
     if (autoScanStartedRef.current || isLoading) return;
     try {
-      if (sessionStorage.getItem(importAutoScanStorageKey(source))) return;
-      sessionStorage.setItem(importAutoScanStorageKey(source), '1');
+      if (sessionStorage.getItem(importAutoScanStorageKey(source, isYouTubeLikes ? 'likes' : undefined))) return;
+      sessionStorage.setItem(importAutoScanStorageKey(source, isYouTubeLikes ? 'likes' : undefined), '1');
     } catch {
       // Private mode — fall through with the in-memory ref only
     }
@@ -571,7 +652,7 @@ const LibraryImport: React.FC = () => {
     void scanLikes(DEFAULT_SCAN_LIMIT);
     // scanLikes is recreated each render; autoScanStartedRef prevents a loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldAutoScan, isConnected, step, isRekordbox, isLoading, source]);
+  }, [shouldAutoScan, isConnected, step, isRekordbox, isYouTubePlaylist, isLoading, source]);
 
   const runExecuteJob = async (payload: Array<Record<string, unknown>>, tip: number) => {
     setIsExecuting(true);
@@ -1015,7 +1096,7 @@ const LibraryImport: React.FC = () => {
             {isRekordbox
               ? 'Admin: upload a Rekordbox XML export, pick playlists, then tip catalog entries into your library. Audio is not uploaded.'
               : isYouTube
-                ? 'Paste a public YouTube playlist. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm.'
+                ? 'Scan liked videos after connecting YouTube, or paste a public playlist. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm.'
               : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
           </p>
           <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">{stepLabel}</p>
@@ -1047,7 +1128,7 @@ const LibraryImport: React.FC = () => {
                         <div className="font-semibold">{sMeta.label}</div>
                         <div className="text-xs text-gray-400">
                           {s === 'youtube'
-                            ? 'Public playlist'
+                            ? youtubeConnected ? 'Likes connected' : 'Likes or public playlist'
                             : connected ? 'Connected' : 'Not connected'}
                         </div>
                       </div>
@@ -1084,13 +1165,19 @@ const LibraryImport: React.FC = () => {
                   <Music className="w-7 h-7" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">{meta.likesLabel}</h2>
+                  <h2 className="text-xl font-semibold">
+                    {isYouTubePlaylist ? 'YouTube playlist' : meta.likesLabel}
+                  </h2>
                   <p className="text-gray-400 text-sm">
                     {isRekordbox
                       ? 'Catalog-only: title, artist, BPM, key, duration, and cover art from local files. No MP3s uploaded.'
-                      : isYouTube
+                      : isYouTubePlaylist
                         ? 'Paste a public playlist URL. We match tracks against MusicBrainz and skip unreliable channels.'
-                      : isConnected
+                      : isYouTubeLikes
+                        ? youtubeConnected
+                          ? 'We\'ll match liked videos against MusicBrainz and skip unreliable channels'
+                          : 'Connect YouTube to scan your liked videos'
+                        : isConnected
                         ? 'We\'ll match against the Tuneable catalog and skip mixes/sets'
                         : `Connect ${meta.label} to scan your likes`}
                   </p>
@@ -1216,30 +1303,79 @@ const LibraryImport: React.FC = () => {
                 </div>
               ) : isYouTube ? (
                 <div className="space-y-3">
-                  <label className="text-sm text-gray-400 block">
-                    Public playlist URL
-                    <input
-                      type="url"
-                      value={youtubePlaylistUrl}
-                      onChange={(e) => setYoutubePlaylistUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/playlist?list=…"
-                      className="mt-1 w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
-                    disabled={isLoading || !youtubePlaylistUrl.trim()}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
-                  >
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                    {isLoading ? 'Matching…' : 'Scan playlist'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => selectYoutubeMode('likes')}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                        youtubeMode === 'likes'
+                          ? 'border-red-500 bg-gray-900 text-white'
+                          : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                      }`}
+                    >
+                      Liked videos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectYoutubeMode('playlist')}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                        youtubeMode === 'playlist'
+                          ? 'border-red-500 bg-gray-900 text-white'
+                          : 'border-gray-700 text-gray-400 hover:border-gray-500'
+                      }`}
+                    >
+                      Public playlist
+                    </button>
+                  </div>
+                  {youtubeMode === 'playlist' ? (
+                    <>
+                      <label className="text-sm text-gray-400 block">
+                        Public playlist URL
+                        <input
+                          type="url"
+                          value={youtubePlaylistUrl}
+                          onChange={(e) => setYoutubePlaylistUrl(e.target.value)}
+                          placeholder="https://www.youtube.com/playlist?list=…"
+                          className="mt-1 w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
+                        disabled={isLoading || !youtubePlaylistUrl.trim()}
+                        className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                      >
+                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                        {isLoading ? 'Matching…' : 'Scan playlist'}
+                      </button>
+                    </>
+                  ) : youtubeConnected ? (
+                    <button
+                      type="button"
+                      onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
+                      disabled={isLoading}
+                      className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                    >
+                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                      {isLoading ? 'Matching…' : 'Scan liked videos'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={connectSource}
+                      disabled={isLoading}
+                      className="w-full py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                    >
+                      Connect YouTube
+                    </button>
+                  )}
                   {isLoading && progressMessage ? (
                     <p className="text-xs text-gray-400">{progressMessage}</p>
                   ) : (
                     <p className="text-xs text-gray-500 text-center">
-                      Confident MusicBrainz matches are ready to import. Weaker matches go to review. Junk/lyric channels are skipped.
+                      {youtubeMode === 'likes'
+                        ? 'Liked videos are private, so this needs a YouTube connect. Confident MusicBrainz matches are ready to import.'
+                        : 'Confident MusicBrainz matches are ready to import. Weaker matches go to review. Junk/lyric channels are skipped.'}
                     </p>
                   )}
                 </div>
@@ -1650,7 +1786,7 @@ const LibraryImport: React.FC = () => {
 
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <div className="flex flex-wrap items-center gap-3">
-                {!isRekordbox && !isYouTube && limit < MAX_SCAN_LIMIT ? (
+                {!isRekordbox && !isYouTubePlaylist && limit < MAX_SCAN_LIMIT ? (
                   <button
                     type="button"
                     onClick={() => void scanLikes(Math.min(MAX_SCAN_LIMIT, limit + SCAN_STEP))}
@@ -1682,7 +1818,7 @@ const LibraryImport: React.FC = () => {
             {showAdvancedLimit && !isRekordbox && (
               <div className="bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-wrap items-end gap-3">
                 <label className="text-sm text-gray-400">
-                  {isYouTube ? 'Tracks to scan' : 'Likes to scan'} (max {MAX_SCAN_LIMIT})
+                  {isYouTubePlaylist ? 'Tracks to scan' : 'Likes to scan'} (max {MAX_SCAN_LIMIT})
                   <input
                     type="number"
                     min={1}

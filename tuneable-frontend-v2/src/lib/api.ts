@@ -1572,6 +1572,11 @@ export const userAPI = {
     return response.data as { connected: boolean };
   },
 
+  getYouTubeStatus: async () => {
+    const response = await api.get('/users/me/youtube-status');
+    return response.data as { connected: boolean };
+  },
+
   previewSoundCloudImport: async (limit = 50, crossRefMode: 'spotify_only' | 'full' | 'none' = 'spotify_only') => {
     const response = await api.get('/users/me/import/soundcloud/preview', {
       params: { limit, crossRefMode },
@@ -1670,8 +1675,12 @@ export const userAPI = {
     };
   },
 
-  startYouTubeImportPreview: async (playlistUrl: string, limit = 50) => {
-    const response = await api.post('/users/me/import/youtube/preview/start', { playlistUrl, limit });
+  startYouTubeImportPreview: async (playlistUrl: string | undefined, limit = 50, mode: 'playlist' | 'likes' = 'playlist') => {
+    const response = await api.post('/users/me/import/youtube/preview/start', {
+      playlistUrl,
+      limit,
+      mode,
+    });
     return response.data as { jobId: string; status: string };
   },
 
