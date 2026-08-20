@@ -27,6 +27,7 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import {
+  episodeCoverArt,
   episodeId,
   getEpisodeDisplayTags,
   isEpisodePlayable,
@@ -415,7 +416,19 @@ export default function PodcastEpisodeProfileScreen() {
             </Pressable>
 
             <Text style={styles.title}>{media.title || 'Untitled episode'}</Text>
-            <Text style={styles.series}>{seriesName}</Text>
+            {seriesIdFromMedia(media) ? (
+              <Pressable
+                onPress={() => {
+                  const sid = seriesIdFromMedia(media);
+                  if (sid) router.push(`/show/${sid}`);
+                }}
+                accessibilityRole="link"
+                accessibilityLabel={`Open show ${seriesName}`}>
+                <Text style={styles.series}>{seriesName}</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.series}>{seriesName}</Text>
+            )}
 
             {heroMetadata.length > 0 ? (
               <Text style={styles.metaLine}>{heroMetadata.join(' · ')}</Text>
@@ -429,7 +442,7 @@ export default function PodcastEpisodeProfileScreen() {
                       <Pressable
                         key={`tag-${ranking.tag}-${ranking.rank}`}
                         onPress={() =>
-                          router.push(getTagProfileHref(ranking.tag) as Href)
+                          router.push(getTagProfileHref(ranking.tag, 'podcast') as Href)
                         }
                         style={styles.tagRankChip}>
                         <Ionicons name="pricetag" size={12} color="#c084fc" />
@@ -476,7 +489,7 @@ export default function PodcastEpisodeProfileScreen() {
                 {fallbackTags.map((tag) => (
                   <Pressable
                     key={tag}
-                    onPress={() => router.push(getTagProfileHref(tag) as Href)}
+                    onPress={() => router.push(getTagProfileHref(tag, 'podcast') as Href)}
                     style={styles.tag}>
                     <Text style={styles.tagText}>#{tag}</Text>
                   </Pressable>
@@ -560,10 +573,12 @@ export default function PodcastEpisodeProfileScreen() {
                         }}>
                         <Image
                           source={{
-                            uri:
-                              item.coverArt ||
-                              item.podcastSeries?.coverArt ||
-                              DEFAULT_PODCAST_COVER,
+                            uri: episodeCoverArt(
+                              item,
+                              typeof media.podcastSeries === 'object'
+                                ? media.podcastSeries?.coverArt
+                                : undefined
+                            ),
                           }}
                           style={styles.relatedCover}
                         />

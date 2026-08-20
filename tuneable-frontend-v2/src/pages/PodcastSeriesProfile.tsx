@@ -83,6 +83,10 @@ interface SeriesStats {
   };
 }
 
+function isHttpCover(url?: string | null): url is string {
+  return typeof url === 'string' && /^https?:\/\//i.test(url.trim());
+}
+
 const PodcastSeriesProfile: React.FC = () => {
   const { seriesId } = useParams<{ seriesId: string }>();
   const navigate = useNavigate();
@@ -103,7 +107,7 @@ const PodcastSeriesProfile: React.FC = () => {
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'mostTipped' | 'duration'>('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'mostTipped' | 'duration'>('mostTipped');
   const [currentPage, setCurrentPage] = useState(1);
   const episodesPerPage = 20;
   
@@ -570,7 +574,7 @@ const PodcastSeriesProfile: React.FC = () => {
       _id: episode._id,
       title: episode.title,
       duration: episode.duration,
-      coverArt: episode.coverArt || series?.coverArt,
+      coverArt: isHttpCover(episode.coverArt) ? episode.coverArt : series?.coverArt,
       podcastSeries: series ? { _id: series._id, title: series.title, coverArt: series.coverArt } : undefined,
       sources: episode.sources,
       audioUrl: episode.audioUrl,
@@ -1018,9 +1022,9 @@ const PodcastSeriesProfile: React.FC = () => {
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
               >
+                <option value="mostTipped">Most Tipped</option>
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
-                <option value="mostTipped">Most Tipped</option>
                 <option value="duration">Longest</option>
               </select>
               
@@ -1159,7 +1163,10 @@ const PodcastSeriesProfile: React.FC = () => {
                     <div className="relative flex-shrink-0 cursor-pointer group">
                       <Link to={`/podcasts/${episode._id}`} className="block">
                         <img
-                          src={episode.coverArt || series?.coverArt || DEFAULT_COVER_ART}
+                          src={
+                            (isHttpCover(episode.coverArt) ? episode.coverArt : series?.coverArt) ||
+                            DEFAULT_COVER_ART
+                          }
                           alt={episode.title}
                           className="w-24 h-24 sm:w-32 sm:h-32 rounded-lg object-cover"
                         />

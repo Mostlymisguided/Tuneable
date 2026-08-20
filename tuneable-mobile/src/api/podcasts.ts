@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  CreateOrFindSeriesResponse,
   ImportSingleEpisodeResponse,
   PodcastCatalogSource,
   PodcastChartResponse,
@@ -34,16 +35,43 @@ export const podcastsAPI = {
   /** Series + episodes. Prefer autoImport=false for profile rails. */
   getSeries: async (
     seriesId: string,
-    params?: { autoImport?: boolean; limit?: number }
+    params?: {
+      autoImport?: boolean;
+      limit?: number;
+      offset?: number;
+      sortBy?: string;
+    }
   ): Promise<PodcastSeriesResponse> => {
+    const autoImport = params?.autoImport === true;
     const response = await api.get<PodcastSeriesResponse>(
       `/podcasts/series/${seriesId}`,
       {
         params: {
-          autoImport: params?.autoImport === true ? 'true' : 'false',
+          autoImport: autoImport ? 'true' : 'false',
           limit: params?.limit ?? 12,
+          offset: params?.offset ?? 0,
+          sortBy: params?.sortBy ?? 'mostTipped',
         },
+        timeout: autoImport ? 90000 : undefined,
       }
+    );
+    return response.data;
+  },
+
+  getSeriesInfo: async (seriesId: string): Promise<PodcastSeriesResponse> => {
+    const response = await api.get<PodcastSeriesResponse>(
+      `/podcasts/series/${seriesId}/info`
+    );
+    return response.data;
+  },
+
+  createOrFindSeries: async (
+    seriesData: Record<string, unknown>
+  ): Promise<CreateOrFindSeriesResponse> => {
+    const response = await api.post<CreateOrFindSeriesResponse>(
+      '/podcasts/discovery/create-or-find-series',
+      { seriesData },
+      { timeout: 60000 }
     );
     return response.data;
   },

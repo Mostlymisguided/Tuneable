@@ -4,6 +4,7 @@
  */
 
 const Media = require('../models/Media');
+const { normalizeCoverArtUrl } = require('../utils/podcastCoverArt');
 
 class PodcastAdapter {
   /**
@@ -212,7 +213,10 @@ class PodcastAdapter {
       description: taddyEpisode.description || '',
       
       // Visual
-      coverArt: taddyEpisode.podcastSeries?.imageUrl || null,
+      coverArt:
+        normalizeCoverArtUrl(taddyEpisode.podcastSeries?.imageUrl) ||
+        normalizeCoverArtUrl(seriesData?.image || seriesData?.coverArt) ||
+        null,
       
       // Categorization
       genres: genres,
@@ -310,7 +314,10 @@ class PodcastAdapter {
       description: piEpisode.description || '',
       
       // Visual
-      coverArt: piEpisode.feedImage || piEpisode.image || null,
+      coverArt:
+        normalizeCoverArtUrl(piEpisode.image || piEpisode.feedImage) ||
+        normalizeCoverArtUrl(seriesData?.image || seriesData?.coverArt) ||
+        null,
       
       // Categorization
       genres: genres,
@@ -366,8 +373,11 @@ class PodcastAdapter {
       explicit: rssItem.explicit === 'yes' || rssItem.explicit === true,
       description: rssItem.contentSnippet || rssItem.content || '',
       
-      // Visual
-      coverArt: rssItem.image?.url || rssItem.itunes?.image || null,
+      // Visual — prefer episode art, then series art, and never persist "[object Object]"
+      coverArt:
+        normalizeCoverArtUrl(rssItem.image?.url || rssItem.image || rssItem.itunes?.image) ||
+        normalizeCoverArtUrl(seriesData?.image || seriesData?.coverArt) ||
+        null,
       
       // Categorization
       genres: genres,
@@ -422,7 +432,10 @@ class PodcastAdapter {
       description: appleEpisode.description || '',
       
       // Visual
-      coverArt: appleEpisode.artworkUrl600 || appleEpisode.artworkUrl100 || null,
+      coverArt:
+        normalizeCoverArtUrl(appleEpisode.artworkUrl600 || appleEpisode.artworkUrl100) ||
+        normalizeCoverArtUrl(seriesData?.image || seriesData?.coverArt) ||
+        null,
       
       // Categorization
       genres: genres,

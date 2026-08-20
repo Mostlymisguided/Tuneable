@@ -17,6 +17,11 @@ const podcastAdapter = require('../services/podcastAdapter');
 const spotifyService = require('../services/spotifyService');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
+const {
+  extractRssItemImage,
+  getSeriesEpisodeSort,
+  withSeriesCoverArt,
+} = require('../utils/podcastCoverArt');
 
 const router = express.Router();
 
@@ -99,13 +104,14 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
     
     const episodes = items.slice(0, maxEpisodes).map(item => {
       const enclosure = item.enclosure || {};
-      const itunes = item['itunes:episode'] ? {
+      const episodeImage = extractRssItemImage(item);
+      const itunes = {
         episode: item['itunes:episode'],
         season: item['itunes:season'],
         duration: item['itunes:duration'],
-        image: item['itunes:image']?.href || item['itunes:image'],
+        image: episodeImage,
         explicit: item['itunes:explicit']
-      } : {};
+      };
       
       // Parse pubDate
       let pubDate = null;
@@ -130,11 +136,11 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
           type: enclosure.type || enclosure.$.type || 'audio/mpeg',
           length: enclosure.length || enclosure.$.length || null
         },
-        image: item.image || (itunes.image ? { url: itunes.image } : null),
+        image: episodeImage ? { url: episodeImage } : null,
         itunes: itunes,
         categories: item.category ? (Array.isArray(item.category) ? item.category : [item.category]) : [],
-        episodeNumber: itunes.episode ? parseInt(itunes.episode) : null,
-        seasonNumber: itunes.season ? parseInt(itunes.season) : null,
+        episodeNumber: itunes.episode ? parseInt(itunes.episode, 10) : null,
+        seasonNumber: itunes.season ? parseInt(itunes.season, 10) : null,
         duration: parseDuration(itunes.duration) || 0,
         explicit: itunes.explicit === 'yes' || itunes.explicit === true,
         feedUrl: rssUrl
@@ -2397,7 +2403,8 @@ router.get('/series/:seriesId/info', async (req, res) => {
         typeof v === 'string' && (v.includes('http') || v.includes('rss'))
       );
       
-      if (rssUrl && typeof rssUrl === 'string') {
+      // /info is the fast header path — only hit RSS when explicitly refreshing.
+      if (rssUrl && typeof rssUrl === 'string' && req.query.refresh === 'true') {
         console.log(`📡 Fetching RSS feed metadata for series: ${series.title}`);
         const rssResult = await parseRSSFeed(rssUrl, 1); // Only need 1 episode to get channel metadata
         const rssChannel = rssResult.channel;
@@ -2572,11 +2579,98 @@ router.get('/series/:seriesId/import-progress', async (req, res) => {
   }
 });
 
+const SERIES_EPISODE_MATCH = (seriesId) => ({
+  podcastSeries: seriesId,
+  contentType: { $in: ['spoken'] },
+  contentForm: { $in: ['podcastepisode'] }
+});
+
+async function fetchSeriesEpisodePage({
+  seriesId,
+  sortBy,
+  applyLimit,
+  limit,
+  offset,
+  slim,
+}) {
+  let query = Media.find(SERIES_EPISODE_MATCH(seriesId))
+    .sort(getSeriesEpisodeSort(sortBy))
+    .populate('podcastSeries', 'title coverArt genres tags')
+    .select(
+      slim
+        ? '_id uuid title coverArt duration globalMediaAggregate releaseDate episodeNumber seasonNumber tags genres category sources podcastSeries host explicit createdAt'
+        : '-transcript -editHistory -ownershipHistory -relationships'
+    )
+    .lean();
+  if (applyLimit) {
+    query = query.skip(offset).limit(limit);
+  }
+  return query;
+}
+
+async function computeSeriesEpisodeStats(seriesId) {
+  const statsResult = await Media.aggregate([
+    { $match: {
+      podcastSeries: new mongoose.Types.ObjectId(seriesId),
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] }
+    } },
+    { $group: {
+      _id: null,
+      totalTips: { $sum: { $ifNull: ['$globalMediaAggregate', 0] } },
+      episodeCount: { $sum: 1 },
+      episodesWithTips: {
+        $sum: { $cond: [{ $gt: [{ $ifNull: ['$globalMediaAggregate', 0] }, 0] }, 1, 0] }
+      }
+    } }
+  ]);
+  const stats = statsResult[0] || { totalTips: 0, episodeCount: 0, episodesWithTips: 0 };
+  const avgTip = stats.episodesWithTips > 0 ? stats.totalTips / stats.episodesWithTips : 0;
+  const topEpisode = await Media.findOne(SERIES_EPISODE_MATCH(seriesId))
+    .sort({ globalMediaAggregate: -1 })
+    .select('_id title globalMediaAggregate')
+    .lean();
+  return {
+    totalEpisodes: stats.episodeCount,
+    totalTips: stats.totalTips,
+    avgTip,
+    topEpisode: topEpisode
+      ? {
+          _id: topEpisode._id,
+          title: topEpisode.title,
+          globalMediaAggregate: topEpisode.globalMediaAggregate || 0
+        }
+      : null
+  };
+}
+
+function serializeSeriesEpisodes(episodes, seriesCoverArt) {
+  return episodes.map((ep) => {
+    const episode = withSeriesCoverArt({ ...ep }, seriesCoverArt);
+    if (episode.sources instanceof Map) {
+      episode.sources = Object.fromEntries(episode.sources);
+    }
+    if (episode.releaseDate && episode.releaseDate instanceof Date) {
+      episode.releaseDate = episode.releaseDate.toISOString();
+    } else if (episode.releaseDate && typeof episode.releaseDate === 'object' && episode.releaseDate.$date) {
+      episode.releaseDate = new Date(episode.releaseDate.$date).toISOString();
+    } else if (!episode.releaseDate && episode.createdAt) {
+      episode.releaseDate = episode.createdAt;
+    }
+    return episode;
+  });
+}
+
 // Get podcast series with episodes
 router.get('/series/:seriesId', async (req, res) => {
   try {
     const { seriesId } = req.params;
-    const { autoImport = 'true', refresh = 'false', loadMore = 'false', limit = '20', offset = '0' } = req.query;
+    const { autoImport = 'true', refresh = 'false', loadMore = 'false', offset = '0' } = req.query;
+    const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : 'mostTipped';
+    // Only paginate when the client sends `limit`. Web still loads the full catalog.
+    const applyLimit = Object.prototype.hasOwnProperty.call(req.query, 'limit');
+    const requestedLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+    const episodeOffset = Math.max(parseInt(offset, 10) || 0, 0);
     
     if (!isValidObjectId(seriesId)) {
       return res.status(400).json({ error: 'Invalid series ID' });
@@ -2595,38 +2689,20 @@ router.get('/series/:seriesId', async (req, res) => {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
 
-    // Get existing episodes first
-    let episodes = await Media.find({
-      podcastSeries: seriesId,
-      contentType: { $in: ['spoken'] },
-      contentForm: { $in: ['podcastepisode'] }
-    })
-      .sort({ releaseDate: -1 }) // Sort by newest first
-      .populate('host.userId', 'username profilePic uuid')
-      .populate('addedBy', 'username')
-      .populate('podcastSeries', 'title coverArt')
-      .lean();
-
-    // Check if we have enough episodes already
-    const existingEpisodeCount = episodes.length;
-    const requestedLimit = parseInt(limit, 10) || 20;
-    const hasEnoughEpisodes = existingEpisodeCount >= requestedLimit;
+    const existingEpisodeCount = await Media.countDocuments(SERIES_EPISODE_MATCH(seriesId));
 
     // Auto-import episodes from external source if series has external IDs
     let importedCount = 0;
     let importErrors = [];
-    const maxEpisodesToImport = parseInt(limit, 10) || 10; // Import episodes (default 10 for initial load)
-    const episodeOffset = parseInt(offset, 10) || 0; // Offset for pagination
+    const maxEpisodesToImport = applyLimit ? requestedLimit : 20;
     const shouldImport = autoImport === 'true' || loadMore === 'true';
     
-    // Only import if:
-    // 1. User explicitly requested more (loadMore === 'true')
-    // 2. OR refresh is requested
-    // 3. OR we don't have enough episodes AND autoImport is enabled
+    // Don't block the show page on RSS/API import when episodes already exist.
+    // Import only for an empty catalog, an explicit refresh, or "load more".
     const needsImport = shouldImport && (
       loadMore === 'true' || 
       refresh === 'true' || 
-      !hasEnoughEpisodes
+      existingEpisodeCount === 0
     );
     
     let taddyResult = null; // Declare outside if block for use in response
@@ -3608,50 +3684,30 @@ router.get('/series/:seriesId', async (req, res) => {
         // Don't fail the request, just log the error
       }
       
-      // Re-fetch episodes after import to get newly imported ones
-      if (importedCount > 0 || refresh === 'true') {
-        episodes = await Media.find({
-          podcastSeries: seriesId,
-          contentType: { $in: ['spoken'] },
-          contentForm: { $in: ['podcastepisode'] }
-        })
-          .sort({ releaseDate: -1 })
-          .populate('host.userId', 'username profilePic uuid')
-          .populate('addedBy', 'username')
-          .populate('podcastSeries', 'title coverArt')
-          .lean();
-      }
       } // Close if (taddyUuid || podcastIndexId || iTunesId)
     } else if (existingEpisodeCount > 0) {
-      // Episodes exist and we have enough, skip import
       console.log(`✅ Using ${existingEpisodeCount} existing episodes (skipping import)`);
     } // Close if (needsImport && series.externalIds)
 
-    // Convert series to plain object for response
     const seriesObj = series.toObject ? series.toObject() : series;
+    const seriesCoverArt = seriesObj.coverArt || null;
 
-    // Calculate stats (avg tip = total tips / episodes that received tips, not all episodes)
-    const totalEpisodes = episodes.length;
-    const totalTips = episodes.reduce((sum, ep) => sum + (ep.globalMediaAggregate || 0), 0);
-    const episodesWithTips = episodes.filter(ep => (ep.globalMediaAggregate || 0) > 0).length;
-    const avgTip = episodesWithTips > 0 ? totalTips / episodesWithTips : 0;
-    const topEpisode = episodes.length > 0 ? 
-      episodes.reduce((top, ep) => 
-        (ep.globalMediaAggregate || 0) > (top.globalMediaAggregate || 0) ? ep : top
-      ) : null;
+    const [episodes, stats] = await Promise.all([
+      fetchSeriesEpisodePage({
+        seriesId,
+        sortBy,
+        applyLimit,
+        limit: requestedLimit,
+        offset: episodeOffset,
+        slim: applyLimit,
+      }),
+      computeSeriesEpisodeStats(seriesId),
+    ]);
 
-    // Ensure releaseDate is properly serialized for frontend
-    const serializedEpisodes = episodes.map(ep => {
-      const episode = { ...ep };
-      // Convert releaseDate to ISO string if it's a Date object
-      if (episode.releaseDate && episode.releaseDate instanceof Date) {
-        episode.releaseDate = episode.releaseDate.toISOString();
-      } else if (episode.releaseDate && typeof episode.releaseDate === 'object' && episode.releaseDate.$date) {
-        // Handle MongoDB date format
-        episode.releaseDate = new Date(episode.releaseDate.$date).toISOString();
-      }
-      return episode;
-    });
+    const serializedEpisodes = serializeSeriesEpisodes(episodes, seriesCoverArt);
+    const hasMore = applyLimit
+      ? episodeOffset + serializedEpisodes.length < stats.totalEpisodes
+      : false;
 
     // Clean up progress after a delay (to allow final poll)
     setTimeout(() => {
@@ -3661,16 +3717,11 @@ router.get('/series/:seriesId', async (req, res) => {
     res.json({
       series: seriesObj,
       episodes: serializedEpisodes,
-      stats: {
-        totalEpisodes,
-        totalTips,
-        avgTip,
-        topEpisode: topEpisode ? {
-          _id: topEpisode._id,
-          title: topEpisode.title,
-          globalMediaAggregate: topEpisode.globalMediaAggregate || 0
-        } : null
-      },
+      stats,
+      sortBy,
+      offset: episodeOffset,
+      limit: applyLimit ? requestedLimit : serializedEpisodes.length,
+      hasMore,
       importInfo: importedCount > 0 ? {
         imported: importedCount,
         errors: importErrors.length,

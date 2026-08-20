@@ -4,6 +4,11 @@ export interface PodcastSeriesRef {
   coverArt?: string;
   genres?: string[];
   tags?: string[];
+  description?: string | null;
+  host?: Array<{ name?: string }>;
+  author?: Array<{ name?: string }>;
+  language?: string;
+  explicit?: boolean;
 }
 
 export interface PodcastEpisodeBid {
@@ -84,9 +89,34 @@ export interface PodcastChartResponse {
   };
 }
 
+export interface PodcastSeriesStats {
+  totalEpisodes?: number;
+  totalTips?: number;
+  avgTip?: number;
+}
+
+export const PODCAST_SHOW_SORT_OPTIONS = [
+  { key: 'mostTipped', label: 'Most tipped' },
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'duration', label: 'Longest' },
+] as const;
+
+export type PodcastShowSortKey = (typeof PODCAST_SHOW_SORT_OPTIONS)[number]['key'];
+
 export interface PodcastSeriesResponse {
   series?: PodcastSeriesRef & { _id?: string; title?: string };
   episodes?: PodcastEpisode[];
+  stats?: PodcastSeriesStats;
+  sortBy?: PodcastShowSortKey | string;
+  offset?: number;
+  limit?: number;
+  hasMore?: boolean;
+}
+
+export interface CreateOrFindSeriesResponse {
+  success?: boolean;
+  series: PodcastSeriesRef & { _id: string; title?: string };
 }
 
 export const PODCAST_CHART_PAGE_SIZE = 20;

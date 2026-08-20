@@ -3,7 +3,10 @@ import { normalizeSources } from '@/src/lib/media';
 import { getCanonicalTag } from '@/src/lib/tagNormalizer';
 import type { TopTagEntry } from '@/src/lib/chartFilters';
 import { getSelectedTagFilters } from '@/src/lib/chartFilters';
-import type { PodcastEpisode } from '@/src/types/podcast';
+import {
+  DEFAULT_PODCAST_COVER,
+  type PodcastEpisode,
+} from '@/src/types/podcast';
 
 export function episodeId(episode: PodcastEpisode): string {
   return episode.id || episode._id || episode.uuid || '';
@@ -15,6 +18,15 @@ export function seriesTitle(episode: PodcastEpisode): string {
     episode.podcastTitle ||
     'Podcast'
   );
+}
+
+export function seriesId(episode: PodcastEpisode): string {
+  return episode.podcastSeries?._id || '';
+}
+
+export function stripHtml(html?: string | null): string {
+  if (!html) return '';
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Map a media profile payload into a PodcastEpisode for the player / rails. */
@@ -198,4 +210,25 @@ export function isEpisodePlayable(
   episode: PodcastEpisode | null | undefined
 ): boolean {
   return Boolean(getEpisodeAudioUrl(episode));
+}
+
+function isHttpUrl(value?: string | null): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+}
+
+/** Episode art, then series art, then the Tuneable default cover. */
+export function episodeCoverArt(
+  episode: PodcastEpisode | null | undefined,
+  fallback?: string | null
+): string {
+  const candidates = [
+    episode?.coverArt,
+    episode?.podcastSeries?.coverArt,
+    episode?.podcastImage,
+    fallback,
+  ];
+  for (const value of candidates) {
+    if (isHttpUrl(value)) return value.trim();
+  }
+  return DEFAULT_PODCAST_COVER;
 }

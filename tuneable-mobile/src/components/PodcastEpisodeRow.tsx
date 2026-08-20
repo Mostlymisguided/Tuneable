@@ -7,16 +7,15 @@ import {
 } from '@/src/components/MiniSupportersBar';
 import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
-import {
-  DEFAULT_PODCAST_COVER,
-  type PodcastEpisode,
-} from '@/src/types/podcast';
+import type { PodcastEpisode } from '@/src/types/podcast';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import {
+  episodeCoverArt,
   getEpisodeDisplayTags,
   isEpisodePlayable,
   seriesTitle,
 } from '@/src/lib/podcast';
+import { tagsMatch } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
 
@@ -24,6 +23,8 @@ type Props = {
   rank: number;
   episode: PodcastEpisode;
   tipPence?: number;
+  fallbackCoverArt?: string | null;
+  hideTag?: string;
   onPlay: () => void;
   onTip: () => void;
   onOpenProfile?: () => void;
@@ -33,6 +34,8 @@ export function PodcastEpisodeRow({
   rank,
   episode,
   tipPence,
+  fallbackCoverArt,
+  hideTag,
   onPlay,
   onTip,
   onOpenProfile,
@@ -41,16 +44,15 @@ export function PodcastEpisodeRow({
   const playable = isEpisodePlayable(episode);
   const displayTip = tipPence ?? episode.globalMediaAggregate ?? 0;
   const durationLabel = formatDuration(episode.duration);
-  const allTags = getEpisodeDisplayTags(episode);
+  const allTags = getEpisodeDisplayTags(episode).filter(
+    (tag) => !hideTag || !tagsMatch(tag, hideTag)
+  );
   const supporterCount = countSupporters(episode.bids);
   const hasFooter = allTags.length > 0 || supporterCount > 0;
   const hiddenTagCount = Math.max(0, allTags.length - COLLAPSED_TAG_COUNT);
   const canExpandFooter =
     allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 0;
-  const cover =
-    episode.coverArt ||
-    episode.podcastSeries?.coverArt ||
-    DEFAULT_PODCAST_COVER;
+  const cover = episodeCoverArt(episode, fallbackCoverArt);
   const collapsedTags = allTags.slice(0, COLLAPSED_TAG_COUNT);
   const toggleFooter = () => setFooterExpanded((open) => !open);
   const openProfile = onOpenProfile ?? onPlay;
@@ -131,7 +133,7 @@ export function PodcastEpisodeRow({
         <View style={styles.denseFooter}>
           <View style={styles.tagsInline}>
             {collapsedTags.map((tag) => (
-              <TagChip key={tag} tag={tag} />
+              <TagChip key={tag} tag={tag} scope="podcast" />
             ))}
             {hiddenTagCount > 0 ? (
               <Pressable style={styles.moreChip} onPress={toggleFooter} hitSlop={6}>
@@ -153,7 +155,7 @@ export function PodcastEpisodeRow({
           {allTags.length > 0 ? (
             <View style={styles.tags}>
               {allTags.map((tag) => (
-                <TagChip key={tag} tag={tag} />
+                <TagChip key={tag} tag={tag} scope="podcast" />
               ))}
             </View>
           ) : null}
