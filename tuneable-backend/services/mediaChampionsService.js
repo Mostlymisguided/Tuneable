@@ -260,6 +260,45 @@ async function getMediaChampions(mediaId, options = {}) {
   const mediaObjectId = await resolveMediaObjectId(mediaId);
   if (!mediaObjectId) return null;
 
+  const media = await Media.findById(mediaObjectId).select('contentForm').lean();
+  const forms = Array.isArray(media?.contentForm)
+    ? media.contentForm
+    : [media?.contentForm].filter(Boolean);
+  const isSeries = forms.includes('podcastseries');
+
+  if (isSeries) {
+    const episodeIds = await Media.find({
+      podcastSeries: mediaObjectId,
+      contentForm: { $in: PODCAST_FORMS },
+      status: { $nin: ['vetoed', 'deleted'] },
+    }).distinct('_id');
+
+    if (!episodeIds.length) {
+      return {
+        entityType: 'media',
+        mediaId,
+        catalog: 'podcastseries',
+        scope: options.locationPlaceId ? 'place' : 'global',
+        locationPlaceId: options.locationPlaceId || null,
+        tipperCount: 0,
+        totalAmount: 0,
+        bidCount: 0,
+        hasChampions: false,
+        hasChampion: false,
+        champions: [],
+        champion: null,
+        rankings: [],
+        podiumSize: CHAMPION_PODIUM_SIZE,
+        minTippersForChampion: MIN_TIPPERS_FOR_CHAMPION,
+      };
+    }
+
+    return aggregateChampionsForMatch(
+      { mediaId: { $in: episodeIds } },
+      { ...options, meta: { entityType: 'media', mediaId, catalog: 'podcastseries' } }
+    );
+  }
+
   return aggregateChampionsForMatch(
     { mediaId: mediaObjectId },
     { ...options, meta: { entityType: 'media', mediaId } }

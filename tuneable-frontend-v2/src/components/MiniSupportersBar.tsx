@@ -16,8 +16,22 @@ interface Bid {
   _doc?: any; // some bids may come via doc wrapper
 }
 
+export interface ChampionSupporter {
+  totalAmount?: number;
+  bidCount?: number;
+  user?: {
+    _id?: string;
+    id?: string;
+    uuid?: string;
+    username: string;
+    profilePic?: string | null;
+  };
+}
+
 interface MiniSupportersBarProps {
   bids?: Bid[];
+  /** Pre-aggregated tip champions (e.g. series-wide). Takes precedence over bids. */
+  champions?: ChampionSupporter[];
   maxVisible?: number; // number of supporters shown before scrolling or expand
   scrollable?: boolean; // true → horizontal scroll; false + expandable “+N more” chip
   /** When set, only show the top N tippers (no expand / scroll-all). */
@@ -27,6 +41,7 @@ interface MiniSupportersBarProps {
 
 const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   bids = [],
+  champions,
   maxVisible = 5,
   scrollable = true,
   limit,
@@ -35,6 +50,26 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   const [expanded, setExpanded] = useState(false);
 
   const supporters = useMemo(() => {
+    if (champions && champions.length > 0) {
+      return champions
+        .filter((c) => c.user?.username)
+        .map((c) => {
+          const user = c.user!;
+          return {
+            id: String(user.uuid || user._id || user.id || user.username),
+            user: {
+              _id: user._id,
+              id: user.id,
+              uuid: user.uuid,
+              username: user.username,
+              profilePic: user.profilePic || undefined,
+            },
+            total: c.totalAmount || 0,
+            count: c.bidCount || 0,
+          };
+        });
+    }
+
     const map: Record<string, {
       id: string;
       user: NonNullable<Bid['userId']>;
@@ -53,7 +88,15 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
     }
 
     return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [bids]);
+  }, [bids, champions]);
+
+  const podiumRankById = useMemo(() => {
+    const m = new Map<string, number>();
+    supporters.slice(0, 3).forEach((s, idx) => {
+      m.set(s.id, idx + 1);
+    });
+    return m;
+  }, [supporters]);
 
   if (supporters.length === 0) return null;
 
@@ -65,13 +108,6 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
         ? supporters
         : supporters.slice(0, maxVisible);
   const moreCount = typeof limit === 'number' ? 0 : supporters.length - maxVisible;
-  const podiumRankById = useMemo(() => {
-    const m = new Map<string, number>();
-    supporters.slice(0, 3).forEach((s, idx) => {
-      m.set(s.id, idx + 1);
-    });
-    return m;
-  }, [supporters]);
 
   const podiumBadgeStyles = (rank: number) => {
     if (rank === 1) return 'bg-amber-400/15 border-amber-400/30 text-amber-200';

@@ -133,6 +133,24 @@ export interface MediaLocationRankingsResponse {
   locationRankings: MediaLocationRanking[];
 }
 
+export interface MediaChampion {
+  rank?: number;
+  totalAmount: number;
+  bidCount?: number;
+  user: {
+    _id?: string;
+    uuid?: string;
+    username: string;
+    profilePic?: string | null;
+  };
+}
+
+export interface MediaChampionsResponse {
+  champions?: MediaChampion[];
+  rankings?: MediaChampion[];
+  hasChampions?: boolean;
+}
+
 export interface SortedMediaResponse {
   timePeriod: string;
   media: ChartMediaItem[];

@@ -1,6 +1,7 @@
 import { api } from './client';
 import type {
   ChartMediaItem,
+  MediaChampionsResponse,
   MediaLocationRankingsResponse,
   MediaProfileResponse,
   MediaTagRankingsResponse,
@@ -108,6 +109,17 @@ export const mediaAPI = {
     const response = await api.get<MediaLocationRankingsResponse>(
       `/media/${mediaId}/location-rankings`,
       { params: { limit } }
+    );
+    return response.data;
+  },
+
+  getChampions: async (
+    mediaId: string,
+    params?: { limit?: number }
+  ): Promise<MediaChampionsResponse> => {
+    const response = await api.get<MediaChampionsResponse>(
+      `/media/${mediaId}/champions`,
+      { params: { limit: params?.limit } }
     );
     return response.data;
   },

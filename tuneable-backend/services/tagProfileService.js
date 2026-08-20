@@ -747,6 +747,7 @@ module.exports = {
   generateSlug,
   collectTagVariants,
   collectTagLabels,
+  catalogMatchOr,
   itemMatchesTag,
   parseContentScope,
   computeRelatedTags,
@@ -755,4 +756,5 @@ module.exports = {
   parseReleaseYearFromSlug,
   parseBpmFromSlug,
   mediaBpmQuery,
+  PODCAST_FORMS,
 };

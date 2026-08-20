@@ -11,10 +11,10 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
-import { TagChip } from '@/src/components/TagChip';
+import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
@@ -22,6 +22,8 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatPoundsFromPence } from '@/src/lib/format';
+import { getPlaceProfileHref } from '@/src/lib/location';
+import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import {
   episodeId,
   isEpisodePlayable,
@@ -30,6 +32,11 @@ import {
 } from '@/src/lib/podcast';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
+import type {
+  MediaChampion,
+  MediaLocationRanking,
+  MediaTagRanking,
+} from '@/src/types/media';
 import {
   DEFAULT_PODCAST_COVER,
   PODCAST_SHOW_SORT_OPTIONS,
@@ -67,6 +74,11 @@ export default function PodcastShowScreen() {
   const [sortBy, setSortBy] = useState<PodcastShowSortKey>('mostTipped');
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
+  const [locationRankings, setLocationRankings] = useState<MediaLocationRanking[]>(
+    []
+  );
+  const [champions, setChampions] = useState<MediaChampion[]>([]);
   const setQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
 
   const load = useCallback(
@@ -76,14 +88,35 @@ export default function PodcastShowScreen() {
       else setLoading(true);
       setError(null);
       try {
-        const info = await podcastsAPI.getSeriesInfo(id);
+        const [info, tagRes, locationRes, champRes] = await Promise.all([
+          podcastsAPI.getSeriesInfo(id),
+          mediaAPI
+            .getTagRankings(id)
+            .catch(() => ({ tagRankings: [] as MediaTagRanking[] })),
+          mediaAPI
+            .getLocationRankings(id, 3)
+            .catch(() => ({ locationRankings: [] as MediaLocationRanking[] })),
+          mediaAPI
+            .getChampions(id, { limit: 3 })
+            .catch(() => ({ champions: [] as MediaChampion[], rankings: [] as MediaChampion[] })),
+        ]);
         setSeries(info.series ?? null);
         setStats(info.stats ?? null);
+        setTagRankings(tagRes.tagRankings ?? []);
+        setLocationRankings(locationRes.locationRankings ?? []);
+        setChampions(
+          champRes.champions?.length
+            ? champRes.champions
+            : (champRes.rankings ?? []).slice(0, 3)
+        );
       } catch (err) {
         setError(getApiErrorMessage(err, 'Failed to load show'));
         if (!isRefresh) {
           setSeries(null);
           setEpisodes([]);
+          setTagRankings([]);
+          setLocationRankings([]);
+          setChampions([]);
         }
         setLoading(false);
         setRefreshing(false);
@@ -174,6 +207,11 @@ export default function PodcastShowScreen() {
     }
     return out.slice(0, 8);
   }, [series?.genres, series?.tags]);
+  const topTagRankings = useMemo(() => tagRankings.slice(0, 3), [tagRankings]);
+  const topLocationRankings = useMemo(
+    () => locationRankings.slice(0, 3),
+    [locationRankings]
+  );
 
   const onPlayItem = (episode: PodcastEpisode) => {
     const index = episodes.findIndex((e) => episodeId(e) === episodeId(episode));
@@ -274,6 +312,76 @@ export default function PodcastShowScreen() {
               <Text style={styles.title}>{series.title || 'Podcast'}</Text>
               {host ? <Text style={styles.host}>{host}</Text> : null}
 
+              {topTagRankings.length > 0 || topLocationRankings.length > 0 ? (
+                <View style={styles.rankingBlock}>
+                  {topTagRankings.length > 0 ? (
+                    <View style={styles.rankingRow}>
+                      {topTagRankings.map((ranking) => (
+                        <Pressable
+                          key={`tag-${ranking.tag}-${ranking.rank}`}
+                          onPress={() =>
+                            router.push(
+                              getTagProfileHref(ranking.tag, 'podcast') as Href
+                            )
+                          }
+                          style={styles.tagRankChip}>
+                          <Ionicons name="pricetag" size={12} color="#c084fc" />
+                          <Text style={styles.tagRankText}>
+                            #{ranking.rank} {ranking.tag}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+                  {topLocationRankings.length > 0 ? (
+                    <View style={styles.rankingRow}>
+                      {topLocationRankings.map((ranking) => {
+                        const href = getPlaceProfileHref(ranking.placeId);
+                        if (!href) {
+                          return (
+                            <View
+                              key={`loc-${ranking.placeId}`}
+                              style={styles.locationRankChip}>
+                              <Ionicons name="location" size={12} color="#38bdf8" />
+                              <Text style={styles.locationRankText}>
+                                #{ranking.rank} {ranking.name}
+                              </Text>
+                            </View>
+                          );
+                        }
+                        return (
+                          <Pressable
+                            key={`loc-${ranking.placeId}`}
+                            onPress={() => router.push(href as Href)}
+                            style={styles.locationRankChip}>
+                            <Ionicons name="location" size={12} color="#38bdf8" />
+                            <Text style={styles.locationRankText}>
+                              #{ranking.rank} {ranking.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+                </View>
+              ) : tags.length > 0 ? (
+                <View style={styles.rankingBlock}>
+                  <View style={styles.rankingRow}>
+                    {tags.map((tag) => (
+                      <Pressable
+                        key={tag}
+                        onPress={() =>
+                          router.push(getTagProfileHref(tag, 'podcast') as Href)
+                        }
+                        style={styles.tagRankChip}>
+                        <Ionicons name="pricetag" size={12} color="#c084fc" />
+                        <Text style={styles.tagRankText}>{tag}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
               <View style={styles.statRow}>
                 {typeof stats?.totalEpisodes === 'number' ? (
                   <View style={styles.statChip}>
@@ -320,6 +428,16 @@ export default function PodcastShowScreen() {
                 </Pressable>
               </View>
 
+              {champions.length > 0 ? (
+                <View style={styles.supportersWrap}>
+                  <MiniSupportersBar
+                    champions={champions}
+                    maxVisible={5}
+                    variant="chips"
+                  />
+                </View>
+              ) : null}
+
               {about ? (
                 <Pressable
                   onPress={() => setShowAboutMore((open) => !open)}
@@ -331,14 +449,6 @@ export default function PodcastShowScreen() {
                     </Text>
                   ) : null}
                 </Pressable>
-              ) : null}
-
-              {tags.length > 0 ? (
-                <View style={styles.tags}>
-                  {tags.map((tag) => (
-                    <TagChip key={tag} tag={tag} scope="podcast" />
-                  ))}
-                </View>
               ) : null}
 
               <View style={styles.sectionTitleRow}>
@@ -462,6 +572,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  rankingBlock: {
+    width: '100%',
+    marginTop: 12,
+    gap: 6,
+  },
+  rankingRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  tagRankChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  tagRankText: {
+    color: '#e9d5ff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  locationRankChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  locationRankText: {
+    color: '#bae6fd',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  supportersWrap: {
+    width: '100%',
+    marginTop: 12,
+    alignItems: 'center',
+  },
   statRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -533,13 +691,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 14,
   },
   sectionTitleRow: {
     alignSelf: 'stretch',

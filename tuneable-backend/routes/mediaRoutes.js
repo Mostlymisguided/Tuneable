@@ -1723,7 +1723,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       .populate({
         path: 'podcastSeries',
         model: 'Media',
-        select: '_id title coverArt description frequency'
+        select: '_id title coverArt description frequency genres tags'
       });
 
     // Fetch recent comments
@@ -1780,10 +1780,21 @@ router.get('/:mediaId/profile', async (req, res) => {
     }
 
     // Compute GlobalMediaAggregateRank (rank by total bid value) - use calculated value
-    // Count how many media have a higher globalMediaAggregate value
-    const rank = await Media.countDocuments({
-      globalMediaAggregate: { $gt: calculatedGlobalMediaAggregate }
-    }) + 1; // +1 because rank is 1-indexed
+    // Podcasts rank among spoken episodes, not mixed with music.
+    const mediaForms = Array.isArray(populatedMedia.contentForm)
+      ? populatedMedia.contentForm
+      : [populatedMedia.contentForm].filter(Boolean);
+    const isPodcastMedia = mediaForms.some((form) =>
+      ['podcast', 'podcastseries', 'episode', 'podcastepisode'].includes(form)
+    );
+    const rankQuery = isPodcastMedia
+      ? {
+          contentType: { $in: ['spoken'] },
+          contentForm: { $in: ['podcastepisode', 'podcast', 'episode'] },
+          globalMediaAggregate: { $gt: calculatedGlobalMediaAggregate },
+        }
+      : { globalMediaAggregate: { $gt: calculatedGlobalMediaAggregate } };
+    const rank = await Media.countDocuments(rankQuery) + 1; // +1 because rank is 1-indexed
 
     // Convert sources Map to plain object BEFORE toObject()
     let sourcesObj = {};
@@ -3688,49 +3699,15 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
       actualMediaId = mediaByUuid._id;
     }
 
-    const media = await Media.findById(actualMediaId);
+    const media = await Media.findById(actualMediaId)
+      .populate('podcastSeries', 'title coverArt genres tags')
+      .lean();
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    if (!media.tags || media.tags.length === 0) {
-      return res.json({ tagRankings: [] });
-    }
-
-    console.log('📊 Computing rankings for tags:', media.tags);
-
-    // Calculate ranking for each tag
-    const tagRankings = [];
-    
-    for (const tag of media.tags) {
-      // Find all media with this tag, sorted by globalMediaAggregate
-      const mediaWithTag = await Media.find({ 
-        tags: tag,
-        contentType: { $in: ['music'] } // Only music for now
-      })
-        .sort({ globalMediaAggregate: -1 })
-        .select('uuid title globalMediaAggregate')
-        .lean();
-      
-      // Find this media's rank
-      const rankIndex = mediaWithTag.findIndex(m => m._id.toString() === actualMediaId.toString());
-      const rank = rankIndex + 1;
-      const total = mediaWithTag.length;
-      const percentile = total > 0 ? ((total - rank) / total * 100).toFixed(1) : '0';
-      
-      tagRankings.push({
-        tag,
-        rank,
-        total,
-        percentile: parseFloat(percentile),
-        aggregate: media.globalMediaAggregate || 0
-      });
-      
-      console.log(`  Tag "${tag}": Rank #${rank} of ${total} (Top ${percentile}%)`);
-    }
-
-    // Sort by best rank (lowest number)
-    tagRankings.sort((a, b) => a.rank - b.rank);
+    const { getMediaTagRankings } = require('../services/mediaTagRankingsService');
+    const tagRankings = await getMediaTagRankings(media);
 
     console.log('✅ Returning', tagRankings.length, 'tag rankings');
 

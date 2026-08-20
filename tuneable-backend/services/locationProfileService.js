@@ -465,9 +465,12 @@ function originQueryForMedia(placeId, media) {
   const isPodcast = forms.some((f) => PODCAST_FORMS.includes(f));
 
   if (isPodcast) {
+    const rankingForms = forms.includes('podcastseries')
+      ? ['podcastseries']
+      : ['podcastepisode', 'podcast', 'episode'];
     return {
       status: 'active',
-      contentForm: { $in: PODCAST_FORMS },
+      contentForm: { $in: rankingForms },
       $or: [
         { 'primaryLocation.placeId': placeId },
         { 'primaryLocation.ancestorIds': placeId },
@@ -476,6 +479,62 @@ function originQueryForMedia(placeId, media) {
   }
 
   return mediaOriginQuery(placeId);
+}
+
+const EPISODE_FORMS = ['podcastepisode', 'podcast', 'episode'];
+
+async function seriesTipTotal(seriesId) {
+  const [row] = await Media.aggregate([
+    {
+      $match: {
+        podcastSeries: seriesId,
+        status: 'active',
+        contentForm: { $in: EPISODE_FORMS },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: { $ifNull: ['$globalMediaAggregate', 0] } },
+      },
+    },
+  ]);
+  return row?.total || 0;
+}
+
+async function countSeriesLocationRank(query, aggregate) {
+  const seriesDocs = await Media.find(query).select('_id').lean();
+  const total = seriesDocs.length;
+  if (total === 0) return { rank: 1, total: 0 };
+  const ids = seriesDocs.map((doc) => doc._id);
+  const sums = await Media.aggregate([
+    {
+      $match: {
+        podcastSeries: { $in: ids },
+        status: 'active',
+        contentForm: { $in: EPISODE_FORMS },
+      },
+    },
+    {
+      $group: {
+        _id: '$podcastSeries',
+        total: { $sum: { $ifNull: ['$globalMediaAggregate', 0] } },
+      },
+    },
+  ]);
+  const sumById = new Map(sums.map((row) => [String(row._id), row.total]));
+  const higher = ids.filter((id) => (sumById.get(String(id)) || 0) > aggregate).length;
+  return { rank: higher + 1, total };
+}
+
+async function rankingAggregateForMedia(media) {
+  const forms = Array.isArray(media.contentForm)
+    ? media.contentForm
+    : [media.contentForm].filter(Boolean);
+  if (forms.includes('podcastseries')) {
+    return seriesTipTotal(media._id);
+  }
+  return media.globalMediaAggregate || 0;
 }
 
 /**
@@ -491,7 +550,11 @@ async function getMediaLocationRankings(media, { minTotal = 2, limit = 3 } = {})
   const candidates = pickLocationRankingCandidates(media.primaryLocation);
   if (candidates.length === 0) return [];
 
-  const aggregate = media.globalMediaAggregate || 0;
+  const forms = Array.isArray(media.contentForm)
+    ? media.contentForm
+    : [media.contentForm].filter(Boolean);
+  const isSeries = forms.includes('podcastseries');
+  const aggregate = await rankingAggregateForMedia(media);
   const maxResults = Math.min(Math.max(parseInt(limit, 10) || 2, 1), 5);
   const minPool = Math.max(parseInt(minTotal, 10) || 2, 1);
 
@@ -499,14 +562,23 @@ async function getMediaLocationRankings(media, { minTotal = 2, limit = 3 } = {})
 
   for (const candidate of candidates) {
     const query = originQueryForMedia(candidate.placeId, media);
-    const [higherCount, total] = await Promise.all([
-      Media.countDocuments({ ...query, globalMediaAggregate: { $gt: aggregate } }),
-      Media.countDocuments(query),
-    ]);
+    let rank;
+    let total;
+    if (isSeries) {
+      const counted = await countSeriesLocationRank(query, aggregate);
+      rank = counted.rank;
+      total = counted.total;
+    } else {
+      const [higherCount, pool] = await Promise.all([
+        Media.countDocuments({ ...query, globalMediaAggregate: { $gt: aggregate } }),
+        Media.countDocuments(query),
+      ]);
+      rank = higherCount + 1;
+      total = pool;
+    }
 
     if (total < minPool) continue;
 
-    const rank = higherCount + 1;
     const percentile = total > 0
       ? parseFloat((((total - rank) / total) * 100).toFixed(1))
       : 0;

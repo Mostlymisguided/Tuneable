@@ -16,8 +16,21 @@ type Supporter = {
   total: number;
 };
 
+export type ChampionSupporter = {
+  totalAmount?: number;
+  bidCount?: number;
+  user?: {
+    _id?: string;
+    uuid?: string;
+    username: string;
+    profilePic?: string | null;
+  };
+};
+
 type Props = {
   bids?: Bid[];
+  /** Pre-aggregated tip champions (e.g. series-wide). Takes precedence over bids. */
+  champions?: ChampionSupporter[];
   maxVisible?: number;
   /** Overlapping avatars for dense footers; chips for expanded view. */
   variant?: 'chips' | 'stack';
@@ -60,11 +73,27 @@ export function countSupporters(bids?: Bid[]): number {
 
 export function MiniSupportersBar({
   bids = [],
+  champions,
   maxVisible = 5,
   variant = 'chips',
   onStackPress,
 }: Props) {
-  const supporters = useMemo(() => aggregateSupporters(bids), [bids]);
+  const supporters = useMemo(() => {
+    if (champions && champions.length > 0) {
+      return champions
+        .filter((c) => c.user?.username)
+        .map((c) => {
+          const user = c.user!;
+          return {
+            id: String(user.uuid || user._id || user.username),
+            username: user.username,
+            profilePic: user.profilePic || undefined,
+            total: c.totalAmount || 0,
+          };
+        });
+    }
+    return aggregateSupporters(bids);
+  }, [bids, champions]);
 
   const podiumRankById = useMemo(() => {
     const m = new Map<string, number>();

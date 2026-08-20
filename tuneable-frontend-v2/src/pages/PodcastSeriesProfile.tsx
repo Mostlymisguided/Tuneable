@@ -21,12 +21,17 @@ import {
   Linkedin,
   Search,
   RefreshCw,
-  Play
+  Play,
+  Tag,
+  MapPin
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { stripHtml } from '../utils/stripHtml';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getPlaceProfilePath } from '../utils/locationHelpers';
+import { getEpisodeDisplayTags } from '../utils/podcastTags';
+import MiniSupportersBar from '../components/MiniSupportersBar';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { resolveTipStatInputs } from '../utils/tipStats';
 
@@ -130,6 +135,28 @@ const PodcastSeriesProfile: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [tagRankings, setTagRankings] = useState<Array<{
+    tag: string;
+    rank: number;
+    total?: number;
+    percentile?: number;
+  }>>([]);
+  const [locationRankings, setLocationRankings] = useState<Array<{
+    placeId: string;
+    name: string;
+    featureType?: string | null;
+    rank: number;
+  }>>([]);
+  const [champions, setChampions] = useState<Array<{
+    totalAmount: number;
+    bidCount?: number;
+    user?: {
+      _id?: string;
+      uuid?: string;
+      username: string;
+      profilePic?: string | null;
+    };
+  }>>([]);
 
   useEffect(() => {
     if (seriesId) {
@@ -139,6 +166,28 @@ const PodcastSeriesProfile: React.FC = () => {
         fetchEpisodes();
       });
     }
+  }, [seriesId]);
+
+  useEffect(() => {
+    if (!seriesId) return;
+    let cancelled = false;
+    (async () => {
+      const [tagRes, locRes, champRes] = await Promise.all([
+        mediaAPI.getTagRankings(seriesId).catch(() => ({ tagRankings: [] })),
+        mediaAPI.getLocationRankings(seriesId, 3).catch(() => ({ locationRankings: [] })),
+        mediaAPI.getChampions(seriesId, { limit: 3 }).catch(() => ({ champions: [], rankings: [] })),
+      ]);
+      if (cancelled) return;
+      setTagRankings(tagRes.tagRankings || []);
+      setLocationRankings(locRes.locationRankings || []);
+      const nextChampions = champRes.champions?.length
+        ? champRes.champions
+        : (champRes.rankings || []).slice(0, 3);
+      setChampions(nextChampions);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [seriesId]);
 
   useEffect(() => {
@@ -652,6 +701,12 @@ const PodcastSeriesProfile: React.FC = () => {
     }
   };
 
+  const topTagRankings = tagRankings.slice(0, 3);
+  const topLocationRankings = locationRankings.slice(0, 3);
+  const fallbackTags = series
+    ? getEpisodeDisplayTags({ tags: series.tags, genres: series.genres }).slice(0, 8)
+    : [];
+
   if (isLoadingSeries) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 flex items-center justify-center p-4">
@@ -777,29 +832,71 @@ const PodcastSeriesProfile: React.FC = () => {
               </div>
             </div>
 
-            {/* Genres/Tags */}
-            {(series.genres && series.genres.length > 0) || (series.tags && series.tags.length > 0) ? (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {series.genres?.slice(0, 5).map((genre, idx) => (
+            {(topTagRankings.length > 0 || topLocationRankings.length > 0) ? (
+              <div className="flex flex-col gap-1.5 mb-4">
+                {topTagRankings.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {topTagRankings.map((ranking, index) => (
+                      <Link
+                        key={`${ranking.tag}-${index}`}
+                        to={getTagProfilePath(ranking.tag, 'podcast')}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
+                      >
+                        <Tag className="h-3 w-3 text-purple-400" />
+                        #{ranking.rank} {ranking.tag}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+                {topLocationRankings.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {topLocationRankings.map((ranking) => {
+                      const placePath = getPlaceProfilePath(ranking.placeId);
+                      const chipClass =
+                        'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-200 text-xs font-medium hover:bg-sky-500/25 hover:border-sky-400/50 transition-colors no-underline';
+                      const chipBody = (
+                        <>
+                          <MapPin className="h-3 w-3 text-sky-400" />
+                          #{ranking.rank} {ranking.name}
+                        </>
+                      );
+                      return placePath ? (
+                        <Link key={ranking.placeId} to={placePath} className={chipClass}>
+                          {chipBody}
+                        </Link>
+                      ) : (
+                        <span key={ranking.placeId} className={chipClass}>
+                          {chipBody}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : fallbackTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {fallbackTags.map((tag) => (
                   <Link
-                    key={idx}
-                    to={getTagProfilePath(genre, 'podcast')}
-                    className="px-2 py-1 bg-purple-600/30 text-purple-300 text-xs rounded-full hover:bg-purple-600/50 no-underline"
-                  >
-                    {genre}
-                  </Link>
-                ))}
-                {series.tags?.slice(0, 5).map((tag, idx) => (
-                  <Link
-                    key={idx}
+                    key={tag}
                     to={getTagProfilePath(tag, 'podcast')}
-                    className="px-2 py-1 bg-gray-700 text-gray-300 text-xs rounded-full hover:bg-gray-600 no-underline"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
                   >
+                    <Tag className="h-3 w-3 text-purple-400" />
                     {tag}
                   </Link>
                 ))}
               </div>
             ) : null}
+
+            {champions.length > 0 && (
+              <div className="mb-4">
+                <MiniSupportersBar
+                  champions={champions}
+                  limit={3}
+                  scrollable={false}
+                />
+              </div>
+            )}
 
             {/* About Section - Below title, to the right of artwork */}
             {(series.description || series.summary) && (

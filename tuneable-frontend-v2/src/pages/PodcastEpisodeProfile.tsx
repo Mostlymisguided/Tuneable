@@ -19,7 +19,6 @@ import {
   Disc,
   Headphones,
   Award,
-  Crown,
   X,
   Save,
   Youtube,
@@ -45,7 +44,6 @@ import {
   MapPin
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
-import MediaChampions from '../components/MediaChampions';
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
@@ -65,6 +63,7 @@ import DeleteMediaSection from '../components/DeleteMediaSection';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getEpisodeDisplayTags } from '../utils/podcastTags';
 
 interface Media {
   _id: string;
@@ -98,6 +97,8 @@ interface Media {
     coverArt?: string;
     description?: string;
     frequency?: string;
+    genres?: string[];
+    tags?: string[];
   };
   transcript?: string;
   description?: string;
@@ -309,8 +310,6 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [showReportModal, setShowReportModal] = useState(false);
 
   // Collapsible sections
-  const [showTopFans, setShowTopFans] = useState(false);
-  const [showTagRankings, setShowTagRankings] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
 
   // Share functionality state
@@ -2012,6 +2011,7 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   const topTagRankings = tagRankings.slice(0, 3);
   const topLocationRankings = locationRankings.slice(0, 3);
+  const fallbackTags = media ? getEpisodeDisplayTags(media).slice(0, 8) : [];
 
   const avgTipPounds = media ? calculateGlobalMediaBidAvg(media) || undefined : undefined;
 
@@ -2378,7 +2378,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                 </p>
               )}
 
-              {(topTagRankings.length > 0 || topLocationRankings.length > 0) && (
+              {(topTagRankings.length > 0 || topLocationRankings.length > 0) ? (
                 <div className="flex flex-col gap-1.5 px-2 mb-3">
                   {topTagRankings.length > 0 && (
                     <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
@@ -2419,7 +2419,20 @@ const PodcastEpisodeProfile: React.FC = () => {
                     </div>
                   )}
                 </div>
-              )}
+              ) : fallbackTags.length > 0 ? (
+                <div className="flex flex-wrap justify-center md:justify-start gap-1.5 px-2 mb-3">
+                  {fallbackTags.map((tag) => (
+                    <Link
+                      key={tag}
+                      to={getTagProfilePath(tag, 'podcast')}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
+                    >
+                      <Tag className="h-3 w-3 text-purple-400" />
+                      {tag}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2 mb-3">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm">
@@ -2621,68 +2634,6 @@ const PodcastEpisodeProfile: React.FC = () => {
           /* NORMAL VIEW - All existing content */
           <>
         {renderSlimSupportSection()}
-
-        {/* Champions - collapsible */}
-        {media.bids && media.bids.length > 0 && (
-          <div className="mb-6 px-2 md:px-0 flex flex-col items-center">
-            <button
-              onClick={() => setShowTopFans(!showTopFans)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            >
-              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Crown className="h-5 w-5 md:h-6 md:w-6 mr-2 text-amber-400 flex-shrink-0" />
-                {showTopFans ? 'Champions' : 'Show Champions'}
-              </span>
-              {showTopFans ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-            </button>
-            {showTopFans && (
-              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <MediaChampions mediaId={media.uuid || media._id} maxDisplay={10} />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tag Rankings - collapsible */}
-        {tagRankings.length > 0 && (
-          <div className="mb-8 px-2 md:px-0 flex flex-col items-center">
-            <button
-              onClick={() => setShowTagRankings(!showTagRankings)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-black/20 hover:bg-black/30 transition-colors"
-            >
-              <span className="flex items-center text-xl md:text-2xl font-bold text-white">
-                <Tag className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400 flex-shrink-0" />
-                {showTagRankings ? 'Tag Rankings' : 'Show Tag Rankings'}
-              </span>
-              {showTagRankings ? <Minus className="h-5 w-5 text-gray-400" /> : <Plus className="h-5 w-5 text-gray-400" />}
-            </button>
-            {showTagRankings && (
-              <div className="mt-3 w-full card bg-black/20 rounded-lg p-4 md:p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {tagRankings.map((ranking, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 md:p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all"
-                    >
-                      <div className="flex items-center space-x-2 md:space-x-3">
-                        <Tag className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        <span className="text-white font-medium text-sm md:text-base">{ranking.tag}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-base md:text-lg font-bold text-purple-400">
-                          #{ranking.rank}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          of {ranking.total} • Top {ranking.percentile}%
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Collectives Section - Above label, below metrics */}
         {(() => {
