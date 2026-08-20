@@ -20,6 +20,8 @@ export interface PodcastEpisodeBid {
   };
 }
 
+export type PodcastCatalogSource = 'local' | 'taddy' | 'apple' | 'podcastindex';
+
 export interface PodcastEpisode {
   _id?: string;
   id?: string;
@@ -30,8 +32,11 @@ export interface PodcastEpisode {
   duration?: number;
   globalMediaAggregate?: number;
   releaseDate?: string;
+  publishedAt?: string;
   podcastSeries?: PodcastSeriesRef;
   podcastTitle?: string;
+  podcastAuthor?: string;
+  podcastImage?: string;
   genres?: string[];
   tags?: string[];
   category?: string;
@@ -39,6 +44,35 @@ export interface PodcastEpisode {
   audioUrl?: string;
   enclosure?: { url?: string; type?: string };
   bids?: PodcastEpisodeBid[];
+  source?: PodcastCatalogSource;
+  isExternal?: boolean;
+  taddyUuid?: string;
+  podcastSeriesUuid?: string;
+  appleId?: string;
+  collectionId?: string | number;
+  feedId?: number;
+  podcastIndexId?: number | string;
+  rssUrl?: string;
+  guid?: string;
+  episodeNumber?: number;
+  seasonNumber?: number;
+}
+
+export interface PodcastEpisodeSearchResponse {
+  episodes: PodcastEpisode[];
+  count?: number;
+  total?: number;
+  offset?: number;
+  hasMore?: boolean;
+  page?: number;
+  pagesCount?: number;
+  source?: PodcastCatalogSource;
+}
+
+export interface ImportSingleEpisodeResponse {
+  success?: boolean;
+  message?: string;
+  episode: PodcastEpisode;
 }
 
 export interface PodcastChartResponse {

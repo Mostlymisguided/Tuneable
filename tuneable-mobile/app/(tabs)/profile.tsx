@@ -139,6 +139,24 @@ export default function ProfileScreen() {
                 onWalletPress={() => router.push('/wallet')}
               />
             ) : null}
+            <View style={styles.addRow}>
+              <Pressable
+                style={styles.addBtn}
+                onPress={() => router.push('/music-search')}
+                accessibilityRole="button"
+                accessibilityLabel="Add Music">
+                <Ionicons name="add" size={18} color={colors.text} />
+                <Text style={styles.addBtnText}>Add Music</Text>
+              </Pressable>
+              <Pressable
+                style={styles.addBtn}
+                onPress={() => router.push('/podcast-search')}
+                accessibilityRole="button"
+                accessibilityLabel="Add Podcast">
+                <Ionicons name="add" size={18} color={colors.text} />
+                <Text style={styles.addBtnText}>Add Podcast</Text>
+              </Pressable>
+            </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             {loading && !library.length ? (
               <ActivityIndicator
@@ -202,6 +220,30 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
+  },
+  addRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  addBtnText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
   },
   error: {
     color: '#fca5a5',

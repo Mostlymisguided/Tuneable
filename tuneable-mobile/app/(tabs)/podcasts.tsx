@@ -205,6 +205,15 @@ export default function PodcastsScreen() {
               locationQuickPicks={locationQuickPicks}
             />
 
+            <Pressable
+              style={styles.addPodcastBtn}
+              onPress={() => router.push('/podcast-search')}
+              accessibilityRole="button"
+              accessibilityLabel="Add Podcast">
+              <Ionicons name="add" size={18} color={colors.text} />
+              <Text style={styles.addPodcastText}>Add Podcast</Text>
+            </Pressable>
+
             <ChartFilterToolbar
               period={period}
               onPeriodChange={(next) => setPeriod(next as PodcastTimeRangeKey)}
@@ -298,6 +307,24 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 8,
+  },
+  addPodcastBtn: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  addPodcastText: {
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: 14,
   },
   playBtn: {
     alignSelf: 'center',

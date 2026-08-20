@@ -77,6 +77,7 @@ type Props = {
     | {
         canAgreeTopTags?: boolean;
         suggestedAgreeTags?: string[];
+        media?: { _id?: string; uuid?: string };
       }
     | void
   >;
@@ -282,7 +283,8 @@ export function TipSheet({
     setSubmitting(true);
     try {
       const result = await onConfirm(amount, tags);
-      const mid = resolvedMediaId;
+      const mid =
+        result?.media?._id || result?.media?.uuid || resolvedMediaId;
       const suggested =
         result?.suggestedAgreeTags?.filter(Boolean) ||
         (tipMedia?.tags || []).filter(Boolean);

@@ -1,6 +1,9 @@
 import { api } from './client';
 import type {
+  ImportSingleEpisodeResponse,
+  PodcastCatalogSource,
   PodcastChartResponse,
+  PodcastEpisodeSearchResponse,
   PodcastSeriesResponse,
 } from '@/src/types/podcast';
 
@@ -41,6 +44,69 @@ export const podcastsAPI = {
           limit: params?.limit ?? 12,
         },
       }
+    );
+    return response.data;
+  },
+
+  searchEpisodes: async (
+    query: string,
+    params?: { limit?: number; offset?: number }
+  ): Promise<PodcastEpisodeSearchResponse> => {
+    const response = await api.get<PodcastEpisodeSearchResponse>(
+      '/podcasts/search-episodes',
+      {
+        params: {
+          q: query,
+          limit: params?.limit ?? 50,
+          offset: params?.offset ?? 0,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  searchTaddyEpisodes: async (
+    query: string,
+    params?: { max?: number; page?: number }
+  ): Promise<PodcastEpisodeSearchResponse> => {
+    const response = await api.get<PodcastEpisodeSearchResponse>(
+      '/podcasts/discovery/taddy/search-episodes',
+      {
+        params: {
+          q: query,
+          max: params?.max ?? 25,
+          page: params?.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  searchAppleEpisodes: async (
+    query: string,
+    params?: { max?: number }
+  ): Promise<PodcastEpisodeSearchResponse> => {
+    const response = await api.get<PodcastEpisodeSearchResponse>(
+      '/podcasts/discovery/apple/search-episodes',
+      {
+        params: {
+          q: query,
+          max: params?.max ?? 50,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  importSingleEpisode: async (body: {
+    source: Exclude<PodcastCatalogSource, 'local'>;
+    episodeData: Record<string, unknown>;
+    seriesData?: Record<string, unknown> | null;
+  }): Promise<ImportSingleEpisodeResponse> => {
+    const response = await api.post<ImportSingleEpisodeResponse>(
+      '/podcasts/discovery/import-single-episode',
+      body,
+      { timeout: 60000 }
     );
     return response.data;
   },
