@@ -115,8 +115,14 @@ export function PodcastEpisodeRow({
           {!playable ? <Text style={styles.hint}>No audio URL</Text> : null}
         </Pressable>
 
-        <Pressable onPress={onTip} hitSlop={8} style={styles.tipBtn}>
-          <Ionicons name="heart" size={24} color="#f472b6" />
+        <Pressable
+          onPress={onTip}
+          hitSlop={8}
+          style={styles.tipBtn}
+          accessibilityLabel="Send a tip">
+          <View style={styles.heartCircle}>
+            <Ionicons name="heart" size={18} color={colors.tipHeart} />
+          </View>
           <Text style={styles.tipAmount}>{formatPoundsFromPence(displayTip)}</Text>
         </Pressable>
       </View>
@@ -256,6 +262,16 @@ const styles = StyleSheet.create({
   tipBtn: {
     alignItems: 'center',
     paddingLeft: 4,
+  },
+  heartCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.tipHeartBg,
+    borderWidth: 1,
+    borderColor: colors.tipHeartBorder,
   },
   tipAmount: {
     marginTop: 2,

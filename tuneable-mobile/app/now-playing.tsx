@@ -204,7 +204,7 @@ export default function NowPlayingScreen() {
           style={styles.heartBtn}
           onPress={() => setTipOpen(true)}
           accessibilityLabel="Send a tip">
-          <Ionicons name="heart" size={22} color="#e9d5ff" />
+          <Ionicons name="heart" size={22} color={colors.tipHeart} />
           <Text style={styles.heartLabel}>Tip</Text>
         </Pressable>
       </View>
@@ -312,12 +312,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 22,
-    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    backgroundColor: colors.tipHeartBg,
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.45)',
+    borderColor: colors.tipHeartBorder,
   },
   heartLabel: {
-    color: '#e9d5ff',
+    color: colors.tipHeart,
     fontSize: 15,
     fontWeight: '600',
   },

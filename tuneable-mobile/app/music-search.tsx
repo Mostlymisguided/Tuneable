@@ -478,7 +478,7 @@ export default function MusicSearchScreen() {
                 {isAdding ? (
                   <ActivityIndicator color={colors.accentLight} size="small" />
                 ) : (
-                  <Ionicons name="heart" size={24} color={colors.accentLight} />
+                  <Ionicons name="heart" size={18} color={colors.tipHeart} />
                 )}
               </Pressable>
             </View>
@@ -732,8 +732,12 @@ const styles = StyleSheet.create({
   heartBtn: {
     width: 40,
     height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.tipHeartBg,
+    borderWidth: 1,
+    borderColor: colors.tipHeartBorder,
   },
   disabled: { opacity: 0.6 },
 });

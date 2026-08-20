@@ -9,6 +9,10 @@ export const colors = {
   textMuted: 'rgba(229, 231, 235, 0.65)',
   accent: '#9333ea',
   accentLight: '#a855f7',
+  /** Heart/tip CTA — matches web `text-purple-300` on `bg-purple-900/40`. */
+  tipHeart: '#d8b4fe',
+  tipHeartBg: 'rgba(88, 28, 135, 0.4)',
+  tipHeartBorder: 'rgba(168, 85, 247, 0.4)',
   card: 'rgba(255, 255, 255, 0.08)',
   cardBorder: 'rgba(255, 255, 255, 0.15)',
   danger: '#ef4444',

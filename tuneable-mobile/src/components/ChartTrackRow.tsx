@@ -136,8 +136,8 @@ export function ChartTrackRow({
         </Pressable>
         <View style={styles.right}>
           <Text style={styles.tips}>{formatPoundsFromPence(displayTip)}</Text>
-          <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn}>
-            <Ionicons name="heart" size={22} color="#f472b6" />
+          <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn} accessibilityLabel="Send a tip">
+            <Ionicons name="heart" size={16} color={colors.tipHeart} />
           </Pressable>
         </View>
       </View>
@@ -242,7 +242,7 @@ export function ChartTrackRow({
               hitSlop={8}
               style={styles.tipBtn}
               accessibilityLabel="Send a tip">
-              <Ionicons name="heart" size={22} color="#f472b6" />
+              <Ionicons name="heart" size={18} color={colors.tipHeart} />
             </Pressable>
           </View>
         </View>
@@ -340,7 +340,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   actionBtn: {
-    padding: 2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.tipHeartBg,
+    borderWidth: 1,
+    borderColor: colors.tipHeartBorder,
   },
   richCard: {
     marginBottom: 8,
@@ -444,7 +451,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   tipBtn: {
-    padding: 2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.tipHeartBg,
+    borderWidth: 1,
+    borderColor: colors.tipHeartBorder,
     flexShrink: 0,
   },
   denseFooter: {

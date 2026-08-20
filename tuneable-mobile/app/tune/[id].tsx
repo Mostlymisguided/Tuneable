@@ -566,7 +566,7 @@ export default function TuneProfileScreen() {
                 style={styles.heartBtn}
                 onPress={() => openTipSheet()}
                 accessibilityLabel="Send a tip">
-                <Ionicons name="heart" size={20} color="#e9d5ff" />
+                <Ionicons name="heart" size={20} color={colors.tipHeart} />
               </Pressable>
             </View>
 
@@ -1088,9 +1088,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    backgroundColor: colors.tipHeartBg,
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.45)',
+    borderColor: colors.tipHeartBorder,
   },
   section: {
     width: '100%',

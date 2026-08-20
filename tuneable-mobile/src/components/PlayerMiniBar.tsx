@@ -159,9 +159,9 @@ function MiniBarChrome({
       <Pressable
         onPress={onTip}
         hitSlop={12}
-        style={styles.iconBtn}
+        style={styles.tipBtn}
         accessibilityLabel="Send a tip">
-        <Ionicons name="heart" size={22} color="#f472b6" />
+        <Ionicons name="heart" size={16} color={colors.tipHeart} />
       </Pressable>
       <Pressable onPress={onToggle} hitSlop={12} style={styles.iconBtn}>
         {isLoading ? (
@@ -221,5 +221,15 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     padding: 4,
+  },
+  tipBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.tipHeartBg,
+    borderWidth: 1,
+    borderColor: colors.tipHeartBorder,
   },
 });
