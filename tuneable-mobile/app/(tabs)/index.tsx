@@ -18,6 +18,7 @@ import { DashboardPrompts } from '@/src/components/DashboardPrompts';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LibraryImportCards } from '@/src/components/LibraryImportCards';
+import { UserLibrarySection } from '@/src/components/UserLibrarySection';
 import { partyAPI } from '@/src/api/party';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -50,7 +51,6 @@ import {
 } from '@/src/types/user';
 
 const RISING_PREVIEW_COUNT = 10;
-const LIBRARY_PREVIEW_COUNT = 10;
 const HOME_BADGE_VISIBLE = 3;
 
 function badgeColors(rank: number) {
@@ -58,25 +58,6 @@ function badgeColors(rank: number) {
   if (rank === 2) return { border: '#94a3b8', bg: '#cbd5e1', text: '#e2e8f0' };
   if (rank === 3) return { border: '#b45309', bg: '#fdba74', text: '#fdba74' };
   return { border: '#7c3aed', bg: '#a855f7', text: '#ddd6fe' };
-}
-
-function libraryToChartItem(item: UserLibraryItem): ChartMediaItem {
-  return {
-    _id: item.mediaId,
-    uuid: item.mediaUuid,
-    title: item.title,
-    artist: item.artist,
-    coverArt: item.coverArt ?? undefined,
-    duration: item.duration ?? undefined,
-    bpm: item.bpm ?? null,
-    releaseDate: item.releaseDate ?? null,
-    releaseYear: item.releaseYear ?? null,
-    primaryLocation: item.primaryLocation ?? null,
-    tags: item.tags ?? [],
-    sources: item.sources ?? {},
-    partyMediaAggregate: item.globalUserMediaAggregate ?? 0,
-    globalMediaAggregate: item.globalMediaAggregate ?? 0,
-  };
 }
 
 type HomeBadge = {
@@ -87,7 +68,7 @@ type HomeBadge = {
 };
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
   const canUpload = canUploadMedia(user);
@@ -101,28 +82,6 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const libraryPreview = useMemo(() => {
-    return [...library]
-      .sort((a, b) => {
-        const aTime = a.lastBidAt ? new Date(a.lastBidAt).getTime() : 0;
-        const bTime = b.lastBidAt ? new Date(b.lastBidAt).getTime() : 0;
-        return bTime - aTime;
-      })
-      .slice(0, LIBRARY_PREVIEW_COUNT);
-  }, [library]);
-
-  const libraryRail = useMemo<CoverRailItem[]>(
-    () =>
-      libraryPreview.map((item) => ({
-        key: item.mediaId,
-        title: item.title || 'Untitled',
-        subtitle: item.artist || 'Unknown artist',
-        coverArt: item.coverArt,
-        meta: formatPoundsFromPence(item.globalUserMediaAggregate),
-      })),
-    [libraryPreview]
-  );
 
   const risingRail = useMemo<CoverRailItem[]>(
     () =>
@@ -208,11 +167,6 @@ export default function HomeScreen() {
 
   const onPlayRisingItem = (_item: CoverRailItem, index: number) => {
     void setQueueAndPlay(rising, index);
-  };
-
-  const onPlayLibraryItem = (_item: CoverRailItem, index: number) => {
-    const queue = libraryPreview.map(libraryToChartItem);
-    void setQueueAndPlay(queue, index);
   };
 
   const openSearch = () => {
@@ -389,7 +343,7 @@ export default function HomeScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {loading && rising.length === 0 && libraryPreview.length === 0 ? (
+          {loading && rising.length === 0 && library.length === 0 ? (
             <ActivityIndicator
               color={colors.accentLight}
               style={styles.loader}
@@ -397,23 +351,26 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        <CoverRail
-          title="Recently tipped"
-          actionLabel="Library"
-          onAction={() => router.push('/(tabs)/profile')}
-          items={libraryRail}
-          emptyTitle="No tipped tunes yet"
-          emptyBody="Search a track and send a tip — it lands in your library and on the charts."
-          emptyActionLabel="Add your first tip"
-          onEmptyAction={() => router.push('/music-search')}
-          onOpen={(item) => {
-            const match = libraryPreview.find((entry) => entry.mediaId === item.key);
-            if (match) {
-              router.push(`/tune/${match.mediaUuid || match.mediaId}`);
-            }
-          }}
-          onPlay={onPlayLibraryItem}
-        />
+        <View style={styles.librarySection}>
+          <UserLibrarySection
+            items={library}
+            user={user}
+            onBalanceUpdate={updateBalance}
+            title="Recently tipped"
+            actionLabel="Library"
+            onAction={() => router.push('/(tabs)/profile')}
+            showTime={false}
+            showBpm={false}
+            sortBy="recent"
+            previewLimit={10}
+            compactHeader
+            searchHint="Filters your recently tipped tunes."
+            emptyTitle="No tipped tunes yet"
+            emptyBody="Search a track and send a tip — it lands in your library and on the charts."
+            emptyActionLabel="Add your first tip"
+            onEmptyAction={() => router.push('/music-search')}
+          />
+        </View>
 
         <CoverRail
           title="Rising today"
@@ -434,6 +391,8 @@ export default function HomeScreen() {
           <InviteShareCard
             inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
             username={user?.username}
+            collapsible
+            defaultCollapsed
           />
         </View>
       </ScrollView>
@@ -481,6 +440,11 @@ const styles = StyleSheet.create({
   },
   padded: {
     paddingHorizontal: 16,
+  },
+  librarySection: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 12,
   },
   hero: {
     flexDirection: 'row',

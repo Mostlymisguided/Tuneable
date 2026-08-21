@@ -92,12 +92,29 @@ function isPodcastLibraryItem(item: UserLibraryItem | ChartMediaItem): boolean {
   );
 }
 
+type SortMode = 'amount' | 'recent';
+
 type Props = {
   items: UserLibraryItem[];
   user: User | null;
   onBalanceUpdate?: (newBalancePence: number) => void;
   contentPaddingBottom?: number;
   emptyLabel?: string;
+  title?: string;
+  subtitle?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  showTime?: boolean;
+  showBpm?: boolean;
+  sortBy?: SortMode;
+  /** Cap visible rows (home preview). Overflow uses `onAction` instead of paging. */
+  previewLimit?: number;
+  emptyTitle?: string;
+  emptyBody?: string;
+  emptyActionLabel?: string;
+  onEmptyAction?: () => void;
+  searchHint?: string;
+  compactHeader?: boolean;
 };
 
 export function UserLibrarySection({
@@ -106,6 +123,20 @@ export function UserLibrarySection({
   onBalanceUpdate,
   contentPaddingBottom = 0,
   emptyLabel = 'No tunes tipped yet.',
+  title = 'Library',
+  subtitle,
+  actionLabel,
+  onAction,
+  showTime = true,
+  showBpm = true,
+  sortBy = 'amount',
+  previewLimit,
+  emptyTitle,
+  emptyBody,
+  emptyActionLabel,
+  onEmptyAction,
+  searchHint = 'Filters your tipped tunes.',
+  compactHeader = false,
 }: Props) {
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
@@ -133,10 +164,17 @@ export function UserLibrarySection({
     setVisibleCount(LIBRARY_PAGE_SIZE);
   }, [period, selectedTagTerms, searchQuery, bpmFilterRange, items]);
 
-  const periodFiltered = useMemo(
-    () => items.filter((item) => itemInPeriod(item, period)),
-    [items, period]
-  );
+  const periodFiltered = useMemo(() => {
+    const list = showTime
+      ? items.filter((item) => itemInPeriod(item, period))
+      : [...items];
+    if (sortBy !== 'recent') return list;
+    return list.sort((a, b) => {
+      const aTime = a.lastBidAt ? new Date(a.lastBidAt).getTime() : 0;
+      const bTime = b.lastBidAt ? new Date(b.lastBidAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [items, period, showTime, sortBy]);
 
   const chartItems = useMemo(
     () => periodFiltered.map(toChartMediaItem),
@@ -150,14 +188,16 @@ export function UserLibrarySection({
 
   const filtered = useMemo(() => {
     const list = filterChartMedia(chartItems, filterState);
+    if (sortBy === 'recent') return list;
     return [...list].sort(
       (a, b) => (b.partyMediaAggregate ?? 0) - (a.partyMediaAggregate ?? 0)
     );
-  }, [chartItems, filterState]);
+  }, [chartItems, filterState, sortBy]);
 
+  const visibleCap = previewLimit ?? Number.POSITIVE_INFINITY;
   const visible = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount]
+    () => filtered.slice(0, Math.min(visibleCount, visibleCap)),
+    [filtered, visibleCount, visibleCap]
   );
 
   const playableCount = useMemo(
@@ -201,41 +241,94 @@ export function UserLibrarySection({
     );
   };
 
-  const hasMore = visibleCount < filtered.length;
+  const hasMore = visible.length < filtered.length && visible.length < visibleCap;
+  const hasOverflow =
+    previewLimit != null && filtered.length > previewLimit && Boolean(onAction);
+  const resolvedSubtitle =
+    subtitle === undefined
+      ? `${items.length} tune${items.length === 1 ? '' : 's'} tipped`
+      : subtitle;
   const emptyMessage = filtersActive
     ? 'No tunes match these filters.'
     : emptyLabel;
+  const showFilters = items.length > 0;
+
+  const emptyState =
+    filtersActive || !emptyTitle ? (
+      <Text style={styles.empty}>{emptyMessage}</Text>
+    ) : (
+      <View style={styles.emptyCard}>
+        <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+        {emptyBody ? <Text style={styles.emptyBody}>{emptyBody}</Text> : null}
+        {emptyActionLabel && onEmptyAction ? (
+          <Pressable style={styles.emptyBtn} onPress={onEmptyAction}>
+            <Text style={styles.emptyBtnText}>{emptyActionLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+
+  const listFooter =
+    hasMore ? (
+      <Pressable
+        style={styles.showMoreBtn}
+        onPress={() => setVisibleCount((n) => n + LIBRARY_PAGE_SIZE)}>
+        <Text style={styles.showMoreText}>
+          Show more ({filtered.length - visible.length} remaining)
+        </Text>
+      </Pressable>
+    ) : hasOverflow ? (
+      <Pressable style={styles.showMoreBtn} onPress={onAction}>
+        <Text style={styles.showMoreText}>
+          See library ({filtered.length - visible.length} more)
+        </Text>
+      </Pressable>
+    ) : null;
 
   return (
     <View>
       <View style={styles.header}>
-        <Text style={styles.title}>Library</Text>
-        <Text style={styles.subtitle}>
-          {items.length} tune{items.length === 1 ? '' : 's'} tipped
-        </Text>
+        <View style={styles.headerCopy}>
+          <Text style={[styles.title, compactHeader && styles.titleCompact]}>
+            {title}
+          </Text>
+          {resolvedSubtitle ? (
+            <Text style={styles.subtitle}>{resolvedSubtitle}</Text>
+          ) : null}
+        </View>
+        {actionLabel && onAction ? (
+          <Pressable onPress={onAction} hitSlop={8}>
+            <Text style={styles.action}>{actionLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      <ChartFilterToolbar
-        period={period}
-        onPeriodChange={(next) => setPeriod(next as TimePeriodKey)}
-        selectedTagTerms={selectedTagTerms}
-        onTagTermsChange={setSelectedTagTerms}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        bpmFilterRange={bpmFilterRange}
-        onBpmFilterChange={setBpmFilterRange}
-        topTags={topTags}
-        showTagPanel={showTagPanel}
-        showTimePanel={showTimePanel}
-        showBpmPanel={showBpmPanel}
-        showSearchPanel={showSearchPanel}
-        onToggleTagPanel={() => setShowTagPanel((open) => !open)}
-        onToggleTimePanel={() => setShowTimePanel((open) => !open)}
-        onToggleBpmPanel={() => setShowBpmPanel((open) => !open)}
-        onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
-        onClearFilters={clearClientFilters}
-        hasActiveFilters={filtersActive}
-      />
+      {showFilters ? (
+        <ChartFilterToolbar
+          period={period}
+          onPeriodChange={(next) => setPeriod(next as TimePeriodKey)}
+          selectedTagTerms={selectedTagTerms}
+          onTagTermsChange={setSelectedTagTerms}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          bpmFilterRange={bpmFilterRange}
+          onBpmFilterChange={setBpmFilterRange}
+          showTime={showTime}
+          showBpm={showBpm}
+          topTags={topTags}
+          showTagPanel={showTagPanel}
+          showTimePanel={showTimePanel}
+          showBpmPanel={showBpmPanel}
+          showSearchPanel={showSearchPanel}
+          onToggleTagPanel={() => setShowTagPanel((open) => !open)}
+          onToggleTimePanel={() => setShowTimePanel((open) => !open)}
+          onToggleBpmPanel={() => setShowBpmPanel((open) => !open)}
+          onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
+          onClearFilters={clearClientFilters}
+          hasActiveFilters={filtersActive}
+          searchHint={searchHint}
+        />
+      ) : null}
 
       {playableCount > 0 ? (
         <Pressable
@@ -252,18 +345,8 @@ export function UserLibrarySection({
         keyExtractor={(item, index) => mediaId(item) || String(index)}
         scrollEnabled={false}
         contentContainerStyle={{ paddingBottom: contentPaddingBottom }}
-        ListEmptyComponent={<Text style={styles.empty}>{emptyMessage}</Text>}
-        ListFooterComponent={
-          hasMore ? (
-            <Pressable
-              style={styles.showMoreBtn}
-              onPress={() => setVisibleCount((n) => n + LIBRARY_PAGE_SIZE)}>
-              <Text style={styles.showMoreText}>
-                Show more ({filtered.length - visibleCount} remaining)
-              </Text>
-            </Pressable>
-          ) : null
-        }
+        ListEmptyComponent={emptyState}
+        ListFooterComponent={listFooter}
         renderItem={({ item, index }) => (
           <ChartTrackRow
             rank={index + 1}
@@ -310,17 +393,34 @@ export function UserLibrarySection({
 
 const styles = StyleSheet.create({
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
     marginBottom: 10,
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     color: colors.text,
     fontSize: 22,
     fontWeight: '700',
   },
+  titleCompact: {
+    fontSize: 18,
+  },
   subtitle: {
     marginTop: 4,
     color: colors.textSecondary,
     fontSize: 14,
+  },
+  action: {
+    marginTop: 4,
+    color: colors.accentLight,
+    fontSize: 13,
+    fontWeight: '600',
   },
   playBtn: {
     alignSelf: 'center',
@@ -336,6 +436,40 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
     color: colors.textSecondary,
+  },
+  emptyCard: {
+    marginTop: 4,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  emptyTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyBody: {
+    marginTop: 4,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  emptyBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  emptyBtnText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 13,
   },
   showMoreBtn: {
     alignSelf: 'center',

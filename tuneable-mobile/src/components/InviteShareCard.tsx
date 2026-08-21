@@ -14,15 +14,24 @@ import { colors } from '@/src/theme/colors';
 type Props = {
   inviteCode?: string | null;
   username?: string;
+  /** Compact header that expands to copy/share — used on home. */
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 };
 
 function getInviteShareUrl(code: string): string {
   return `https://tuneable.stream/register?invite=${encodeURIComponent(code)}`;
 }
 
-export function InviteShareCard({ inviteCode, username }: Props) {
+export function InviteShareCard({
+  inviteCode,
+  username,
+  collapsible = false,
+  defaultCollapsed = true,
+}: Props) {
   const code = (inviteCode || '').trim().toUpperCase();
   const [copied, setCopied] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   if (!code) return null;
 
@@ -48,11 +57,13 @@ export function InviteShareCard({ inviteCode, username }: Props) {
     }
   };
 
-  return (
-    <View style={styles.card}>
-      <Text style={styles.label}>Your invite code</Text>
-      <Text style={styles.code}>{code}</Text>
-      <Text style={styles.hint}>
+  const details = (
+    <>
+      {!collapsible ? (
+        <Text style={styles.label}>Your invite code</Text>
+      ) : null}
+      {!collapsible ? <Text style={styles.code}>{code}</Text> : null}
+      <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
         Friends need this 5-character code to create an account.
       </Text>
       <View style={styles.actions}>
@@ -69,6 +80,37 @@ export function InviteShareCard({ inviteCode, username }: Props) {
           <Text style={styles.actionText}>Share</Text>
         </Pressable>
       </View>
+    </>
+  );
+
+  if (!collapsible) {
+    return <View style={styles.card}>{details}</View>;
+  }
+
+  return (
+    <View style={styles.card}>
+      <Pressable
+        onPress={() => setCollapsed((prev) => !prev)}
+        style={styles.collapseHeader}
+        accessibilityRole="button"
+        accessibilityLabel={
+          collapsed ? 'Show invite code' : 'Hide invite code'
+        }
+        accessibilityState={{ expanded: !collapsed }}>
+        <View style={styles.collapseTitleRow}>
+          <Ionicons name="gift-outline" size={18} color={colors.accentLight} />
+          <Text style={styles.collapseTitle}>Invite</Text>
+          <View style={styles.codePill}>
+            <Text style={styles.codePillText}>{code}</Text>
+          </View>
+        </View>
+        <Ionicons
+          name={collapsed ? 'chevron-down' : 'chevron-up'}
+          size={18}
+          color={colors.textMuted}
+        />
+      </Pressable>
+      {collapsed ? null : details}
     </View>
   );
 }
@@ -81,6 +123,42 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  collapseTitleRow: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  collapseTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  codePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  codePillText: {
+    color: '#e9d5ff',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    fontVariant: ['tabular-nums'],
+  },
+  hintCollapsed: {
+    marginTop: 10,
   },
   label: {
     color: colors.textMuted,

@@ -24,6 +24,7 @@ type Props = {
   bpmFilterRange?: BpmFilterRange;
   onBpmFilterChange?: (range: BpmFilterRange) => void;
   showBpm?: boolean;
+  showTime?: boolean;
   topTags: TopTagEntry[];
   showTagPanel: boolean;
   showTimePanel: boolean;
@@ -50,6 +51,7 @@ export function ChartFilterToolbar({
   bpmFilterRange = 'all',
   onBpmFilterChange,
   showBpm = true,
+  showTime = true,
   topTags,
   showTagPanel,
   showTimePanel,
@@ -98,13 +100,15 @@ export function ChartFilterToolbar({
           }
           onPress={onToggleTagPanel}
         />
-        <FilterTrigger
-          icon="time-outline"
-          label="Time"
-          active={showTimePanel}
-          detail={periodLabel}
-          onPress={onToggleTimePanel}
-        />
+        {showTime ? (
+          <FilterTrigger
+            icon="time-outline"
+            label="Time"
+            active={showTimePanel}
+            detail={periodLabel}
+            onPress={onToggleTimePanel}
+          />
+        ) : null}
         {showBpm ? (
           <FilterTrigger
             icon="speedometer-outline"
@@ -166,7 +170,7 @@ export function ChartFilterToolbar({
         </FilterPanel>
       ) : null}
 
-      {showTimePanel ? (
+      {showTime && showTimePanel ? (
         <FilterPanel title="Time Period" onHide={onToggleTimePanel}>
           <View style={styles.chips}>
             {periods.map((p) => {
