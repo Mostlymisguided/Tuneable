@@ -83,18 +83,14 @@ export function WelcomeCreditClaimCard({ compact = false }: Props) {
         ) : (
           <>
             <Text style={styles.title}>Claim your {amountLabel} welcome credit</Text>
-            <Text style={styles.body}>
-              Promotional credit — not cash, and it can’t be withdrawn. Unused credit can be
-              revoked and expires 12 months after you claim it.
-              {!compact
-                ? ' Spent tips stay on the charts. Artist earnings from welcome credit stay pending until you top up with real money (within 90 days). Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and you can’t tip media you own.'
-                : ''}
-            </Text>
+            {!compact ? (
+              <Text style={styles.body}>Promo credit — not cash. Unused amounts expire in 12 months.</Text>
+            ) : null}
             <Pressable
               onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
               hitSlop={6}
               style={styles.termsWrap}>
-              <Text style={styles.terms}>Read the full welcome credit terms</Text>
+              <Text style={styles.terms}>Welcome credit terms</Text>
             </Pressable>
             <Pressable
               onPress={() => setAccepted((prev) => !prev)}
