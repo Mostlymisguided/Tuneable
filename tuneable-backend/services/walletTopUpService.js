@@ -35,6 +35,12 @@ async function creditIapTopUp({
 
   if (existing) {
     const user = await User.findById(existing.userId);
+    try {
+      const { afterPaidTopUp } = require('./welcomePromoEscrowService');
+      await afterPaidTopUp(existing.userId, existing);
+    } catch (promoErr) {
+      console.error('Failed to convert promo escrow on duplicate IAP top-up:', promoErr);
+    }
     return {
       balance: user?.balance || 0,
       transaction: existing,
@@ -128,6 +134,13 @@ async function creditIapTopUp({
       await sendPaymentNotification(updatedUser, creditPence / 100);
     } catch (emailError) {
       console.error('Failed to send payment notification email (non-critical):', emailError);
+    }
+
+    try {
+      const { afterPaidTopUp } = require('./welcomePromoEscrowService');
+      await afterPaidTopUp(updatedUser._id, walletTx);
+    } catch (promoErr) {
+      console.error('Failed to convert promo escrow after IAP top-up:', promoErr);
     }
 
     return {

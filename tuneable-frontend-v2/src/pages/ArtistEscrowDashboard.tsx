@@ -24,6 +24,8 @@ import { penceToPounds } from '../utils/currency';
 interface EscrowInfo {
   balance: number;
   balancePounds: number;
+  promoBalance?: number;
+  promoBalancePounds?: number;
   totalEscrowEarned?: number;
   totalEscrowEarnedPounds?: number;
   lastPayoutTotalEarned?: number;
@@ -35,8 +37,11 @@ interface EscrowInfo {
   remainingToEligiblePounds?: number;
   history: Array<{
     mediaId: string | { _id: string; title: string; coverArt?: string };
-    bidId: string | { _id: string; amount: number; createdAt: string };
+    bidId: string | { _id: string; amount: number; createdAt: string; promoEscrowStatus?: string; promoEscrowExpiresAt?: string };
     amount: number;
+    paidPence?: number;
+    promoPence?: number;
+    promoStatus?: 'none' | 'pending' | 'converted' | 'expired' | 'reversed';
     allocatedAt: string;
     claimedAt?: string;
     status: 'pending' | 'claimed';
@@ -367,6 +372,12 @@ const ArtistEscrowDashboard: React.FC = () => {
               <p className="text-3xl font-bold text-yellow-400">
                 {penceToPounds(escrowInfo.balance)}
               </p>
+              {(escrowInfo.promoBalance || 0) > 0 && (
+                <p className="text-sm text-amber-200 mt-2">
+                  {penceToPounds(escrowInfo.promoBalance || 0)} pending from welcome-credit tips
+                  — becomes withdrawable if those fans top up within 90 days.
+                </p>
+              )}
               <p className="text-sm text-gray-300 mt-2">
                 {escrowInfo.history.length} allocation{escrowInfo.history.length !== 1 ? 's' : ''} in history
               </p>
@@ -918,6 +929,16 @@ const ArtistEscrowDashboard: React.FC = () => {
                             )}
                             <span className="capitalize">{entry.status}</span>
                           </span>
+                          {entry.promoStatus && entry.promoStatus !== 'none' && (
+                            <span className={`capitalize ${
+                              entry.promoStatus === 'pending' ? 'text-amber-300' :
+                              entry.promoStatus === 'converted' ? 'text-green-300' :
+                              entry.promoStatus === 'expired' ? 'text-gray-500' :
+                              'text-gray-400'
+                            }`}>
+                              {entry.promoStatus === 'pending' ? 'welcome pending' : `welcome ${entry.promoStatus}`}
+                            </span>
+                          }
                         </div>
                         {media && (
                           <Link

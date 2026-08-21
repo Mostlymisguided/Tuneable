@@ -59,6 +59,13 @@ db.connectDB()
     } catch (error) {
       console.error('Failed to start enrichment drip cron:', error);
     }
+
+    try {
+      const { startPromoEscrowExpiryCron } = require('./services/welcomePromoEscrowService');
+      startPromoEscrowExpiryCron();
+    } catch (error) {
+      console.error('Failed to start promo escrow expiry cron:', error);
+    }
   })
   .catch((err) => {
     console.error('Error connecting to the database:', err);
@@ -288,6 +295,12 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
           console.log(`   User was already credited: £${(existingTransaction.amount / 100).toFixed(2)}`);
           console.log(`   Transaction created at: ${existingTransaction.createdAt}`);
           console.log(`   User ID: ${existingTransaction.userId}`);
+          try {
+            const { afterPaidTopUp } = require('./services/welcomePromoEscrowService');
+            await afterPaidTopUp(existingTransaction.userId, existingTransaction);
+          } catch (promoErr) {
+            console.error('Failed to convert promo escrow on duplicate Stripe webhook:', promoErr);
+          }
           // Still acknowledge to Stripe to prevent retries
           return res.json({ received: true, message: 'Already processed' });
         }
@@ -580,6 +593,13 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
           // Commit the transaction - all operations succeed or all fail
           await dbSession.commitTransaction();
           console.log(`✅ Transaction committed successfully: User ${userId} requested £${(amountRequestedPence / 100).toFixed(2)}, received £${amountReceivedPounds.toFixed(2)} (fees: £${stripeFeesPounds.toFixed(2)}), new balance: £${(updatedUser.balance / 100).toFixed(2)}`);
+
+          try {
+            const { afterPaidTopUp } = require('./services/welcomePromoEscrowService');
+            await afterPaidTopUp(updatedUser._id, walletTx);
+          } catch (promoErr) {
+            console.error('Failed to convert promo escrow after Stripe top-up:', promoErr);
+          }
           
           // Send email notification (non-critical, don't fail if this fails)
           try {
@@ -630,6 +650,45 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
     } else {
       console.log(`⚠️ Unhandled checkout session type: ${session.metadata?.type || 'no metadata'}`);
     }
+  } else if (event.type === 'charge.refunded') {
+    try {
+      const charge = event.data.object;
+      const paymentIntentId =
+        typeof charge.payment_intent === 'string'
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+      const fullyRefunded =
+        charge.refunded === true ||
+        (Number(charge.amount_refunded || 0) >= Number(charge.amount || 0) &&
+          Number(charge.amount || 0) > 0);
+
+      if (!paymentIntentId || !fullyRefunded) {
+        return res.json({ received: true });
+      }
+
+      const WalletTransaction = require('./models/WalletTransaction');
+      const tx = await WalletTransaction.findOne({
+        stripePaymentIntentId: paymentIntentId,
+        type: 'topup',
+        paymentMethod: 'stripe',
+      });
+
+      if (!tx) {
+        return res.json({ received: true });
+      }
+
+      if (tx.status === 'completed') {
+        tx.status = 'refunded';
+        await tx.save();
+      }
+
+      const { unconvertPromoEscrowIfNoPaidTopUp } = require('./services/welcomePromoEscrowService');
+      await unconvertPromoEscrowIfNoPaidTopUp(tx.userId);
+      console.log(`⚠️ Stripe charge refunded for top-up ${tx._id}; promo escrow unconvert checked`);
+    } catch (refundErr) {
+      console.error('Failed to handle charge.refunded for promo escrow:', refundErr);
+    }
+    return res.json({ received: true });
   } else {
     console.log(`⚠️ Unhandled webhook event type: ${event.type}`);
     // For unhandled events, still acknowledge to Stripe

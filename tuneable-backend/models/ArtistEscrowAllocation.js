@@ -74,7 +74,29 @@ const artistEscrowAllocationSchema = new mongoose.Schema({
     type: Number, 
     required: true,
     min: 0
-  }, // Amount allocated in PENCE (integer)
+  }, // Amount allocated in PENCE (integer) (paid + promo)
+  paidPence: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  promoPence: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  promoStatus: {
+    type: String,
+    enum: ['none', 'pending', 'converted', 'expired', 'reversed'],
+    default: 'none'
+  },
+  promoEscrowExpiresAt: { type: Date },
+  tipperUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true
+  },
   
   // ========================================
   // CLAIM STATUS
@@ -120,6 +142,8 @@ artistEscrowAllocationSchema.index({ artistName: 1, claimed: 1 });
 artistEscrowAllocationSchema.index({ 'matchingCriteria.youtubeChannelId': 1, claimed: 1 });
 artistEscrowAllocationSchema.index({ artistUserId: 1, claimed: 1 });
 artistEscrowAllocationSchema.index({ transactionHash: 1 }); // Hash lookup for verification
+artistEscrowAllocationSchema.index({ promoStatus: 1, promoEscrowExpiresAt: 1 });
+artistEscrowAllocationSchema.index({ tipperUserId: 1, promoStatus: 1 });
 
 // ========================================
 // HASH GENERATION
@@ -193,18 +217,36 @@ artistEscrowAllocationSchema.methods.claim = async function(userId) {
   
   await this.save();
   
-  // Update user's escrow balance
+  const paid = Math.max(0, this.paidPence || 0);
+  const promo = Math.max(0, this.promoPence || 0);
+  const hasSplit = paid > 0 || promo > 0;
+  let creditPaid = hasSplit ? paid : this.allocatedAmount;
+  let creditPromo = 0;
+  let historyPromoStatus = hasSplit ? (this.promoStatus || 'none') : 'none';
+
+  if (hasSplit) {
+    if (this.promoStatus === 'pending') {
+      creditPromo = promo;
+    } else if (this.promoStatus === 'converted') {
+      creditPaid = paid + promo;
+    }
+  }
+
   const User = require('./User');
   await User.findByIdAndUpdate(userId, {
     $inc: {
-      artistEscrowBalance: this.allocatedAmount,
-      totalEscrowEarned: this.allocatedAmount,
+      artistEscrowBalance: creditPaid,
+      artistPromoEscrowBalance: creditPromo,
+      totalEscrowEarned: creditPaid,
     },
     $push: {
       artistEscrowHistory: {
         mediaId: this.mediaId,
         bidId: this.bidId,
         amount: this.allocatedAmount,
+        paidPence: hasSplit ? paid : creditPaid,
+        promoPence: hasSplit ? promo : 0,
+        promoStatus: historyPromoStatus,
         allocatedAt: this.allocatedAt,
         claimedAt: this.claimedAt,
         status: 'claimed'

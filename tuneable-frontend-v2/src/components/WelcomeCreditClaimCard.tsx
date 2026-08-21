@@ -105,7 +105,7 @@ const WelcomeCreditClaimCard: React.FC<{ variant?: Variant }> = ({ variant = 'de
                 <li>Unused credit can be revoked and expires 12 months after you claim it.</li>
                 {!compact && (
                   <>
-                    <li>Spent tips are not clawed back.</li>
+                    <li>Spent tips stay on the charts. Artist earnings from welcome credit stay pending until you top up (within 90 days).</li>
                     <li>Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and you can’t tip media you own.</li>
                   </>
                 )}

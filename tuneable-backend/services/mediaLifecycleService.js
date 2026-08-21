@@ -4,7 +4,6 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const Party = require('../models/Party');
 const Comment = require('../models/Comment');
-const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
 const tuneableLedgerService = require('./tuneableLedgerService');
 const notificationService = require('./notificationService');
 const bidMetricsEngine = require('./bidMetricsEngine');
@@ -21,46 +20,8 @@ async function resolveMediaByIdentifier(mediaId) {
 }
 
 async function reverseEscrowForBid(bid, refundAmount) {
-  try {
-    const escrowAllocation = await ArtistEscrowAllocation.findOne({ bidId: bid._id });
-
-    if (escrowAllocation) {
-      if (!escrowAllocation.claimed) {
-        await escrowAllocation.deleteOne();
-        return;
-      }
-      if (escrowAllocation.claimed && escrowAllocation.artistUserId) {
-        const artistUser = await User.findById(escrowAllocation.artistUserId);
-        if (artistUser && artistUser.artistEscrowBalance > 0) {
-          const userShare = escrowAllocation.allocatedAmount;
-          if (artistUser.artistEscrowBalance >= userShare) {
-            artistUser.artistEscrowBalance -= userShare;
-            artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - userShare);
-            await artistUser.save();
-          }
-        }
-      }
-      return;
-    }
-
-    const mediaWithOwners = await Media.findById(bid.mediaId).select('mediaOwners');
-    if (!mediaWithOwners?.mediaOwners?.length) return;
-
-    const userShare = Math.round(refundAmount * 0.70);
-    for (const owner of mediaWithOwners.mediaOwners) {
-      if (!owner.userId) continue;
-      const artistUser = await User.findById(owner.userId);
-      if (!artistUser || artistUser.artistEscrowBalance <= 0) continue;
-      const ownerShare = Math.round(userShare * (owner.percentage / 100));
-      if (artistUser.artistEscrowBalance >= ownerShare) {
-        artistUser.artistEscrowBalance -= ownerShare;
-        artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - ownerShare);
-        await artistUser.save();
-      }
-    }
-  } catch (error) {
-    console.error(`Error reversing escrow for bid ${bid._id}:`, error);
-  }
+  const artistEscrowService = require('./artistEscrowService');
+  return artistEscrowService.reverseEscrowForBid(bid, refundAmount);
 }
 
 async function refundActiveBidsForMedia(media, actorId, reason) {

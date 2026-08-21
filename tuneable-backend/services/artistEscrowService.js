@@ -17,6 +17,11 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
 const { validatePenceAmount } = require('../utils/penceValidation');
+const {
+  splitArtistShare,
+  splitOwnerShare,
+  PROMO_ESCROW_STATUS,
+} = require('../utils/welcomePromoEscrow');
 
 // Revenue split constants
 const ARTIST_SHARE_PERCENTAGE = 0.70; // 70% to artists
@@ -43,23 +48,55 @@ class ArtistEscrowService {
       if (!media) {
         throw new Error(`Media ${mediaId} not found`);
       }
+
+      const bid = await Bid.findById(bidId).select(
+        'userId amount welcomeCreditAppliedPence promoEscrowStatus'
+      );
+      const { hasCompletedPaidTopUp, convertPromoEscrowForTipper } =
+        require('./welcomePromoEscrowService');
+      const alreadyPaying = bid?.userId
+        ? await hasCompletedPaidTopUp(bid.userId)
+        : false;
+      const bidSplit = splitArtistShare({
+        bidAmountPence: validatedAmount,
+        welcomeCreditAppliedPence: bid?.welcomeCreditAppliedPence || 0,
+        treatWelcomeAsPaid: alreadyPaying,
+      });
+
+      if (alreadyPaying && bid?.userId) {
+        convertPromoEscrowForTipper(bid.userId).catch((err) => {
+          console.error('Failed to convert leftover promo escrow for paying tipper:', err);
+        });
+      }
       
       // Calculate artist share (70% of bid amount)
-      const artistSharePence = Math.round(validatedAmount * ARTIST_SHARE_PERCENTAGE);
+      const artistSharePence = bidSplit.artistSharePence;
 
       const rightsPending = media.rightsStatus === 'pending' && !media.rightsCleared;
 
       // Pending library imports: full artist share goes to escrow until rights holder claims
       if (rightsPending) {
-        await this._allocateToUnknownArtist(media, bidId, artistSharePence, 100);
+        await this._allocateToUnknownArtist(
+          media,
+          bidId,
+          artistSharePence,
+          100,
+          bidSplit,
+          bid?.userId
+        );
+        await this._stampBidPromoEscrow(bidId, bidSplit);
         const tuneableFeePence = validatedAmount - artistSharePence;
         return {
           allocated: true,
           artistShare: artistSharePence,
+          paidArtistShare: bidSplit.paidArtistSharePence,
+          promoArtistShare: bidSplit.promoArtistSharePence,
           tuneableFee: tuneableFeePence,
           allocations: [{
             type: 'unknown',
             amount: artistSharePence,
+            paidPence: bidSplit.paidArtistSharePence,
+            promoPence: bidSplit.promoArtistSharePence,
             percentage: 100,
             reason: 'rights_pending',
           }],
@@ -103,6 +140,7 @@ class ArtistEscrowService {
       }
       
       const allocations = [];
+      let allocatedPromo = 0;
       
       // Allocate to each media owner based on their percentage
       for (const owner of media.mediaOwners) {
@@ -111,6 +149,9 @@ class ArtistEscrowService {
         if (ownerSharePence <= 0) {
           continue; // Skip zero allocations
         }
+
+        const ownerSplit = splitOwnerShare(ownerSharePence, bidSplit);
+        allocatedPromo += ownerSplit.promoPence;
         
         if (owner.userId) {
           // Registered artist - add to their escrow balance
@@ -119,12 +160,15 @@ class ArtistEscrowService {
             mediaId,
             bidId,
             ownerSharePence,
-            owner.percentage
+            owner.percentage,
+            ownerSplit
           );
           allocations.push({
             type: 'registered',
             userId: owner.userId.toString(),
             amount: ownerSharePence,
+            paidPence: ownerSplit.paidPence,
+            promoPence: ownerSplit.promoPence,
             percentage: owner.percentage
           });
         } else {
@@ -133,15 +177,26 @@ class ArtistEscrowService {
             media,
             bidId,
             ownerSharePence,
-            owner.percentage
+            owner.percentage,
+            { ...bidSplit, paidArtistSharePence: ownerSplit.paidPence, promoArtistSharePence: ownerSplit.promoPence },
+            bid?.userId
           );
           allocations.push({
             type: 'unknown',
             amount: ownerSharePence,
+            paidPence: ownerSplit.paidPence,
+            promoPence: ownerSplit.promoPence,
             percentage: owner.percentage
           });
         }
       }
+
+      const stampedSplit = {
+        ...bidSplit,
+        promoArtistSharePence: allocatedPromo,
+        promoEscrowStatus: allocatedPromo > 0 ? PROMO_ESCROW_STATUS.PENDING : PROMO_ESCROW_STATUS.NONE,
+      };
+      await this._stampBidPromoEscrow(bidId, stampedSplit);
       
       // Calculate Tuneable fee (30% + any rounding differences)
       const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
@@ -149,11 +204,16 @@ class ArtistEscrowService {
       
       console.log(`✅ Escrow allocated for bid ${bidId}:`);
       console.log(`   - Artist share: £${(artistSharePence / 100).toFixed(2)} (${allocations.length} allocations)`);
+      if (allocatedPromo > 0) {
+        console.log(`   - Promo pending: £${(allocatedPromo / 100).toFixed(2)}`);
+      }
       console.log(`   - Tuneable fee: £${(tuneableFeePence / 100).toFixed(2)}`);
       
       return {
         allocated: true,
         artistShare: artistSharePence,
+        paidArtistShare: bidSplit.paidArtistSharePence,
+        promoArtistShare: allocatedPromo,
         tuneableFee: tuneableFeePence,
         allocations
       };
@@ -164,12 +224,29 @@ class ArtistEscrowService {
     }
   }
   
+  async _stampBidPromoEscrow(bidId, bidSplit) {
+    if (!bidId || !bidSplit) return;
+    const promo = bidSplit.promoArtistSharePence || 0;
+    await Bid.updateOne(
+      { _id: bidId },
+      {
+        $set: {
+          promoArtistSharePence: promo,
+          promoEscrowStatus: promo > 0 ? PROMO_ESCROW_STATUS.PENDING : PROMO_ESCROW_STATUS.NONE,
+          promoEscrowExpiresAt: promo > 0 ? bidSplit.promoEscrowExpiresAt : null,
+        },
+      }
+    );
+  }
+
   /**
    * Allocate escrow to a registered artist
    * @private
    */
-  async _allocateToRegisteredArtist(userId, mediaId, bidId, amountPence, percentage) {
+  async _allocateToRegisteredArtist(userId, mediaId, bidId, amountPence, percentage, ownerSplit = {}) {
     const validatedAmount = validatePenceAmount(amountPence, 'artist escrow allocation');
+    const paidPence = Math.max(0, ownerSplit.paidPence ?? validatedAmount);
+    const promoPence = Math.max(0, ownerSplit.promoPence ?? 0);
     
     // Get media for notification
     const media = await Media.findById(mediaId).select('title artist');
@@ -180,14 +257,18 @@ class ArtistEscrowService {
     
     await User.findByIdAndUpdate(userId, {
       $inc: { 
-        artistEscrowBalance: validatedAmount,
-        totalEscrowEarned: validatedAmount // Track cumulative earnings for payout eligibility
+        artistEscrowBalance: paidPence,
+        artistPromoEscrowBalance: promoPence,
+        totalEscrowEarned: paidPence
       },
       $push: {
         artistEscrowHistory: {
           mediaId: mediaId,
           bidId: bidId,
           amount: validatedAmount,
+          paidPence,
+          promoPence,
+          promoStatus: promoPence > 0 ? PROMO_ESCROW_STATUS.PENDING : PROMO_ESCROW_STATUS.NONE,
           allocatedAt: new Date(),
           status: 'pending'
         }
@@ -197,11 +278,19 @@ class ArtistEscrowService {
     // Send notification to artist (async, don't block)
     try {
       const Notification = require('../models/Notification');
+      let message;
+      if (promoPence > 0 && paidPence <= 0) {
+        message = `£${(promoPence / 100).toFixed(2)} from a welcome-credit tip on "${mediaTitle}" is pending until that fan tops up.`;
+      } else if (promoPence > 0) {
+        message = `£${(paidPence / 100).toFixed(2)} has been added to your escrow from "${mediaTitle}" (£${(promoPence / 100).toFixed(2)} pending welcome credit).`;
+      } else {
+        message = `£${(validatedAmount / 100).toFixed(2)} has been added to your escrow balance from "${mediaTitle}"`;
+      }
       const notification = new Notification({
         userId: userId,
         type: 'escrow_allocated',
-        title: 'Escrow Allocated',
-        message: `£${(validatedAmount / 100).toFixed(2)} has been added to your escrow balance from "${mediaTitle}"`,
+        title: promoPence > 0 && paidPence <= 0 ? 'Promotional tip pending' : 'Escrow Allocated',
+        message,
         link: `/tune/${mediaId}`,
         linkText: 'View Media',
         relatedMediaId: mediaId,
@@ -220,8 +309,10 @@ class ArtistEscrowService {
    * Allocate escrow to an unknown artist
    * @private
    */
-  async _allocateToUnknownArtist(media, bidId, amountPence, percentage) {
+  async _allocateToUnknownArtist(media, bidId, amountPence, percentage, bidSplit = {}, tipperUserId = null) {
     const validatedAmount = validatePenceAmount(amountPence, 'unknown artist escrow allocation');
+    const paidPence = Math.max(0, bidSplit.paidArtistSharePence ?? validatedAmount);
+    const promoPence = Math.max(0, bidSplit.promoArtistSharePence ?? 0);
     
     // Get artist name(s) for matching
     const artistNames = media.artist && media.artist.length > 0
@@ -254,6 +345,11 @@ class ArtistEscrowService {
       },
       percentage: percentage,
       allocatedAmount: validatedAmount,
+      paidPence,
+      promoPence,
+      promoStatus: promoPence > 0 ? PROMO_ESCROW_STATUS.PENDING : PROMO_ESCROW_STATUS.NONE,
+      promoEscrowExpiresAt: promoPence > 0 ? bidSplit.promoEscrowExpiresAt : null,
+      tipperUserId: tipperUserId || null,
       claimed: false
     });
     
@@ -406,10 +502,13 @@ class ArtistEscrowService {
    */
   async getEscrowInfo(userId) {
     try {
+      const { expireDuePromoEscrowForArtist } = require('./welcomePromoEscrowService');
+      await expireDuePromoEscrowForArtist(userId);
+
       const user = await User.findById(userId)
-        .select('artistEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory')
+        .select('artistEscrowBalance artistPromoEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory')
         .populate('artistEscrowHistory.mediaId', 'title artist coverArt')
-        .populate('artistEscrowHistory.bidId', 'amount createdAt');
+        .populate('artistEscrowHistory.bidId', 'amount createdAt promoEscrowStatus promoEscrowExpiresAt');
       
       if (!user) {
         throw new Error(`User ${userId} not found`);
@@ -458,8 +557,10 @@ class ArtistEscrowService {
       }
       
       return {
-        balance: user.artistEscrowBalance || 0, // In pence
+        balance: user.artistEscrowBalance || 0, // In pence (withdrawable)
         balancePounds: (user.artistEscrowBalance || 0) / 100,
+        promoBalance: user.artistPromoEscrowBalance || 0,
+        promoBalancePounds: (user.artistPromoEscrowBalance || 0) / 100,
         totalEscrowEarned: totalEscrowEarned, // In pence
         totalEscrowEarnedPounds: totalEscrowEarned / 100,
         lastPayoutTotalEarned: lastPayoutTotalEarned, // In pence
@@ -497,6 +598,11 @@ class ArtistEscrowService {
     const validatedAmount = validatePenceAmount(bidAmountPence, 'bid amount');
     const artistSharePence = Math.round(validatedAmount * ARTIST_SHARE_PERCENTAGE);
     return Math.round(artistSharePence * (percentage / 100));
+  }
+
+  async reverseEscrowForBid(bid, refundAmount) {
+    const { reverseEscrowForBid } = require('./welcomePromoEscrowService');
+    return reverseEscrowForBid(bid, refundAmount);
   }
 }
 

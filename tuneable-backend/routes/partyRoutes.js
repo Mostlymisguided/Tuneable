@@ -4222,68 +4222,9 @@ router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), as
         await bid.save();
 
         // Reverse escrow allocation if possible
-        // Note: If artist already claimed, this will need admin review
         try {
-            const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
-            const escrowAllocation = await ArtistEscrowAllocation.findOne({ bidId: bid._id });
-            
-            if (escrowAllocation) {
-                if (!escrowAllocation.claimed) {
-                    // Reverse unclaimed allocation
-                    await escrowAllocation.remove();
-                    console.log(`✅ Reversed unclaimed escrow allocation for bid ${bidId}`);
-                } else if (escrowAllocation.claimed && escrowAllocation.artistUserId) {
-                    // Escrow was claimed by a registered artist - try to reverse from their balance
-                    const artistUser = await User.findById(escrowAllocation.artistUserId);
-                    if (artistUser && artistUser.artistEscrowBalance > 0) {
-                        const userShare = escrowAllocation.allocatedAmount; // Use the actual allocated amount
-                        if (artistUser.artistEscrowBalance >= userShare) {
-                            artistUser.artistEscrowBalance -= userShare;
-                            artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - userShare);
-                            await artistUser.save();
-                            console.log(`✅ Reversed escrow from artist balance for bid ${bidId}`);
-                        } else {
-                            console.log(`⚠️  Insufficient escrow balance to reverse - requires admin review`);
-                        }
-                    }
-                } else {
-                    // Escrow was claimed but no artistUserId - flag for admin review
-                    console.log(`⚠️  Escrow already claimed for bid ${bidId} - requires admin review`);
-                }
-            } else {
-                // No escrow allocation found - escrow may have been allocated directly to registered artist
-                // Check media owners to find registered artists who received escrow
-                const mediaWithOwners = await Media.findById(bid.mediaId).select('mediaOwners');
-                if (mediaWithOwners && mediaWithOwners.mediaOwners) {
-                    const userShare = Math.round(refundAmount * 0.70); // 70% artist share
-                    for (const owner of mediaWithOwners.mediaOwners) {
-                if (owner.userId) {
-                  const artistUser = await User.findById(owner.userId);
-                  if (artistUser && artistUser.artistEscrowBalance > 0) {
-                    const ownerShare = Math.round(userShare * (owner.percentage / 100));
-                    if (artistUser.artistEscrowBalance >= ownerShare) {
-                      artistUser.artistEscrowBalance -= ownerShare;
-                      artistUser.totalEscrowEarned = Math.max(0, (artistUser.totalEscrowEarned || 0) - ownerShare);
-                      
-                      // Update artistEscrowHistory - mark the entry for this bid as refunded
-                      if (artistUser.artistEscrowHistory && artistUser.artistEscrowHistory.length > 0) {
-                        const historyEntry = artistUser.artistEscrowHistory.find(
-                          entry => entry.bidId && entry.bidId.toString() === bid._id.toString()
-                        );
-                        if (historyEntry && historyEntry.status === 'pending') {
-                          historyEntry.status = 'claimed'; // Mark as claimed/processed (we can't add 'refunded' without schema change)
-                          historyEntry.claimedAt = new Date();
-                        }
-                      }
-                      
-                      await artistUser.save();
-                      console.log(`✅ Reversed escrow from artist ${artistUser.username} balance for bid ${bidId}`);
-                    }
-                  }
-                }
-                    }
-                }
-            }
+            const artistEscrowService = require('../services/artistEscrowService');
+            await artistEscrowService.reverseEscrowForBid(bid, refundAmount);
         } catch (escrowError) {
             console.error('Error reversing escrow allocation:', escrowError);
             // Don't fail the refund if escrow reversal fails - flag for admin review

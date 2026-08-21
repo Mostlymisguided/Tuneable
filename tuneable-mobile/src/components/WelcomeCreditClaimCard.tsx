@@ -87,7 +87,7 @@ export function WelcomeCreditClaimCard({ compact = false }: Props) {
               Promotional credit — not cash, and it can’t be withdrawn. Unused credit can be
               revoked and expires 12 months after you claim it.
               {!compact
-                ? ' Spent tips are not clawed back. Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and you can’t tip media you own.'
+                ? ' Spent tips stay on the charts. Artist earnings from welcome credit stay pending until you top up with real money (within 90 days). Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and you can’t tip media you own.'
                 : ''}
             </Text>
             <Pressable

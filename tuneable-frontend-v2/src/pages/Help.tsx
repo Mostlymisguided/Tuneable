@@ -28,10 +28,11 @@ const Help: React.FC = () => {
             <p className="text-gray-300">
               Register with your email or a social account — no invite code required.
               If a friend shares their invite link, you&apos;ll be attributed to them automatically.
-              New users receive £11.11 in welcome credits.
+              New users can claim £11.11 in welcome credits.
               Welcome credit is promotional: tips using it are capped at £1.11 each, £3.33 / 3 songs per artist,
               and cannot be used on media you own. Unused amounts expire after 12 months and may be revoked
-              at Tuneable&apos;s discretion.
+              at Tuneable&apos;s discretion. Spent tips stay on the charts; artist earnings from welcome credit
+              stay pending until you top up with real money (within 90 days), otherwise those earnings expire.
             </p>
           </div>
         </div>
@@ -49,7 +50,8 @@ const Help: React.FC = () => {
               When you tip on a tune, you're voting for it to be moved up the charts. It is also added to your Library. Higher tips give tunes more weight 
               in the charts. The minimum tip is usually £0.01, but party hosts can set their own minimum.
               Tips funded by welcome credit are limited to £1.11 each, with a max of £3.33 and three songs per artist,
-              and cannot be used on your own releases.
+              and cannot be used on your own releases. Artist earnings from welcome-credit tips stay pending until
+              you top up with real money (within 90 days).
             </p>
           </div>
           <div>

@@ -8,6 +8,7 @@
  * - Max £3.33 welcome + max 3 distinct media per artist (owner or name key)
  * - Cannot use welcome credit on media you own / control
  * - Refunds do not restore welcome credit (see welcomeCreditHelper)
+ * - Welcome-funded artist share is provisional until a real top-up (90 days)
  */
 
 const mongoose = require('mongoose');
@@ -429,6 +430,9 @@ async function getArtistWelcomeOriginStats(artistUserId) {
  * Gate artist payout requests for manual holds and welcome-origin risk.
  */
 async function assertPayoutAllowed(user) {
+  const { expireDuePromoEscrowForArtist } = require('../services/welcomePromoEscrowService');
+  await expireDuePromoEscrowForArtist(user._id);
+
   if (user.payoutHeldAt) {
     throw policyError(
       CODES.PAYOUT_HELD,

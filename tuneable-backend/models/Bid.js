@@ -130,6 +130,19 @@ const bidSchema = new mongoose.Schema({
         default: 0,
         min: [0, 'Welcome credit applied cannot be negative']
     },
+    // Artist-share of the welcome portion held as provisional escrow until the
+    // tipper tops up with real money (or this expires / the tip is reversed).
+    promoArtistSharePence: {
+        type: Number,
+        default: 0,
+        min: [0, 'Promo artist share cannot be negative']
+    },
+    promoEscrowStatus: {
+        type: String,
+        enum: ['none', 'pending', 'converted', 'expired', 'reversed'],
+        default: 'none'
+    },
+    promoEscrowExpiresAt: { type: Date },
     status: {
         type: String,
         enum: ['active', 'vetoed', 'refunded'],
@@ -297,6 +310,8 @@ bidSchema.index({ mediaId: 1, status: 1, bidderLocationAncestorIds: 1 }); // Med
 bidSchema.index({ mediaId: 1, status: 1, amount: -1 }); // Global Party top supporters per media
 bidSchema.index({ status: 1, bidderHomePlaceId: 1, createdAt: -1 }); // Global Party top places
 bidSchema.index({ status: 1, bidderCountryPlaceId: 1, createdAt: -1 }); // Global Party top countries
+bidSchema.index({ promoEscrowStatus: 1, promoEscrowExpiresAt: 1 }); // Welcome promo escrow expiry
+bidSchema.index({ userId: 1, promoEscrowStatus: 1 }); // Convert pending promo on paid top-up
 
 // ========================================
 // HASH GENERATION

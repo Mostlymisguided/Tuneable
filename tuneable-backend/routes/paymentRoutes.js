@@ -326,6 +326,13 @@ router.post('/update-balance', authMiddleware, async (req, res) => {
         console.error('❌ Failed to create ledger entry for fallback top-up:', ledgerError);
         // Don't fail the request, but log the error
       }
+
+      try {
+        const { afterPaidTopUp } = require('../services/welcomePromoEscrowService');
+        await afterPaidTopUp(user._id, walletTransaction);
+      } catch (promoErr) {
+        console.error('Failed to convert promo escrow after Stripe fallback top-up:', promoErr);
+      }
     }
 
     res.json({ message: 'Balance updated successfully', balance: user.balance });

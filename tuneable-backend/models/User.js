@@ -79,10 +79,25 @@ const userSchema = new mongoose.Schema({
     default: 0 
   }, // Artist revenue in PENCE (integer), not pounds - unclaimed until payout
   // Example: 1050 represents £10.50, 3300 represents £33.00
+  // Welcome-funded artist share not yet converted by a real tipper top-up. Not withdrawable.
+  artistPromoEscrowBalance: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  welcomePromoConvertedAt: { type: Date, default: null },
+  welcomePromoConvertedByTxId: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletTransaction', default: null },
   artistEscrowHistory: [{
     mediaId: { type: mongoose.Schema.Types.ObjectId, ref: 'Media' },
     bidId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bid' },
-    amount: { type: Number, required: true }, // In pence
+    amount: { type: Number, required: true }, // In pence (paid + promo at allocation)
+    paidPence: { type: Number, default: 0, min: 0 },
+    promoPence: { type: Number, default: 0, min: 0 },
+    promoStatus: {
+      type: String,
+      enum: ['none', 'pending', 'converted', 'expired', 'reversed'],
+      default: 'none',
+    },
     allocatedAt: { type: Date, default: Date.now },
     claimedAt: { type: Date },
     status: { type: String, enum: ['pending', 'claimed'], default: 'pending' },

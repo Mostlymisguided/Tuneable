@@ -127,7 +127,8 @@ async function recordWelcomeGrantSideEffects(user, amountPence, balanceBefore) {
       title: 'Welcome Credit Claimed',
       message:
         `You've claimed £11.11 promotional credit. Welcome tips are capped ` +
-        `(max £1.11 per tip, £3.33 / 3 songs per artist). Unused credit expires after ` +
+        `(max £1.11 per tip, £3.33 / 3 songs per artist). Artist earnings from those tips stay pending ` +
+        `until you top up with real money (within 90 days). Unused credit expires after ` +
         `${WELCOME_CREDIT_EXPIRY_MONTHS} months and may be revoked at Tuneable's discretion.`,
       link: '/wallet',
       linkText: 'View Wallet',

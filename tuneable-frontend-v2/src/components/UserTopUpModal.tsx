@@ -368,7 +368,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                 <div className="pt-4 border-t border-gray-700">
                   <p className="text-xs text-gray-400 mb-3">
                     Revoke removes only unspent welcome credit ({penceToPounds(welcomeCreditRemainingPence)}),
-                    not Stripe top-ups or spent tips.
+                    not Stripe top-ups. Spent tips stay on charts; artist earnings from those tips stay pending until a real top-up.
                   </p>
                   <button
                     type="button"

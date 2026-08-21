@@ -115,7 +115,7 @@ const TermsOfService: React.FC = () => {
                   <li>Wallet funds can be added through secure payment processing via Stripe</li>
                   <li>Wallet balances are non-refundable except as required by law</li>
                   <li>Unused wallet funds remain in your account for future use</li>
-                  <li>Promotional welcome credit may be offered to new users at Tuneable's discretion. Welcome credit is not cash, has no monetary value outside the platform, and any unused welcome credit may be revoked by Tuneable at any time (including automatic expiry after 12 months from grant). Spent welcome credit is not clawed back from tips already placed.</li>
+                  <li>Promotional welcome credit may be offered to new users at Tuneable's discretion. Welcome credit is not cash, has no monetary value outside the platform, and any unused welcome credit may be revoked by Tuneable at any time (including automatic expiry after 12 months from grant). Tips placed with welcome credit remain on charts and in your history. Artist earnings from the welcome-credit portion of a tip stay pending until you add funds with a real payment (card or in-app purchase). If you do not top up within 90 days of that tip, those pending artist earnings expire. Tuneable may also reverse that conversion if the converting payment is refunded or charged back. Spent tips themselves are not deleted from charts.</li>
                   <li>Welcome credit is subject to use limits designed to prevent abuse, including a maximum of £1.11 per tip, a maximum of £3.33 and three songs per artist, and a prohibition on using welcome credit to tip media you own or control.</li>
                   <li>Tuneable may freeze wallets or place payout holds at its sole discretion where tipping or promotional-credit activity appears abusive, fraudulent, or otherwise harmful to the Service. Frozen wallets cannot tip, pledge, or request payouts until the hold is lifted.</li>
                 </ul>
@@ -135,9 +135,9 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>When users tip on media, 70% of the tip amount is allocated to the artist's escrow balance</li>
                   <li>Escrow allocations are split among media owners based on their ownership percentages</li>
-                  <li>For registered artists, escrow is immediately added to their balance</li>
-                  <li>For unregistered artists, escrow is stored and can be claimed when they register and verify their identity</li>
-                  <li>Artists can view their escrow balance and request payouts through their dashboard</li>
+                  <li>For registered artists, paid escrow is immediately added to their withdrawable balance. The welcome-credit portion is held as pending promotional escrow until the tipper tops up with real money (or it expires after 90 days)</li>
+                  <li>For unregistered artists, escrow is stored and can be claimed when they register and verify their identity, subject to the same promotional-pending rules</li>
+                  <li>Artists can view their escrow balance and request payouts through their dashboard. Pending promotional escrow is not payable</li>
                   <li>Payouts are processed manually by Tuneable staff</li>
                   <li>Revenue is accrued and reserved for creators until claimed, but not held in trust</li>
                   <li>Unclaimed allocations remain claimable indefinitely</li>

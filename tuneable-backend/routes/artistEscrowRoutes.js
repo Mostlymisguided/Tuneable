@@ -30,7 +30,9 @@ router.get('/info', authMiddleware, async (req, res) => {
         remainingToEligible: escrowInfo.remainingToEligible, // In pence
         remainingToEligiblePounds: escrowInfo.remainingToEligiblePounds,
         history: escrowInfo.history,
-        unclaimedAllocations: escrowInfo.unclaimedAllocations
+        unclaimedAllocations: escrowInfo.unclaimedAllocations,
+        promoBalance: escrowInfo.promoBalance || 0,
+        promoBalancePounds: escrowInfo.promoBalancePounds || 0,
       }
     });
   } catch (error) {
