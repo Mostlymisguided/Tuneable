@@ -39,39 +39,23 @@ const PrivacyPolicy: React.FC = () => {
                   <li>Platform usage patterns and feature interactions</li>
                 </ul>
 
-                <h3 className="text-xl font-medium text-gray-900">1.3 YouTube Data API Information</h3>
+                <h3 className="text-xl font-medium text-gray-900">1.3 Catalogue Import Information</h3>
                 <p className="mb-2">
-                  Tuneable uses the YouTube Data API to access publicly available video metadata in compliance with YouTube's Terms of Service 
-                  and API Services Terms. We collect and store:
+                  When you import a public playlist or similar catalogue source (for example a public YouTube playlist), we may collect 
+                  publicly available catalogue metadata so those items can be matched to tracks in Tuneable's library. This may include:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Video titles, descriptions, and thumbnails (for display and search purposes only)</li>
-                  <li>Video duration, channel information, and publication dates</li>
-                  <li>YouTube video IDs and URLs (for embedding the official YouTube player)</li>
-                  <li>Video category and basic metadata (for content organization)</li>
+                  <li>Track titles, artist names, and related catalogue metadata</li>
+                  <li>Public playlist identifiers or source URLs you provide</li>
                 </ul>
                 <p className="mb-2 mt-4">
                   <strong>Important:</strong>
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Tuneable does <strong>not</strong> collect or store any personal information from YouTube users or YouTube account holders</li>
-                  <li>We only access publicly available metadata through the YouTube Data API</li>
-                  <li>We do <strong>not</strong> download, store, or rehost any video or audio content from YouTube</li>
-                  <li>We do <strong>not</strong> access private or unlisted YouTube videos</li>
-                  <li>Video metadata is used solely for platform functionality (display, search, queueing) and is not sold or shared with third parties</li>
-                  <li>Playback uses the official YouTube embedded player only (user-initiated)</li>
-                  <li>We comply with YouTube API quota limits and usage policies</li>
+                  <li>Tuneable does <strong>not</strong> play YouTube video or audio on the Service, and does not embed a YouTube player</li>
+                  <li>We do <strong>not</strong> download, store, or rehost any video or audio content from YouTube or other third-party platforms</li>
+                  <li>Catalogue metadata is used for library matching, display, and queueing, and is not sold</li>
                 </ul>
-                <p className="mb-2">
-                  <strong>Data Processing Basis:</strong> We process YouTube metadata under our legitimate interest to provide platform functionality 
-                  and facilitate user-initiated content discovery and playback. This processing is necessary for the operation of our social music 
-                  platform and does not infringe on YouTube users' privacy rights.
-                </p>
-                <p className="mb-2">
-                  <strong>Compliance:</strong> If YouTube or Google requests that we modify or cease using YouTube Data API content, we will comply 
-                  immediately. In such cases, we may transition to alternative metadata sources (MusicBrainz, Discogs, Spotify API, Apple Music API, 
-                  SoundCloud, ISRC databases, or user-submitted metadata) while maintaining platform functionality.
-                </p>
 
                 <h3 className="text-xl font-medium text-gray-900">1.4 Artist Revenue and Escrow Data</h3>
                 <p className="mb-2">
@@ -170,7 +154,7 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li><strong>Stripe:</strong> Payment processing and financial transactions (see Stripe's privacy policy)</li>
                   <li><strong>OAuth Providers:</strong> Facebook, Google, SoundCloud, Instagram for authentication (see their respective privacy policies)</li>
-                  <li><strong>YouTube/Google:</strong> Access to YouTube Data API for metadata (see Google's privacy policy)</li>
+                  <li><strong>Catalogue sources:</strong> Public catalogue metadata you choose to import (for example a public YouTube playlist) for library matching</li>
                   <li><strong>Hosting Providers:</strong> Cloud infrastructure and data storage services</li>
                   <li><strong>Analytics Services:</strong> Platform usage analytics (in anonymized form where possible)</li>
                 </ul>
@@ -318,13 +302,9 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">6.3 Content and Media Services</h3>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li><strong>YouTube/Google:</strong> YouTube Data API for metadata access and embedded player - <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Google Privacy Policy</a></li>
-                  <li>Tuneable uses YouTube Data API to access publicly available video metadata only (in compliance with YouTube Terms of Service)</li>
-                  <li>Playback uses the official YouTube embedded player (user-initiated only)</li>
-                  <li>Tuneable does not collect personal information from YouTube users or YouTube account holders</li>
-                  <li>We do not download, store, or rehost any YouTube content</li>
-                  <li>We comply with YouTube API quota limits and usage policies</li>
-                  <li>If YouTube restricts API access, we will transition to alternative metadata sources (see Terms of Service section 2.1.2)</li>
+                  <li>Tuneable may import public catalogue information you provide (for example titles and artists from a public YouTube playlist) so it can be matched to tracks in Tuneable's library</li>
+                  <li>Tuneable does not play YouTube video or audio on the Service, and does not embed a YouTube player</li>
+                  <li>We do not download, store, or rehost any video or audio content from third-party platforms</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">6.4 Data Processing by Third Parties</h3>

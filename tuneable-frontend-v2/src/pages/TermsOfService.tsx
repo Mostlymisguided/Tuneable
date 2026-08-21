@@ -38,31 +38,31 @@ const TermsOfService: React.FC = () => {
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
                 <li>Create and join music listening parties</li>
                 <li>Tip on tunes to influence party playlists and support artists</li>
-                <li>Stream music from various platforms including YouTube and podcasts</li>
+                <li>Play music hosted on Tuneable, including creator uploads and other licensed media</li>
                 <li>Upload and host their own content (after declaring rights ownership)</li>
+                <li>Import catalogue information (such as titles and artists) from public third-party sources to match against Tuneable's library</li>
                 <li>Connect with other music lovers</li>
                 <li>Manage a digital wallet for tipping on songs</li>
               </ul>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2.1 Platform Nature & YouTube API Usage</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2.1 Platform Nature</h2>
               <div className="space-y-4 text-gray-700">
                 <h3 className="text-xl font-medium text-gray-900">2.1.1 Tuneable is Not a Streaming Service</h3>
                 <p className="mb-2">
                   <strong>Tuneable CIC is a community-funded artist support platform, not a music streaming service. </strong> 
-                  Tuneable facilitates fan tipping, social queueing, and artist support. Playback of media content is incidental, 
-                  user-initiated, and uses official third-party players only.
+                  Tuneable facilitates fan tipping, social queueing, and artist support. Playback on Tuneable is limited to 
+                  media hosted on the Service.
                 </p>
                 <p className="mb-4">
                   Tuneable does <strong>not</strong>:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Host, download, or store video or audio content from third-party sources (YouTube, etc.)</li>
-                  <li>Circumvent YouTube API restrictions or terms of service</li>
-                  <li>Charge users for access to YouTube or third-party content</li>
+                  <li>Host, download, or store video or audio content from third-party platforms such as YouTube</li>
+                  <li>Play YouTube video or audio on the Service, or embed a YouTube player</li>
+                  <li>Charge users for access to third-party content</li>
                   <li>Replace or compete with streaming services</li>
-                  <li>Store or rehost any third-party media content</li>
                 </ul>
                 <p className="mb-4">
                   Tuneable <strong>does</strong>:
@@ -70,33 +70,9 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Allow users to place monetary tips to influence social rankings and party queues</li>
                   <li>Host content uploaded by creators who have declared themselves as rights holders</li>
-                  <li>Use public YouTube Data API metadata (title, artist, duration, thumbnails, links) for display purposes only</li>
-                  <li>Embed the official YouTube player for user-initiated playback (per YouTube Terms of Service)</li>
+                  <li>Allow users to import public catalogue information (for example titles and artists from a public YouTube playlist) so it can be matched to tracks already in Tuneable's library. Imports are catalogue metadata only; they do not add YouTube playback to Tuneable</li>
                   <li>Share revenue with artists and rights-holders through an escrow and tipping system (70% to artists, 30% to platform)</li>
                   <li>Facilitate community support for musicians and creators</li>
-                </ul>
-
-                <h3 className="text-xl font-medium text-gray-900">2.1.2 YouTube Data API Usage</h3>
-                <p className="mb-2">
-                  Tuneable uses the YouTube Data API in compliance with YouTube's Terms of Service and API Services Terms. 
-                  Our use of the API is limited to:
-                </p>
-                <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Accessing video metadata (title, artist, duration, thumbnails) for display and search purposes</li>
-                  <li>Linking users to YouTube creators and content</li>
-                  <li>Supporting artists financially through our escrow and revenue sharing system</li>
-                  <li>Using the official YouTube embedded player for playback (user-initiated only)</li>
-                </ul>
-                <p className="mb-2">
-                  Tuneable complies with all YouTube API requirements:
-                </p>
-                <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>We do not charge users for access to YouTube content</li>
-                  <li>We do not circumvent YouTube advertisements</li>
-                  <li>We use only the official YouTube embed player</li>
-                  <li>We follow YouTube branding guidelines</li>
-                  <li>We do not download, store, or rehost any YouTube content</li>
-                  <li>We respect YouTube API quota limits and usage policies</li>
                 </ul>
                 <p className="mb-2">
                   <strong>Revenue Model:</strong> Money exchanged on Tuneable is for social influence, ranking, tipping artists, 
@@ -105,16 +81,7 @@ const TermsOfService: React.FC = () => {
                 </p>
                 <p className="mb-2">
                   <strong>Community Interest Company Status:</strong> As a UK Community Interest Company (CIC), Tuneable exists 
-                  to increase income for musicians and rights-holders by turning passive listening into active community support. 
-                  Our CIC status demonstrates that Tuneable is not exploiting third-party content commercially, but rather 
-                  redistributing fan support to artists.
-                </p>
-                <p className="mb-2">
-                  <strong>Compliance:</strong> If YouTube or Google requests that we cease using the YouTube Data API or modify 
-                  our usage, we will comply immediately. Tuneable can continue operating using alternative metadata sources 
-                  (MusicBrainz, Discogs, Spotify API, Apple Music API, SoundCloud, ISRC databases, user-submitted metadata, 
-                  or artist uploads) while maintaining all core functionality as a queueing engine, tipping system, and 
-                  social jukebox platform.
+                  to increase income for musicians and rights-holders by turning passive listening into active community support.
                 </p>
               </div>
             </section>
@@ -217,7 +184,6 @@ const TermsOfService: React.FC = () => {
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Immediately remove or disable access to the requested content metadata</li>
-                  <li>Cease using any related YouTube Data API content for that media</li>
                   <li>Remove the content from all party queues and search results</li>
                   <li>Process the request within 7 business days (or sooner if technically feasible)</li>
                 </ul>
@@ -227,21 +193,15 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Your name and contact information</li>
                   <li>Proof of rights ownership (artist name, label, ISRC codes, or other documentation)</li>
-                  <li>Specific content identifiers (song titles, YouTube URLs, or Tuneable media IDs)</li>
+                  <li>Specific content identifiers (song titles, Tuneable media IDs, or other source URLs)</li>
                   <li>Clear statement of your opt-out request</li>
                 </ul>
 
-                <h3 className="text-xl font-medium text-gray-900">5.4.2 YouTube/Google Takedown Requests</h3>
+                <h3 className="text-xl font-medium text-gray-900">5.4.2 Third-Party Catalogue Takedown Requests</h3>
                 <p className="mb-2">
-                  If YouTube, Google, or any authorized representative requests that Tuneable cease using YouTube Data API content 
-                  or remove specific content, Tuneable will:
+                  If a third-party platform or authorized representative requests that Tuneable cease using catalogue metadata 
+                  obtained from that platform, or remove specific content, Tuneable will comply and remove related metadata.
                 </p>
-                <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Comply immediately with the request</li>
-                  <li>Remove all related metadata and API-derived content</li>
-                  <li>Disable embedding of affected YouTube videos</li>
-                  <li>Continue operating using alternative metadata sources (as outlined in section 2.1.2)</li>
-                </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">5.4.3 Copyright Takedown (DMCA-Style)</h3>
                 <p className="mb-2">
@@ -285,8 +245,9 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">6.2 Third-Party Content</h3>
                 <p className="mb-2">
-                  Music and media content streamed through the Service is provided by third-party platforms (YouTube, etc.). 
-                  Users must comply with the terms of service of these third-party providers.
+                  Tuneable may display catalogue information (such as titles, artists, and related metadata) obtained from 
+                  public third-party sources or submitted by users. Playback on Tuneable is limited to media hosted on the Service. 
+                  If you import catalogue information from a third-party platform, you must comply with that platform's terms of service.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">6.3 User Content</h3>
@@ -443,8 +404,8 @@ const TermsOfService: React.FC = () => {
                   metadata or before accepting tips directed toward their work. Tuneable operates under:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li><strong>Implied License:</strong> YouTube content is licensed by uploaders under YouTube's Terms of Service, 
-                  which allows public display of metadata and embedding of videos</li>
+                  <li><strong>Publicly available catalogue information:</strong> Titles, artists, and similar metadata imported from 
+                  public sources are used for display and library matching only, not for third-party playback</li>
                   <li><strong>Safe Harbour:</strong> Tuneable complies with all takedown requests and opt-out requests immediately 
                   upon receipt (see section 5.4 for opt-out procedures)</li>
                 </ul>
@@ -505,8 +466,8 @@ const TermsOfService: React.FC = () => {
                   and services that Tuneable integrates with, including but not limited to:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li><strong>YouTube Terms of Service:</strong> You must comply with YouTube's Terms of Service when content 
-                  from YouTube is displayed or played through Tuneable</li>
+                  <li><strong>Catalogue imports:</strong> If you import catalogue information from a third-party platform 
+                  (for example a public YouTube playlist), you must comply with that platform's terms of service</li>
                   <li><strong>OAuth Providers:</strong> When using Facebook, Google, SoundCloud, or Instagram login, you must 
                   comply with their respective terms of service</li>
                   <li><strong>Payment Processors:</strong> When making payments through Stripe, you must comply with Stripe's 
@@ -578,7 +539,7 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Continuous, uninterrupted, or error-free access to the Service</li>
                   <li>That all content will be available at all times</li>
-                  <li>That third-party services (YouTube, payment processors, etc.) will always be available</li>
+                  <li>That third-party services (payment processors, catalogue sources, etc.) will always be available</li>
                   <li>That the Service will meet your specific requirements or expectations</li>
                   <li>That any errors or defects will be corrected</li>
                 </ul>
@@ -588,16 +549,14 @@ const TermsOfService: React.FC = () => {
                   Tuneable is not responsible for:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>The availability, accuracy, or legality of content from third-party platforms (YouTube, SoundCloud, etc.)</li>
-                  <li>Changes to third-party APIs, terms of service, or availability that may affect Tuneable's functionality</li>
+                  <li>The availability, accuracy, or legality of catalogue information from third-party platforms</li>
+                  <li>Changes to third-party services, terms of service, or availability that may affect Tuneable's functionality</li>
                   <li>Actions taken by third-party platforms that may impact content displayed on Tuneable</li>
                   <li>Any loss or damage resulting from the unavailability of third-party content or services</li>
                 </ul>
                 <p className="mb-2">
-                  If YouTube, Google, or any other third-party service restricts or revokes Tuneable's access to their API or 
-                  content, Tuneable will comply with such restrictions but is not liable for any resulting impact on Service 
-                  functionality. Tuneable will make reasonable efforts to transition to alternative data sources, but cannot 
-                  guarantee seamless continuity of all features.
+                  If a third-party service restricts or revokes Tuneable's access to catalogue information or other services, 
+                  Tuneable will comply with such restrictions but is not liable for any resulting impact on Service functionality.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">11.3 Limitation of Liability</h3>
@@ -653,11 +612,11 @@ const TermsOfService: React.FC = () => {
                 The Service integrates with third-party platforms including:
               </p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                <li><strong>YouTube:</strong> For music streaming (subject to YouTube Terms of Service)</li>
                 <li><strong>Facebook:</strong> For OAuth authentication</li>
                 <li><strong>Google:</strong> For OAuth authentication</li>
                 <li><strong>SoundCloud:</strong> For OAuth authentication</li>
                 <li><strong>Stripe:</strong> For payment processing</li>
+                <li><strong>Catalogue sources:</strong> Optional import of public catalogue information (for example titles and artists from a public YouTube playlist) for library matching only — not for playback on Tuneable</li>
               </ul>
               <p className="text-gray-700 mt-4">
                 Your use of these third-party services is subject to their respective terms and privacy policies.

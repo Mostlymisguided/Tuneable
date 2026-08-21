@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Youtube, Wallet, MessagesSquare } from 'lucide-react';
+import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Library, Wallet, MessagesSquare } from 'lucide-react';
 import { SUPPORT_EMAIL } from '../constants';
 import GeneralReportModal from '../components/GeneralReportModal';
 
@@ -105,7 +105,7 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Adding Tunes</h3>
             <p className="text-gray-300">
-              Use the search feature in any party to find tunes from our library or YouTube. When adding 
+              Use the search feature in any party to find tunes from our library. When adding 
               a new track, you'll be prompted to add tags to help others discover it. Set your tip amount 
               and add the tune to the queue.
             </p>
@@ -219,24 +219,31 @@ const Help: React.FC = () => {
       )
     },
     {
-      id: 'youtube-third-party',
-      icon: <Youtube className="h-6 w-6" />,
-      title: 'Youtube and Third Party Platforms',
+      id: 'library-imports',
+      icon: <Library className="h-6 w-6" />,
+      title: 'Library Imports',
       content: (
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Adding YouTube Tracks</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">Importing Your Library</h3>
             <p className="text-gray-300">
-              You can search for and add tracks from YouTube to parties and your library. Simply use the 
-              search feature and select tracks from YouTube results. These tracks will be playable through 
-              YouTube's player.
+              You can import catalogue information from Spotify, SoundCloud, Rekordbox, or a public YouTube playlist 
+              so those tracks can be matched against Tuneable's library. Imports are titles, artists, and related 
+              metadata only. Tuneable does not play YouTube video or audio, or embed a YouTube player.
             </p>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Third Party Integration</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">YouTube Playlists</h3>
             <p className="text-gray-300">
-              Tuneable integrates with various third-party platforms to provide a rich music experience. 
-              Content from these platforms is subject to their respective terms of service and licensing agreements.
+              Paste a public YouTube playlist URL. Confident matches are ready to import; weaker matches need a 
+              quick confirm. Nothing from YouTube is streamed or played on Tuneable.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Third-Party Terms</h3>
+            <p className="text-gray-300">
+              When you import catalogue information from another platform, you must comply with that platform's 
+              terms of service.
             </p>
           </div>
         </div>
