@@ -172,7 +172,7 @@ export function LibraryImportCards({ showUpload = false }: Props) {
           </View>
           <View style={styles.uploadCopy}>
             <Text style={styles.uploadTitle}>Upload a track</Text>
-            <Text style={styles.uploadSub}>MP3 you own or have rights to</Text>
+            <Text style={styles.uploadSub}>Audio you own or have rights to</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>

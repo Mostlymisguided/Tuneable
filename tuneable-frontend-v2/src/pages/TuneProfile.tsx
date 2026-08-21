@@ -44,6 +44,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
+import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -1331,12 +1332,10 @@ const TuneProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isMp3 =
-      file.type === 'audio/mpeg' ||
-      file.type === 'audio/mp3' ||
-      file.name.toLowerCase().endsWith('.mp3');
-    if (!isMp3) {
-      toast.error('Please select an audio file (MP3)');
+    const typeError = getAudioUploadRejection(file.name, file.type);
+    if (typeError) {
+      toast.error(typeError);
+      if (audioFileInputRef.current) audioFileInputRef.current.value = '';
       return;
     }
     if (file.size > 50 * 1024 * 1024) {
@@ -4227,11 +4226,11 @@ const TuneProfile: React.FC = () => {
             )}
 
             <div className="mb-4">
-              <label className="block text-white font-medium mb-2">Audio file (MP3)</label>
+              <label className="block text-white font-medium mb-2">Audio File</label>
               <input
                 ref={audioFileInputRef}
                 type="file"
-                accept="audio/mpeg,.mp3"
+                accept={AUDIO_FILE_ACCEPT}
                 onChange={handleAttachAudioFileSelect}
                 className="hidden"
               />
@@ -4242,7 +4241,7 @@ const TuneProfile: React.FC = () => {
                 className="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 <Upload className="h-5 w-5" />
-                {attachAudioFile ? attachAudioFile.name : 'Choose Audio File'}
+                {attachAudioFile ? attachAudioFile.name : 'Audio File'}
               </button>
               {attachAudioFile && (
                 <p className="text-xs text-gray-400 mt-1">

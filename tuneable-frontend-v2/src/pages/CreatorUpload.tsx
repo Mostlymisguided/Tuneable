@@ -12,6 +12,7 @@ import ProductionStackEditor from '../components/ProductionStackEditor';
 import AiToolsEditor from '../components/AiToolsEditor';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
+import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -190,9 +191,10 @@ const CreatorUpload: React.FC = () => {
       return;
     }
 
-    // Validate file type
-    if (!selectedFile.name.toLowerCase().endsWith('.mp3')) {
-      toast.error('Only MP3 files are supported');
+    const typeError = getAudioUploadRejection(selectedFile.name, selectedFile.type);
+    if (typeError) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      toast.error(typeError);
       return;
     }
 
@@ -644,7 +646,7 @@ const CreatorUpload: React.FC = () => {
           <div className="mb-8">
             <label className="block text-white font-semibold mb-4 flex items-center">
               <Upload className="h-5 w-5 mr-2 text-purple-400" />
-              Audio File (MP3 only) *
+              Audio File *
             </label>
             
             <div
@@ -677,7 +679,7 @@ const CreatorUpload: React.FC = () => {
                 <div>
                   <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-white font-medium mb-1">
-                    Click to select MP3 file
+                    Click to select audio file
                   </p>
                   <p className="text-gray-400 text-sm">
                     or drag and drop (Max 50MB)
@@ -689,7 +691,7 @@ const CreatorUpload: React.FC = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".mp3,audio/mpeg"
+              accept={AUDIO_FILE_ACCEPT}
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -1540,7 +1542,7 @@ const CreatorUpload: React.FC = () => {
           <div className="mt-6 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
             <h4 className="text-white font-semibold mb-2 text-sm">📌 Upload Guidelines</h4>
             <ul className="text-gray-300 text-sm space-y-1">
-              <li>• MP3 format only (max 50MB)</li>
+              <li>• MP3 for now (max 50MB). WAV and FLAC coming in version 1.1</li>
               <li>• You'll be automatically verified as the artist</li>
               <li>• Your track will be available on Tuneable immediately</li>
               <li>• You can edit metadata after upload</li>

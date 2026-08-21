@@ -121,7 +121,7 @@ export function ProfileSettingsSheet({
                 size={20}
                 color={colors.accentLight}
               />
-              <Text style={styles.rowText}>Upload MP3</Text>
+              <Text style={styles.rowText}>Upload audio</Text>
             </Pressable>
           ) : null}
 

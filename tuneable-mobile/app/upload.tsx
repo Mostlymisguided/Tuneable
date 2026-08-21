@@ -21,6 +21,10 @@ import {
 import { useAuth } from '@/src/auth/AuthContext';
 import { canUploadMedia } from '@/src/lib/permissions';
 import { mediaId } from '@/src/lib/media';
+import {
+  AUDIO_PICKER_TYPES,
+  getAudioUploadRejection,
+} from '@/src/lib/audioUpload';
 import { colors } from '@/src/theme/colors';
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -60,7 +64,7 @@ export default function UploadScreen() {
     setError(null);
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['audio/mpeg', 'audio/mp3', 'audio/*'],
+        type: AUDIO_PICKER_TYPES,
         copyToCacheDirectory: true,
         multiple: false,
       });
@@ -68,13 +72,9 @@ export default function UploadScreen() {
 
       const asset = result.assets[0];
       const name = asset.name || 'track.mp3';
-      const isMp3 =
-        name.toLowerCase().endsWith('.mp3') ||
-        asset.mimeType === 'audio/mpeg' ||
-        asset.mimeType === 'audio/mp3';
-
-      if (!isMp3) {
-        setError('Only MP3 files are supported.');
+      const rejection = getAudioUploadRejection(name, asset.mimeType);
+      if (rejection) {
+        setError(rejection);
         return;
       }
       if (asset.size != null && asset.size > MAX_BYTES) {
@@ -154,7 +154,7 @@ export default function UploadScreen() {
           <View style={styles.gateCard}>
             <Text style={styles.gateTitle}>Creators only</Text>
             <Text style={styles.gateBody}>
-              Uploading MP3s is available to creator and admin accounts. You can
+              Uploading audio is available to creator and admin accounts. You can
               still tip and explore the charts.
             </Text>
             <Pressable
@@ -167,8 +167,8 @@ export default function UploadScreen() {
           <>
             <Text style={styles.lede}>
               {isAttachMode
-                ? 'Attach an MP3 to this catalog tune so it can play in the app.'
-                : 'Upload an MP3 (max 50MB). It becomes playable as soon as processing finishes.'}
+                ? 'Attach an audio file to this catalog tune so it can play in the app.'
+                : 'Upload an audio file (max 50MB). It becomes playable as soon as processing finishes.'}
             </Text>
 
             {user && !user.emailVerified ? (
@@ -185,12 +185,12 @@ export default function UploadScreen() {
               />
               <View style={styles.fileMeta}>
                 <Text style={styles.fileLabel}>
-                  {file ? file.name : 'Choose MP3'}
+                  {file ? file.name : 'Audio File'}
                 </Text>
                 {file?.size ? (
                   <Text style={styles.fileSize}>{formatBytes(file.size)}</Text>
                 ) : (
-                  <Text style={styles.fileHint}>audio/mpeg · up to 50MB</Text>
+                  <Text style={styles.fileHint}>MP3 · up to 50MB</Text>
                 )}
               </View>
               <Ionicons name="folder-open-outline" size={20} color={colors.textMuted} />

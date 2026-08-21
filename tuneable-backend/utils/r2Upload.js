@@ -4,6 +4,44 @@ const multerS3 = require('multer-s3');
 const path = require('path');
 const { buildReadableAudioKey, buildReadableCoverKey } = require('./readableUploadKey');
 
+const LOSSLESS_EXTS = new Set(['.wav', '.wave', '.flac']);
+const LOSSLESS_MIMES = new Set([
+  'audio/wav',
+  'audio/x-wav',
+  'audio/wave',
+  'audio/vnd.wave',
+  'audio/flac',
+  'audio/x-flac',
+]);
+
+const LOSSLESS_UPLOAD_COMING_SOON =
+  'WAV and FLAC (lossless) uploads are coming in version 1.1';
+
+function isLosslessAudioFile(file) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = (file.mimetype || '').toLowerCase();
+  return LOSSLESS_EXTS.has(ext) || LOSSLESS_MIMES.has(mime);
+}
+
+function isMp3AudioFile(file) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = (file.mimetype || '').toLowerCase();
+  const extOk = ext === '.mp3';
+  const mimeOk = mime === 'audio/mpeg' || mime === 'audio/mp3';
+  return extOk && mimeOk;
+}
+
+/** Multer fileFilter helper: MP3 only; WAV/FLAC get a 1.1 coming-soon error. */
+function filterMp3AudioFile(file, cb, fallbackMessage = 'Only MP3 files are allowed') {
+  if (isMp3AudioFile(file)) {
+    return cb(null, true);
+  }
+  if (isLosslessAudioFile(file)) {
+    return cb(new Error(LOSSLESS_UPLOAD_COMING_SOON));
+  }
+  return cb(new Error(fallbackMessage));
+}
+
 // Check if R2 is configured
 const isR2Configured = () => {
   return !!(process.env.R2_ENDPOINT && 
@@ -291,16 +329,7 @@ const createMediaUpload = () => {
       }),
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
       fileFilter: (req, file, cb) => {
-        // Only MP3 files for MVP
-        const allowedTypes = /mp3/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
-        
-        if (mimetype && extname) {
-          return cb(null, true);
-        } else {
-          cb(new Error('Only MP3 files are allowed for MVP'));
-        }
+        filterMp3AudioFile(file, cb, 'Only MP3 files are allowed for MVP');
       }
     });
   } else {
@@ -329,15 +358,7 @@ const createMediaUpload = () => {
       }),
       limits: { fileSize: 50 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
-        const allowedTypes = /mp3/;
-        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-        const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
-        
-        if (mimetype && extname) {
-          return cb(null, true);
-        } else {
-          cb(new Error('Only MP3 files are allowed for MVP'));
-        }
+        filterMp3AudioFile(file, cb, 'Only MP3 files are allowed for MVP');
       }
     });
   }
@@ -443,6 +464,7 @@ module.exports = {
   createProfilePictureUpload,
   createMediaUpload,
   createCoverArtUpload,
-  createLabelProfilePictureUpload
+  createLabelProfilePictureUpload,
+  filterMp3AudioFile,
 };
 

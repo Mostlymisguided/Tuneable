@@ -10,7 +10,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
-const { createCoverArtUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createCoverArtUpload, getPublicUrl, filterMp3AudioFile } = require('../utils/r2Upload');
 const { buildReadableAudioKey, buildReadableCoverKey } = require('../utils/readableUploadKey');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
@@ -499,16 +499,7 @@ const mixedUpload = multer({
   },
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'audioFile') {
-      // Only MP3 files for audio
-      const allowedTypes = /mp3/;
-      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-      const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
-      
-      if (mimetype && extname) {
-        return cb(null, true);
-      } else {
-        return cb(new Error('Only MP3 files are allowed for audio'));
-      }
+      return filterMp3AudioFile(file, cb, 'Only MP3 files are allowed for audio');
     } else if (file.fieldname === 'coverArtFile') {
       // Only image files for cover art
       if (file.mimetype.startsWith('image/')) {
@@ -554,14 +545,7 @@ const attachAudioUpload = multer({
       return cb(new Error('Only XML files are allowed for library metadata'));
     }
 
-    const allowedTypes = /mp3/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = file.mimetype === 'audio/mpeg' || file.mimetype === 'audio/mp3';
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    }
-    return cb(new Error('Only MP3 files are allowed'));
+    return filterMp3AudioFile(file, cb, 'Only MP3 files are allowed');
   },
 });
 
