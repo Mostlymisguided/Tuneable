@@ -2576,16 +2576,6 @@ const TuneProfile: React.FC = () => {
                     Play
                   </button>
                 )}
-                {listenElsewhere && (
-                  <button
-                    type="button"
-                    onClick={handleListenElsewhere}
-                    className="px-4 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-white/15 transition-all flex items-center gap-2 text-sm"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    {listenElsewhere.label}
-                  </button>
-                )}
                 {renderShareButton()}
                 {user && media.bids?.some((bid: any) => {
                   const bidderId = bid?.userId?._id || bid?.userId?.uuid || bid?.userId;

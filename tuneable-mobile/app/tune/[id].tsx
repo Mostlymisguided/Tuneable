@@ -532,16 +532,6 @@ export default function TuneProfileScreen() {
                   <Text style={styles.playBtnText}>Play</Text>
                 </Pressable>
               ) : null}
-              {listenElsewhere ? (
-                <Pressable
-                  style={styles.listenElsewhereBtn}
-                  onPress={onListenElsewhere}>
-                  <Ionicons name="open-outline" size={16} color={colors.text} />
-                  <Text style={styles.listenElsewhereBtnText}>
-                    {listenElsewhere.label}
-                  </Text>
-                </Pressable>
-              ) : null}
               {showClaimCta ? (
                 <Pressable
                   style={styles.claimBtn}
@@ -1048,22 +1038,6 @@ const styles = StyleSheet.create({
   playBtnText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 14,
-  },
-  listenElsewhereBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  listenElsewhereBtnText: {
-    color: colors.text,
-    fontWeight: '600',
     fontSize: 14,
   },
   shareBtn: {
