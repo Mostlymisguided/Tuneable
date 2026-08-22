@@ -545,7 +545,7 @@ export default function TuneProfileScreen() {
                   style={styles.tagBtn}
                   onPress={() => setTagClaimOpen(true)}>
                   <Ionicons name="pricetag-outline" size={16} color={colors.text} />
-                  <Text style={styles.tagBtnText}>Tag</Text>
+                  <Text style={styles.tagBtnText}>Add Tags</Text>
                 </Pressable>
               ) : null}
               <Pressable style={styles.shareBtn} onPress={() => void onShare()}>

@@ -2592,7 +2592,7 @@ const TuneProfile: React.FC = () => {
                     className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
                   >
                     <Tag className="h-4 w-4" />
-                    <span>Tag</span>
+                    <span>Add Tags</span>
                   </button>
                 ) : null}
                 {!isEditMode && (

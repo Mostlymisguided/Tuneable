@@ -251,9 +251,7 @@ export function TagClaimSheet({
               {submitting ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.confirmText}>
-                  Claim {tags.length || ''} tag{tags.length === 1 ? '' : 's'}
-                </Text>
+                <Text style={styles.confirmText}>Add Tags</Text>
               )}
             </Pressable>
 

@@ -199,7 +199,7 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
             className="w-full py-2.5 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Claim {tags.length} tag{tags.length === 1 ? '' : 's'}
+            Add Tags
           </button>
           {ranked.length > 0 ? (
             <button
