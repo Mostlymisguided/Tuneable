@@ -16,6 +16,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import {
+  AuthBackButton,
   AuthHero,
   AuthSocialButton,
   authStyles,
@@ -248,6 +249,7 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView
         style={authStyles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <AuthBackButton />
         <ScrollView
           contentContainerStyle={authStyles.scrollTop}
           keyboardShouldPersistTaps="handled">

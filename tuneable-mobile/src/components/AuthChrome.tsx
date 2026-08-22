@@ -1,4 +1,5 @@
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 
@@ -42,14 +43,28 @@ export function BrandMark({ size = 96 }: BrandMarkProps) {
   );
 }
 
+export function AuthBackButton() {
+  return (
+    <Pressable
+      onPress={() => router.replace('/')}
+      hitSlop={12}
+      style={styles.backBtn}
+      accessibilityRole="button"
+      accessibilityLabel="Back">
+      <Ionicons name="chevron-back" size={26} color={colors.text} />
+    </Pressable>
+  );
+}
+
 export function AuthHero({
-  subtitle = 'The Social Charting App',
+  subtitle = 'Tip What You Love',
 }: {
   subtitle?: string;
 }) {
   return (
     <View style={styles.hero}>
       <BrandMark />
+      <Text style={styles.wordmark}>Tuneable</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </View>
   );
@@ -160,6 +175,20 @@ export const authStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  ghostBtn: {
+    marginTop: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  ghostBtnText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
   disabled: { opacity: 0.7 },
   dividerRow: {
     flexDirection: 'row',
@@ -224,17 +253,31 @@ const styles = StyleSheet.create({
   markClip: {
     overflow: 'hidden',
   },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
   hero: {
     alignItems: 'center',
     marginBottom: 22,
   },
+  wordmark: {
+    marginTop: 12,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: colors.text,
+  },
   subtitle: {
-    marginTop: 14,
+    marginTop: 6,
     fontSize: 14,
     lineHeight: 20,
-    color: colors.textSecondary,
+    color: '#e9d5ff',
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   socialBtn: {
     marginTop: 8,

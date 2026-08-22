@@ -72,8 +72,11 @@ function RootNavigator() {
           contentStyle: { backgroundColor: colors.background },
         }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
+        <Stack.Screen name="login" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen
+          name="register"
+          options={{ animation: 'slide_from_right' }}
+        />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="set-home-location" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" />

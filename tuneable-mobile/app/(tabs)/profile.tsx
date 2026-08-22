@@ -99,7 +99,7 @@ export default function ProfileScreen() {
 
   const onLogout = async () => {
     await logout();
-    router.replace('/login');
+    router.replace('/');
   };
 
   return (
@@ -195,7 +195,7 @@ export default function ProfileScreen() {
         onSignOut={() => void onLogout()}
         onDeleteAccount={async () => {
           await deleteAccount();
-          router.replace('/login');
+          router.replace('/');
         }}
       />
     </Screen>

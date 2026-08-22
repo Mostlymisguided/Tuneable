@@ -8,7 +8,7 @@ export default function TabLayout() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
   if (!isLoading && !isAuthenticated) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/" />;
   }
 
   if (!isLoading && isAuthenticated && needsOnboarding(user)) {

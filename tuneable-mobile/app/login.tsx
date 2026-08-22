@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { Screen } from '@/src/components/Screen';
 import {
+  AuthBackButton,
   AuthHero,
   AuthSocialButton,
   authStyles,
@@ -156,6 +157,7 @@ export default function LoginScreen() {
       <KeyboardAvoidingView
         style={authStyles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <AuthBackButton />
         <ScrollView
           contentContainerStyle={authStyles.scroll}
           keyboardShouldPersistTaps="handled">
