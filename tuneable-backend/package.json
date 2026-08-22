@@ -7,6 +7,7 @@
     "start": "node --max-old-space-size=384 index.js",
     "dev": "nodemon index.js",
     "test": "jest",
+    "migrate-tunebytes": "node scripts/migrateTuneBytes.js",
     "migrate-songs": "node scripts/migrate-songs.js",
     "migrate-uuids": "node scripts/migrate-uuids.js",
     "enrichment-drip": "node scripts/runEnrichmentDrip.js",

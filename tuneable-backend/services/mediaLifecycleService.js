@@ -154,6 +154,16 @@ async function softDeleteMedia(media, actor, reason = null) {
     reason || 'Media deleted by owner',
   );
 
+  try {
+    const tuneBytesService = require('./tuneBytesService');
+    await tuneBytesService.recalculateTuneBytesForMedia(media._id, {
+      skipLedgerEntry: true,
+      notify: false,
+    });
+  } catch (tuneBytesError) {
+    console.error('Failed to recalculate TuneBytes after media delete refunds:', tuneBytesError);
+  }
+
   media.status = 'deleted';
   media.deletedAt = new Date();
   media.deletedBy = actorId;

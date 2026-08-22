@@ -4264,6 +4264,13 @@ router.post('/:partyId/bids/:bidId/remove', authMiddleware, resolvePartyId(), as
 
         console.log(`✅ User ${user.username} removed their tip of £${(refundAmount / 100).toFixed(2)} for bid ${bidId}`);
 
+        try {
+            const tuneBytesService = require('../services/tuneBytesService');
+            tuneBytesService.scheduleRecalculateForMedia(bid.mediaId);
+        } catch (tuneBytesError) {
+            console.error('Failed to schedule TuneBytes recalc after tip removal:', tuneBytesError);
+        }
+
         res.json({
             success: true,
             message: 'Tip removed successfully',

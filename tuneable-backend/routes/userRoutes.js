@@ -5583,6 +5583,13 @@ router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
       console.error('Error reversing escrow for vetoed bid:', escrowError);
     }
 
+    try {
+      const tuneBytesService = require('../services/tuneBytesService');
+      tuneBytesService.scheduleRecalculateForMedia(bid.mediaId);
+    } catch (tuneBytesError) {
+      console.error('Failed to schedule TuneBytes recalc after veto:', tuneBytesError);
+    }
+
     res.json({
       message: 'Bid vetoed successfully',
       bid: {
@@ -6314,6 +6321,13 @@ router.post('/admin/refunds/:requestId/process', authMiddleware, adminMiddleware
       refundRequest.processedBy = adminId;
       refundRequest.processedAt = new Date();
       await refundRequest.save();
+
+      try {
+        const tuneBytesService = require('../services/tuneBytesService');
+        tuneBytesService.scheduleRecalculateForMedia(bid.mediaId);
+      } catch (tuneBytesError) {
+        console.error('Failed to schedule TuneBytes recalc after refund:', tuneBytesError);
+      }
       
       // Notify user
       try {

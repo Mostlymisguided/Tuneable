@@ -50,12 +50,17 @@ const tuneBytesTransactionSchema = new mongoose.Schema({
   calculationSnapshot: {
     currentTotalValue: { type: Number, required: true },
     bidTimeTotalValue: { type: Number, required: true },
+    subsequentGrowth: { type: Number, default: 0 },
     userBidAmount: { type: Number, required: true },
     userBidPence: { type: Number, required: true },
     discoveryRank: { type: Number, required: true },
     discoveryBonus: { type: Number, required: true },
     timeElapsed: { type: Number }, // hours since bid
-    formula: { type: String, default: '(currentTotal - bidTimeTotal) * ∛(userBidPence) * discoveryBonus' }
+    totalBidsOnMedia: { type: Number },
+    formula: {
+      type: String,
+      default: '(currentTotal - bidTimeTotal - userBid) * ∛(userBidPence) * discoveryBonus'
+    }
   },
   
   // ========================================

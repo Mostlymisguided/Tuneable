@@ -30,6 +30,7 @@ async function recoverPendingBidWork({ afterId = null } = {}) {
 
   const bidMetricsEngine = require('./bidMetricsEngine');
   const tuneBytesService = require('./tuneBytesService');
+  const settledMediaIds = new Set();
 
   for (const bid of pendingBids) {
     if (bid.metricsUpdateStatus === 'pending') {
@@ -50,9 +51,14 @@ async function recoverPendingBidWork({ afterId = null } = {}) {
       }
     }
 
-    if (bid.tuneBytesAwardStatus === 'pending') {
+    if (bid.tuneBytesAwardStatus === 'pending' && bid.mediaId) {
+      const mediaKey = bid.mediaId.toString();
+      if (settledMediaIds.has(mediaKey)) {
+        continue;
+      }
       try {
-        await tuneBytesService.awardTuneBytesForBid(bid._id);
+        await tuneBytesService.recalculateTuneBytesForMedia(bid.mediaId);
+        settledMediaIds.add(mediaKey);
       } catch (error) {
         console.error('Failed to recover TuneBytes award:', bid._id, error);
       }

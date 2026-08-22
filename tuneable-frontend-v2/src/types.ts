@@ -450,11 +450,13 @@ export interface TuneBytesTransaction {
   calculationSnapshot: {
     currentTotalValue: number;
     bidTimeTotalValue: number;
+    subsequentGrowth?: number;
     userBidAmount: number;
     userBidPence: number;
     discoveryRank: number;
     discoveryBonus: number;
     timeElapsed: number;
+    totalBidsOnMedia?: number;
     formula: string;
   };
   status: 'pending' | 'confirmed' | 'redeemed';
