@@ -209,9 +209,9 @@ export default function PodcastsScreen() {
               style={styles.addPodcastBtn}
               onPress={() => router.push('/podcast-search')}
               accessibilityRole="button"
-              accessibilityLabel="Add Podcast">
+              accessibilityLabel="Add Media">
               <Ionicons name="add" size={18} color={colors.text} />
-              <Text style={styles.addPodcastText}>Add Podcast</Text>
+              <Text style={styles.addPodcastText}>Add Media</Text>
             </Pressable>
 
             <ChartFilterToolbar

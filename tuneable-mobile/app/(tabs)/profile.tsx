@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -41,6 +42,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [addMediaOpen, setAddMediaOpen] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -85,6 +87,7 @@ export default function ProfileScreen() {
         ...(profileUser ?? {}),
         // Prefer live auth wallet balance over profile snapshot.
         balance: user.balance,
+        tuneBytes: profileUser?.tuneBytes ?? user.tuneBytes,
         id: user.id,
         uuid: user.uuid ?? profileUser?.uuid,
         _id: user._id ?? profileUser?._id,
@@ -104,16 +107,6 @@ export default function ProfileScreen() {
 
   return (
     <Screen>
-      <View style={styles.topBar}>
-        <View style={{ width: 36 }} />
-        <Pressable
-          style={styles.gearBtn}
-          onPress={() => setSettingsOpen(true)}
-          hitSlop={10}>
-          <Ionicons name="settings-outline" size={22} color={colors.text} />
-        </Pressable>
-      </View>
-
       <FlatList
         data={[{ key: 'library' }]}
         keyExtractor={(item) => item.key}
@@ -138,25 +131,18 @@ export default function ProfileScreen() {
                 mediaChampions={mediaChampions}
                 isOwnProfile
                 onWalletPress={() => router.push('/wallet')}
+                onSettingsPress={() => setSettingsOpen(true)}
               />
             ) : null}
             <WelcomeCreditClaimCard />
             <View style={styles.addRow}>
               <Pressable
                 style={styles.addBtn}
-                onPress={() => router.push('/music-search')}
+                onPress={() => setAddMediaOpen(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Add Music">
+                accessibilityLabel="Add Media">
                 <Ionicons name="add" size={18} color={colors.text} />
-                <Text style={styles.addBtnText}>Add Music</Text>
-              </Pressable>
-              <Pressable
-                style={styles.addBtn}
-                onPress={() => router.push('/podcast-search')}
-                accessibilityRole="button"
-                accessibilityLabel="Add Podcast">
-                <Ionicons name="add" size={18} color={colors.text} />
-                <Text style={styles.addBtnText}>Add Podcast</Text>
+                <Text style={styles.addBtnText}>Add Media</Text>
               </Pressable>
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -177,6 +163,71 @@ export default function ProfileScreen() {
           />
         )}
       />
+
+      <Modal
+        visible={addMediaOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddMediaOpen(false)}>
+        <Pressable
+          style={styles.addSheetBackdrop}
+          onPress={() => setAddMediaOpen(false)}>
+          <Pressable
+            style={styles.addSheet}
+            onPress={(e) => e.stopPropagation()}>
+            <View style={styles.addSheetHandle} />
+            <View style={styles.addSheetHeader}>
+              <Text style={styles.addSheetTitle}>Add Media</Text>
+              <Pressable
+                onPress={() => setAddMediaOpen(false)}
+                hitSlop={10}
+                accessibilityLabel="Close">
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <Pressable
+              style={styles.addSheetRow}
+              onPress={() => {
+                setAddMediaOpen(false);
+                router.push('/music-search');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add Music">
+              <Ionicons
+                name="musical-notes-outline"
+                size={20}
+                color={colors.accentLight}
+              />
+              <View style={styles.addSheetCopy}>
+                <Text style={styles.addSheetRowText}>Music</Text>
+                <Text style={styles.addSheetRowHint}>
+                  Search and tip to add a tune
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={[styles.addSheetRow, styles.addSheetRowLast]}
+              onPress={() => {
+                setAddMediaOpen(false);
+                router.push('/podcast-search');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add Podcast">
+              <Ionicons
+                name="mic-outline"
+                size={20}
+                color={colors.accentLight}
+              />
+              <View style={styles.addSheetCopy}>
+                <Text style={styles.addSheetRowText}>Podcast</Text>
+                <Text style={styles.addSheetRowHint}>
+                  Search and tip to add an episode
+                </Text>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <ProfileSettingsSheet
         visible={settingsOpen}
@@ -203,25 +254,9 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 4,
-    marginBottom: 4,
-  },
-  gearBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   addRow: {
     flexDirection: 'row',
@@ -246,6 +281,64 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
     fontSize: 14,
+  },
+  addSheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  addSheet: {
+    backgroundColor: colors.gradientStart,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 36,
+    paddingTop: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  addSheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    marginBottom: 12,
+  },
+  addSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  addSheetTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  addSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.cardBorder,
+  },
+  addSheetRowLast: {
+    borderBottomWidth: 0,
+  },
+  addSheetCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  addSheetRowText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  addSheetRowHint: {
+    color: colors.textMuted,
+    fontSize: 13,
   },
   error: {
     color: '#fca5a5',

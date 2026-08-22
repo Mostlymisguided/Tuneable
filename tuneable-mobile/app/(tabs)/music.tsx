@@ -206,9 +206,9 @@ export default function MusicScreen() {
               style={styles.addTunesBtn}
               onPress={() => router.push('/music-search')}
               accessibilityRole="button"
-              accessibilityLabel="Add Music">
+              accessibilityLabel="Add Media">
               <Ionicons name="add" size={18} color={colors.text} />
-              <Text style={styles.addTunesText}>Add Music</Text>
+              <Text style={styles.addTunesText}>Add Media</Text>
             </Pressable>
 
             <ChartFilterToolbar
