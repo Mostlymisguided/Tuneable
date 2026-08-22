@@ -93,10 +93,11 @@ export default function SetHomeLocationScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>← Back</Text>
         </Pressable>
-        <Text style={styles.title}>Where are you based?</Text>
+        <Text style={styles.title}>Enable location for local charts</Text>
         <Text style={styles.lede}>
-          Allow location so we can connect you to local parties and charts. If
-          you&apos;re traveling or it isn&apos;t home, search instead.
+          Tips influence charts where you are — at home, and wherever you tip.
+          Location is only used while Tuneable is open. Search if GPS isn&apos;t
+          home.
         </Text>
 
         <Pressable
@@ -119,7 +120,7 @@ export default function SetHomeLocationScreen() {
                 style={
                   homeLocation?.placeId ? styles.gpsBtnOutlineText : styles.buttonText
                 }>
-                {locationFromGps ? 'Detect again' : 'Use my current location'}
+                {locationFromGps ? 'Detect again' : 'Enable location'}
               </Text>
             </View>
           )}

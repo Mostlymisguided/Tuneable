@@ -90,6 +90,8 @@ function withWelcomeCreditOffer(user) {
   if (!user) return user;
   const obj = typeof user.toObject === 'function' ? user.toObject() : { ...user };
   obj.welcomeCreditOffer = getWelcomeCreditOffer(user);
+  obj.hasPushDevice = Array.isArray(obj.pushDevices) && obj.pushDevices.length > 0;
+  delete obj.pushDevices;
   return obj;
 }
 

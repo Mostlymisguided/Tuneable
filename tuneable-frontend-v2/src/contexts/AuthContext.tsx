@@ -78,6 +78,7 @@ export interface User {
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;
     importSkipped?: boolean;
+    notificationsPromptSeenAt?: string;
   };
   creatorProfile?: {
     artistName?: string;

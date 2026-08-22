@@ -39,26 +39,30 @@ import {
 } from '@/src/lib/oauth';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
+import { requestAndRegisterPush } from '@/src/lib/pushNotifications';
 import type { ResolvedLocation } from '@/src/types/user';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type OnboardingStep = 'tip' | 'location' | 'import';
-type ImportSource = 'spotify' | 'soundcloud';
+type OnboardingStep = 'tip' | 'location' | 'notifications' | 'import';
+type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
 
-const STEP_ORDER: OnboardingStep[] = ['tip', 'location', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['tip', 'location', 'notifications', 'import'];
 const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
 const ONBOARDING_IMPORT_LIMIT = 25;
+const SPOTIFY_READONLY_COPY =
+  'Tuneable only reads your likes. We cannot change your Spotify library, playlists, or playback.';
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'location' || raw === 'import') return raw;
+  if (raw === 'location' || raw === 'import' || raw === 'notifications') return raw;
   return 'tip';
 }
 
-function parseSource(value: string | string[] | undefined): ImportSource {
+function parseSource(value: string | string[] | undefined): ImportSource | null {
   const raw = Array.isArray(value) ? value[0] : value;
-  return raw === 'soundcloud' ? 'soundcloud' : 'spotify';
+  if (raw === 'soundcloud' || raw === 'spotify' || raw === 'youtube') return raw;
+  return null;
 }
 
 export default function OnboardingScreen() {
@@ -87,6 +91,7 @@ export default function OnboardingScreen() {
 
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
+  const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
   const [importLoading, setImportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<{
@@ -243,9 +248,48 @@ export default function OnboardingScreen() {
     try {
       await authAPI.updateProfile({ homeLocation });
       await refreshUser();
-      goToStep('import');
+      goToStep('notifications');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save home location.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const markNotificationsSeen = async () => {
+    await authAPI.updateProfile({
+      onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
+    });
+    await refreshUser();
+  };
+
+  const allowNotificationsStep = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await requestAndRegisterPush();
+      if (result === 'denied') {
+        setError(
+          'Notifications were blocked. You can enable them later in Settings.'
+        );
+      }
+      await markNotificationsSeen();
+      goToStep('import');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not enable notifications.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const skipNotificationsStep = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await markNotificationsSeen();
+      goToStep('import');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to continue.'));
     } finally {
       setSaving(false);
     }
@@ -294,9 +338,11 @@ export default function OnboardingScreen() {
   }, [step, checkConnections]);
 
   const loadImportPreview = useCallback(
-    async (source: ImportSource) => {
+    async (source: ImportSource, playlistUrl?: string) => {
       setImportLoading(true);
-      setImportProgress('Scanning your likes…');
+      setImportProgress(
+        source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…'
+      );
       setImportPreview(null);
       try {
         const started =
@@ -305,12 +351,23 @@ export default function OnboardingScreen() {
                 ONBOARDING_IMPORT_LIMIT,
                 'spotify_only'
               )
+            : source === 'youtube'
+              ? await userAPI.startYouTubeImportPreview(
+                  playlistUrl || youtubePlaylistUrl,
+                  ONBOARDING_IMPORT_LIMIT,
+                  'playlist'
+                )
             : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
         const data = await userAPI.waitForImportJob<{
-          items?: Array<{ matchStatus: string }>;
+          items?: Array<{ matchStatus: string; selected?: boolean }>;
           summary?: { userBalance?: number };
         }>(started.jobId, (job) => {
-          setImportProgress(job.message || 'Scanning your likes…');
+          setImportProgress(
+            job.message
+              || (source === 'youtube'
+                ? 'Matching playlist…'
+                : 'Scanning your likes…')
+          );
         });
 
         const tip =
@@ -318,7 +375,11 @@ export default function OnboardingScreen() {
           parseFloat(defaultTip) ??
           DEFAULT_TIP_POUNDS;
         const items = data.items || [];
-        const actionable = items.filter((i) => i.matchStatus !== 'in_library');
+        const actionable = items.filter(
+          (i) =>
+            i.matchStatus !== 'in_library' &&
+            (source !== 'youtube' || i.selected !== false)
+        );
         const balance =
           data.summary?.userBalance ??
           (user?.balance != null ? user.balance / 100 : 0);
@@ -336,15 +397,13 @@ export default function OnboardingScreen() {
         setImportProgress(null);
       }
     },
-    [defaultTip, user?.balance, user?.preferences?.defaultTip]
+    [defaultTip, user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]
   );
 
   useEffect(() => {
     if (step !== 'import') return;
-    const sourceParam = Array.isArray(params.source)
-      ? params.source[0]
-      : params.source;
-    if (!sourceParam) return;
+    const sourceParam = parseSource(params.source);
+    if (!sourceParam || sourceParam === 'youtube') return;
 
     void (async () => {
       const connections = await checkConnections();
@@ -353,12 +412,12 @@ export default function OnboardingScreen() {
           ? connections.soundcloud
           : connections.spotify;
       if (connected) {
-        await loadImportPreview(sourceParam as ImportSource);
+        await loadImportPreview(sourceParam);
       }
     })();
   }, [step, params.source, checkConnections, loadImportPreview]);
 
-  const connectImportSource = async (source: ImportSource) => {
+  const connectImportSource = async (source: 'spotify' | 'soundcloud') => {
     if (!token) {
       setError('You need to be signed in to connect an account.');
       return;
@@ -400,7 +459,17 @@ export default function OnboardingScreen() {
     }
   };
 
+  const clearImportSource = () => {
+    setImportPreview(null);
+    setError(null);
+    goToStep('import');
+  };
+
   const handleImportSourcePress = (source: ImportSource) => {
+    if (source === 'youtube') {
+      goToStep('import', 'youtube');
+      return;
+    }
     const connected =
       source === 'soundcloud' ? soundcloudConnected : spotifyConnected;
     if (connected) {
@@ -415,6 +484,7 @@ export default function OnboardingScreen() {
   };
 
   const runQuickImport = async () => {
+    if (!importSource) return;
     setImportLoading(true);
     setImportProgress('Preparing import…');
     setError(null);
@@ -429,6 +499,12 @@ export default function OnboardingScreen() {
               ONBOARDING_IMPORT_LIMIT,
               'spotify_only'
             )
+          : importSource === 'youtube'
+            ? await userAPI.startYouTubeImportPreview(
+                youtubePlaylistUrl,
+                ONBOARDING_IMPORT_LIMIT,
+                'playlist'
+              )
           : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
       const data = await userAPI.waitForImportJob<{
         items?: Array<{
@@ -438,14 +514,16 @@ export default function OnboardingScreen() {
           matchStatus?: string;
           useSuggestedMatch?: boolean;
           crossRefStatus?: string;
+          selected?: boolean;
           externalMedia?: Record<string, unknown>;
         }>;
       }>(previewStarted.jobId, (job) => {
-        setImportProgress(job.message || 'Scanning your likes…');
+        setImportProgress(job.message || 'Scanning…');
       });
 
       const items = (data.items || [])
         .filter((i) => i.matchStatus !== 'in_library')
+        .filter((i) => importSource !== 'youtube' || i.selected !== false)
         .slice(0, ONBOARDING_IMPORT_LIMIT)
         .map((i) => ({
           key: i.key,
@@ -472,6 +550,8 @@ export default function OnboardingScreen() {
       const executeStarted =
         importSource === 'soundcloud'
           ? await userAPI.startSoundCloudImportExecute(items, tip)
+          : importSource === 'youtube'
+            ? await userAPI.startYouTubeImportExecute(items, tip)
           : await userAPI.startSpotifyImportExecute(items, tip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
@@ -652,11 +732,11 @@ export default function OnboardingScreen() {
                     <Ionicons name="location-outline" size={20} color={colors.accentLight} />
                   </View>
                   <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Where are you based?</Text>
+                    <Text style={styles.stepTitle}>Enable location for local charts</Text>
                     <Text style={styles.stepText}>
-                      Allow location so we can connect you to local parties and
-                      charts. If you&apos;re traveling or it isn&apos;t home,
-                      search instead.
+                      Tips influence charts where you are — at home, and wherever
+                      you tip. Location is only used while Tuneable is open,
+                      never in the background. Search if GPS isn&apos;t home.
                     </Text>
                   </View>
                 </View>
@@ -683,7 +763,7 @@ export default function OnboardingScreen() {
                             ? styles.gpsBtnOutlineText
                             : styles.primaryBtnText
                         }>
-                        {locationFromGps ? 'Detect again' : 'Use my current location'}
+                        {locationFromGps ? 'Detect again' : 'Enable location'}
                       </Text>
                     </View>
                   )}
@@ -739,7 +819,7 @@ export default function OnboardingScreen() {
                   disabled={busy}
                   onPress={() => {
                     setError(null);
-                    goToStep('import');
+                    goToStep('notifications');
                   }}>
                   <Text style={styles.secondaryBtnText}>Skip for now</Text>
                 </Pressable>
@@ -752,6 +832,48 @@ export default function OnboardingScreen() {
               </View>
             )}
 
+            {step === 'notifications' && (
+              <View style={styles.stepBody}>
+                <View style={styles.stepHeader}>
+                  <View style={styles.iconBubble}>
+                    <Ionicons name="notifications-outline" size={20} color={colors.accentLight} />
+                  </View>
+                  <View style={styles.stepHeaderCopy}>
+                    <Text style={styles.stepTitle}>Stay in the loop</Text>
+                    <Text style={styles.stepText}>
+                      Get a ping when someone tips your tracks, or when you&apos;re
+                      out-tipped on a chart. You can skip and enable this later.
+                    </Text>
+                  </View>
+                </View>
+
+                {error ? <Text style={styles.error}>{error}</Text> : null}
+
+                <Pressable
+                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => void allowNotificationsStep()}>
+                  {saving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Allow notifications</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  style={[styles.secondaryBtn, busy && styles.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => void skipNotificationsStep()}>
+                  <Text style={styles.secondaryBtnText}>Skip for now</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.backBtn}
+                  disabled={busy}
+                  onPress={() => goToStep('location')}>
+                  <Text style={styles.backBtnText}>Back</Text>
+                </Pressable>
+              </View>
+            )}
+
             {step === 'import' && (
               <View style={styles.stepBody}>
                 <View style={styles.stepHeader}>
@@ -759,10 +881,10 @@ export default function OnboardingScreen() {
                     <Ionicons name="musical-notes-outline" size={20} color={colors.accentLight} />
                   </View>
                   <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Jump-start your library</Text>
+                    <Text style={styles.stepTitle}>Import your existing library</Text>
                     <Text style={styles.stepText}>
-                      Import likes from Spotify or SoundCloud. Each track gets a
-                      tip at your default (£
+                      Bring in likes from Spotify or SoundCloud, or a public
+                      YouTube playlist. Each track gets a tip at your default (£
                       {(
                         user?.preferences?.defaultTip ??
                         parsedDefaultTip
@@ -784,9 +906,10 @@ export default function OnboardingScreen() {
                       <Text style={styles.importSub}>
                         {spotifyConnected
                           ? 'Connected — tap to scan your likes'
-                          : 'Import your saved tracks'}
+                          : 'Read-only access to your saved tracks'}
                       </Text>
                     </Pressable>
+                    <Text style={styles.privacyNote}>{SPOTIFY_READONLY_COPY}</Text>
                     <Pressable
                       style={[styles.importCard, styles.soundcloudCard]}
                       disabled={busy}
@@ -802,19 +925,56 @@ export default function OnboardingScreen() {
                           : 'Import your liked tracks'}
                       </Text>
                     </Pressable>
+                    <Pressable
+                      style={[styles.importCard, styles.youtubeCard]}
+                      disabled={busy}
+                      onPress={() => handleImportSourcePress('youtube')}>
+                      <Text style={styles.importTitleYt}>YouTube</Text>
+                      <Text style={styles.importSub}>
+                        Paste a public playlist URL — no YouTube login
+                      </Text>
+                    </Pressable>
                   </View>
                 ) : (
                   <View style={styles.previewBox}>
-                    {importLoading && !importPreview ? (
+                    {importSource === 'youtube' && !importPreview && !importLoading ? (
+                      <>
+                        <Text style={styles.previewText}>
+                          Paste a public YouTube playlist URL
+                        </Text>
+                        <TextInput
+                          value={youtubePlaylistUrl}
+                          onChangeText={setYoutubePlaylistUrl}
+                          placeholder="https://www.youtube.com/playlist?list=…"
+                          placeholderTextColor={colors.textMuted}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          style={styles.input}
+                        />
+                        <Pressable
+                          style={[
+                            styles.primaryBtn,
+                            (busy || !youtubePlaylistUrl.trim()) && styles.btnDisabled,
+                          ]}
+                          disabled={busy || !youtubePlaylistUrl.trim()}
+                          onPress={() =>
+                            void loadImportPreview('youtube', youtubePlaylistUrl)
+                          }>
+                          <Text style={styles.primaryBtnText}>Scan playlist</Text>
+                        </Pressable>
+                      </>
+                    ) : importLoading && !importPreview ? (
                       <View style={styles.previewLoading}>
                         <ActivityIndicator color={colors.accentLight} />
                         <Text style={styles.hint}>
                           {importProgress ||
-                            `Scanning your ${
-                              importSource === 'soundcloud'
-                                ? 'SoundCloud'
-                                : 'Spotify'
-                            } likes…`}
+                            (importSource === 'youtube'
+                              ? 'Matching playlist…'
+                              : `Scanning your ${
+                                  importSource === 'soundcloud'
+                                    ? 'SoundCloud'
+                                    : 'Spotify'
+                                } likes…`)}
                         </Text>
                       </View>
                     ) : importPreview ? (
@@ -846,14 +1006,22 @@ export default function OnboardingScreen() {
                       <View style={styles.previewLoading}>
                         <ActivityIndicator color={colors.accentLight} />
                         <Text style={styles.hint}>
-                          Scanning your{' '}
-                          {importSource === 'soundcloud'
-                            ? 'SoundCloud'
-                            : 'Spotify'}{' '}
-                          likes…
+                          {importSource === 'youtube'
+                            ? 'Matching playlist…'
+                            : `Scanning your ${
+                                importSource === 'soundcloud'
+                                  ? 'SoundCloud'
+                                  : 'Spotify'
+                              } likes…`}
                         </Text>
                       </View>
                     )}
+                    <Pressable
+                      style={styles.backBtn}
+                      disabled={busy}
+                      onPress={clearImportSource}>
+                      <Text style={styles.backBtnText}>Choose a different source</Text>
+                    </Pressable>
                   </View>
                 )}
 
@@ -872,7 +1040,7 @@ export default function OnboardingScreen() {
                 <Pressable
                   style={styles.backBtn}
                   disabled={busy}
-                  onPress={() => goToStep('location')}>
+                  onPress={() => goToStep('notifications')}>
                   <Text style={styles.backBtnText}>Back</Text>
                 </Pressable>
               </View>
@@ -1129,10 +1297,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  importTitleYt: {
+    color: '#fca5a5',
+    fontSize: 16,
+    fontWeight: '700',
+  },
   importSub: {
     marginTop: 4,
     color: colors.textMuted,
     fontSize: 13,
+  },
+  privacyNote: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: -4,
+    marginBottom: 2,
+  },
+  youtubeCard: {
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   previewBox: {
     borderRadius: 12,

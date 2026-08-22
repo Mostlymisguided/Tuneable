@@ -33,12 +33,14 @@ export interface User {
     anonymousMode?: boolean;
     favoriteTags?: string[];
   };
+  hasPushDevice?: boolean;
   onboarding?: {
     defaultTipPromptSeenAt?: string;
     completedAt?: string;
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;
     importSkipped?: boolean;
+    notificationsPromptSeenAt?: string;
   };
   welcomeCreditOffer?: {
     status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';

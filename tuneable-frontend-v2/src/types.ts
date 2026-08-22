@@ -129,7 +129,9 @@ export interface User {
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;
     importSkipped?: boolean;
+    notificationsPromptSeenAt?: string;
   };
+  hasPushDevice?: boolean;
   creatorProfile?: {
     artistName?: string;
     bio?: string;

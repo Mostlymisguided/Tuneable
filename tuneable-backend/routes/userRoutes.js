@@ -693,6 +693,65 @@ router.get('/profile', authMiddleware, async (req, res) => {
   }
 });
 
+const { isExpoPushToken } = require('../services/pushService');
+const MAX_PUSH_DEVICES = 8;
+
+router.post('/me/push-devices', authMiddleware, async (req, res) => {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const platform = req.body?.platform === 'ios' ? 'ios' : req.body?.platform === 'android' ? 'android' : null;
+    if (!isExpoPushToken(token) || !platform) {
+      return res.status(400).json({ error: 'A valid Expo push token and platform are required' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (!Array.isArray(user.pushDevices)) user.pushDevices = [];
+    const existing = user.pushDevices.find((device) => device.token === token);
+    if (existing) {
+      existing.updatedAt = new Date();
+      existing.platform = platform;
+    } else {
+      user.pushDevices.push({ token, platform, updatedAt: new Date() });
+      if (user.pushDevices.length > MAX_PUSH_DEVICES) {
+        user.pushDevices = user.pushDevices
+          .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+          .slice(0, MAX_PUSH_DEVICES);
+      }
+    }
+
+    if (!user.preferences) user.preferences = {};
+    if (!user.preferences.notifications) user.preferences.notifications = {};
+    user.preferences.notifications.push = true;
+    await user.save();
+
+    res.json({ success: true, hasPushDevice: true });
+  } catch (error) {
+    console.error('Error registering push device:', error);
+    res.status(500).json({ error: 'Failed to register push device' });
+  }
+});
+
+router.delete('/me/push-devices', authMiddleware, async (req, res) => {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (token) {
+      user.pushDevices = (user.pushDevices || []).filter((device) => device.token !== token);
+    } else {
+      user.pushDevices = [];
+    }
+    await user.save();
+    res.json({ success: true, hasPushDevice: (user.pushDevices || []).length > 0 });
+  } catch (error) {
+    console.error('Error removing push device:', error);
+    res.status(500).json({ error: 'Failed to remove push device' });
+  }
+});
+
 // Get list of users invited by the current user
 router.get('/invited', authMiddleware, async (req, res) => {
   try {
@@ -3066,6 +3125,12 @@ router.put('/profile', authMiddleware, async (req, res) => {
         if (onboarding.importSkipped !== undefined) {
           user.onboarding.importSkipped = Boolean(onboarding.importSkipped);
         }
+        if (onboarding.notificationsPromptSeenAt !== undefined) {
+          user.onboarding.notificationsPromptSeenAt = parseOnboardingDate(
+            onboarding.notificationsPromptSeenAt,
+            'onboarding.notificationsPromptSeenAt'
+          );
+        }
       } catch (fieldError) {
         return res.status(400).json({
           error: 'Invalid onboarding timestamp',
@@ -3209,6 +3274,7 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
 
     // Update delivery methods (only email - SMS removed)
     if (email !== undefined) user.preferences.notifications.email = email;
+    if (req.body.push !== undefined) user.preferences.notifications.push = Boolean(req.body.push);
 
     // Update privacy settings
     if (anonymousMode !== undefined) user.preferences.anonymousMode = anonymousMode;

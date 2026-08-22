@@ -55,6 +55,10 @@ export function getCurrentLocationError(): string | null {
   return lastError;
 }
 
+export async function getForegroundLocationPermission() {
+  return Location.getForegroundPermissionsAsync();
+}
+
 export function getTipCurrentLocation(): ResolvedLocation | null {
   if (memoryCache && Date.now() - memoryCache.resolvedAt <= TTL_MS) {
     return memoryCache.location;

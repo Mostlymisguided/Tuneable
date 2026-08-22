@@ -1057,6 +1057,8 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           { error: 'spotify_auth_failed', message: 'Session could not be started' }
         ));
       }
+      // Read-only likes. Spotify's consent chrome still says "on your behalf"
+      // (OAuth wording) — we do not request any write/modify scopes.
       passport.authenticate('spotify', {
         scope: ['user-library-read'],
         showDialog: false

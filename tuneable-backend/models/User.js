@@ -183,6 +183,7 @@ const userSchema = new mongoose.Schema({
     notifications: {
       email: { type: Boolean, default: true },
       sms: { type: Boolean, default: false },
+      push: { type: Boolean, default: true },
       types: {
         bid_received: { type: Boolean, default: true },
         bid_outbid: { type: Boolean, default: true },
@@ -202,7 +203,13 @@ const userSchema = new mongoose.Schema({
     favoriteTagsSelectedAt: { type: Date },
     importPromptSeenAt: { type: Date },
     importSkipped: { type: Boolean, default: false },
+    notificationsPromptSeenAt: { type: Date },
   },
+  pushDevices: [{
+    token: { type: String, required: true },
+    platform: { type: String, enum: ['ios', 'android'] },
+    updatedAt: { type: Date, default: Date.now },
+  }],
   role: { 
     type: [String], 
     enum: ['user', 'admin', 'creator', 'host', 'moderator', 'partier', 'dj'], 
@@ -358,7 +365,14 @@ const userSchema = new mongoose.Schema({
   tuneBytesTagRankingsUpdatedAt: { type: Date }
 }, { 
   timestamps: true,
-  toJSON: { virtuals: true }, 
+  toJSON: {
+    virtuals: true,
+    transform(_doc, ret) {
+      ret.hasPushDevice = Array.isArray(ret.pushDevices) && ret.pushDevices.length > 0;
+      delete ret.pushDevices;
+      return ret;
+    },
+  },
   toObject: { virtuals: true } 
 });
 

@@ -163,8 +163,8 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
   if (!hasHomeLocation) {
     prompts.push({
       id: 'location',
-      title: 'Add Home Location',
-      description: 'Use your current location so tips influence local parties and charts. You can change it on your profile if this isn\'t home.',
+      title: 'Enable location for local charts',
+      description: 'Tips influence charts where you are. Use current location, or set home on your profile.',
       icon: MapPin,
       action: handleAddLocation,
       actionLabel: isEnablingLocation ? 'Detecting...' : 'Use current location',

@@ -405,11 +405,11 @@ export default function ImportLibraryScreen() {
               onPress={() => void startSource('spotify')}>
               <Text style={styles.importTitle}>Spotify</Text>
               <Text style={styles.importSub}>
-                {spotifyConnected
-                  ? 'Connected — tap to import'
-                  : spotifyOauthAvailable
-                    ? 'Import your saved tracks'
-                    : 'Request tester access'}
+            {spotifyConnected
+              ? 'Connected — tap to import'
+              : spotifyOauthAvailable
+                ? 'Read-only: we only look at your likes'
+                : 'Request tester access'}
               </Text>
             </Pressable>
             <Pressable

@@ -8,6 +8,8 @@ export interface OnboardingUser {
     defaultTipPromptSeenAt?: string;
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;
+    importSkipped?: boolean;
+    notificationsPromptSeenAt?: string;
   };
 }
 

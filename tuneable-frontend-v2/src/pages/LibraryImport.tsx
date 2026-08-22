@@ -1020,6 +1020,11 @@ const LibraryImport: React.FC = () => {
                 ? 'Paste a public YouTube playlist URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm.'
                 : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
           </p>
+          {source === 'spotify' ? (
+            <p className="text-sm text-gray-500 mt-2 max-w-2xl">
+              Tuneable only reads your likes. We cannot change your Spotify library, playlists, or playback.
+            </p>
+          ) : null}
           <p className="text-xs text-gray-500 mt-2 uppercase tracking-wide">{stepLabel}</p>
         </div>
 

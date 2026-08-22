@@ -20,6 +20,7 @@ import {
 } from '@/src/auth/storage';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
+import { syncPushTokenIfGranted } from '@/src/lib/pushNotifications';
 
 interface AuthContextValue {
   user: User | null;
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
     setUser(newUser);
     await saveSession(newToken, JSON.stringify(newUser));
+    void syncPushTokenIfGranted();
     return newUser;
   }, []);
 
@@ -101,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const { user: fresh } = await authAPI.getProfile();
             setUser(fresh);
             await saveSession(storedToken, JSON.stringify(fresh));
+            void syncPushTokenIfGranted();
           } catch {
             await clearSession();
             setToken(null);
@@ -168,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: fresh } = await authAPI.getProfile();
       setUser(fresh);
       await saveSession(oauthToken, JSON.stringify(fresh));
+      void syncPushTokenIfGranted();
       return fresh;
     } catch (error) {
       setToken(null);

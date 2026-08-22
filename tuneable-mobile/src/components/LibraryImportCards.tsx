@@ -87,7 +87,7 @@ export function LibraryImportCards({ showUpload = false }: Props) {
               spotifyConnected,
               spotifyImported,
               spotifyOauthAvailable
-                ? 'Import your saved tracks'
+                ? 'Read-only likes import'
                 : 'Request tester access'
             )}
           </Text>
@@ -162,7 +162,7 @@ export function LibraryImportCards({ showUpload = false }: Props) {
           style={styles.uploadCard}
           onPress={() => router.push('/upload')}
           accessibilityRole="button"
-          accessibilityLabel="Upload a track">
+          accessibilityLabel="Upload">
           <View style={styles.uploadIcon}>
             <Ionicons
               name="cloud-upload-outline"
@@ -171,7 +171,7 @@ export function LibraryImportCards({ showUpload = false }: Props) {
             />
           </View>
           <View style={styles.uploadCopy}>
-            <Text style={styles.uploadTitle}>Upload a track</Text>
+            <Text style={styles.uploadTitle}>Upload</Text>
             <Text style={styles.uploadSub}>Audio you own or have rights to</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

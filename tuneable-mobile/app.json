@@ -61,6 +61,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "color": "#6D28D9",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Tuneable uses your photos so you can set a profile picture.",

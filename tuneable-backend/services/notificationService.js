@@ -130,6 +130,17 @@ const createNotification = async (params) => {
     const unreadCount = await Notification.countDocuments({ userId, isRead: false });
     sendUnreadCount(userId.toString(), unreadCount);
 
+    const { sendPushToUser } = require('./pushService');
+    sendPushToUser(userId, {
+      title: populated.title,
+      body: populated.message,
+      data: {
+        type: populated.type,
+        url: populated.link || '',
+        notificationId: String(populated._id),
+      },
+    }).catch((err) => console.error('Error sending push for notification:', err));
+
     console.log(`📬 Notification created: ${type} for user ${userId}`);
     return populated;
   } catch (error) {

@@ -27,10 +27,12 @@ import {
 } from '../utils/currentLocationCache';
 
 type OnboardingStep = 'tip' | 'location' | 'import';
-type ImportSource = 'spotify' | 'soundcloud';
+type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
 
 const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
 const ONBOARDING_IMPORT_LIMIT = 25;
+const SPOTIFY_READONLY_COPY =
+  'Tuneable only reads your likes. We cannot change your Spotify library, playlists, or playback.';
 
 const STEP_ORDER: OnboardingStep[] = ['tip', 'location', 'import'];
 
@@ -39,13 +41,18 @@ function parseStep(value: string | null): OnboardingStep {
   return 'tip';
 }
 
+function parseImportSource(value: string | null): ImportSource | null {
+  if (value === 'soundcloud' || value === 'spotify' || value === 'youtube') return value;
+  return null;
+}
+
 const Onboarding: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, refreshUser, updateBalance } = useAuth();
 
   const step = parseStep(searchParams.get('step'));
-  const importSource = (searchParams.get('source') === 'soundcloud' ? 'soundcloud' : 'spotify') as ImportSource;
+  const importSource = parseImportSource(searchParams.get('source'));
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -62,6 +69,7 @@ const Onboarding: React.FC = () => {
   const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
   const [spotifyRequestStatus, setSpotifyRequestStatus] = useState<string | null>(null);
   const [spotifyAccountInput, setSpotifyAccountInput] = useState('');
+  const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
   const [importPreview, setImportPreview] = useState<{
     actionableCount: number;
     estimatedCost: number;
@@ -173,20 +181,30 @@ const Onboarding: React.FC = () => {
     void checkConnections();
   }, [step, checkConnections]);
 
-  const loadImportPreview = useCallback(async (source: ImportSource) => {
+  const loadImportPreview = useCallback(async (source: ImportSource, playlistUrl?: string) => {
     setIsImportLoading(true);
-    setImportProgressMessage('Scanning your likes…');
+    setImportProgressMessage(source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…');
     try {
       const started = source === 'soundcloud'
         ? await userAPI.startSoundCloudImportPreview(ONBOARDING_IMPORT_LIMIT, 'spotify_only')
+        : source === 'youtube'
+          ? await userAPI.startYouTubeImportPreview(
+              playlistUrl || youtubePlaylistUrl,
+              ONBOARDING_IMPORT_LIMIT,
+              'playlist'
+            )
         : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
       const data = await userAPI.waitForImportJob(started.jobId, (job) => {
-        setImportProgressMessage(job.message || 'Scanning your likes…');
+        setImportProgressMessage(
+          job.message || (source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…')
+        );
       });
 
       const items = data.items || [];
       const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
-      const actionable = items.filter((i: { matchStatus: string }) => i.matchStatus !== 'in_library');
+      const actionable = items.filter((i: { matchStatus: string; selected?: boolean }) =>
+        i.matchStatus !== 'in_library' && (source !== 'youtube' || i.selected !== false)
+      );
       const balance = data.summary?.userBalance
         ?? (user?.balance != null ? penceToPoundsNumber(user.balance) : 0);
 
@@ -204,7 +222,7 @@ const Onboarding: React.FC = () => {
       setIsImportLoading(false);
       setImportProgressMessage(null);
     }
-  }, [defaultTip, user?.balance, user?.preferences?.defaultTip]);
+  }, [defaultTip, user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]);
 
   useEffect(() => {
     if (step !== 'import') return;
@@ -343,7 +361,7 @@ const Onboarding: React.FC = () => {
     }
   };
 
-  const connectImportSource = (source: ImportSource) => {
+  const connectImportSource = (source: 'spotify' | 'soundcloud') => {
     const token = localStorage.getItem('token') || undefined;
     const returnPath = `/onboarding?step=import&source=${source}`;
     const redirect = `${window.location.origin}/auth/callback?oauth_success=true&returnUrl=${encodeURIComponent(returnPath)}`;
@@ -371,7 +389,19 @@ const Onboarding: React.FC = () => {
     setSearchParams(params, { replace: true });
   };
 
+  const clearImportSource = () => {
+    const params = new URLSearchParams(searchParams);
+    params.set('step', 'import');
+    params.delete('source');
+    setImportPreview(null);
+    setSearchParams(params, { replace: true });
+  };
+
   const handleSourceCardClick = (source: ImportSource) => {
+    if (source === 'youtube') {
+      startImportFromSource('youtube');
+      return;
+    }
     const connected = source === 'soundcloud' ? soundcloudConnected : spotifyConnected;
     if (connected) {
       if (searchParams.get('source') === source) {
@@ -409,19 +439,23 @@ const Onboarding: React.FC = () => {
   };
 
   const runQuickImport = async () => {
+    if (!importSource) return;
     setIsImportLoading(true);
     setImportProgressMessage('Preparing import…');
     try {
       const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
       const previewStarted = importSource === 'soundcloud'
         ? await userAPI.startSoundCloudImportPreview(ONBOARDING_IMPORT_LIMIT, 'spotify_only')
+        : importSource === 'youtube'
+          ? await userAPI.startYouTubeImportPreview(youtubePlaylistUrl, ONBOARDING_IMPORT_LIMIT, 'playlist')
         : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
       const data = await userAPI.waitForImportJob(previewStarted.jobId, (job) => {
         setImportProgressMessage(job.message || 'Scanning your likes…');
       });
 
       const items = (data.items || [])
-        .filter((i: { matchStatus: string }) => i.matchStatus !== 'in_library')
+        .filter((i: { matchStatus: string; selected?: boolean }) => i.matchStatus !== 'in_library')
+        .filter((i: { selected?: boolean }) => importSource !== 'youtube' || i.selected !== false)
         .slice(0, ONBOARDING_IMPORT_LIMIT)
         .map((i: {
           key: string;
@@ -453,6 +487,8 @@ const Onboarding: React.FC = () => {
       setImportProgressMessage(`Importing ${items.length} track${items.length === 1 ? '' : 's'}…`);
       const executeStarted = importSource === 'soundcloud'
         ? await userAPI.startSoundCloudImportExecute(items, tip)
+        : importSource === 'youtube'
+          ? await userAPI.startYouTubeImportExecute(items, tip)
         : await userAPI.startSpotifyImportExecute(items, tip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
@@ -614,10 +650,11 @@ const Onboarding: React.FC = () => {
                 <MapPin className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">Where are you based?</h2>
+                <h2 className="text-xl font-semibold text-white">Enable location for local charts</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Allow location so we can connect you to local parties and charts. If you&apos;re
-                  traveling or it isn&apos;t home, search instead. You can skip and set it later.
+                  Tips influence charts where you are — at home, and wherever you tip.
+                  Location is only used while Tuneable is open. Search if GPS isn&apos;t home.
+                  You can skip and set it later.
                 </p>
               </div>
             </div>
@@ -641,7 +678,7 @@ const Onboarding: React.FC = () => {
                 ? 'Detecting your location…'
                 : locationFromGps
                   ? 'Detect again'
-                  : 'Use my current location'}
+                  : 'Enable location'}
             </button>
 
             {gpsError && <p className="text-sm text-amber-300/90">{gpsError}</p>}
@@ -716,9 +753,10 @@ const Onboarding: React.FC = () => {
                 <Music className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">Jump-start your library</h2>
+                <h2 className="text-xl font-semibold text-white">Import your existing library</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Import likes from Spotify or SoundCloud. Each imported track gets a tip at your default
+                  Bring in likes from Spotify or SoundCloud, or a public YouTube playlist. Each imported
+                  track gets a tip at your default
                   (£{(user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS).toFixed(2)}).
                   You can skip and do this later.
                 </p>
@@ -744,7 +782,7 @@ const Onboarding: React.FC = () => {
                     {spotifyConnected
                       ? 'Connected — tap to scan your likes'
                       : spotifyOauthAvailable
-                        ? 'Import your saved tracks'
+                        ? 'Read-only access to your saved tracks'
                         : 'Tester allowlist — request access'}
                   </p>
                 </button>
@@ -761,16 +799,49 @@ const Onboarding: React.FC = () => {
                     {soundcloudConnected ? 'Connected — tap to scan your likes' : 'Import your liked tracks'}
                   </p>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => handleSourceCardClick('youtube')}
+                  disabled={isSaving || isImportLoading}
+                  className="rounded-xl border border-red-700/50 bg-red-900/20 p-5 text-left transition-colors hover:bg-red-900/30 sm:col-span-2"
+                >
+                  <p className="font-semibold text-red-300">YouTube playlist</p>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Paste a public playlist URL — no YouTube login
+                  </p>
+                </button>
+                <p className="sm:col-span-2 text-xs text-gray-500">{SPOTIFY_READONLY_COPY}</p>
               </div>
             )}
 
             {(isImportLoading || importPreview || searchParams.get('source')) && (
-              <div className="rounded-xl border border-gray-700 bg-black/30 p-5">
-                {isImportLoading && !importPreview ? (
+              <div className="rounded-xl border border-gray-700 bg-black/30 p-5 space-y-4">
+                {importSource === 'youtube' && !importPreview && !isImportLoading ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-400">Paste a public YouTube playlist URL</p>
+                    <input
+                      type="url"
+                      value={youtubePlaylistUrl}
+                      onChange={(e) => setYoutubePlaylistUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/playlist?list=…"
+                      className="w-full rounded-lg border border-gray-600 bg-black/40 px-3 py-2 text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void loadImportPreview('youtube', youtubePlaylistUrl)}
+                      disabled={isSaving || isImportLoading || !youtubePlaylistUrl.trim()}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+                    >
+                      Scan playlist
+                    </button>
+                  </div>
+                ) : isImportLoading && !importPreview ? (
                   <div className="flex items-center gap-2 text-gray-400">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     {importProgressMessage
-                      || `Scanning your ${importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} likes…`}
+                      || (importSource === 'youtube'
+                        ? 'Matching playlist…'
+                        : `Scanning your ${importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} likes…`)}
                   </div>
                 ) : importPreview ? (
                   <div className="space-y-4">
@@ -836,16 +907,17 @@ const Onboarding: React.FC = () => {
                       Request Spotify import
                     </button>
                   </div>
-                ) : (importSource === 'soundcloud' ? soundcloudConnected : spotifyConnected) ? (
+                ) : (importSource === 'soundcloud' ? soundcloudConnected : importSource === 'spotify' && spotifyConnected) ? (
                   <div className="flex items-center gap-2 text-gray-400">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Scanning your {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} likes…
                   </div>
-                ) : (
+                ) : importSource === 'soundcloud' || importSource === 'spotify' ? (
                   <div className="space-y-3">
                     <p className="text-sm text-gray-400">
                       Connect {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'} to preview your import.
                     </p>
+                    <p className="text-xs text-gray-500">{importSource === 'spotify' ? SPOTIFY_READONLY_COPY : null}</p>
                     <button
                       type="button"
                       onClick={() => connectImportSource(importSource)}
@@ -855,7 +927,14 @@ const Onboarding: React.FC = () => {
                       Connect {importSource === 'soundcloud' ? 'SoundCloud' : 'Spotify'}
                     </button>
                   </div>
-                )}
+                ) : null}
+                <button
+                  type="button"
+                  onClick={clearImportSource}
+                  className="text-sm text-gray-400 hover:text-gray-200"
+                >
+                  Choose a different source
+                </button>
               </div>
             )}
 

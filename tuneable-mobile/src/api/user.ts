@@ -283,4 +283,25 @@ export const userAPI = {
 
     throw new Error('Import job timed out — please try again with fewer tracks');
   },
+
+  registerPushDevice: async (body: {
+    token: string;
+    platform: 'ios' | 'android';
+  }): Promise<{ success: boolean; hasPushDevice: boolean }> => {
+    const response = await api.post<{ success: boolean; hasPushDevice: boolean }>(
+      '/users/me/push-devices',
+      body
+    );
+    return response.data;
+  },
+
+  unregisterPushDevice: async (
+    token?: string
+  ): Promise<{ success: boolean; hasPushDevice: boolean }> => {
+    const response = await api.delete<{ success: boolean; hasPushDevice: boolean }>(
+      '/users/me/push-devices',
+      { data: token ? { token } : {} }
+    );
+    return response.data;
+  },
 };
