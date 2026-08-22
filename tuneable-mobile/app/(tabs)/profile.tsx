@@ -239,6 +239,10 @@ export default function ProfileScreen() {
           setSettingsOpen(false);
           router.push('/wallet');
         }}
+        onEditProfile={() => {
+          setSettingsOpen(false);
+          router.push('/edit-profile');
+        }}
         onUpload={() => {
           setSettingsOpen(false);
           router.push('/upload');

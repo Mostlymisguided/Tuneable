@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '@/src/auth/AuthContext';
 import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
+import { subscribeNotificationResponses } from '@/src/lib/pushNotifications';
 import { colors } from '@/src/theme/colors';
 
 export { ErrorBoundary } from 'expo-router';
@@ -50,6 +51,10 @@ export default function RootLayout() {
 function RootNavigator() {
   const { isLoading } = useAuth();
 
+  useEffect(() => {
+    return subscribeNotificationResponses();
+  }, []);
+
   if (isLoading) {
     return (
       <View
@@ -79,6 +84,7 @@ function RootNavigator() {
         />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="set-home-location" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />

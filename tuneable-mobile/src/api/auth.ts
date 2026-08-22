@@ -54,12 +54,42 @@ export const authAPI = {
       onboarding?: User['onboarding'];
       preferences?: User['preferences'];
       homeLocation?: User['homeLocation'];
+      secondaryLocation?: User['secondaryLocation'];
     }
   ): Promise<{ user: User; message?: string }> => {
     const response = await api.put<{ user: User; message?: string }>(
       '/users/profile',
       userData
     );
+    return response.data;
+  },
+
+  uploadProfilePic: async (file: {
+    uri: string;
+    name: string;
+    mimeType?: string | null;
+  }): Promise<{ user: Pick<User, '_id' | 'profilePic'>; message?: string }> => {
+    const form = new FormData();
+    form.append('profilePic', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType || 'image/jpeg',
+    } as unknown as Blob);
+    const response = await api.put<{
+      user: Pick<User, '_id' | 'profilePic'>;
+      message?: string;
+    }>('/users/profile-pic', form);
+    return response.data;
+  },
+
+  removeProfilePic: async (): Promise<{
+    user: Pick<User, '_id' | 'profilePic'>;
+    message?: string;
+  }> => {
+    const response = await api.delete<{
+      user: Pick<User, '_id' | 'profilePic'>;
+      message?: string;
+    }>('/users/profile-pic');
     return response.data;
   },
 

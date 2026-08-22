@@ -137,10 +137,26 @@ export function UserProfileHero({
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
-        <Image
-          source={{ uri: user.profilePic || DEFAULT_PROFILE_PIC }}
-          style={styles.avatar}
-        />
+        {isOwnProfile ? (
+          <Pressable
+            onPress={() => router.push('/edit-profile')}
+            style={styles.avatarWrap}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile picture">
+            <Image
+              source={{ uri: user.profilePic || DEFAULT_PROFILE_PIC }}
+              style={styles.avatar}
+            />
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={12} color="#fff" />
+            </View>
+          </Pressable>
+        ) : (
+          <Image
+            source={{ uri: user.profilePic || DEFAULT_PROFILE_PIC }}
+            style={styles.avatar}
+          />
+        )}
         <View style={styles.identity}>
           <Text style={styles.name} numberOfLines={2}>
             {user.username}
@@ -444,6 +460,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 14,
   },
+  avatarWrap: {
+    width: 80,
+    height: 80,
+  },
   avatar: {
     width: 80,
     height: 80,
@@ -451,6 +471,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 2,
     borderColor: 'rgba(168, 85, 247, 0.45)',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.gradientStart,
   },
   identity: {
     flex: 1,

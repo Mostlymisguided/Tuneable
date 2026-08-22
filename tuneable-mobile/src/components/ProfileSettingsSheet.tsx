@@ -24,6 +24,7 @@ type Props = {
   onClose: () => void;
   onWallet: () => void;
   onUpload?: () => void;
+  onEditProfile: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => Promise<void>;
 };
@@ -37,13 +38,16 @@ export function ProfileSettingsSheet({
   onClose,
   onWallet,
   onUpload,
+  onEditProfile,
   onSignOut,
   onDeleteAccount,
 }: Props) {
   const [busy, setBusy] = useState(false);
 
-  const openEditOnWeb = async () => {
-    await WebBrowser.openBrowserAsync('https://tuneable.stream/profile');
+  const openAdvancedOnWeb = async () => {
+    await WebBrowser.openBrowserAsync(
+      'https://tuneable.stream/profile?settings=true'
+    );
   };
 
   const confirmDelete = () => {
@@ -127,10 +131,18 @@ export function ProfileSettingsSheet({
 
           <Pressable
             style={styles.row}
-            onPress={() => void openEditOnWeb()}
+            onPress={onEditProfile}
             disabled={disabled}>
             <Ionicons name="create-outline" size={20} color={colors.accentLight} />
-            <Text style={styles.rowText}>Edit profile on web</Text>
+            <Text style={styles.rowText}>Edit profile</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.row}
+            onPress={() => void openAdvancedOnWeb()}
+            disabled={disabled}>
+            <Ionicons name="globe-outline" size={20} color={colors.accentLight} />
+            <Text style={styles.rowText}>Advanced settings on web</Text>
           </Pressable>
 
           <Pressable

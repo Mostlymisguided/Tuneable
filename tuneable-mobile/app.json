@@ -59,6 +59,14 @@
         {
           "locationWhenInUsePermission": "Tuneable uses your location so tips can influence charts where you are."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tuneable uses your photos so you can set a profile picture.",
+          "cameraPermission": "Tuneable uses your camera so you can take a profile picture.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

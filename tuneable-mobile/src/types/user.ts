@@ -4,6 +4,9 @@ export interface User {
   uuid?: string;
   username: string;
   email: string;
+  givenName?: string;
+  familyName?: string;
+  cellPhone?: string;
   profilePic?: string;
   personalInviteCode?: string;
   primaryInviteCode?: string;
