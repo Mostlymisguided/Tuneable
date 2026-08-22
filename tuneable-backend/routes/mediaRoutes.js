@@ -15,6 +15,8 @@ const { buildReadableAudioKey, buildReadableCoverKey } = require('../utils/reada
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
+const { buildMediaStoryCard, publicStoryCardUrl } = require('../services/storyCardService');
+const { detectMediaKind, canonicalMediaPath, buildStoryCardCopy, creatorLabel } = require('../services/storyCardCopy');
 const MetadataExtractor = require('../utils/metadataExtractor');
 const {
   parseLibraryXmlContent,
@@ -4528,6 +4530,29 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/media/story-card/:id
+// @desc    Branded 9:16 story PNG (or 1200×630 OG via ?format=og)
+// @access  Public
+router.get('/story-card/:id', async (req, res) => {
+  try {
+    const format = req.query.format === 'og' ? 'og' : 'story';
+    const result = await buildMediaStoryCard(req.params.id, { format });
+    if (!result) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Content-Disposition', `inline; filename="${result.filename}"`);
+    res.setHeader('X-Tuneable-Share-Url', result.shareUrl);
+    return res.send(result.buffer);
+  } catch (error) {
+    console.error('Error rendering story card:', error);
+    return res.status(500).json({ error: 'Failed to render story card' });
+  }
+});
+
 // @route   GET /api/media/share/:id
 // @desc    Serve HTML with Open Graph meta tags for Facebook sharing
 // @access  Public
@@ -4725,15 +4750,27 @@ router.get('/share/:id', async (req, res) => {
     
     const artistText = creatorDisplay ? ` by ${creatorDisplay}` : '';
     const mediaTitle = (media.title && media.title.trim()) || 'Untitled Tune';
+    const mediaKind = detectMediaKind(media);
+    const sharePath = canonicalMediaPath(mediaKind, media._id);
     
     // Ensure we have a valid cover art URL
-    const ogImage = getAbsoluteImageUrl(coverArtUrl);
+    const ogImage = publicStoryCardUrl(req, media._id, 'og');
     
     // Build title and description
     const ogTitle = escapeHtml(`${mediaTitle}${artistText} | Tuneable`);
-    const ogDescription = escapeHtml(`Support your Favourite Creators on Tuneable! Check out "${mediaTitle}"${artistText} and show it some love.`);
-    // Use _id for shorter URLs
-    const ogUrl = `${frontendUrl}/tune/${media._id}`;
+    const storyCopy = buildStoryCardCopy({
+      kind: mediaKind,
+      title: mediaTitle,
+      artist: creatorLabel(media),
+      championPence: media.globalMediaAggregateTop,
+    });
+    const ogDescription = escapeHtml(
+      storyCopy.stat
+        ? `${storyCopy.stat}. ${storyCopy.cta}`
+        : `Support your Favourite Creators on Tuneable! Check out "${mediaTitle}"${artistText} and show it some love.`
+    );
+    const ogUrl = `${frontendUrl}${sharePath}`;
+    const ogType = mediaKind === 'tune' ? 'music.song' : 'website';
     const escapedTitle = escapeHtml(mediaTitle);
     const escapedId = escapeHtml(media._id.toString());
     
@@ -4774,7 +4811,7 @@ router.get('/share/:id', async (req, res) => {
   <meta name="description" content="${ogDescription}">
   
   <!-- Open Graph / Facebook - MUST be in this order for Facebook -->
-  <meta property="og:type" content="music.song" />
+  <meta property="og:type" content="${ogType}" />
   <meta property="og:url" content="${ogUrl}" />
   <meta property="og:title" content="${ogTitle}" />
   <meta property="og:description" content="${ogDescription}" />

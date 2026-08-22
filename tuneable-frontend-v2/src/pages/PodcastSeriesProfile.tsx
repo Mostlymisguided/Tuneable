@@ -19,11 +19,14 @@ import {
   Twitter,
   Facebook,
   Linkedin,
+  Instagram,
+  Download,
   Search,
   RefreshCw,
   Play,
   Tag,
-  MapPin
+  MapPin,
+  Loader2
 } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
@@ -34,6 +37,7 @@ import { getEpisodeDisplayTags } from '../utils/podcastTags';
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { resolveTipStatInputs } from '../utils/tipStats';
+import { shareStoryCardWithToast } from '../utils/shareMediaCard';
 
 interface PodcastSeries {
   _id: string;
@@ -135,6 +139,7 @@ const PodcastSeriesProfile: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [tagRankings, setTagRankings] = useState<Array<{
     tag: string;
     rank: number;
@@ -640,29 +645,53 @@ const PodcastSeriesProfile: React.FC = () => {
   };
 
   // Share functionality
-  const shareUrl = window.location.href;
+  const shareUrl = seriesId
+    ? `${window.location.origin}/podcast/${seriesId}`
+    : window.location.href;
   const shareText = `Check out "${series?.title || 'this podcast'}" on Tuneable! Support your favourite Creators and discover new content.`;
+  const storyMediaId = series?._id || seriesId;
 
   const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: series?.title || 'Tuneable Podcast',
-          text: shareText,
-          url: shareUrl,
-        });
-      } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          console.error('Error sharing:', err);
-        }
-      }
-    } else {
+    if (!storyMediaId) {
       handleCopyLink();
+      return;
+    }
+    setIsSharing(true);
+    try {
+      await shareStoryCardWithToast({
+        mediaId: storyMediaId,
+        title: series?.title || 'Tuneable Podcast',
+        text: shareText,
+        url: shareUrl,
+        platform: 'native',
+      });
+    } finally {
+      setIsSharing(false);
     }
   };
 
-  const handleShare = (platform: string) => {
+  const handleShare = async (platform: string) => {
     try {
+      if (platform === 'instagram' || platform === 'download') {
+        if (!storyMediaId) {
+          toast.error('Nothing to share yet.');
+          return;
+        }
+        setIsSharing(true);
+        try {
+          await shareStoryCardWithToast({
+            mediaId: storyMediaId,
+            title: series?.title || 'Tuneable Podcast',
+            text: shareText,
+            url: shareUrl,
+            platform: platform === 'download' ? 'download' : 'instagram',
+          });
+        } finally {
+          setIsSharing(false);
+        }
+        return;
+      }
+
       const encodedUrl = encodeURIComponent(shareUrl);
       const encodedText = encodeURIComponent(shareText);
 
@@ -773,10 +802,11 @@ const PodcastSeriesProfile: React.FC = () => {
                 {isMobile && 'share' in navigator ? (
                   <button
                     onClick={handleNativeShare}
-                    className="px-4 py-2 rounded-lg bg-gray-900/80 hover:bg-gray-800 border border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.3)] flex items-center gap-2 transition-colors"
+                    disabled={isSharing}
+                    className="px-4 py-2 rounded-lg bg-gray-900/80 hover:bg-gray-800 border border-purple-500/50 shadow-[0_0_8px_rgba(168,85,247,0.3)] flex items-center gap-2 transition-colors disabled:opacity-60"
                   >
-                    <Share2 className="h-4 w-4 text-white" />
-                    <span className="text-sm font-semibold text-white">Share</span>
+                    {isSharing ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <Share2 className="h-4 w-4 text-white" />}
+                    <span className="text-sm font-semibold text-white">{isSharing ? 'Preparing…' : 'Share'}</span>
                   </button>
                 ) : (
                   <>
@@ -811,6 +841,20 @@ const PodcastSeriesProfile: React.FC = () => {
                           >
                             <Linkedin className="h-4 w-4 text-blue-600" />
                             <span className="text-sm text-white">LinkedIn</span>
+                          </button>
+                          <button
+                            onClick={() => { void handleShare('instagram'); setShowShareDropdown(false); }}
+                            className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors"
+                          >
+                            <Instagram className="h-4 w-4 text-pink-400" />
+                            <span className="text-sm text-white">Instagram Story</span>
+                          </button>
+                          <button
+                            onClick={() => { void handleShare('download'); setShowShareDropdown(false); }}
+                            className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-800 transition-colors"
+                          >
+                            <Download className="h-4 w-4 text-purple-300" />
+                            <span className="text-sm text-white">Download story</span>
                           </button>
                           <div className="border-t border-gray-700 my-1"></div>
                           <button

@@ -40,6 +40,7 @@ import {
   Facebook,
   Linkedin,
   Instagram,
+  Download,
   Info,
   MapPin
 } from 'lucide-react';
@@ -57,6 +58,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { computeChampionTipContext } from '../utils/tipStats';
+import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import DeleteMediaSection from '../components/DeleteMediaSection';
@@ -316,6 +318,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   // Cover art upload state
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
@@ -1614,7 +1617,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     ? `${window.location.origin}/podcasts/${media._id}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
-  const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
+  const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this episode'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
 
   // Update Open Graph meta tags for better Facebook sharing
   useEffect(() => {
@@ -1632,7 +1635,9 @@ const PodcastEpisodeProfile: React.FC = () => {
       return `${window.location.origin}/${imageUrl}`;
     };
 
-    const ogImage = getAbsoluteImageUrl(media.coverArt);
+    const ogImage = media._id
+      ? getStoryCardUrl(media._id, 'og')
+      : getAbsoluteImageUrl(media.coverArt);
     const artistDisplay = Array.isArray(media.artist) 
       ? media.artist.map((a: any) => a.name || a).join(', ')
       : media.artist || '';
@@ -1684,22 +1689,21 @@ const PodcastEpisodeProfile: React.FC = () => {
   }, [media, shareUrl, shareText]);
 
   const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: media?.title || 'Tuneable Tune',
-          text: shareText,
-          url: shareUrl,
-        });
-      } catch (err: any) {
-        // User cancelled or error occurred
-        if (err.name !== 'AbortError') {
-          console.error('Error sharing:', err);
-        }
-      }
-    } else {
-      // Fallback to copy link if native share not available
+    if (!media?._id) {
       handleCopyLink();
+      return;
+    }
+    setIsSharing(true);
+    try {
+      await shareStoryCardWithToast({
+        mediaId: media._id,
+        title: media.title || 'Tuneable',
+        text: shareText,
+        url: shareUrl,
+        platform: 'native',
+      });
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -1725,20 +1729,26 @@ const PodcastEpisodeProfile: React.FC = () => {
       };
 
       // Handle Instagram sharing (copy text + link to clipboard)
-      if (platform === 'instagram') {
-        try {
-          const textToCopy = `${shareText}\n\n${shareUrl}`;
-          await navigator.clipboard.writeText(textToCopy);
-          setCopySuccess(true);
-          toast.success('Link and message copied! Paste it in your Instagram Story or post.');
-          setTimeout(() => setCopySuccess(false), 2000);
-          console.log('Instagram share tracked:', { mediaId: media?._id, url: shareUrl });
-          return;
-        } catch (err) {
-          console.error('Failed to copy link:', err);
-          toast.error('Failed to copy link. Please copy it manually.');
+      if (platform === 'instagram' || platform === 'download') {
+        if (!media?._id) {
+          toast.error('Nothing to share yet.');
           return;
         }
+        setIsSharing(true);
+        try {
+          await shareStoryCardWithToast({
+            mediaId: media._id,
+            title: media.title || 'Tuneable',
+            text: shareText,
+            url: shareUrl,
+            platform: platform === 'download' ? 'download' : 'instagram',
+          });
+          setCopySuccess(true);
+          setTimeout(() => setCopySuccess(false), 2000);
+        } finally {
+          setIsSharing(false);
+        }
+        return;
       }
 
       // Handle Facebook sharing (copy text + link to clipboard for better UX)
@@ -2071,10 +2081,11 @@ const PodcastEpisodeProfile: React.FC = () => {
     isMobile ? (
       <button
         onClick={handleNativeShare}
-        className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
+        disabled={isSharing}
+        className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm disabled:opacity-60"
       >
-        <Share2 className="h-4 w-4" />
-        <span>Share</span>
+        {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+        <span>{isSharing ? 'Preparing…' : 'Share'}</span>
       </button>
     ) : (
       <div className="relative">
@@ -2101,7 +2112,10 @@ const PodcastEpisodeProfile: React.FC = () => {
               <Share2 className="h-5 w-5 text-green-500" /><span>WhatsApp</span>
             </button>
             <button onClick={() => handleShare('instagram')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
-              <Instagram className="h-5 w-5 text-pink-500" /><span>Instagram</span>
+              <Instagram className="h-5 w-5 text-pink-500" /><span>Instagram Story</span>
+            </button>
+            <button onClick={() => handleShare('download')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white">
+              <Download className="h-5 w-5 text-purple-300" /><span>Download story</span>
             </button>
             <button onClick={() => handleShare('copy')} className="w-full px-4 py-3 text-left hover:bg-gray-800/80 transition-colors flex items-center space-x-3 text-white border-t border-gray-700">
               {copySuccess ? <Check className="h-5 w-5 text-green-400" /> : <Copy className="h-5 w-5 text-gray-400" />}

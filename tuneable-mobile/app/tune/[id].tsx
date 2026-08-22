@@ -37,7 +37,7 @@ import {
   isUploadPlayable,
   mediaId,
 } from '@/src/lib/media';
-import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
+import { shareStoryCard } from '@/src/lib/shareStoryCard';
 import {
   buildTipStatChips,
   resolveTipStatInputs,
@@ -90,6 +90,7 @@ export default function TuneProfileScreen() {
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [tagClaimOpen, setTagClaimOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [rankedTags, setRankedTags] = useState<
     Array<{ tag: string; aggregate?: number; tipperCount?: number }>
   >([]);
@@ -315,14 +316,27 @@ export default function TuneProfileScreen() {
   const onShare = async () => {
     if (!media) return;
     const mid = mediaId(media) || id;
+    if (!mid) return;
     const url = `https://tuneable.stream/tune/${mid}`;
+    setSharing(true);
     try {
-      await Share.share({
-        message: `${media.title || 'Tune'} — ${artist}\n${url}`,
+      await shareStoryCard({
+        mediaId: mid,
+        title: media.title || 'Tune',
+        artist,
         url,
       });
     } catch {
-      // dismissed
+      try {
+        await Share.share({
+          message: `${media.title || 'Tune'} — ${artist}\n${url}`,
+          url,
+        });
+      } catch {
+        // dismissed
+      }
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -548,9 +562,16 @@ export default function TuneProfileScreen() {
                   <Text style={styles.tagBtnText}>Add Tags</Text>
                 </Pressable>
               ) : null}
-              <Pressable style={styles.shareBtn} onPress={() => void onShare()}>
-                <Ionicons name="share-outline" size={16} color={colors.text} />
-                <Text style={styles.shareBtnText}>Share</Text>
+              <Pressable
+                style={[styles.shareBtn, sharing && { opacity: 0.6 }]}
+                onPress={() => void onShare()}
+                disabled={sharing}>
+                {sharing ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Ionicons name="share-outline" size={16} color={colors.text} />
+                )}
+                <Text style={styles.shareBtnText}>{sharing ? 'Preparing…' : 'Share'}</Text>
               </Pressable>
               <Pressable
                 style={styles.heartBtn}
