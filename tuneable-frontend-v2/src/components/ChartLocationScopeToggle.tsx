@@ -29,7 +29,7 @@ const ChartLocationScopeToggle: React.FC<ChartLocationScopeToggleProps> = ({
   if (open) {
     return (
       <div
-        className="flex flex-wrap justify-center gap-x-3 gap-y-1 mb-2"
+        className="flex w-full flex-wrap justify-center gap-x-3 gap-y-1 mb-3"
         role="radiogroup"
         aria-label="Location chart scope"
       >
@@ -63,7 +63,7 @@ const ChartLocationScopeToggle: React.FC<ChartLocationScopeToggleProps> = ({
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="group inline-flex items-center justify-center gap-1 mb-2 text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-purple-300/80 hover:text-purple-200 transition-colors"
+      className="group flex w-full items-center justify-center gap-1 mb-3 text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-purple-300/80 hover:text-purple-200 transition-colors"
       aria-haspopup="true"
       aria-expanded={false}
       aria-label={`Chart scope ${locationScopeLabel(value)}. Change to In, From, or Supported by.`}

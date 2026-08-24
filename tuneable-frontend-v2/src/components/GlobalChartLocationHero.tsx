@@ -136,50 +136,52 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
       <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
         {chartLabel}
       </p>
-      {onLocationScopeChange ? (
-        <ChartLocationScopeToggle
-          value={locationScope}
-          onChange={onLocationScopeChange}
-        />
-      ) : (
-        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
-          In
-        </p>
-      )}
-
-      {showLocationFilter ? (
-        <div className="max-w-md mx-auto">
-          <LocationAutocomplete
-            value={selectedLocation}
-            onChange={handleSearchChange}
-            placeholder="Search city, town, or region…"
-            autoFocus
-            showIcon={false}
-            inputClassName="w-full text-center text-2xl sm:text-4xl font-black bg-transparent border-0 border-b border-purple-400/40 rounded-none text-white placeholder:text-gray-500 placeholder:font-semibold placeholder:text-lg sm:placeholder:text-2xl focus:outline-none focus:ring-0 focus:border-purple-300 py-2 pr-10"
+      <div className="flex w-full flex-col items-center">
+        {onLocationScopeChange ? (
+          <ChartLocationScopeToggle
+            value={locationScope}
+            onChange={onLocationScopeChange}
           />
+        ) : (
+          <p className="w-full text-center text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-3">
+            In
+          </p>
+        )}
+
+        {showLocationFilter ? (
+          <div className="w-full max-w-md mx-auto">
+            <LocationAutocomplete
+              value={selectedLocation}
+              onChange={handleSearchChange}
+              placeholder="Search city, town, or region…"
+              autoFocus
+              showIcon={false}
+              inputClassName="w-full text-center text-2xl sm:text-4xl font-black bg-transparent border-0 border-b border-purple-400/40 rounded-none text-white placeholder:text-gray-500 placeholder:font-semibold placeholder:text-lg sm:placeholder:text-2xl focus:outline-none focus:ring-0 focus:border-purple-300 py-2 pr-10"
+            />
+            <button
+              type="button"
+              onClick={onToggleLocationFilter}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              aria-label="Close location search"
+            >
+              <ChevronDown className="h-3.5 w-3.5 rotate-180" />
+              Done
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
             onClick={onToggleLocationFilter}
-            className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            aria-label="Close location search"
+            className="group flex w-full flex-col items-center"
+            aria-label={`Current location ${locationLabel}. Search for a location.`}
           >
-            <ChevronDown className="h-3.5 w-3.5 rotate-180" />
-            Done
+            <h1 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300 drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)] group-hover:from-purple-200 group-hover:to-purple-200 transition-colors underline decoration-purple-400/0 group-hover:decoration-purple-400/50 underline-offset-8">
+              {locationLabel}
+            </h1>
+            <ChevronDown className="mt-2 h-4 w-4 text-gray-500 opacity-50 group-hover:opacity-90 transition-opacity" />
           </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={onToggleLocationFilter}
-          className="group inline-flex flex-col items-center"
-          aria-label={`Current location ${locationLabel}. Search for a location.`}
-        >
-          <h1 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 via-white to-purple-300 drop-shadow-[0_2px_10px_rgba(168,85,247,0.35)] group-hover:from-purple-200 group-hover:to-purple-200 transition-colors underline decoration-purple-400/0 group-hover:decoration-purple-400/50 underline-offset-8">
-            {locationLabel}
-          </h1>
-          <ChevronDown className="mt-2 h-4 w-4 text-gray-500 opacity-50 group-hover:opacity-90 transition-opacity" />
-        </button>
-      )}
+        )}
+      </div>
 
       {locationQuickPicks.length > 0 && (
         <div className="mt-4">

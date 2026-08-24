@@ -158,6 +158,7 @@ function LocationChip({
 
 const styles = StyleSheet.create({
   wrap: {
+    flexDirection: 'column',
     alignItems: 'center',
     paddingTop: 8,
     paddingBottom: 12,
@@ -186,19 +187,22 @@ const styles = StyleSheet.create({
     color: 'rgba(196, 181, 253, 0.85)',
   },
   scopeButton: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
-    marginBottom: 8,
+    marginBottom: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   scopeRow: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   scopeOption: {
     paddingVertical: 4,
