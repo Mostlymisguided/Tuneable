@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { uuidv7 } = require('uuidv7');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
+const { normalizeLanguageInput } = require('../utils/language');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -577,6 +578,11 @@ mediaSchema.pre('save', function (next) {
 
   if (this.isModified('isrc')) {
     this.isrc = normalizeIsrc(this.isrc);
+  }
+
+  // MongoDB text indexes treat `language` as a stemming override (`en`, not `eng`).
+  if (this.language) {
+    this.language = normalizeLanguageInput(this.language);
   }
   
   next();

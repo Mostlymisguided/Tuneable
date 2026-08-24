@@ -79,4 +79,13 @@ describe('buildBookDoc', () => {
     expect(doc.author[0].name).toBe('Frank Herbert');
     expect(doc.rightsCleared).toBe(false);
   });
+
+  it('maps Open Library ISO-639-2 language codes so MongoDB text indexes accept them', () => {
+    const doc = buildBookDoc({
+      title: 'The Hobbit',
+      authors: ['J.R.R. Tolkien'],
+      language: 'eng',
+    }, 'user1');
+    expect(doc.language).toBe('en');
+  });
 });
