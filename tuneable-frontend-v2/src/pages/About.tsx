@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Heart,
   Globe,
@@ -9,9 +9,24 @@ import {
   Waves,
   Coins,
   Zap,
+  Percent,
+  Landmark,
+  Vote,
 } from 'lucide-react';
 
 const About: React.FC = () => {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+    const id = hash.replace('#', '');
+    const scrollToHash = () => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const timer = window.setTimeout(scrollToHash, 50);
+    return () => window.clearTimeout(timer);
+  }, [hash]);
+
   const aims = [
     {
       icon: <Heart className="h-8 w-8 text-pink-500" />,
@@ -109,7 +124,9 @@ const About: React.FC = () => {
                 <Zap className="h-10 w-10 text-yellow-400" />
               </div>
               <h3 className="text-xl font-bold text-white mb-3">Support Creators</h3>
-              <p className="text-gray-300 leading-relaxed">Creators Earn Most of Your Tips</p>
+              <p className="text-gray-300 leading-relaxed">
+                70% of each tip reaches artists today — 90% when we are at scale
+              </p>
             </div>
             <div className="text-center group">
               <div className="bg-purple-600/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-purple-500/30 group-hover:border-purple-400 group-hover:bg-purple-600/30 transition-all">
@@ -160,6 +177,63 @@ const About: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Fair take rate */}
+      <section id="how-money-works" className="py-16 bg-indigo-950 text-white scroll-mt-24">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">Artists keep more as we grow</h2>
+            <p className="text-lg md:text-xl text-indigo-100 leading-relaxed">
+              Today Tuneable keeps 30% of each tip so we can build and run the platform. That is
+              higher than we want long-term. We are committed to cutting our take to{' '}
+              <strong className="text-white">10% once Tuneable is running at scale</strong>, so{' '}
+              <strong className="text-white">90% of every tip reaches artists</strong>. Those
+              percentages are of the tip itself; card and app-store processing fees are charged
+              separately by payment providers.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6 mb-10">
+            <div className="bg-white/10 rounded-xl p-6 border border-white/15">
+              <Percent className="h-8 w-8 text-pink-400 mb-4" />
+              <h3 className="font-semibold text-white mb-2">Today</h3>
+              <p className="text-indigo-100 text-sm leading-relaxed">
+                70% of each tip goes to the artist. 30% funds Tuneable while we are still small.
+              </p>
+            </div>
+            <div className="bg-white/10 rounded-xl p-6 border border-white/15">
+              <Coins className="h-8 w-8 text-yellow-400 mb-4" />
+              <h3 className="font-semibold text-white mb-2">At scale</h3>
+              <p className="text-indigo-100 text-sm leading-relaxed">
+                Target 90% to artists, 10% to the platform. Our take rate is intended only to fall,
+                not to rise.
+              </p>
+            </div>
+            <div className="bg-white/10 rounded-xl p-6 border border-white/15">
+              <Vote className="h-8 w-8 text-green-400 mb-4" />
+              <h3 className="font-semibold text-white mb-2">At £1 billion</h3>
+              <p className="text-indigo-100 text-sm leading-relaxed">
+                If Tuneable ever reaches a £1 billion valuation, we commit to moving to full
+                community governance — a DAO owned and steered by artists and users.
+              </p>
+            </div>
+          </div>
+          <div className="bg-white/5 rounded-xl p-6 border border-white/10 flex items-start gap-4">
+            <Landmark className="h-8 w-8 text-purple-300 flex-shrink-0 mt-1" />
+            <p className="text-indigo-100 leading-relaxed">
+              Tuneable is a UK Community Interest Company: the point is a fairer music economy, not
+              private fortune. CIC rules already constrain how much value can be extracted. Nobody
+              here is building Tuneable so a founder becomes a billionaire from your tips.
+            </p>
+          </div>
+          <p className="text-center text-sm text-indigo-200 mt-8">
+            The current split and this direction are also in our{' '}
+            <Link to="/terms-of-service" className="underline hover:text-white">
+              Terms of Service
+            </Link>
+            .
+          </p>
         </div>
       </section>
 
@@ -233,6 +307,12 @@ const About: React.FC = () => {
               </a>
               <Link to="/help" className="text-gray-400 hover:text-white transition-colors">
                 Help
+              </Link>
+              <Link
+                to="/about#how-money-works"
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                How money works
               </Link>
               <Link
                 to="/privacy-policy"

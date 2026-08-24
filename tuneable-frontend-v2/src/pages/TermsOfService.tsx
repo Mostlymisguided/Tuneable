@@ -307,13 +307,23 @@ const TermsOfService: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>All revenue shares are calculated after standard payment processing fees</li>
                   <li>Payments are processed securely through Stripe</li>
-                  <li>Revenue share percentages may be adjusted with 30 days notice to accommodate platform scaling and sustainability</li>
+                  <li>Payment-processing fees charged by Stripe or app stores are separate from Tuneable&apos;s platform take rate</li>
+                  <li>Tuneable&apos;s platform take rate will not increase above 30% of tip revenue. We may reduce our take rate (increasing the artist share) as the platform scales, with 30 days&apos; notice of any change</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">8.3 Revenue Share Commitment</h3>
                 <p className="mb-2">
-                  Tuneable CIC is committed to maintaining this artist-friendly revenue split, with artists receiving the majority 
-                  of tip revenue. We will provide transparent reporting on revenue distribution upon request.
+                  Tuneable currently retains 30% of each tip, with 70% allocated to artists and rights-holders.
+                  We are committed to reducing our platform take rate to 10% of each tip once the platform is
+                  operating at scale, so that 90% of tip revenue reaches artists. Until that reduction takes
+                  effect, artists continue to receive the majority of each tip. We will provide transparent
+                  reporting on revenue distribution upon request.
+                </p>
+                <p className="mb-2">
+                  If Tuneable reaches a £1 billion valuation, we commit to transitioning toward community
+                  governance — a DAO owned and steered by artists and users — consistent with our Community
+                  Interest Company purpose. Tuneable CIC is not designed to produce billionaire outcomes from
+                  artist tips.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.4 Future Features</h3>

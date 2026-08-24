@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -16,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { useAuth } from '@/src/auth/AuthContext';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
+import { LEGAL_URLS } from '@/src/components/LegalLinks';
 import { mediaAPI } from '@/src/api/media';
 import {
   getCurrentLocationStatus,
@@ -744,6 +746,17 @@ export function TipSheet({
               <WelcomeCreditClaimCard compact />
             ) : null}
 
+            <Text style={styles.splitHint}>
+              70% of this tip goes to the artist.{' '}
+              <Text
+                style={styles.splitLink}
+                onPress={() => {
+                  void Linking.openURL(LEGAL_URLS.aboutHowMoneyWorks);
+                }}>
+                How we split money
+              </Text>
+            </Text>
+
             <Pressable
               style={[styles.confirm, submitting && styles.confirmDisabled]}
               onPress={() => void submit()}
@@ -1059,6 +1072,18 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: '#fca5a5',
     fontSize: 14,
+  },
+  splitHint: {
+    marginTop: 14,
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  splitLink: {
+    color: colors.accentLight,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   confirm: {
     marginTop: 18,

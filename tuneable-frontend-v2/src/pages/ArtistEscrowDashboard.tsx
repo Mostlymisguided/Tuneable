@@ -20,6 +20,9 @@ import {
 import { artistEscrowAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
+import { HOW_MONEY_WORKS_PATH } from '../constants';
+
+const ESCROW_TAKE_RATE_NOTE_KEY = 'tuneable.escrowTakeRateNote.dismissed';
 
 interface EscrowInfo {
   balance: number;
@@ -101,6 +104,13 @@ const ArtistEscrowDashboard: React.FC = () => {
     wiseEmail: '',
     wiseAccountId: '',
     otherDetails: ''
+  });
+  const [showTakeRateNote, setShowTakeRateNote] = useState(() => {
+    try {
+      return localStorage.getItem(ESCROW_TAKE_RATE_NOTE_KEY) !== '1';
+    } catch {
+      return true;
+    }
   });
 
   useEffect(() => {
@@ -360,6 +370,43 @@ const ArtistEscrowDashboard: React.FC = () => {
             View your escrow balance, allocation history, and request payouts
           </p>
         </div>
+
+        {showTakeRateNote && (
+          <div className="bg-indigo-900/60 border border-indigo-500/50 rounded-lg p-4 mb-6 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <Coins className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 text-sm text-indigo-100">
+                <p className="font-semibold text-white mb-1">Artists keep more as we grow</p>
+                <p className="mb-2">
+                  You receive 70% of each tip today. We are committed to cutting Tuneable&apos;s take
+                  to 10% at scale (90% to you). If the company ever reaches a £1 billion valuation,
+                  we commit to community governance — a DAO owned by artists and users.
+                </p>
+                <Link
+                  to={HOW_MONEY_WORKS_PATH}
+                  className="text-indigo-200 underline hover:text-white"
+                >
+                  How money works
+                </Link>
+              </div>
+              <button
+                type="button"
+                aria-label="Dismiss take rate note"
+                onClick={() => {
+                  try {
+                    localStorage.setItem(ESCROW_TAKE_RATE_NOTE_KEY, '1');
+                  } catch {
+                    /* ignore */
+                  }
+                  setShowTakeRateNote(false);
+                }}
+                className="text-indigo-300 hover:text-white p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Balance Card */}
         <div className="bg-purple-800/50 rounded-lg p-6 mb-6 backdrop-blur-sm">
@@ -852,8 +899,12 @@ const ArtistEscrowDashboard: React.FC = () => {
             <Info className="h-5 w-5 text-blue-400 mt-0.5" />
             <div className="flex-1 text-sm text-gray-300">
               <p className="mb-2">
-                <strong className="text-white">How it works:</strong> When users tip on your media, 70% of the tip amount is allocated to your escrow balance. 
-                You can request payouts which are processed manually by our team.
+                <strong className="text-white">How it works:</strong> When users tip on your media, 70% of the tip amount is allocated to your escrow balance.
+                Tuneable keeps 30% today so we can run the platform; we are committed to reducing that to 10% at scale.
+                You can request payouts which are processed manually by our team.{' '}
+                <Link to={HOW_MONEY_WORKS_PATH} className="text-blue-300 underline hover:text-white">
+                  How money works
+                </Link>
               </p>
               <p>
                 <strong className="text-white">Unclaimed allocations:</strong> If you weren't registered when your media received tips, 

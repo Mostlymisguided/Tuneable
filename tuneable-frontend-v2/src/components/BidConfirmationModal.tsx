@@ -14,6 +14,7 @@ import {
 } from '../utils/elementNormalizer';
 import TipStatChips from './TipStatChips';
 import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
+import { HOW_MONEY_WORKS_PATH } from '../constants';
 
 type ProgressStep = 'placing' | 'processing' | 'updating' | null;
 
@@ -322,6 +323,17 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               Minimum {actionLabelLower} is £{minTip.toFixed(2)}
             </p>
           )}
+
+          <p className="mt-3 text-xs text-purple-200/90 text-center">
+            70% of this {actionLabelLower} goes to the artist.{' '}
+            <Link
+              to={HOW_MONEY_WORKS_PATH}
+              onClick={onClose}
+              className="underline hover:text-white"
+            >
+              How we split money
+            </Link>
+          </p>
         </div>
 
         {/* Insufficient Funds Warning */}

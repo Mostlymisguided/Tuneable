@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Library, Wallet, MessagesSquare } from 'lucide-react';
-import { SUPPORT_EMAIL } from '../constants';
+import { SUPPORT_EMAIL, HOW_MONEY_WORKS_PATH } from '../constants';
 import GeneralReportModal from '../components/GeneralReportModal';
 
 const Help: React.FC = () => {
@@ -52,6 +52,17 @@ const Help: React.FC = () => {
               Tips funded by welcome credit are limited to £1.11 each, with a max of £3.33 and three songs per artist,
               and cannot be used on your own releases. Artist earnings from welcome-credit tips stay pending until
               you top up with real money (within 90 days).
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Where your tip goes</h3>
+            <p className="text-gray-300">
+              70% of each tip goes to the artist (or is split among rights-holders). Tuneable keeps 30% today
+              to run the platform. We are committed to cutting that take to 10% at scale, so 90% reaches artists.
+              Processing fees from Stripe or app stores are separate.{' '}
+              <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">
+                How money works
+              </Link>
             </p>
           </div>
           <div>
@@ -157,6 +168,17 @@ const Help: React.FC = () => {
               Creators can upload their own music through the Creator Dashboard. You'll need to provide 
               the track file, artwork, and metadata. Once uploaded, your tracks can be discovered and 
               tipped on by other users.
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Artist earnings</h3>
+            <p className="text-gray-300">
+              Verified creators receive 70% of each tip on their media via escrow. Tuneable keeps 30% today
+              and is committed to reducing that to 10% at scale. If the company reaches a £1 billion
+              valuation, we commit to community governance (a DAO for artists and users).{' '}
+              <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">
+                How money works
+              </Link>
             </p>
           </div>
           <div>

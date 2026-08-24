@@ -4,6 +4,7 @@ import { Users, TrendingUp, MessageCircle, Music, Sparkles, Shield, Zap, ArrowRi
 import { paymentAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
+import { HOW_MONEY_WORKS_PATH } from '../constants';
 
 const JoinUs: React.FC = () => {
   const { user } = useAuth();
@@ -143,6 +144,14 @@ const JoinUs: React.FC = () => {
             <p className="text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed mb-8">
               Invest in the future of music discovery. Join us in building a platform that empowers artists and connects music lovers worldwide.
             </p>
+            <p className="text-base md:text-lg text-indigo-100 max-w-3xl mx-auto leading-relaxed">
+              Tuneable is a Community Interest Company. Shares help fund the mission — they are not a path to billionaire extraction.
+              If Tuneable ever reaches a £1 billion valuation, we commit to becoming a DAO owned and steered by artists and users.
+              {' '}
+              <Link to={HOW_MONEY_WORKS_PATH} className="underline hover:text-white">
+                How we split money
+              </Link>
+            </p>
           </div>
         </div>
       </section>
@@ -278,7 +287,7 @@ const JoinUs: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-white mb-3">Support Artists</h3>
               <p className="text-gray-300">
-                Your investment directly supports our mission to create fair compensation for artists worldwide.
+                Your investment funds a CIC built so artists keep more of every tip over time — 70% today, 90% at scale — not a vehicle for private fortune.
               </p>
             </div>
 
@@ -316,9 +325,9 @@ const JoinUs: React.FC = () => {
               <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
                 <Sparkles className="h-8 w-8 text-purple-400" />
               </div>
-              <h3 className="text-xl font-bold text-white mb-3">Innovation</h3>
+              <h3 className="text-xl font-bold text-white mb-3">Community-owned future</h3>
               <p className="text-gray-300">
-                Support cutting-edge technology that's changing how people discover and interact with music.
+                At a £1 billion valuation we commit to full community governance: a DAO for artists and users, consistent with our CIC purpose.
               </p>
             </div>
           </div>

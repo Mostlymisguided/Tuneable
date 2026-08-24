@@ -30,7 +30,7 @@ Tuneable is legally committed to using our assets and profits for the benefit of
 - **Media ownership tracking** - supports multiple owners with percentage-based revenue distribution
 - **Unclaimed funds protection** - artists can claim earnings when they register
 
-> **Our Commitment**: We are committed to reducing the current 30% commission when the platform is up and running and financially stable. Our goal is to maximize artist earnings while maintaining platform sustainability.
+> **Our Commitment**: We are committed to reducing our take from 30% to **10%** once the platform is running at scale, so **90% of every tip reaches artists**. Tuneable is a CIC — not a vehicle for private fortune. If the company reaches a **£1 billion valuation**, we commit to becoming a community-governed DAO owned and steered by artists and users.
 
 ### 🎨 Unified Media Platform
 - **Multi-content support**: Music, podcasts, video, images, and written content
@@ -52,7 +52,7 @@ Tuneable is legally committed to using our assets and profits for the benefit of
 
 ## 🚀 Future Vision: Artist-Run DAO
 
-Our long-term goal is to transition Tuneable into a **self-governing DAO (Decentralized Autonomous Organization) run by artists**. This will enable:
+If Tuneable reaches a **£1 billion valuation**, we commit to transitioning into a **self-governing DAO (Decentralized Autonomous Organization)** owned and steered by artists and users. This will enable:
 
 - **Artist-led governance** - creators make decisions about platform direction
 - **Democratic voting** on platform policies, fee structures, and feature development

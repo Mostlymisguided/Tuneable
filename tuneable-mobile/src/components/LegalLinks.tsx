@@ -5,6 +5,7 @@ export const LEGAL_URLS = {
   privacy: 'https://tuneable.stream/privacy-policy',
   terms: 'https://tuneable.stream/terms-of-service',
   dataDeletion: 'https://tuneable.stream/data-deletion',
+  aboutHowMoneyWorks: 'https://tuneable.stream/about#how-money-works',
 } as const;
 
 type Props = {
