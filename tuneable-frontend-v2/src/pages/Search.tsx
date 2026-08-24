@@ -4,10 +4,11 @@ import { searchAPI, partyAPI } from '../lib/api';
 import { toast } from 'react-toastify';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
-import TagInputModal from '../components/TagInputModal';
+import BidConfirmationModal from '../components/BidConfirmationModal';
 import MediaValidationModal from '../components/MediaValidationModal';
-import { penceToPounds } from '../utils/currency';
+import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import { useAuth } from '../contexts/AuthContext';
 
 // Define types directly to avoid import issues
 interface SearchResult {
@@ -42,6 +43,7 @@ const SearchPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const partyId = searchParams.get('partyId');
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -54,8 +56,9 @@ const SearchPage: React.FC = () => {
   const [podcastSource] = useState<'local' | 'apple' | 'taddy'>('local');
   const [searchSource, setSearchSource] = useState<'local' | 'external' | null>(null);
   const [hasMoreExternal, setHasMoreExternal] = useState(false);
-  const [showTagModal, setShowTagModal] = useState(false);
+  const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<SearchResult | null>(null);
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
   
   // Validation modal state
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -310,7 +313,7 @@ const SearchPage: React.FC = () => {
   const handleValidationConfirm = () => {
     setShowValidationModal(false);
     if (pendingMedia) {
-      setShowTagModal(true);
+      setShowBidConfirmationModal(true);
     }
   };
 
@@ -460,7 +463,7 @@ const SearchPage: React.FC = () => {
         
         // No warnings, proceed directly to tag modal
         setPendingMedia(song);
-        setShowTagModal(true);
+        setShowBidConfirmationModal(true);
       }
     } catch (error: any) {
       console.error('Bid error:', error);
@@ -468,13 +471,12 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  const handleTagSubmit = async (tags: string[]) => {
+  const handleBidConfirm = async (tags: string[], amount: number) => {
     if (!pendingMedia || !partyId) return;
 
     const song = pendingMedia;
-    const rawAmount = bidAmounts[song.id] ?? '';
-    const parsedAmount = parseFloat(rawAmount);
-    const songBidAmount = Number.isFinite(parsedAmount) ? parsedAmount : (party?.minimumBid || 0.01);
+    const songBidAmount = Number.isFinite(amount) ? amount : (party?.minimumBid || 0.01);
+    setIsSubmittingBid(true);
     
     try {
       // Handle regular song - detect platform from available sources
@@ -505,7 +507,7 @@ const SearchPage: React.FC = () => {
         duration: song.duration,
         coverArt: song.coverArt,
         bidAmount: songBidAmount,
-        tags: tags, // Use user-generated tags
+        tags: tags,
         category: song.category || 'Unknown',
         externalIds: song.externalIds || {},
         album: song.album || null,
@@ -523,7 +525,8 @@ const SearchPage: React.FC = () => {
       console.error('Error adding media with tags:', error);
       toast.error(error.response?.data?.error || 'Failed to add content');
     } finally {
-      setShowTagModal(false);
+      setIsSubmittingBid(false);
+      setShowBidConfirmationModal(false);
       setPendingMedia(null);
     }
   };
@@ -909,16 +912,28 @@ const SearchPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tag Input Modal */}
-      <TagInputModal
-        isOpen={showTagModal}
+      {/* Tip Confirmation Modal */}
+      <BidConfirmationModal
+        isOpen={showBidConfirmationModal}
         onClose={() => {
-          setShowTagModal(false);
+          if (isSubmittingBid) return;
+          setShowBidConfirmationModal(false);
           setPendingMedia(null);
         }}
-        onSubmit={handleTagSubmit}
-        mediaTitle={pendingMedia?.title}
+        onConfirm={handleBidConfirm}
+        bidAmount={(() => {
+          if (!pendingMedia) return party?.minimumBid || 0.01;
+          const raw = bidAmounts[pendingMedia.id] ?? '';
+          const parsed = parseFloat(raw);
+          return Number.isFinite(parsed) ? parsed : (party?.minimumBid || 0.01);
+        })()}
+        minTip={party?.minimumBid || 0.01}
+        mediaTitle={pendingMedia?.title || 'Unknown'}
         mediaArtist={pendingMedia?.artist}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isSubmittingBid}
+        party={party}
+        user={user}
       />
 
       <MediaValidationModal

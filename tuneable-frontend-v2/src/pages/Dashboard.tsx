@@ -12,7 +12,6 @@ import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
-import TagInputModal from '../components/TagInputModal';
 import EmailInviteModal from '../components/EmailInviteModal';
 import CreatorProfilePrompts from '../components/CreatorProfilePrompts';
 import UserProfilePrompts from '../components/UserProfilePrompts';
@@ -78,8 +77,11 @@ const Dashboard: React.FC = () => {
     () => resolveTipStatInputs(libraryItemToTip, user),
     [libraryItemToTip, user]
   );
-  const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<SearchResult | null>(null);
+  const addTuneChampionTip = useMemo(
+    () => resolveTipStatInputs(pendingAddTuneResult, user),
+    [pendingAddTuneResult, user]
+  );
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
   
   // Validation modal state
@@ -693,7 +695,7 @@ Join here: ${inviteLink}`.trim();
     }
   };
 
-  const handleAddTune = async (media: SearchResult, tags: string[] = []) => {
+  const handleAddTune = async (media: SearchResult, tags: string[] = [], amountOverride?: number) => {
     if (!user) {
       toast.info('Please log in to add tunes');
       navigate('/login');
@@ -702,7 +704,8 @@ Join here: ${inviteLink}`.trim();
 
     const mediaKey = media._id || media.id || '';
     const rawAmount = addTuneBidAmounts[mediaKey] ?? '';
-    const bidAmount = parseFloat(rawAmount);
+    const parsedAmount = parseFloat(rawAmount);
+    const bidAmount = Number.isFinite(amountOverride) ? amountOverride : parsedAmount;
 
     if (!Number.isFinite(bidAmount) || bidAmount < minimumBid) {
       toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);
@@ -750,7 +753,7 @@ Join here: ${inviteLink}`.trim();
           }
         : undefined;
 
-      await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia);
+      await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia, tags);
       toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} tip!`);
       
       // Clear search
@@ -762,7 +765,6 @@ Join here: ${inviteLink}`.trim();
       setTuneLibrary(data.library || []);
       
       setPendingAddTuneResult(null);
-      setShowAddTuneTagModal(false);
     } catch (error: any) {
       console.error('Error adding tune:', error);
       toast.error(error.response?.data?.error || 'Failed to add tune');
@@ -807,25 +809,14 @@ Join here: ${inviteLink}`.trim();
       return;
     }
 
-    // No warnings, proceed to tag modal or directly add
-    if (!media._id) {
-      setPendingAddTuneResult(media);
-      setShowAddTuneTagModal(true);
-    } else {
-      void handleAddTune(media, []);
-    }
+    // No warnings — confirm tip (including location) before adding
+    setPendingAddTuneResult(media);
   };
 
   const handleValidationConfirm = () => {
     if (!pendingMedia) return;
     setShowValidationModal(false);
-    // Proceed to tag modal or add directly
-    if (!pendingMedia._id) {
-      setPendingAddTuneResult(pendingMedia);
-      setShowAddTuneTagModal(true);
-    } else {
-      void handleAddTune(pendingMedia, []);
-    }
+    setPendingAddTuneResult(pendingMedia);
     // Clear validation state
     setValidationWarnings({});
     setValidationCategory('');
@@ -2927,19 +2918,33 @@ Join here: ${inviteLink}`.trim();
         isLoading={isPlacingLibraryTip}
       />
 
-      <TagInputModal
-        isOpen={showAddTuneTagModal}
-        onClose={() => {
-          setShowAddTuneTagModal(false);
-          setPendingAddTuneResult(null);
-        }}
-        onSubmit={(tags) => {
+      <BidConfirmationModal
+        isOpen={!!pendingAddTuneResult}
+        onClose={() => setPendingAddTuneResult(null)}
+        onConfirm={(tags, amount) => {
           if (pendingAddTuneResult) {
-            void handleAddTune(pendingAddTuneResult, tags);
+            void handleAddTune(pendingAddTuneResult, tags, amount);
           }
         }}
-        mediaTitle={pendingAddTuneResult?.title}
-        mediaArtist={pendingAddTuneResult?.artist}
+        bidAmount={(() => {
+          if (!pendingAddTuneResult) return Math.max(minimumBid, getUserDefaultTip());
+          const mediaKey = pendingAddTuneResult._id || pendingAddTuneResult.id || '';
+          const minBid = getEffectiveMinimumBid(pendingAddTuneResult);
+          const defaultBid = Math.max(getUserDefaultTip(), minBid);
+          const raw = addTuneBidAmounts[mediaKey] ?? defaultBid.toFixed(2);
+          const parsed = parseFloat(raw);
+          return Number.isFinite(parsed) ? parsed : defaultBid;
+        })()}
+        minTip={pendingAddTuneResult ? getEffectiveMinimumBid(pendingAddTuneResult) : minimumBid}
+        avgTip={addTuneChampionTip.avgTip}
+        championAggregate={addTuneChampionTip?.championAggregate}
+        viewerAggregate={addTuneChampionTip?.viewerAggregate}
+        viewerIsChampion={addTuneChampionTip?.viewerIsChampion}
+        mediaTitle={pendingAddTuneResult?.title || 'Unknown'}
+        mediaArtist={pendingAddTuneResult?.artist || 'Unknown Artist'}
+        userBalance={penceToPoundsNumber((user as any)?.balance)}
+        isLoading={isAddingTune}
+        user={user}
       />
 
       <EmailInviteModal

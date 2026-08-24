@@ -103,7 +103,6 @@ const CollapsibleBadgeWrap: React.FC<{
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
-import TagInputModal from '../components/TagInputModal';
 import MediaChampions from '../components/MediaChampions';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -347,7 +346,6 @@ const UserProfile: React.FC = () => {
   }>({ database: [], youtube: [] });
   const [isSearchingTune, setIsSearchingTune] = useState(false);
   const [addTuneBidAmounts, setAddTuneBidAmounts] = useState<Record<string, string>>({});
-  const [showAddTuneTagModal, setShowAddTuneTagModal] = useState(false);
   const [pendingAddTuneResult, setPendingAddTuneResult] = useState<any>(null);
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
@@ -1024,6 +1022,11 @@ const UserProfile: React.FC = () => {
     [libraryItemToTip, currentUser]
   );
 
+  const addTuneChampionTip = useMemo(
+    () => resolveTipStatInputs(pendingAddTuneResult, currentUser),
+    [pendingAddTuneResult, currentUser]
+  );
+
   // Add tune search handler
   const handleAddTuneSearch = async () => {
     if (!addTuneSearchQuery.trim()) return;
@@ -1103,7 +1106,7 @@ const UserProfile: React.FC = () => {
   };
 
   // Add tune handler
-  const handleAddTune = async (media: any, tags: string[] = []) => {
+  const handleAddTune = async (media: any, tags: string[] = [], amountOverride?: number) => {
     if (!currentUser) {
       toast.info('Please log in to add tunes');
       return;
@@ -1117,7 +1120,9 @@ const UserProfile: React.FC = () => {
     const mediaKey = media._id || media.id || '';
     const rawAmount = addTuneBidAmounts[mediaKey] ?? '';
     const parsedAmount = parseFloat(rawAmount);
-    const bidAmount = Number.isFinite(parsedAmount) ? parsedAmount : getDefaultBidAmount(media);
+    const bidAmount = Number.isFinite(amountOverride)
+      ? amountOverride
+      : (Number.isFinite(parsedAmount) ? parsedAmount : getDefaultBidAmount(media));
     const minBid = getEffectiveMinimumBid(media);
 
     if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
@@ -1177,7 +1182,7 @@ const UserProfile: React.FC = () => {
           }
         : undefined;
 
-      await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia);
+      await mediaAPI.placeGlobalBid(targetMediaId, bidAmount, externalMedia, tags);
       toast.success(`Added "${media.title}" to your library with £${bidAmount.toFixed(2)} tip!`);
       
       // Clear search
@@ -1197,7 +1202,6 @@ const UserProfile: React.FC = () => {
       }
       
       setPendingAddTuneResult(null);
-      setShowAddTuneTagModal(false);
     } catch (error: any) {
       console.error('Error adding tune:', error);
       const msg = error.response?.data?.error;
@@ -1214,7 +1218,6 @@ const UserProfile: React.FC = () => {
 
   const startAddTune = async (media: any) => {
     setPendingAddTuneResult(media);
-    setShowAddTuneTagModal(true);
   };
 
   const handleImportLikes = () => {
@@ -4545,20 +4548,37 @@ const UserProfile: React.FC = () => {
         isLoading={isPlacingLibraryTip}
       />
 
-      {/* Tag Input Modal for Add Tune */}
-      <TagInputModal
-        isOpen={showAddTuneTagModal}
-        onClose={() => {
-          setShowAddTuneTagModal(false);
-          setPendingAddTuneResult(null);
-        }}
-        onSubmit={(tags) => {
+      <BidConfirmationModal
+        isOpen={!!pendingAddTuneResult}
+        onClose={() => setPendingAddTuneResult(null)}
+        onConfirm={(tags, amount) => {
           if (pendingAddTuneResult) {
-            void handleAddTune(pendingAddTuneResult, tags);
+            void handleAddTune(pendingAddTuneResult, tags, amount);
           }
         }}
-        mediaTitle={pendingAddTuneResult?.title}
-        mediaArtist={pendingAddTuneResult?.artist}
+        bidAmount={(() => {
+          if (!pendingAddTuneResult) return currentUser?.preferences?.defaultTip || 1.11;
+          const mediaKey = pendingAddTuneResult._id || pendingAddTuneResult.id || '';
+          const raw = addTuneBidAmounts[mediaKey] ?? '';
+          const parsed = parseFloat(raw);
+          return Number.isFinite(parsed) ? parsed : getDefaultBidAmount(pendingAddTuneResult);
+        })()}
+        minTip={pendingAddTuneResult ? getEffectiveMinimumBid(pendingAddTuneResult) : 0.01}
+        avgTip={pendingAddTuneResult ? calculateAverageBid(pendingAddTuneResult) || addTuneChampionTip.avgTip : undefined}
+        championAggregate={addTuneChampionTip?.championAggregate}
+        viewerAggregate={addTuneChampionTip?.viewerAggregate}
+        viewerIsChampion={addTuneChampionTip?.viewerIsChampion}
+        mediaTitle={pendingAddTuneResult?.title || 'Unknown'}
+        mediaArtist={
+          Array.isArray(pendingAddTuneResult?.artist)
+            ? pendingAddTuneResult.artist[0]?.name || pendingAddTuneResult.artist[0] || 'Unknown Artist'
+            : typeof pendingAddTuneResult?.artist === 'object' && pendingAddTuneResult?.artist?.name
+              ? pendingAddTuneResult.artist.name
+              : pendingAddTuneResult?.artist || 'Unknown Artist'
+        }
+        userBalance={penceToPoundsNumber((currentUser as any)?.balance)}
+        isLoading={isAddingTune}
+        user={currentUser}
       />
     </div>
   );
