@@ -1334,6 +1334,46 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Create a flagged test user
+  createTestUser: async (payload: { username: string; password?: string; balance?: number }) => {
+    const response = await api.post('/users/admin/test-users', payload);
+    return response.data as {
+      message: string;
+      password: string;
+      passwordGenerated: boolean;
+      user: { username: string; _id?: string };
+    };
+  },
+
+  // Admin: Preview what a user purge would unwind
+  getUserPurgePreview: async (userId: string) => {
+    const response = await api.get(`/users/admin/users/${userId}/purge-preview`);
+    return response.data as {
+      user: { isTestUser?: boolean; username?: string };
+      counts: {
+        bids: number;
+        activeBids: number;
+        activeBidPence: number;
+        ledgerEntries: number;
+        parties: number;
+        mediaAdded: number;
+        mediaOwned: number;
+      };
+    };
+  },
+
+  // Admin: Permanently delete a user and unwind their tips
+  purgeUser: async (userId: string, confirmUsername: string, confirmNotTestUser = false) => {
+    const response = await api.delete(`/users/admin/users/${userId}`, {
+      data: { confirmUsername, confirmNotTestUser },
+    });
+    return response.data as {
+      message?: string;
+      username?: string;
+      tips?: { refundedCount?: number; refundedPence?: number };
+    };
+  },
+
   // Admin: Revoke/Delete warning
   revokeWarning: async (userId: string, warningIndex: number) => {
     const response = await api.delete(`/users/admin/users/${userId}/warnings/${warningIndex}`);

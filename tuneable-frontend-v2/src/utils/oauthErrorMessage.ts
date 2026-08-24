@@ -21,3 +21,13 @@ export function clarifyOAuthErrorMessage(
 
   return decoded || fallback;
 }
+
+/** Spotify Development Mode rejected the account (not on the developer tester list). */
+export function isSpotifyAllowlistOAuthFailure(options: {
+  reason?: string | null;
+  message?: string | null;
+} = {}): boolean {
+  if (options.reason === 'allowlist') return true;
+  const text = `${options.reason || ''} ${options.message || ''}`;
+  return /allowlist|not registered|tester list|failed to fetch user profile/i.test(text);
+}

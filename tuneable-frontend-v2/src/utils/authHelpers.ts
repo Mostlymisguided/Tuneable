@@ -44,8 +44,6 @@ export function getCurrentReturnPath(): string {
 /**
  * New signups need the full wizard until `completedAt` is set.
  * Grandfathers completed wizards and accounts older than 7 days.
- * Do NOT treat `defaultTipPromptSeenAt` alone as done — that is set mid-wizard after the tip step
- * (including when the tip step is skipped).
  */
 export function needsOnboarding(user: OnboardingUser | null | undefined): boolean {
   if (!user) return false;
@@ -72,10 +70,37 @@ function importReturnToOnboarding(returnUrl: string): string {
     if (source === 'spotify' || source === 'soundcloud') {
       params.set('source', source);
     }
+    if (parsed.searchParams.get('requestAccess') === '1') {
+      params.set('requestAccess', '1');
+    }
     return `${ONBOARDING_PATH}?${params.toString()}`;
   } catch {
     return `${ONBOARDING_PATH}?step=import`;
   }
+}
+
+/** After Spotify rejects an unlisted tester, land on the email request form. */
+export function buildSpotifyRequestAccessPath(returnUrl?: string | null): string {
+  const fallback = '/import?source=spotify&requestAccess=1';
+  if (!returnUrl) return fallback;
+  try {
+    const parsed = new URL(returnUrl, 'http://local.invalid');
+    if (parsed.pathname.startsWith('/onboarding')) {
+      parsed.searchParams.set('step', 'import');
+      parsed.searchParams.set('source', 'spotify');
+      parsed.searchParams.set('requestAccess', '1');
+      return `${parsed.pathname}?${parsed.searchParams.toString()}`;
+    }
+    if (parsed.pathname.startsWith('/import')) {
+      parsed.searchParams.set('source', 'spotify');
+      parsed.searchParams.set('requestAccess', '1');
+      parsed.searchParams.delete('autoScan');
+      return `${parsed.pathname}?${parsed.searchParams.toString()}`;
+    }
+  } catch {
+    // fall through
+  }
+  return fallback;
 }
 
 export function getPostAuthPath(

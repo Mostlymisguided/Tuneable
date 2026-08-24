@@ -18,7 +18,7 @@ import { userAPI } from '../lib/api';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { buildOAuthStartUrl } from '../utils/platform';
-import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
+import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../utils/oauthErrorMessage';
 import { isAdmin } from '../utils/permissionHelpers';
 
 type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox' | 'youtube';
@@ -240,6 +240,16 @@ const LibraryImport: React.FC = () => {
     : source === 'soundcloud'
       ? soundcloudConnected
       : true;
+  const requestSpotifyAccess = searchParams.get('requestAccess') === '1';
+  const showSpotifyRequestForm =
+    source === 'spotify'
+    && !isConnected
+    && (
+      !spotifyOauthAvailable
+      || requestSpotifyAccess
+      || spotifyRequest?.status === 'pending'
+      || spotifyRequest?.status === 'rejected'
+    );
   const oauthHandledRef = React.useRef(false);
   const autoScanStartedRef = React.useRef(false);
   const [shouldAutoScan, setShouldAutoScan] = useState(
@@ -282,13 +292,30 @@ const LibraryImport: React.FC = () => {
     const message = searchParams.get('message');
 
     if (error) {
+      const next = new URLSearchParams(searchParams);
+      if (
+        error === 'spotify_auth_failed'
+        && isSpotifyAllowlistOAuthFailure({
+          reason: searchParams.get('reason'),
+          message,
+        })
+      ) {
+        next.delete('error');
+        next.delete('message');
+        next.delete('reason');
+        next.delete('autoScan');
+        next.set('source', 'spotify');
+        next.set('requestAccess', '1');
+        setSearchParams(next, { replace: true });
+        return;
+      }
       toast.error(
         clarifyOAuthErrorMessage(message, 'Connection failed. Please try again.'),
         { autoClose: 12000, pauseOnHover: true }
       );
-      const next = new URLSearchParams(searchParams);
       next.delete('error');
       next.delete('message');
+      next.delete('reason');
       setSearchParams(next, { replace: true });
       return;
     }
@@ -368,6 +395,7 @@ const LibraryImport: React.FC = () => {
     params.set('source', next);
     if (next === 'youtube') params.set('mode', 'playlist');
     else params.delete('mode');
+    if (next !== 'spotify') params.delete('requestAccess');
     setSearchParams(params, { replace: true });
   };
 
@@ -417,6 +445,9 @@ const LibraryImport: React.FC = () => {
       const result = await userAPI.requestSpotifyImport(account, spotifyRequestNote.trim() || undefined);
       toast.success(result.message);
       await checkConnections();
+      const next = new URLSearchParams(searchParams);
+      next.delete('requestAccess');
+      setSearchParams(next, { replace: true });
     } catch (error: any) {
       toast.error(error?.response?.data?.error || error?.message || 'Failed to submit request');
     } finally {
@@ -1256,7 +1287,7 @@ const LibraryImport: React.FC = () => {
                     </p>
                   )}
                 </div>
-              ) : source === 'spotify' && !isConnected && !spotifyOauthAvailable ? (
+              ) : showSpotifyRequestForm ? (
                 <div className="space-y-3">
                   {spotifyRequest?.status === 'pending' ? (
                     <p className="text-sm text-amber-200">
@@ -1268,7 +1299,9 @@ const LibraryImport: React.FC = () => {
                     </p>
                   ) : (
                     <p className="text-sm text-gray-400">
-                      Spotify import is in tester mode (limited allowlist). Request access with the email on your Spotify account.
+                      {requestSpotifyAccess
+                        ? 'Spotify couldn’t connect this account because it isn’t on the tester list yet. Request access with the email on your Spotify account (spotify.com/account/overview).'
+                        : 'Spotify import is in tester mode (limited allowlist). Request access with the email on your Spotify account.'}
                     </p>
                   )}
                   <input

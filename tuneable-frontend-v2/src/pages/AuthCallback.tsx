@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
-import { getPostAuthPath } from '../utils/authHelpers';
-import { clarifyOAuthErrorMessage } from '../utils/oauthErrorMessage';
+import { getPostAuthPath, buildSpotifyRequestAccessPath } from '../utils/authHelpers';
+import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../utils/oauthErrorMessage';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -40,6 +40,14 @@ const AuthCallback: React.FC = () => {
             ? clarifyOAuthErrorMessage(errorMessageParam, 'Account linking failed. Please try again.')
             : 'Account linking failed. Please try again.';
         } else if (error === 'spotify_auth_failed') {
+          const allowlistFailure = isSpotifyAllowlistOAuthFailure({
+            reason: errorReason,
+            message: errorMessageParam,
+          });
+          if (allowlistFailure && localStorage.getItem('token')) {
+            navigate(buildSpotifyRequestAccessPath(searchParams.get('returnUrl')), { replace: true });
+            return;
+          }
           errorMessage = clarifyOAuthErrorMessage(
             errorMessageParam,
             'Spotify connection failed. Please try again.'

@@ -22,7 +22,7 @@ import { colors } from '@/src/theme/colors';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
+type ImportSource = 'soundcloud' | 'youtube';
 
 const IMPORT_LIMIT = 25;
 
@@ -30,7 +30,7 @@ function parseSource(
   value: string | string[] | undefined
 ): ImportSource | null {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'soundcloud' || raw === 'spotify' || raw === 'youtube') return raw;
+  if (raw === 'soundcloud' || raw === 'youtube') return raw;
   return null;
 }
 
@@ -46,13 +46,7 @@ export default function ImportLibraryScreen() {
 
   const sourceParam = parseSource(params.source);
 
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
-  const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
-  const [spotifyRequestStatus, setSpotifyRequestStatus] = useState<
-    'pending' | 'allowlisted' | 'rejected' | null
-  >(null);
-  const [spotifyAccountInput, setSpotifyAccountInput] = useState('');
   const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
   const [activeSource, setActiveSource] = useState<ImportSource | null>(
     sourceParam
@@ -76,22 +70,12 @@ export default function ImportLibraryScreen() {
 
   const checkConnections = useCallback(async () => {
     try {
-      const [spotify, soundcloud] = await Promise.all([
-        userAPI.getSpotifyStatus(),
-        userAPI.getSoundCloudStatus(),
-      ]);
-      const next = {
-        spotify: Boolean(spotify?.connected),
-        soundcloud: Boolean(soundcloud?.connected),
-        oauthAvailable: Boolean(spotify?.oauthAvailable) || Boolean(spotify?.connected),
-      };
-      setSpotifyConnected(next.spotify);
-      setSoundcloudConnected(next.soundcloud);
-      setSpotifyOauthAvailable(next.oauthAvailable);
-      setSpotifyRequestStatus(spotify?.request?.status ?? null);
-      return next;
+      const soundcloud = await userAPI.getSoundCloudStatus();
+      const connected = Boolean(soundcloud?.connected);
+      setSoundcloudConnected(connected);
+      return { soundcloud: connected };
     } catch {
-      return { spotify: false, soundcloud: false, oauthAvailable: false };
+      return { soundcloud: false };
     }
   }, []);
 
@@ -110,13 +94,11 @@ export default function ImportLibraryScreen() {
                 IMPORT_LIMIT,
                 'spotify_only'
               )
-            : source === 'youtube'
-              ? await userAPI.startYouTubeImportPreview(
-                  playlistUrl || youtubePlaylistUrl,
-                  IMPORT_LIMIT,
-                  'playlist'
-                )
-            : await userAPI.startSpotifyImportPreview(IMPORT_LIMIT);
+            : await userAPI.startYouTubeImportPreview(
+                playlistUrl || youtubePlaylistUrl,
+                IMPORT_LIMIT,
+                'playlist'
+              );
         const data = await userAPI.waitForImportJob<{
           items?: Array<{ matchStatus: string; selected?: boolean }>;
           summary?: {
@@ -180,11 +162,7 @@ export default function ImportLibraryScreen() {
     void (async () => {
       const connections = await checkConnections();
       if (sourceParam === 'youtube') return;
-      const connected =
-        sourceParam === 'soundcloud'
-          ? connections.soundcloud
-          : connections.spotify;
-      if (connected) {
+      if (connections.soundcloud) {
         await loadImportPreview(sourceParam);
       }
     })();
@@ -222,14 +200,10 @@ export default function ImportLibraryScreen() {
         }
         goToSource(source);
         const connections = await checkConnections();
-        const connected =
-          source === 'soundcloud' ? connections.soundcloud : connections.spotify;
-        if (connected) {
+        if (connections.soundcloud) {
           await loadImportPreview(source);
         } else {
-          setError(
-            `${source === 'soundcloud' ? 'SoundCloud' : 'Spotify'} did not connect. Try again.`
-          );
+          setError('SoundCloud did not connect. Try again.');
         }
       }
     } catch (err) {
@@ -251,13 +225,11 @@ export default function ImportLibraryScreen() {
               IMPORT_LIMIT,
               'spotify_only'
             )
-          : activeSource === 'youtube'
-            ? await userAPI.startYouTubeImportPreview(
-                youtubePlaylistUrl,
-                IMPORT_LIMIT,
-                'playlist'
-              )
-          : await userAPI.startSpotifyImportPreview(IMPORT_LIMIT);
+          : await userAPI.startYouTubeImportPreview(
+              youtubePlaylistUrl,
+              IMPORT_LIMIT,
+              'playlist'
+            );
       const data = await userAPI.waitForImportJob<{
         items?: Array<{
           key: string;
@@ -304,9 +276,7 @@ export default function ImportLibraryScreen() {
       const executeStarted =
         activeSource === 'soundcloud'
           ? await userAPI.startSoundCloudImportExecute(items, defaultTip)
-          : activeSource === 'youtube'
-            ? await userAPI.startYouTubeImportExecute(items, defaultTip)
-          : await userAPI.startSpotifyImportExecute(items, defaultTip);
+          : await userAPI.startYouTubeImportExecute(items, defaultTip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
         updatedBalance: number;
@@ -335,46 +305,17 @@ export default function ImportLibraryScreen() {
       return;
     }
     const connections = await checkConnections();
-    const connected =
-      source === 'soundcloud' ? connections.soundcloud : connections.spotify;
-    if (connected) {
+    if (connections.soundcloud) {
       goToSource(source);
       await loadImportPreview(source);
-      return;
-    }
-    if (source === 'spotify' && !connections.oauthAvailable) {
-      goToSource(source);
       return;
     }
     await connectImportSource(source);
   };
 
-  const submitSpotifyRequest = async () => {
-    const account = spotifyAccountInput.trim();
-    if (!account) {
-      setError('Enter the email on your Spotify account (spotify.com/account/overview).');
-      return;
-    }
-    setImportLoading(true);
-    setError(null);
-    try {
-      const result = await userAPI.requestSpotifyImport(account);
-      showToast(result.message);
-      await checkConnections();
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not submit request.'));
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
   const busy = importLoading;
   const sourceLabel =
-    activeSource === 'soundcloud'
-      ? 'SoundCloud'
-      : activeSource === 'youtube'
-        ? 'YouTube'
-        : 'Spotify';
+    activeSource === 'soundcloud' ? 'SoundCloud' : 'YouTube';
 
   if (!authLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
@@ -393,25 +334,12 @@ export default function ImportLibraryScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <Text style={styles.lede}>
-          Tip tracks from Spotify, SoundCloud, or a public YouTube playlist into
+          Tip tracks from SoundCloud or a public YouTube playlist into
           your Tuneable library at your default (£{defaultTip.toFixed(2)}).
         </Text>
 
         {!activeSource ? (
           <View style={styles.importGrid}>
-            <Pressable
-              style={[styles.importCard, styles.spotifyCard]}
-              disabled={busy}
-              onPress={() => void startSource('spotify')}>
-              <Text style={styles.importTitle}>Spotify</Text>
-              <Text style={styles.importSub}>
-            {spotifyConnected
-              ? 'Connected — tap to import'
-              : spotifyOauthAvailable
-                ? 'Read-only: we only look at your likes'
-                : 'Request tester access'}
-              </Text>
-            </Pressable>
             <Pressable
               style={[styles.importCard, styles.soundcloudCard]}
               disabled={busy}
@@ -452,33 +380,6 @@ export default function ImportLibraryScreen() {
                   disabled={busy || !youtubePlaylistUrl.trim()}
                   onPress={() => void loadImportPreview('youtube', youtubePlaylistUrl)}>
                   <Text style={styles.primaryBtnText}>Scan playlist</Text>
-                </Pressable>
-              </View>
-            ) : activeSource === 'spotify' && !spotifyConnected && !spotifyOauthAvailable && !importPreview ? (
-              <View style={styles.previewActions}>
-                <Text style={styles.hint}>
-                  {spotifyRequestStatus === 'pending'
-                    ? 'Request pending — we will enable Connect after adding your Spotify account to the tester list.'
-                    : 'Spotify import is in tester mode. Request access with the email on your Spotify account.'}
-                </Text>
-                <TextInput
-                  value={spotifyAccountInput}
-                  onChangeText={setSpotifyAccountInput}
-                  placeholder="Spotify account email"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  style={styles.input}
-                />
-                <Pressable
-                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy}
-                  onPress={() => void submitSpotifyRequest()}>
-                  {importLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryBtnText}>Request Spotify import</Text>
-                  )}
                 </Pressable>
               </View>
             ) : importLoading && !importPreview ? (
@@ -596,10 +497,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
   },
-  spotifyCard: {
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-  },
   soundcloudCard: {
     borderColor: 'rgba(249, 115, 22, 0.4)',
     backgroundColor: 'rgba(249, 115, 22, 0.1)',
@@ -607,11 +504,6 @@ const styles = StyleSheet.create({
   youtubeCard: {
     borderColor: 'rgba(239, 68, 68, 0.4)',
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  importTitle: {
-    color: '#86efac',
-    fontSize: 16,
-    fontWeight: '700',
   },
   importTitleSc: {
     color: '#fdba74',

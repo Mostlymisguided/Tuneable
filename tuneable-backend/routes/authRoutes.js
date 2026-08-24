@@ -89,6 +89,38 @@ function formatSpotifyOAuthError(err) {
   return rawMessage || 'Spotify connection failed. Please try again.';
 }
 
+/** Classify Spotify OAuth failures so the web app can route allowlist misses to the request-access form. */
+function classifySpotifyOAuthError(err) {
+  const message = formatSpotifyOAuthError(err);
+  const rawMessage = String(err?.message || '').trim();
+  const oauthStatus = err?.oauthError?.statusCode;
+  const combined = `${rawMessage} ${message}`;
+
+  if (/Please log in first|User not found|session was lost/i.test(combined)) {
+    return { message, reason: 'session' };
+  }
+  if (/already linked/i.test(combined)) {
+    return { message, reason: 'already_linked' };
+  }
+  if (/premium subscription required/i.test(combined) && !/allowlist|not registered/i.test(combined)) {
+    return { message, reason: 'premium' };
+  }
+  if (
+    /not be registered|not registered|User not registered|developer allowlist|tester list/i.test(combined)
+    || /failed to fetch user profile/i.test(rawMessage)
+    || oauthStatus === 403
+    || /403/.test(String(oauthStatus || ''))
+  ) {
+    return { message, reason: 'allowlist' };
+  }
+  return { message, reason: 'generic' };
+}
+
+function spotifyOAuthFailureQuery(err) {
+  const { message, reason } = classifySpotifyOAuthError(err);
+  return { error: 'spotify_auth_failed', message, reason };
+}
+
 /**
  * Dedupe Facebook authorization-code exchanges.
  * Browsers/proxies sometimes hit the callback twice; the second exchange fails with
@@ -1092,16 +1124,14 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
             );
           }
           clearSpotifySession();
-          return res.redirect(appendQueryParams(baseRedirect, {
-            error: 'spotify_auth_failed',
-            message: formatSpotifyOAuthError(err)
-          }));
+          return res.redirect(appendQueryParams(baseRedirect, spotifyOAuthFailureQuery(err)));
         }
         if (!user) {
           console.error('❌ Spotify OAuth callback returned no user (auth denied or session lost)');
           clearSpotifySession();
           return res.redirect(appendQueryParams(baseRedirect, {
             error: 'spotify_auth_failed',
+            reason: 'denied',
             message: 'Spotify connection failed — authorization was denied or your session was lost. Please try Connect Spotify again while logged in.'
           }));
         }
