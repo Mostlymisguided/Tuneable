@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Headphones, Music, Home, LogOut, Compass, Podcast, Plus, BookOpen } from 'lucide-react';
+import { User as UserIcon, Mic, Music, Home, LogOut, Compass, Plus, BookOpen } from 'lucide-react';
 import AddMediaModal from './AddMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -68,7 +68,7 @@ const Navbar: React.FC = () => {
                   onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
                   onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  <Headphones className="h-5 w-5 sm:hidden" />
+                  <Mic className="h-5 w-5 sm:hidden" />
                   <span className="hidden sm:inline">Podcasts</span>
                 </Link>
                 <Link
@@ -187,7 +187,7 @@ const Navbar: React.FC = () => {
                     (e.target as HTMLElement).style.color = '#D1D5DB';
                   }}
                 >
-                  <Podcast className="h-5 w-5 sm:hidden" />
+                  <Mic className="h-5 w-5 sm:hidden" />
                   <span className="hidden sm:inline">Explore Podcasts</span>
                 </a>
                 <Link
