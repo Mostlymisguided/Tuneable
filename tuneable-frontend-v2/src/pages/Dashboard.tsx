@@ -34,6 +34,11 @@ interface SearchResult {
   sources?: Record<string, string>;
   isLocal?: boolean;
   category?: string;
+  bids?: Array<{ amount?: number; userId?: string }>;
+  globalMediaAggregate?: number | null;
+  globalMediaAggregateAvg?: number | null;
+  globalMediaAggregateTop?: number | null;
+  globalMediaAggregateTopUser?: string | { _id?: string };
 }
 
 const Dashboard: React.FC = () => {
@@ -705,7 +710,10 @@ Join here: ${inviteLink}`.trim();
     const mediaKey = media._id || media.id || '';
     const rawAmount = addTuneBidAmounts[mediaKey] ?? '';
     const parsedAmount = parseFloat(rawAmount);
-    const bidAmount = Number.isFinite(amountOverride) ? amountOverride : parsedAmount;
+    const bidAmount =
+      typeof amountOverride === 'number' && Number.isFinite(amountOverride)
+        ? amountOverride
+        : parsedAmount;
 
     if (!Number.isFinite(bidAmount) || bidAmount < minimumBid) {
       toast.error(`Minimum bid is £${minimumBid.toFixed(2)}`);

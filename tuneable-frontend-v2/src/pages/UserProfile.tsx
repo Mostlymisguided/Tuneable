@@ -1120,9 +1120,10 @@ const UserProfile: React.FC = () => {
     const mediaKey = media._id || media.id || '';
     const rawAmount = addTuneBidAmounts[mediaKey] ?? '';
     const parsedAmount = parseFloat(rawAmount);
-    const bidAmount = Number.isFinite(amountOverride)
-      ? amountOverride
-      : (Number.isFinite(parsedAmount) ? parsedAmount : getDefaultBidAmount(media));
+    const bidAmount =
+      typeof amountOverride === 'number' && Number.isFinite(amountOverride)
+        ? amountOverride
+        : (Number.isFinite(parsedAmount) ? parsedAmount : getDefaultBidAmount(media));
     const minBid = getEffectiveMinimumBid(media);
 
     if (!Number.isFinite(bidAmount) || bidAmount < minBid) {

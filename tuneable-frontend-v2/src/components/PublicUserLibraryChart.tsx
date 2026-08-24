@@ -99,11 +99,6 @@ function mediaMatchesBpmFilter(item: LibraryItem, range: BpmFilterRange): boolea
   return true;
 }
 
-function isPodcastLibraryItem(item: LibraryItem) {
-  const cf = item.contentForm;
-  return cf && (Array.isArray(cf) ? cf.includes('podcastepisode') : cf === 'podcastepisode');
-}
-
 function libraryItemToQueueShape(item: LibraryItem) {
   return {
     ...item,

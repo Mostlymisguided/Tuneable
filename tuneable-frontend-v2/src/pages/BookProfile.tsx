@@ -50,7 +50,7 @@ const BookProfile: React.FC = () => {
   const elsewhere = book ? getReadElsewhereTarget(book) : null;
   const defaultTip = user?.preferences?.defaultTip || 1.11;
 
-  const handleConfirmTip = async (tags: string[], amount: number) => {
+  const handleConfirmTip = async (_tags: string[], amount: number) => {
     if (!mediaId) return;
     setTipping(true);
     try {
