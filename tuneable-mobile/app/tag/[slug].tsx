@@ -220,6 +220,14 @@ export default function TagProfileScreen() {
     [media]
   );
 
+  const playableCount = useMemo(
+    () =>
+      isPodcast
+        ? episodes.filter(isEpisodePlayable).length
+        : media.filter(isUploadPlayable).length,
+    [isPodcast, episodes, media]
+  );
+
   const onPlayItem = (item: ChartMediaItem) => {
     const playable = media.filter(isUploadPlayable);
     const index = playable.findIndex((m) => mediaId(m) === mediaId(item));
@@ -242,6 +250,14 @@ export default function TagProfileScreen() {
     }
     const fallback = episodes.findIndex((e) => episodeId(e) === episodeId(episode));
     if (fallback >= 0) void setPodcastQueueAndPlay(episodes, fallback);
+  };
+
+  const onPlayQueue = () => {
+    if (isPodcast) {
+      void setPodcastQueueAndPlay(episodes, 0);
+      return;
+    }
+    void setQueueAndPlay(media, 0);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
@@ -373,6 +389,18 @@ export default function TagProfileScreen() {
             })}
           </View>
         </View>
+      ) : null}
+
+      {playableCount > 0 ? (
+        <Pressable
+          style={styles.playBtn}
+          onPress={onPlayQueue}
+          accessibilityRole="button"
+          accessibilityLabel={`Play ${playableCount} ${
+            isPodcast ? 'episode' : 'upload'
+          }${playableCount !== 1 ? 's' : ''}`}>
+          <Ionicons name="play" size={22} color="#fff" />
+        </Pressable>
       ) : null}
     </View>
   );
@@ -726,6 +754,16 @@ const styles = StyleSheet.create({
   },
   timeChipTextActive: {
     color: '#fff',
+  },
+  playBtn: {
+    alignSelf: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   centered: {
     alignItems: 'center',

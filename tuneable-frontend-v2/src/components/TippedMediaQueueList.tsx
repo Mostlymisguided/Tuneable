@@ -75,6 +75,8 @@ interface TippedMediaQueueListProps {
   defaultTipTags?: string[];
   /** Called after a tip is successfully placed, so the parent can refresh data. */
   onTipPlaced?: () => void | Promise<void>;
+  /** When false, the parent owns play-all (e.g. a music-screen-style button). Default true. */
+  showPlayAll?: boolean;
 }
 
 /**
@@ -86,6 +88,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   header,
   defaultTipTags,
   onTipPlaced,
+  showPlayAll = true,
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -247,9 +250,13 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   return (
     <>
       {header && (
-        <div className="flex items-center justify-between mb-3 md:mb-4">
+        <div
+          className={`flex items-center mb-3 md:mb-4 ${
+            showPlayAll ? 'justify-between' : ''
+          }`}
+        >
           {header}
-          {hasPlayable && (
+          {showPlayAll && hasPlayable && (
             <button
               type="button"
               onClick={() => startQueue()}

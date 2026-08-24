@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Tag, Loader2, Music, Mic, Coins, MapPin, Clock } from 'lucide-react';
+import { Tag, Loader2, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
 import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { DEFAULT_COVER_ART } from '../constants';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlayability';
+import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
 import PodcastQueueMediaCard, {
@@ -16,7 +20,11 @@ import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
 import { resolveTipStatInputs } from '../utils/tipStats';
-import { getEpisodeAudioUrl, usePodcastPlayerStore } from '../stores/podcastPlayerStore';
+import {
+  getEpisodeAudioUrl,
+  usePodcastPlayerStore,
+  type PodcastPlayerEpisode,
+} from '../stores/podcastPlayerStore';
 
 interface TagEntity {
   name: string;
@@ -72,6 +80,43 @@ function toPodcastChartTimeRange(period: TimePeriod): 'all' | 'day' | 'week' | '
   }
 }
 
+function toPodcastPlayerEpisode(episode: PodcastEpisodeCardData): PodcastPlayerEpisode {
+  return {
+    _id: episode._id,
+    id: episode.id,
+    title: episode.title,
+    duration: episode.duration,
+    coverArt: episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt,
+    podcastSeries: episode.podcastSeries,
+    podcastTitle: episode.podcastTitle,
+    sources: episode.sources,
+    audioUrl: episode.audioUrl,
+    enclosure: episode.enclosure,
+  };
+}
+
+function isTagItemPlayable(item: TagMediaItem) {
+  return isMediaPlayable(
+    enrichMediaWithPlayability(item as Parameters<typeof enrichMediaWithPlayability>[0])
+  );
+}
+
+function formatTagItemForPlayer(item: TagMediaItem) {
+  return {
+    id: item._id || item.uuid,
+    _id: item._id,
+    title: item.title,
+    artist: getCreatorDisplay(item),
+    duration: item.duration || 0,
+    coverArt: item.coverArt || DEFAULT_COVER_ART,
+    sources: item.sources || {},
+    globalMediaAggregate: item.globalMediaAggregate || 0,
+    bids: [],
+    addedBy: null,
+    totalBidValue: item.globalMediaAggregate || 0,
+  };
+}
+
 function podcastCover(item: TagMediaItem | PodcastEpisodeCardData): string {
   const series =
     'podcastSeries' in item && item.podcastSeries && typeof item.podcastSeries === 'object'
@@ -88,7 +133,10 @@ const TagProfile: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
-  const { setCurrentEpisode, play } = usePodcastPlayerStore();
+  const { setCurrentEpisode, setQueue: setPodcastQueue, play: playPodcast } =
+    usePodcastPlayerStore();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
+    useWebPlayerStore();
 
   const slug = slugParam ? decodeURIComponent(slugParam) : '';
   const isPodcast = searchParams.get('type') === 'podcast';
@@ -208,7 +256,7 @@ const TagProfile: React.FC = () => {
     };
     if (getEpisodeAudioUrl(ep)) {
       setCurrentEpisode(ep);
-      play();
+      playPodcast();
       toast.success(`Now playing: ${episode.title}`);
       return;
     }
@@ -235,7 +283,7 @@ const TagProfile: React.FC = () => {
         return;
       }
       setCurrentEpisode(playable);
-      play();
+      playPodcast();
       toast.success(`Now playing: ${loaded.title}`);
     } catch (err: unknown) {
       const message =
@@ -246,6 +294,47 @@ const TagProfile: React.FC = () => {
     } finally {
       setFetchingPlayId(null);
     }
+  };
+
+  const handlePlayQueue = () => {
+    if (isPodcast) {
+      const playable = episodes
+        .map(toPodcastPlayerEpisode)
+        .filter((episode) => getEpisodeAudioUrl(episode));
+      if (playable.length === 0) {
+        toast.info('No playable episodes in this list.');
+        return;
+      }
+      const webPlayer = useWebPlayerStore.getState();
+      webPlayer.pause();
+      webPlayer.setCurrentMedia(null, 0);
+      webPlayer.setQueue([]);
+      webPlayer.setGlobalPlayerActive(false);
+      setPodcastQueue(playable);
+      setCurrentEpisode(playable[0], 0);
+      playPodcast();
+      toast.success(
+        `Playing queue: ${playable.length} episode${playable.length !== 1 ? 's' : ''}`
+      );
+      return;
+    }
+
+    const playableItems = media.filter(isTagItemPlayable);
+    if (playableItems.length === 0) {
+      toast.info(
+        'No playable tracks in this list — tip on tracks awaiting rights or audio, or wait for audio to be added.'
+      );
+      return;
+    }
+
+    usePodcastPlayerStore.getState().clear();
+    const queue = playableItems.map(formatTagItemForPlayer);
+    setQueue(queue as any);
+    setCurrentMedia(queue[0] as any, 0);
+    setGlobalPlayerActive(true);
+    setCurrentPartyId(null);
+    play();
+    toast.success(`Playing queue: ${queue.length} track${queue.length !== 1 ? 's' : ''}`);
   };
 
   const handlePodcastTip = async (tags: string[], amount: number) => {
@@ -464,22 +553,39 @@ const TagProfile: React.FC = () => {
 
         {/* Top Tunes */}
         <div className="mb-8 px-2 md:px-0">
-          <div className="mb-3 md:mb-4 flex flex-wrap justify-center sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setShowTimeFilter((open) => !open)}
-              className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-                showTimeFilter || selectedTimePeriod !== 'all-time'
-                  ? 'bg-gray-700 ring-1 ring-purple-500/50'
-                  : 'bg-gray-800'
-              }`}
-            >
-              <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
-              Time
-              <span className="text-xs text-purple-300 font-normal">
-                ({formatTimePeriodLabel(selectedTimePeriod)})
-              </span>
-            </button>
+          <div className="mb-3 md:mb-4">
+            <div className="flex flex-wrap justify-center sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowTimeFilter((open) => !open)}
+                className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
+                  showTimeFilter || selectedTimePeriod !== 'all-time'
+                    ? 'bg-gray-700 ring-1 ring-purple-500/50'
+                    : 'bg-gray-800'
+                }`}
+              >
+                <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                Time
+                <span className="text-xs text-purple-300 font-normal">
+                  ({formatTimePeriodLabel(selectedTimePeriod)})
+                </span>
+              </button>
+            </div>
+            {!loading && !error && media.length > 0 && (
+              <div className="flex justify-center mt-2 sm:mt-3">
+                <button
+                  type="button"
+                  onClick={handlePlayQueue}
+                  className="px-3 sm:px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 shadow-lg"
+                  title={`Play ${media.length} ${
+                    isPodcast ? 'episode' : 'track'
+                  }${media.length !== 1 ? 's' : ''} from the top`}
+                >
+                  <Play className="h-4 w-4" />
+                  Play
+                </button>
+              </div>
+            )}
           </div>
 
           {showTimeFilter && (
@@ -577,6 +683,7 @@ const TagProfile: React.FC = () => {
                   items={queueItems}
                   header={heading}
                   defaultTipTags={[displayName]}
+                  showPlayAll={false}
                   onTipPlaced={() => loadProfile({ silent: true })}
                 />
               );
