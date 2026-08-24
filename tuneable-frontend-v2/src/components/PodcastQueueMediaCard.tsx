@@ -33,7 +33,7 @@ export interface PodcastEpisodeCardData {
   category?: string;
   podcastSeries?: { _id: string; title: string; coverArt?: string; genres?: string[]; tags?: string[] };
   podcastTitle?: string;
-  sources?: Record<string, string>;
+  sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
   isExternal?: boolean;

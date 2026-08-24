@@ -938,7 +938,7 @@ const ArtistEscrowDashboard: React.FC = () => {
                             }`}>
                               {entry.promoStatus === 'pending' ? 'welcome pending' : `welcome ${entry.promoStatus}`}
                             </span>
-                          }
+                          )}
                         </div>
                         {media && (
                           <Link
