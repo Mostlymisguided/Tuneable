@@ -3838,7 +3838,9 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
             ? req.query.locationPlaceId.trim()
             : '';
         const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+        const { normalizeLocationScope } = require('../utils/locationScope');
         const chartSort = normalizeChartSort(req.query.sortBy);
+        const locationScope = normalizeLocationScope(req.query.locationScope);
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
 
         if (!validTimePeriods.includes(timePeriod)) {
@@ -3859,17 +3861,18 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
         }
 
         if (isRequestingGlobalParty) {
-            // Location filter: tips from place OR media originating from place; ranked by global tip aggregate
+            // Location filter: in = origin OR tips; from = origin; supported-by = local tips
             // All-time (no location) uses the slim chart — period path materializes every active bid.
             console.log('🌍 Time-based sorting for Global Party (slim chart)...');
             const { getPeriodStartDate } = require('../utils/globalPartyChart');
             const chart = await fetchPeriodGlobalChart({
                 timePeriod,
                 locationPlaceId: locationPlaceId || null,
+                locationScope,
                 userId: req.user?._id,
                 sortBy: chartSort,
             });
-            console.log(`🌍 Global Party time sorting: ${chart.meta.count} media in ${chart.meta.processingTimeMs}ms${locationPlaceId ? ` (location: ${locationPlaceId})` : ''}`);
+            console.log(`🌍 Global Party time sorting: ${chart.meta.count} media in ${chart.meta.processingTimeMs}ms${locationPlaceId ? ` (location: ${locationPlaceId}, scope: ${locationScope})` : ''}`);
 
             return res.json({
                 timePeriod,
@@ -3879,6 +3882,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 periodStartDate: getPeriodStartDate(timePeriod),
                 periodEndDate: new Date(),
                 locationFilter: locationPlaceId ? { placeId: locationPlaceId } : null,
+                locationScope: locationPlaceId ? locationScope : 'in',
                 topLocations: chart.topLocations || [],
             });
         }

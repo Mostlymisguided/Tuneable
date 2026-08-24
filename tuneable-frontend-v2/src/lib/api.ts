@@ -507,10 +507,13 @@ export const partyAPI = {
     return response.data;
   },
   
-  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; sortBy?: string }) => {
+  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string }) => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
+    }
+    if (options?.locationScope) {
+      params.locationScope = options.locationScope;
     }
     if (options?.sortBy) {
       params.sortBy = options.sortBy;

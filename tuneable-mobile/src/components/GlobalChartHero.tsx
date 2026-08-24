@@ -1,8 +1,14 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 import {
+  LOCATION_SCOPE_OPTIONS,
   formatLocation,
+  locationScopeFilterNote,
+  locationScopeLabel,
   type LocationQuickPick,
+  type LocationScope,
 } from '@/src/lib/location';
 import type { ResolvedLocation } from '@/src/types/user';
 
@@ -10,6 +16,8 @@ type Props = {
   chartLabel?: string;
   contentNoun?: string;
   selectedLocation: ResolvedLocation | null;
+  locationScope?: LocationScope;
+  onLocationScopeChange?: (scope: LocationScope) => void;
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
 };
@@ -18,9 +26,12 @@ export function GlobalChartHero({
   chartLabel = "The World's Best Music",
   contentNoun = 'Music',
   selectedLocation,
+  locationScope = 'in',
+  onLocationScopeChange,
   onLocationChange,
   locationQuickPicks,
 }: Props) {
+  const [scopeOpen, setScopeOpen] = useState(false);
   const locationLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
     : 'Earth';
@@ -28,7 +39,54 @@ export function GlobalChartHero({
   return (
     <View style={styles.wrap}>
       <Text style={styles.eyebrow}>{chartLabel}</Text>
-      <Text style={styles.votedFrom}>In</Text>
+      {onLocationScopeChange ? (
+        scopeOpen ? (
+          <View style={styles.scopeRow} accessibilityRole="tablist">
+            {LOCATION_SCOPE_OPTIONS.map((option) => {
+              const selected = option.id === locationScope;
+              return (
+                <Pressable
+                  key={option.id}
+                  onPress={() => {
+                    onLocationScopeChange(option.id);
+                    setScopeOpen(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={option.label}
+                  style={styles.scopeOption}
+                >
+                  <Text
+                    style={[
+                      styles.votedFrom,
+                      styles.scopeOptionText,
+                      selected && styles.scopeOptionTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setScopeOpen(true)}
+            style={styles.scopeButton}
+            accessibilityRole="button"
+            accessibilityLabel={`Chart scope ${locationScopeLabel(locationScope)}. Change to In, From, or Supported by.`}
+          >
+            <Text style={styles.scopeButtonLabel}>{locationScopeLabel(locationScope)}</Text>
+            <Ionicons
+              name="chevron-down"
+              size={12}
+              color="rgba(196, 181, 253, 0.6)"
+            />
+          </Pressable>
+        )
+      ) : (
+        <Text style={styles.votedFrom}>In</Text>
+      )}
       <Text style={styles.locationTitle}>{locationLabel}</Text>
 
       {locationQuickPicks.length > 0 ? (
@@ -67,7 +125,11 @@ export function GlobalChartHero({
 
       {selectedLocation?.placeId ? (
         <Text style={styles.filterNote}>
-          {contentNoun} in {formatLocation(selectedLocation)} and below
+          {locationScopeFilterNote(
+            contentNoun,
+            formatLocation(selectedLocation),
+            locationScope
+          )}
         </Text>
       ) : null}
     </View>
@@ -115,6 +177,39 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: 'rgba(196, 181, 253, 0.85)',
     marginBottom: 8,
+  },
+  scopeButtonLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    color: 'rgba(196, 181, 253, 0.85)',
+  },
+  scopeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  scopeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  scopeOption: {
+    paddingVertical: 4,
+  },
+  scopeOptionText: {
+    marginBottom: 0,
+    letterSpacing: 1.6,
+    color: 'rgba(196, 181, 253, 0.45)',
+  },
+  scopeOptionTextActive: {
+    color: 'rgba(221, 214, 254, 1)',
   },
   locationTitle: {
     fontSize: 32,

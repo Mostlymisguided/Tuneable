@@ -30,7 +30,12 @@ import {
   sortChartItems,
   type ChartSortKey,
 } from '@/src/lib/chartSort';
-import { computeLocationQuickPicks } from '@/src/lib/location';
+import {
+  computeLocationQuickPicks,
+  formatLocation,
+  locationScopeEmptyMessage,
+  type LocationScope,
+} from '@/src/lib/location';
 import {
   formatArtist,
   getChartTipPence,
@@ -56,6 +61,7 @@ export default function MusicScreen() {
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
     null
   );
+  const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
@@ -81,7 +87,7 @@ export default function MusicScreen() {
 
   useEffect(() => {
     setVisibleCount(CHART_PAGE_SIZE);
-  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange, chartSort]);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange, chartSort, locationScope]);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -90,6 +96,7 @@ export default function MusicScreen() {
     try {
       const res = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, period, {
         locationPlaceId: locationPlaceId ?? undefined,
+        locationScope: locationPlaceId ? locationScope : undefined,
         sortBy: chartSort,
       });
       setMedia(res.media ?? []);
@@ -101,7 +108,7 @@ export default function MusicScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, locationPlaceId, chartSort]);
+  }, [period, locationPlaceId, chartSort, locationScope]);
 
   useFocusEffect(
     useCallback(() => {
@@ -183,7 +190,13 @@ export default function MusicScreen() {
   const hasMore = visibleCount < filteredMedia.length;
   const emptyMessage = filtersActive
     ? 'No tunes match these filters.'
-    : 'No tunes in this period yet.';
+    : selectedLocation?.placeId
+      ? locationScopeEmptyMessage(
+          'tunes',
+          formatLocation(selectedLocation),
+          locationScope
+        )
+      : 'No tunes in this period yet.';
 
   return (
     <Screen>
@@ -205,6 +218,8 @@ export default function MusicScreen() {
           <View style={styles.header}>
             <GlobalChartHero
               selectedLocation={selectedLocation}
+              locationScope={locationScope}
+              onLocationScopeChange={setLocationScope}
               onLocationChange={handleLocationChange}
               locationQuickPicks={locationQuickPicks}
             />

@@ -36,7 +36,11 @@ import {
 } from '../components/ChartSortControl';
 import { toPodcastChartSort, type ChartSortKey } from '../utils/chartSort';
 import {
+  formatLocation,
   getCountryPickFromLocation,
+  locationScopeEmptyMessage,
+  normalizeLocationScope,
+  type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { resolveTipStatInputs } from '../utils/tipStats';
@@ -220,6 +224,9 @@ const Podcasts: React.FC = () => {
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
+  const [locationScope, setLocationScope] = useState<LocationScope>(() =>
+    normalizeLocationScope(searchParams.get('scope'))
+  );
   const [visibleEpisodeCount, setVisibleEpisodeCount] = useState(EPISODE_PAGE_SIZE);
   
   // Tag filtering state (for top tags click functionality)
@@ -287,7 +294,7 @@ const Podcasts: React.FC = () => {
   useEffect(() => {
     fetchChart();
     setVisibleEpisodeCount(EPISODE_PAGE_SIZE);
-  }, [filters, selectedLocation?.placeId]);
+  }, [filters, selectedLocation?.placeId, locationScope]);
 
   // Fetch Spotify connection status when user is logged in
   useEffect(() => {
@@ -362,6 +369,7 @@ const Podcasts: React.FC = () => {
   }, [filters.tag]);
 
   const locationPlaceIdFromUrl = searchParams.get('location');
+  const locationScopeFromUrl = searchParams.get('scope');
 
   useEffect(() => {
     if (!locationPlaceIdFromUrl) {
@@ -390,12 +398,27 @@ const Podcasts: React.FC = () => {
     };
   }, [locationPlaceIdFromUrl]);
 
+  useEffect(() => {
+    const nextScope = normalizeLocationScope(locationScopeFromUrl);
+    setLocationScope((prev) => (prev === nextScope ? prev : nextScope));
+  }, [locationScopeFromUrl]);
+
   const handleLocationFilterChange = (location: ResolvedLocation | null) => {
     setSelectedLocation(location);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (location?.placeId) next.set('location', location.placeId);
       else next.delete('location');
+      return next;
+    }, { replace: true });
+  };
+
+  const handleLocationScopeChange = (scope: LocationScope) => {
+    setLocationScope(scope);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (scope === 'in') next.delete('scope');
+      else next.set('scope', scope);
       return next;
     }, { replace: true });
   };
@@ -432,6 +455,7 @@ const Podcasts: React.FC = () => {
       params.append('limit', '50');
       if (selectedLocation?.placeId) {
         params.append('locationPlaceId', selectedLocation.placeId);
+        params.append('locationScope', locationScope);
       }
 
       const response = await fetch(
@@ -1433,7 +1457,10 @@ const Podcasts: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 text-white">
       <GlobalChartLocationHero
         chartLabel="The World's Best Podcasts"
+        contentNoun="Podcasts"
         selectedLocation={selectedLocation}
+        locationScope={locationScope}
+        onLocationScopeChange={handleLocationScopeChange}
         showLocationFilter={showLocationFilter}
         onToggleLocationFilter={() => setShowLocationFilter((open) => !open)}
         onLocationChange={handleLocationFilterChange}
@@ -1909,7 +1936,15 @@ const Podcasts: React.FC = () => {
           <div className="text-center py-20">
             <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 text-lg">
-              {showSearchResults ? 'No episodes found' : 'No podcast episodes found'}
+              {showSearchResults
+                ? 'No episodes found'
+                : selectedLocation?.placeId
+                  ? locationScopeEmptyMessage(
+                      'podcast episodes',
+                      formatLocation(selectedLocation),
+                      locationScope
+                    )
+                  : 'No podcast episodes found'}
             </p>
             <p className="text-gray-500 text-sm mt-2">
               {showSearchResults ? 'Try a different search term' : 'Try adjusting your filters or search for podcasts'}

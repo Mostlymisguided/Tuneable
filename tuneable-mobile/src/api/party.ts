@@ -28,11 +28,14 @@ export const partyAPI = {
   getMediaSortedByTime: async (
     partyId: string,
     timePeriod: string,
-    options?: { locationPlaceId?: string; sortBy?: string }
+    options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string }
   ): Promise<SortedMediaResponse> => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
+    }
+    if (options?.locationScope) {
+      params.locationScope = options.locationScope;
     }
     if (options?.sortBy) {
       params.sortBy = options.sortBy;

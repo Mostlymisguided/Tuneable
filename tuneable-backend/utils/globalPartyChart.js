@@ -12,6 +12,12 @@ const {
   availablePlatformsFromSources,
 } = require('./mediaPlayability');
 const { normalizeChartSort, mediaChartMongoSort } = require('./chartSort');
+const {
+  normalizeLocationScope,
+  locationScopeIncludesOrigin,
+  locationScopeIncludesTips,
+  locationScopeRanksByLocalTips,
+} = require('./locationScope');
 
 const GLOBAL_PARTY_TUNES_FILTER = {
   contentType: { $in: ['music'] },
@@ -623,15 +629,17 @@ function mediaOriginPlaceMatch(locationPlaceId) {
 /**
  * Period / location Global Party chart.
  *
- * Location filter (when set) is an OR:
- * - tips from tippers in that place (and below), and/or
- * - media originating from that place (primaryLocation)
- * Ranked by global tip aggregate within the filtered set (period tips when
- * time-scoped; stored globalMediaAggregate for all-time). Champions stay tip-scoped.
+ * Location filter (when set) uses locationScope:
+ * - in (default): tips from tippers in that place AND/OR media originating there
+ * - from: media originating from that place (primaryLocation) only
+ * - supported-by: tips from tippers in that place only, ranked by local tip volume
+ * In/from are ranked by global tip aggregate within the filtered set (period tips
+ * when time-scoped; stored globalMediaAggregate for all-time).
  */
 async function fetchPeriodGlobalChart({
   timePeriod = 'today',
   locationPlaceId = null,
+  locationScope = 'in',
   userId = null,
   supportersLimit = DEFAULT_SUPPORTERS_LIMIT,
   limit = null,
@@ -640,6 +648,7 @@ async function fetchPeriodGlobalChart({
 } = {}) {
   const startTime = Date.now();
   const chartSort = normalizeChartSort(sortBy);
+  const scope = normalizeLocationScope(locationScope);
   const startDate = getPeriodStartDate(timePeriod);
   const placeId = typeof locationPlaceId === 'string' && locationPlaceId.trim()
     ? locationPlaceId.trim()
@@ -654,24 +663,32 @@ async function fetchPeriodGlobalChart({
   let matchingMediaIds;
 
   if (placeId) {
-    // Tip side: media that received tips from tippers in this place (period-scoped)
-    const tipBidQuery = { status: 'active', bidderLocationAncestorIds: placeId };
-    if (startDate) {
-      tipBidQuery.createdAt = { $gte: startDate };
+    const includeTips = locationScopeIncludesTips(scope);
+    const includeOrigin = locationScopeIncludesOrigin(scope);
+    const idSet = new Set();
+
+    if (includeTips) {
+      const tipBidQuery = { status: 'active', bidderLocationAncestorIds: placeId };
+      if (startDate) {
+        tipBidQuery.createdAt = { $gte: startDate };
+      }
+      const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
+      for (const id of tipMatchedIds) {
+        if (id) idSet.add(id.toString());
+      }
     }
-    const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
 
-    // Origin side: media from this place (and below)
-    const originMatchedIds = await Media.distinct('_id', {
-      ...GLOBAL_PARTY_TUNES_FILTER,
-      status: { $ne: 'vetoed' },
-      ...mediaOriginPlaceMatch(placeId),
-    });
+    if (includeOrigin) {
+      const originMatchedIds = await Media.distinct('_id', {
+        ...GLOBAL_PARTY_TUNES_FILTER,
+        status: { $ne: 'vetoed' },
+        ...mediaOriginPlaceMatch(placeId),
+      });
+      for (const id of originMatchedIds) {
+        if (id) idSet.add(id.toString());
+      }
+    }
 
-    const idSet = new Set([
-      ...tipMatchedIds.filter(Boolean).map((id) => id.toString()),
-      ...originMatchedIds.filter(Boolean).map((id) => id.toString()),
-    ]);
     matchingMediaIds = [...idSet];
   } else {
     const bidQuery = { status: 'active' };
@@ -696,8 +713,9 @@ async function fetchPeriodGlobalChart({
     };
   }
 
-  // All-time + location: prefer stored globalMediaAggregate for ranking
-  const useStoredGlobalAggregate = placeId && !startDate;
+  const rankByLocalTips = Boolean(placeId && locationScopeRanksByLocalTips(scope));
+  // All-time + location: prefer stored globalMediaAggregate unless ranking by local support
+  const useStoredGlobalAggregate = placeId && !startDate && !rankByLocalTips;
 
   // Rank by tip volume within the filtered set (skip full bid scan when using stored aggregates)
   const mediaBidValues = {};
@@ -708,6 +726,9 @@ async function fetchPeriodGlobalChart({
     };
     if (startDate) {
       rankBidQuery.createdAt = { $gte: startDate };
+    }
+    if (rankByLocalTips) {
+      rankBidQuery.bidderLocationAncestorIds = placeId;
     }
 
     const grouped = await Bid.aggregate([
@@ -789,11 +810,11 @@ async function fetchPeriodGlobalChart({
   }
 
   const pageMediaIds = mediaList.map((row) => row.media._id);
-  // Supporters stay global (period-scoped only) so origin-matched rows still show tippers
+  // Origin-matched rows still show global tippers; supported-by shows local supporters
   const supportersByMedia = await loadTopSupportersByMedia(pageMediaIds, {
     supportersLimit,
     userId,
-    locationPlaceId: null,
+    locationPlaceId: rankByLocalTips ? placeId : null,
     startDate,
   });
 

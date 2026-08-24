@@ -19,7 +19,12 @@ import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
-import { computeLocationQuickPicks } from '@/src/lib/location';
+import {
+  computeLocationQuickPicks,
+  formatLocation,
+  locationScopeEmptyMessage,
+  type LocationScope,
+} from '@/src/lib/location';
 import {
   computePodcastTopTags,
   episodeId,
@@ -53,6 +58,7 @@ export default function PodcastsScreen() {
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
     null
   );
+  const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showTagPanel, setShowTagPanel] = useState(false);
@@ -76,7 +82,7 @@ export default function PodcastsScreen() {
 
   useEffect(() => {
     setVisibleCount(PODCAST_CHART_PAGE_SIZE);
-  }, [period, locationPlaceId, selectedTagTerms, searchQuery, chartSort]);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery, chartSort, locationScope]);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -89,6 +95,7 @@ export default function PodcastsScreen() {
           timeRange: period,
           sortBy: toPodcastChartSort(chartSort),
           locationPlaceId: locationPlaceId ?? undefined,
+          locationScope: locationPlaceId ? locationScope : undefined,
         });
         setEpisodes(res.episodes ?? []);
       } catch (err) {
@@ -100,7 +107,7 @@ export default function PodcastsScreen() {
         setRefreshing(false);
       }
     },
-    [period, locationPlaceId, chartSort]
+    [period, locationPlaceId, chartSort, locationScope]
   );
 
   useFocusEffect(
@@ -190,7 +197,13 @@ export default function PodcastsScreen() {
   const hasMore = visibleCount < filteredEpisodes.length;
   const emptyMessage = filtersActive
     ? 'No episodes match these filters.'
-    : 'No podcast episodes in this period yet.';
+    : selectedLocation?.placeId
+      ? locationScopeEmptyMessage(
+          'podcast episodes',
+          formatLocation(selectedLocation),
+          locationScope
+        )
+      : 'No podcast episodes in this period yet.';
 
   return (
     <Screen>
@@ -214,6 +227,8 @@ export default function PodcastsScreen() {
               chartLabel="The World's Best Podcasts"
               contentNoun="Podcasts"
               selectedLocation={selectedLocation}
+              locationScope={locationScope}
+              onLocationScopeChange={setLocationScope}
               onLocationChange={handleLocationChange}
               locationQuickPicks={locationQuickPicks}
             />

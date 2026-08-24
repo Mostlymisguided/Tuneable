@@ -149,3 +149,56 @@ export function computeLocationQuickPicks(
 
   return picks;
 }
+
+export const LOCATION_SCOPES = ['in', 'from', 'supported-by'] as const;
+export type LocationScope = (typeof LOCATION_SCOPES)[number];
+
+export const LOCATION_SCOPE_OPTIONS: { id: LocationScope; label: string }[] = [
+  { id: 'in', label: 'In' },
+  { id: 'from', label: 'From' },
+  { id: 'supported-by', label: 'Supported by' },
+];
+
+export function normalizeLocationScope(value: string | null | undefined): LocationScope {
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (raw === 'from') return 'from';
+  if (raw === 'supported-by' || raw === 'supported_by' || raw === 'supportedby') {
+    return 'supported-by';
+  }
+  return 'in';
+}
+
+export function locationScopeLabel(scope: LocationScope): string {
+  return LOCATION_SCOPE_OPTIONS.find((option) => option.id === scope)?.label || 'In';
+}
+
+export function locationScopeFilterNote(
+  noun: string,
+  placeLabel: string,
+  scope: LocationScope
+): string {
+  switch (scope) {
+    case 'from':
+      return `${noun} from ${placeLabel} and below`;
+    case 'supported-by':
+      return `${noun} supported by people in ${placeLabel} and below`;
+    default:
+      return `${noun} in ${placeLabel} and below`;
+  }
+}
+
+export function locationScopeEmptyMessage(
+  nounPlural: string,
+  placeLabel: string,
+  scope: LocationScope
+): string {
+  switch (scope) {
+    case 'from':
+      return `No ${nounPlural} from ${placeLabel} yet.`;
+    case 'supported-by':
+      return `Nothing supported by people in ${placeLabel} yet.`;
+    default:
+      return `No ${nounPlural} connected to ${placeLabel} yet.`;
+  }
+}
+

@@ -26,6 +26,12 @@ const {
   buildSeriesEpisodeMatch,
   seriesEpisodeMatch,
 } = require('../utils/podcastSeriesQuery');
+const {
+  normalizeLocationScope,
+  locationScopeIncludesOrigin,
+  locationScopeIncludesTips,
+  locationScopeRanksByLocalTips,
+} = require('../utils/locationScope');
 
 const router = express.Router();
 
@@ -1833,6 +1839,7 @@ router.get('/chart', async (req, res) => {
       timeRange = 'all',
       sortBy = 'globalMediaAggregate', // most-tipped aliases + newest/oldest/releaseDate/playCount/popularity
       locationPlaceId: locationPlaceIdRaw,
+      locationScope: locationScopeRaw,
     } = req.query;
 
     const isDateSort = sortBy === 'newest' || sortBy === 'oldest' || sortBy === 'releaseDate';
@@ -1842,6 +1849,7 @@ router.get('/chart', async (req, res) => {
     
     const limitNum = Math.min(parseInt(limit), 200);
     const locationPlaceId = typeof locationPlaceIdRaw === 'string' ? locationPlaceIdRaw.trim() : '';
+    const locationScope = normalizeLocationScope(locationScopeRaw);
     
     // Build query for podcast episodes
     const query = {
@@ -1883,8 +1891,8 @@ router.get('/chart', async (req, res) => {
     const bidTimeStartDate = timeRange !== 'all' ? getTimeRangeStartDate(timeRange) : null;
     const useBidBasedRanking = !!locationPlaceId || timeRange !== 'all';
 
-    // Location filter is OR: tips from place and/or media originating from place.
-    // Ranking uses global tip volume (not location-scoped tip totals).
+    // Location filter: in = origin OR tips; from = origin; supported-by = local tips.
+    // In/from rank by global tip volume; supported-by ranks by local tip volume.
     const bidPopulateMatch = { status: 'active' };
     if (bidTimeStartDate) {
       bidPopulateMatch.createdAt = { $gte: bidTimeStartDate };
@@ -1914,36 +1922,51 @@ router.get('/chart', async (req, res) => {
         let filteredMediaIds = catalogMediaIds.map((id) => id.toString());
 
         if (locationPlaceId) {
-          const tipBidQuery = {
-            status: 'active',
-            mediaId: { $in: catalogMediaIds },
-            bidderLocationAncestorIds: locationPlaceId,
-          };
-          if (bidTimeStartDate) {
-            tipBidQuery.createdAt = { $gte: bidTimeStartDate };
+          const includeTips = locationScopeIncludesTips(locationScope);
+          const includeOrigin = locationScopeIncludesOrigin(locationScope);
+          const idSet = new Set();
+
+          if (includeTips) {
+            const tipBidQuery = {
+              status: 'active',
+              mediaId: { $in: catalogMediaIds },
+              bidderLocationAncestorIds: locationPlaceId,
+            };
+            if (bidTimeStartDate) {
+              tipBidQuery.createdAt = { $gte: bidTimeStartDate };
+            }
+            const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
+            for (const id of tipMatchedIds) {
+              if (id) idSet.add(id.toString());
+            }
           }
-          const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
 
-          const originMatchedIds = await Media.find({
-            ...query,
-            $or: [
-              { 'primaryLocation.placeId': locationPlaceId },
-              { 'primaryLocation.ancestorIds': locationPlaceId },
-            ],
-          }).distinct('_id');
+          if (includeOrigin) {
+            const originMatchedIds = await Media.find({
+              ...query,
+              $or: [
+                { 'primaryLocation.placeId': locationPlaceId },
+                { 'primaryLocation.ancestorIds': locationPlaceId },
+              ],
+            }).distinct('_id');
+            for (const id of originMatchedIds) {
+              if (id) idSet.add(id.toString());
+            }
+          }
 
-          const idSet = new Set([
-            ...tipMatchedIds.map((id) => id.toString()),
-            ...originMatchedIds.map((id) => id.toString()),
-          ]);
           filteredMediaIds = [...idSet];
         }
 
         if (filteredMediaIds.length === 0) {
           episodes = [];
         } else {
-          const useStoredGlobalAggregate = !!locationPlaceId && !bidTimeStartDate;
+          const rankByLocalTips = Boolean(
+            locationPlaceId && locationScopeRanksByLocalTips(locationScope)
+          );
+          const useStoredGlobalAggregate =
+            !!locationPlaceId && !bidTimeStartDate && !rankByLocalTips;
           let rankedMediaIds;
+          const localTipTotals = {};
 
           if (isDateSort) {
             let candidateIds = filteredMediaIds;
@@ -1955,11 +1978,18 @@ router.get('/chart', async (req, res) => {
               if (bidTimeStartDate) {
                 rankBidQuery.createdAt = { $gte: bidTimeStartDate };
               }
+              if (rankByLocalTips) {
+                rankBidQuery.bidderLocationAncestorIds = locationPlaceId;
+              }
               const bids = await Bid.find(rankBidQuery).select('mediaId amount');
               const tippedIds = new Set();
               bids.forEach((bid) => {
                 if ((bid.amount || 0) > 0 && bid.mediaId) {
-                  tippedIds.add(bid.mediaId.toString());
+                  const id = bid.mediaId.toString();
+                  tippedIds.add(id);
+                  if (rankByLocalTips) {
+                    localTipTotals[id] = (localTipTotals[id] || 0) + bid.amount;
+                  }
                 }
               });
               candidateIds = locationPlaceId
@@ -1987,6 +2017,9 @@ router.get('/chart', async (req, res) => {
             if (bidTimeStartDate) {
               rankBidQuery.createdAt = { $gte: bidTimeStartDate };
             }
+            if (rankByLocalTips) {
+              rankBidQuery.bidderLocationAncestorIds = locationPlaceId;
+            }
 
             const bids = await Bid.find(rankBidQuery).select('mediaId amount');
 
@@ -2000,6 +2033,9 @@ router.get('/chart', async (req, res) => {
                 mediaBidValues[mediaId] = (mediaBidValues[mediaId] || 0) + bid.amount;
               }
             });
+            if (rankByLocalTips) {
+              Object.assign(localTipTotals, mediaBidValues);
+            }
 
             rankedMediaIds = Object.entries(mediaBidValues)
               .sort((a, b) => b[1] - a[1])
@@ -2035,9 +2071,11 @@ router.get('/chart', async (req, res) => {
                   (sum, bid) => sum + (typeof bid.amount === 'number' ? bid.amount : 0),
                   0
                 );
-                const displayAggregate = useStoredGlobalAggregate
-                  ? (episode.globalMediaAggregate || 0)
-                  : periodAggregate;
+                const displayAggregate = rankByLocalTips
+                  ? (localTipTotals[episode._id.toString()] || 0)
+                  : useStoredGlobalAggregate
+                    ? (episode.globalMediaAggregate || 0)
+                    : periodAggregate;
                 return {
                   ...episode,
                   globalMediaAggregate: displayAggregate,
@@ -2130,8 +2168,10 @@ router.get('/chart', async (req, res) => {
         timeRange,
         sortBy,
         locationPlaceId: locationPlaceId || undefined,
+        locationScope: locationPlaceId ? locationScope : undefined,
       },
       locationFilter: locationPlaceId ? { placeId: locationPlaceId } : null,
+      locationScope: locationPlaceId ? locationScope : 'in',
     });
   } catch (error) {
     console.error('Error getting podcast chart:', error);

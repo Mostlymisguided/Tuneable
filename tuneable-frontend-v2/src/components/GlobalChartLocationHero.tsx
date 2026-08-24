@@ -4,10 +4,13 @@ import LocationAutocomplete from './LocationAutocomplete';
 import {
   formatLocation,
   locationPickToResolvedLocation,
+  locationScopeFilterNote,
   type CountryLocationPick,
+  type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { penceToPounds } from '../utils/currency';
+import ChartLocationScopeToggle from './ChartLocationScopeToggle';
 
 export interface LocationQuickPick extends CountryLocationPick {
   total: number;
@@ -16,7 +19,10 @@ export interface LocationQuickPick extends CountryLocationPick {
 
 interface GlobalChartLocationHeroProps {
   chartLabel: string;
+  contentNoun?: string;
   selectedLocation: ResolvedLocation | null;
+  locationScope?: LocationScope;
+  onLocationScopeChange?: (scope: LocationScope) => void;
   showLocationFilter: boolean;
   onToggleLocationFilter: () => void;
   onLocationChange: (location: ResolvedLocation | null) => void;
@@ -87,7 +93,10 @@ function LocationQuickPickButtons({
 
 const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
   chartLabel,
+  contentNoun = 'Music',
   selectedLocation,
+  locationScope = 'in',
+  onLocationScopeChange,
   showLocationFilter,
   onToggleLocationFilter,
   onLocationChange,
@@ -127,9 +136,16 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
       <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
         {chartLabel}
       </p>
-      <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
-        In
-      </p>
+      {onLocationScopeChange ? (
+        <ChartLocationScopeToggle
+          value={locationScope}
+          onChange={onLocationScopeChange}
+        />
+      ) : (
+        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
+          In
+        </p>
+      )}
 
       {showLocationFilter ? (
         <div className="max-w-md mx-auto">
@@ -184,7 +200,7 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
 
       {selectedLocation?.placeId && (
         <p className="text-xs text-purple-300 mt-3">
-          Music in {formatLocation(selectedLocation)} and below
+          {locationScopeFilterNote(contentNoun, formatLocation(selectedLocation), locationScope)}
         </p>
       )}
     </div>

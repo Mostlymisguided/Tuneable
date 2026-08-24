@@ -37,6 +37,10 @@ import {
   formatLocation,
   getCountryPickFromLocation,
   locationPickToResolvedLocation,
+  locationScopeEmptyMessage,
+  locationScopeFilterNote,
+  normalizeLocationScope,
+  type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
@@ -277,6 +281,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
+  const [locationScope, setLocationScope] = useState<LocationScope>(() =>
+    normalizeLocationScope(searchParams.get('scope'))
+  );
   const useSortedQueue =
     selectedTimePeriod !== 'all-time' ||
     !!selectedLocation?.placeId ||
@@ -340,7 +347,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Reset visible count when party, time period, or BPM filter changes
   useEffect(() => {
     setVisibleMediaCount(MEDIA_PAGE_SIZE);
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmFilterRange, chartSort]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmFilterRange, chartSort, locationScope]);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
@@ -514,7 +521,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     } else {
       setSortedMedia([]);
     }
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
@@ -560,6 +567,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   }, [isGlobalParty, queueSearchTerms, searchParams]);
 
   const locationPlaceIdFromUrl = searchParams.get('location');
+  const locationScopeFromUrl = searchParams.get('scope');
 
   // Sync location from URL (global party: shared links, back/forward)
   useEffect(() => {
@@ -590,6 +598,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     };
   }, [locationPlaceIdFromUrl, isGlobalParty, headerVariant]);
 
+  useEffect(() => {
+    if (!isGlobalParty) return;
+    const nextScope = normalizeLocationScope(locationScopeFromUrl);
+    setLocationScope((prev) => (prev === nextScope ? prev : nextScope));
+  }, [locationScopeFromUrl, isGlobalParty]);
+
   const handleLocationFilterChange = (location: ResolvedLocation | null) => {
     setSelectedLocation(location);
     if (!isGlobalParty) return;
@@ -597,6 +611,17 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       const next = new URLSearchParams(prev);
       if (location?.placeId) next.set('location', location.placeId);
       else next.delete('location');
+      return next;
+    }, { replace: true });
+  };
+
+  const handleLocationScopeChange = (scope: LocationScope) => {
+    setLocationScope(scope);
+    if (!isGlobalParty) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (scope === 'in') next.delete('scope');
+      else next.set('scope', scope);
       return next;
     }, { replace: true });
   };
@@ -707,7 +732,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         partyId,
         timePeriod,
         {
-          ...(locationPlaceId ? { locationPlaceId } : {}),
+          ...(locationPlaceId ? { locationPlaceId, locationScope } : {}),
           sortBy: chartSort,
         }
       );
@@ -2360,7 +2385,10 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       {isGlobalParty && headerVariant === 2 && (
       <GlobalChartLocationHero
         chartLabel="The World's Best Music"
+        contentNoun="Music"
         selectedLocation={selectedLocation}
+        locationScope={locationScope}
+        onLocationScopeChange={handleLocationScopeChange}
         showLocationFilter={showLocationFilter}
         onToggleLocationFilter={() => setShowLocationFilter((open) => !open)}
         onLocationChange={handleLocationFilterChange}
@@ -2401,7 +2429,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
               </div>
             </div>
             <p className="text-xs text-gray-400 mb-3">
-              Show tunes connected to this place — music from here, or tipped from here and below.
+              Show tunes connected to this place — from here, supported by people here, or both.
             </p>
             <LocationAutocomplete
               value={selectedLocation}
@@ -2454,7 +2482,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
             )}
             {selectedLocation?.placeId && (
               <p className="text-xs text-purple-300 mt-2">
-                Music in {formatLocation(selectedLocation)} and below
+                {locationScopeFilterNote('Music', formatLocation(selectedLocation), locationScope)}
               </p>
             )}
           </div>
@@ -3350,7 +3378,15 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                 {!showVetoed && getPartyMedia().length === 0 && (
                   <div className="text-center py-8">
                     <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No tunes in queue yet</p>
+                    <p className="text-gray-500">
+                      {selectedLocation?.placeId
+                        ? locationScopeEmptyMessage(
+                            'tunes',
+                            formatLocation(selectedLocation),
+                            locationScope
+                          )
+                        : 'No tunes in queue yet'}
+                    </p>
                     <p className="text-gray-600 text-sm mt-2">Use the search bar above to find tunes and tip them into the party</p>
                   </div>
                 )}
