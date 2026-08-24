@@ -30,6 +30,7 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
+import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
 import {
   formatArtist,
   getPlayabilityBlockReason,
