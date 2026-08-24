@@ -5,6 +5,7 @@
 const Media = require('../models/Media');
 const { normalize, levenshtein } = require('../utils/mediaMatchUtils');
 const { firstIsbn } = require('../utils/isbn');
+const { normalizeLanguageInput } = require('../utils/language');
 
 const BOOK_CLASSIFICATION = {
   contentType: ['written'],
@@ -137,7 +138,7 @@ function buildBookDoc(payload, userId) {
     isbn,
     publisher: payload.publisher || null,
     pages: payload.pageCount || payload.pages || null,
-    language: payload.language || 'en',
+    language: normalizeLanguageInput(payload.language),
     coverArt: payload.coverArt || payload.coverUrl || null,
     description: payload.description || null,
     tags: Array.isArray(payload.subjects) ? payload.subjects.slice(0, 12) : [],
