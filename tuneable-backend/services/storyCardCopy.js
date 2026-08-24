@@ -4,6 +4,7 @@
  */
 
 const { isPodcastMedia, isPodcastSeries } = require('./mediaTagRankingsService');
+const { isWrittenMedia } = require('../utils/mediaKinds');
 
 const MAX_CHART_RANK = 10;
 const MIN_CHART_POOL = 3;
@@ -41,12 +42,14 @@ function amountToTakeChampion(
 function detectMediaKind(media) {
   if (isPodcastSeries(media)) return 'series';
   if (isPodcastMedia(media)) return 'episode';
+  if (isWrittenMedia(media)) return 'book';
   return 'tune';
 }
 
 function kindLabel(kind) {
   if (kind === 'series') return 'PODCAST';
   if (kind === 'episode') return 'EPISODE';
+  if (kind === 'book') return 'BOOK';
   return 'TUNE';
 }
 
@@ -54,6 +57,7 @@ function canonicalMediaPath(kind, mediaId) {
   const id = mediaId == null ? '' : String(mediaId);
   if (kind === 'series') return `/podcast/${id}`;
   if (kind === 'episode') return `/podcasts/${id}`;
+  if (kind === 'book') return `/book/${id}`;
   return `/tune/${id}`;
 }
 
@@ -73,6 +77,7 @@ function creatorLabel(media) {
 
   return (
     fromList(media.host) ||
+    fromList(media.author) ||
     fromList(media.artist) ||
     (typeof media.artist === 'string' ? media.artist : '') ||
     ''

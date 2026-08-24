@@ -202,6 +202,7 @@ const mediaSchema = new mongoose.Schema({
   }],
   explicit: { type: Boolean, default: false }, // Explicit content flag
   isrc: { type: String, default: null }, // International Standard Recording Code
+  isbn: { type: String, default: null }, // Normalized ISBN-13 (written / books)
 
   /**
    * Soft identity quality for discovery / admin review.
@@ -289,6 +290,7 @@ const mediaSchema = new mongoose.Schema({
   // Technical metadata (written content-specific)
   pages: { type: Number },
   wordCount: { type: Number },
+  publisher: { type: String, default: null },
   language: { type: String, default: 'en' },
   
   // Universal fields
@@ -605,7 +607,7 @@ mediaSchema.post('save', function(doc) {
         : podcastForms.includes(doc.contentForm)
     );
     
-    // Skip if not music or if it's a podcast
+    // Skip if not music or if it's a podcast / written work
     if (!isMusic || isPodcast) {
       return;
     }
@@ -684,6 +686,9 @@ mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
 mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
 mediaSchema.index({ "externalIds.soundcloud": 1 }); // Index for SoundCloud import matching
 mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify import matching
+mediaSchema.index({ isbn: 1 }, { unique: true, sparse: true });
+mediaSchema.index({ "externalIds.openLibrary": 1 });
+mediaSchema.index({ "externalIds.googleBooks": 1 });
 mediaSchema.index({ "sources.soundcloud": 1 }); // Index for SoundCloud permalink matching
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.targetId": 1 }); // Index for finding relationships to specific media

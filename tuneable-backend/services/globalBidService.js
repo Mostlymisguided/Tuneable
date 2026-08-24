@@ -170,6 +170,13 @@ async function placeGlobalBid(userId, {
     throw err;
   }
 
+  const { isWrittenMedia } = require('../utils/mediaKinds');
+  if (isWrittenMedia(media)) {
+    const err = new Error('Books cannot be tipped through the Global Party queue. Use the books boost endpoint.');
+    err.status = 400;
+    throw err;
+  }
+
   const tipChips = Array.isArray(tipTags)
     ? tipTags
     : Array.isArray(externalMedia?.tags)

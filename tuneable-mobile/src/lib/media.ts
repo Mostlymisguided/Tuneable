@@ -34,8 +34,17 @@ export function getUploadUrl(media: ChartMediaItem | null | undefined): string |
   return url || null;
 }
 
+export function isWrittenMedia(
+  media: { contentForm?: string[]; contentType?: string[] } | null | undefined
+): boolean {
+  if (!media) return false;
+  if (media.contentType?.includes('written')) return true;
+  return (media.contentForm || []).some((form) => form === 'book' || form === 'article');
+}
+
 export function isUploadPlayable(media: ChartMediaItem | null | undefined): boolean {
   if (!media) return false;
+  if (isWrittenMedia(media)) return false;
   if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
     return false;
   }

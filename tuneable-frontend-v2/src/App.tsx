@@ -33,6 +33,9 @@ import Wallet from './pages/Wallet';
 import LibraryImport from './pages/LibraryImport';
 import Podcasts from './pages/Podcasts';
 import PodcastSearch from './pages/PodcastSearch';
+import Books from './pages/Books';
+import BookSearch from './pages/BookSearch';
+import BookProfile from './pages/BookProfile';
 import TuneProfile from './pages/TuneProfile';
 import GearProfile from './pages/GearProfile';
 import TagProfile from './pages/TagProfile';
@@ -274,6 +277,18 @@ const AppContent = () => {
             <Route 
               path="/podcasts" 
               element={<Podcasts />} 
+            />
+            <Route
+              path="/books"
+              element={<Books />}
+            />
+            <Route
+              path="/books/search"
+              element={<BookSearch />}
+            />
+            <Route
+              path="/book/:mediaId"
+              element={<BookProfile />}
             />
             <Route
               path="/conversations"

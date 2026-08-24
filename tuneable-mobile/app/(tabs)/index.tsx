@@ -323,6 +323,27 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
+          <View style={styles.catalogLinks}>
+            <Pressable
+              style={styles.catalogChip}
+              onPress={() => router.push('/books')}
+              accessibilityRole="button"
+              accessibilityLabel="Open books"
+            >
+              <Ionicons name="book-outline" size={16} color={colors.accentLight} />
+              <Text style={styles.catalogChipText}>Books</Text>
+            </Pressable>
+            <Pressable
+              style={styles.catalogChip}
+              onPress={() => router.push('/(tabs)/podcasts')}
+              accessibilityRole="button"
+              accessibilityLabel="Open podcasts"
+            >
+              <Ionicons name="mic-outline" size={16} color={colors.accentLight} />
+              <Text style={styles.catalogChipText}>Podcasts</Text>
+            </Pressable>
+          </View>
+
           <View style={styles.searchRow}>
             <View style={styles.searchField}>
               <Ionicons name="search" size={18} color={colors.textMuted} />
@@ -582,6 +603,27 @@ const styles = StyleSheet.create({
   badgeMoreText: {
     color: colors.textSecondary,
     fontSize: 11,
+    fontWeight: '700',
+  },
+  catalogLinks: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  catalogChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  catalogChipText: {
+    color: colors.text,
+    fontSize: 13,
     fontWeight: '700',
   },
   searchRow: {

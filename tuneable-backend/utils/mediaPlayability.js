@@ -7,6 +7,8 @@
  * Podcast/spoken content may use other direct audio source keys.
  */
 
+const { isWrittenMedia } = require('./mediaKinds');
+
 const DIRECT_AUDIO_SOURCE_KEYS = ['upload', 'audio_direct', 'audio', 'enclosure'];
 
 function normalizeSources(sources) {
@@ -41,7 +43,7 @@ function normalizeSources(sources) {
 }
 
 function isPodcastLike(media) {
-  const forms = media?.contentForm;
+  const forms = media?.contentForm ?? media?.contentForm;
   if (!forms) return false;
   const list = Array.isArray(forms) ? forms : [forms];
   return list.some((f) => ['podcastepisode', 'podcast', 'episode', 'audiobook'].includes(f));
@@ -70,6 +72,7 @@ function isYouTubeOnly(media) {
 
 function isMediaPlayable(media) {
   if (!media) return false;
+  if (isWrittenMedia(media)) return false;
 
   const sources = normalizeSources(media.sources);
 
@@ -94,6 +97,7 @@ function getSupportMode(media) {
  */
 function getPlayabilityBlockReason(media) {
   if (!media || isMediaPlayable(media) || isPodcastLike(media)) return null;
+  if (isWrittenMedia(media)) return 'audio';
 
   if (media.rightsStatus === 'disputed') return 'disputed';
   if (media.rightsStatus === 'pending') return 'rights';
@@ -119,9 +123,10 @@ function enrichMediaWithPlayability(media, options = {}) {
   const originalSources = normalizeSources(media?.sources);
   const playable = isMediaPlayable({ ...media, sources: originalSources });
   const podcast = isPodcastLike(media);
+  const written = isWrittenMedia(media);
   const hasHostedAudio = typeof media?.hasHostedAudio === 'boolean'
     ? media.hasHostedAudio
-    : (!podcast && hasDirectAudioSource(originalSources));
+    : (!podcast && !written && hasDirectAudioSource(originalSources));
   const exposeDirectAudio = options.exposeDirectAudio === true || playable || podcast;
   const clientSources = exposeDirectAudio
     ? originalSources
@@ -131,7 +136,7 @@ function enrichMediaWithPlayability(media, options = {}) {
     isPlayable: playable,
     supportMode: getSupportMode(media),
     isYouTubeOnly: isYouTubeOnly({ ...media, sources: originalSources }),
-    awaitingUpload: !playable && !podcast && !hasHostedAudio,
+    awaitingUpload: !playable && !podcast && !written && !hasHostedAudio,
     playabilityBlockReason: getPlayabilityBlockReason({ ...media, sources: originalSources }),
     hasHostedAudio,
     sources: clientSources,
@@ -157,6 +162,7 @@ module.exports = {
   DIRECT_AUDIO_SOURCE_KEYS,
   normalizeSources,
   isPodcastLike,
+  isWrittenMedia,
   hasDirectAudioSource,
   stripDirectAudioSources,
   isYouTubeOnly,

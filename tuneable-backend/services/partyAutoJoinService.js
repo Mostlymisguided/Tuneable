@@ -245,14 +245,24 @@ async function autoJoinTagParties(user, media) {
     
     // Podcast-related content forms to exclude
     const podcastForms = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+    const writtenForms = ['book', 'article'];
     const isPodcast = media.contentForm && (
         Array.isArray(media.contentForm)
             ? media.contentForm.some(form => podcastForms.includes(form))
             : podcastForms.includes(media.contentForm)
     );
+    const isWritten = media.contentType && (
+        Array.isArray(media.contentType)
+            ? media.contentType.includes('written')
+            : media.contentType === 'written'
+    ) || (media.contentForm && (
+        Array.isArray(media.contentForm)
+            ? media.contentForm.some(form => writtenForms.includes(form))
+            : writtenForms.includes(media.contentForm)
+    ));
     
-    // Skip if not music or if it's a podcast
-    if (!isMusic || isPodcast) {
+    // Skip if not music or if it's a podcast / written work
+    if (!isMusic || isPodcast || isWritten) {
         return [];
     }
 

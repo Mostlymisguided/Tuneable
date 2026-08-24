@@ -15,6 +15,7 @@ const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const WRITTEN_FORMS = ['book', 'article'];
 const ADDED_BY_FIELDS = 'username profilePic uuid';
 const PODCAST_SERIES_FIELDS = 'title coverArt genres tags';
 const SKIP_PLACE_FEATURE_TYPES = new Set(['continent', 'earth', 'world']);
@@ -153,6 +154,9 @@ function parseContentScope(raw) {
   const normalized = String(value || 'music').trim().toLowerCase();
   if (normalized === 'podcast' || normalized === 'spoken' || normalized === 'podcastepisode') {
     return 'podcast';
+  }
+  if (normalized === 'written' || normalized === 'book' || normalized === 'article') {
+    return 'written';
   }
   return 'music';
 }
@@ -531,7 +535,7 @@ async function findMusicMediaForTag({
     return Media.find({
       status: 'active',
       contentType: 'music',
-      contentForm: { $nin: PODCAST_FORMS },
+      contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
       releaseYear,
     })
       .sort({ globalMediaAggregate: -1, createdAt: -1 })
@@ -544,7 +548,7 @@ async function findMusicMediaForTag({
     return Media.find({
       status: 'active',
       contentType: 'music',
-      contentForm: { $nin: PODCAST_FORMS },
+      contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
       ...mediaBpmQuery(bpm),
     })
       .sort({ globalMediaAggregate: -1, createdAt: -1 })
@@ -557,7 +561,7 @@ async function findMusicMediaForTag({
   const baseQuery = {
     status: 'active',
     contentType: 'music',
-    contentForm: { $nin: PODCAST_FORMS },
+      contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
     tags: { $exists: true, $ne: [] },
   };
 
@@ -580,6 +584,35 @@ async function findMusicMediaForTag({
   }
 
   return pool.filter((item) => itemMatchesTag(item, displayName));
+}
+
+async function findWrittenMediaForTag({ displayName, canonicalTag, selectFields }) {
+  const variants = collectTagVariants(displayName, canonicalTag);
+  const baseQuery = {
+    status: 'active',
+    contentType: { $in: ['written'] },
+    contentForm: { $in: WRITTEN_FORMS },
+  };
+
+  let pool = await Media.find({
+    ...baseQuery,
+    $or: catalogMatchOr(variants),
+  })
+    .sort({ globalMediaAggregate: -1, createdAt: -1 })
+    .select(selectFields)
+    .populate('addedBy', ADDED_BY_FIELDS)
+    .lean();
+
+  if (pool.length === 0) {
+    pool = await Media.find(baseQuery)
+      .sort({ globalMediaAggregate: -1, createdAt: -1 })
+      .limit(500)
+      .select(selectFields)
+      .populate('addedBy', ADDED_BY_FIELDS)
+      .lean();
+  }
+
+  return pool.filter((item) => itemMatchesTag(item, displayName, { includeCatalogFields: true }));
 }
 
 async function findPodcastMediaForTag({ displayName, canonicalTag, selectFields }) {
@@ -669,6 +702,8 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
 
   const matched = contentScope === 'podcast'
     ? await findPodcastMediaForTag({ displayName, canonicalTag, selectFields: MEDIA_FIELDS })
+    : contentScope === 'written'
+      ? await findWrittenMediaForTag({ displayName, canonicalTag, selectFields: MEDIA_FIELDS })
     : await findMusicMediaForTag({
         releaseYear,
         bpm,
@@ -680,7 +715,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   // Related chips stay all-time (stable header); ranked list re-ranks by period
   const relatedTags = computeRelatedTags(matched, displayName, {
     limit: 8,
-    includeCatalogFields: contentScope === 'podcast',
+    includeCatalogFields: contentScope === 'podcast' || contentScope === 'written',
   });
   const topOriginPlaces = computeTopOriginPlaces(matched, { limit: 3 });
   const topSupportPlaces = await computeTopSupportPlaces(
@@ -768,4 +803,5 @@ module.exports = {
   parseBpmFromSlug,
   mediaBpmQuery,
   PODCAST_FORMS,
+  WRITTEN_FORMS,
 };

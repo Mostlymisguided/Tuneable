@@ -1799,6 +1799,15 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             console.log(`✅ Created new media: "${media.title}" (${media._id})`);
         }
 
+        const { isWrittenMedia } = require('../utils/mediaKinds');
+        if (isWrittenMedia(media)) {
+            return res.status(400).json({
+                error: 'Books cannot be added to a party queue. Tip books from the book profile instead.',
+                mediaId: media._id,
+                mediaTitle: media.title
+            });
+        }
+
         // Check if media is globally vetoed (after finding/creating media)
         if (media.status === 'vetoed') {
             return res.status(403).json({ 

@@ -26,6 +26,7 @@ type MediaLike = PlayabilityFields & {
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
   contentForm?: string | string[];
+  contentType?: string | string[];
 };
 
 export function normalizeSources(
@@ -56,6 +57,16 @@ export function normalizeSources(
   return {};
 }
 
+export function isWrittenMedia(media: MediaLike | null | undefined): boolean {
+  const types = media?.contentType;
+  const typeList = Array.isArray(types) ? types : types ? [types] : [];
+  if (typeList.includes('written')) return true;
+  const forms = media?.contentForm;
+  if (!forms) return false;
+  const list = Array.isArray(forms) ? forms : [forms];
+  return list.some((f) => ['book', 'article'].includes(f));
+}
+
 export function isPodcastLike(media: MediaLike | null | undefined): boolean {
   const forms = media?.contentForm;
   if (!forms) return false;
@@ -84,6 +95,7 @@ export function isYouTubeOnly(media: MediaLike | null | undefined): boolean {
 
 export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
   if (!media) return false;
+  if (isWrittenMedia(media)) return false;
 
   const sources = normalizeSources(media.sources);
 
@@ -112,6 +124,7 @@ export function getPlayabilityBlockReason(
   media: MediaLike | null | undefined
 ): PlayabilityBlockReason {
   if (!media || isMediaPlayable(media) || isPodcastLike(media)) return null;
+  if (isWrittenMedia(media)) return 'audio';
 
   if (media.rightsStatus === 'disputed') return 'disputed';
   if (media.rightsStatus === 'pending') return 'rights';
@@ -134,9 +147,10 @@ export function enrichMediaWithPlayability<T extends MediaLike>(media: T): T & P
   const originalSources = normalizeSources(media.sources);
   const playable = isMediaPlayable({ ...media, sources: originalSources });
   const podcast = isPodcastLike(media);
+  const written = isWrittenMedia(media);
   const hasHostedAudio = typeof media.hasHostedAudio === 'boolean'
     ? media.hasHostedAudio
-    : (!podcast && hasDirectAudioSource(originalSources));
+    : (!podcast && !written && hasDirectAudioSource(originalSources));
   const clientSources = playable || podcast
     ? originalSources
     : stripDirectAudioSources(originalSources);
@@ -150,7 +164,7 @@ export function enrichMediaWithPlayability<T extends MediaLike>(media: T): T & P
     isPlayable: playable,
     supportMode: getSupportMode(media),
     isYouTubeOnly: isYouTubeOnly({ ...media, sources: originalSources }),
-    awaitingUpload: !playable && !podcast && !hasHostedAudio,
+    awaitingUpload: !playable && !podcast && !written && !hasHostedAudio,
     playabilityBlockReason,
     hasHostedAudio,
   };
