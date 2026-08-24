@@ -146,6 +146,7 @@ export default function PodcastShowScreen() {
   const loadEpisodes = useCallback(async () => {
     if (!id) return;
     const seq = ++episodeRequestSeq.current;
+    setHasMore(false);
     setLoadingEpisodes(true);
     try {
       const params = {
@@ -192,6 +193,7 @@ export default function PodcastShowScreen() {
 
   const loadMoreEpisodes = useCallback(async () => {
     if (!id || loadingMore || loadingEpisodes || !hasMore) return;
+    const seq = episodeRequestSeq.current;
     setLoadingMore(true);
     try {
       const data = await podcastsAPI.getSeries(id, {
@@ -201,6 +203,7 @@ export default function PodcastShowScreen() {
         sortBy,
         q: searchQuery || undefined,
       });
+      if (seq !== episodeRequestSeq.current) return;
       const incoming = data.episodes ?? [];
       setEpisodes((prev) => {
         const seen = new Set(prev.map((ep) => episodeId(ep)));
@@ -209,7 +212,7 @@ export default function PodcastShowScreen() {
       setHasMore(Boolean(data.hasMore));
       if (data.stats) setStats(data.stats);
     } catch {
-      setHasMore(false);
+      if (seq === episodeRequestSeq.current) setHasMore(false);
     } finally {
       setLoadingMore(false);
     }

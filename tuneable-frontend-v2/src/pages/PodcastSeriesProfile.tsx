@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,6 +122,7 @@ const PodcastSeriesProfile: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const episodesPerPage = 20;
   const appliedSearch = debouncedSearch.trim().length >= 2 ? debouncedSearch.trim() : '';
+  const episodeFetchSeq = useRef(0);
   
   // Tipping state
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -246,6 +247,7 @@ const PodcastSeriesProfile: React.FC = () => {
 
   const fetchEpisodes = async (refresh = false) => {
     if (!seriesId) return;
+    const seq = ++episodeFetchSeq.current;
     
     setIsLoadingEpisodes(true);
     setLoadingMessage('Loading episodes...');
@@ -284,6 +286,7 @@ const PodcastSeriesProfile: React.FC = () => {
       setLoadingProgress(80);
       
       const data = await response.json();
+      if (seq !== episodeFetchSeq.current) return;
       
       // If episodes exist, show them immediately
       if (data.episodes && data.episodes.length > 0) {
@@ -380,6 +383,7 @@ const PodcastSeriesProfile: React.FC = () => {
           
           if (importResponse.ok) {
             const importData = await importResponse.json();
+            if (seq !== episodeFetchSeq.current) return;
             setEpisodes(importData.episodes || []);
             if (importData.stats) {
               setStats(importData.stats);
@@ -398,16 +402,19 @@ const PodcastSeriesProfile: React.FC = () => {
         }
       }
     } catch (error: any) {
+      if (seq !== episodeFetchSeq.current) return;
       console.error('Error fetching episodes:', error);
       toast.error('Failed to load episodes');
       setLoadingMessage('Error loading episodes');
       setLoadingStage('error');
     } finally {
-      setIsLoadingEpisodes(false);
-      setLoadingProgress(0);
-      setEpisodeCount(null);
-      setLoadingSource(null);
-      setLoadingStage('');
+      if (seq === episodeFetchSeq.current) {
+        setIsLoadingEpisodes(false);
+        setLoadingProgress(0);
+        setEpisodeCount(null);
+        setLoadingSource(null);
+        setLoadingStage('');
+      }
     }
   };
 
