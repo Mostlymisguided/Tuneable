@@ -35,6 +35,10 @@ export interface ChartMediaItem {
   genres?: string[];
   category?: string;
   status?: string;
+  createdAt?: string | null;
+  uploadedAt?: string | null;
+  queuedAt?: string | Date | null;
+  lastBidAt?: string | null;
   sources?: MediaSources;
   audioUrl?: string;
   enclosure?: { url?: string; type?: string };

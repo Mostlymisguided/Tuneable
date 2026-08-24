@@ -3828,6 +3828,8 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
         const locationPlaceId = typeof req.query.locationPlaceId === 'string'
             ? req.query.locationPlaceId.trim()
             : '';
+        const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+        const chartSort = normalizeChartSort(req.query.sortBy);
         const validTimePeriods = ['all-time', 'this-year', 'this-month', 'this-week', 'today'];
 
         if (!validTimePeriods.includes(timePeriod)) {
@@ -3856,11 +3858,13 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 timePeriod,
                 locationPlaceId: locationPlaceId || null,
                 userId: req.user?._id,
+                sortBy: chartSort,
             });
             console.log(`🌍 Global Party time sorting: ${chart.meta.count} media in ${chart.meta.processingTimeMs}ms${locationPlaceId ? ` (location: ${locationPlaceId})` : ''}`);
 
             return res.json({
                 timePeriod,
+                sortBy: chartSort,
                 media: chart.media,
                 count: chart.media.length,
                 periodStartDate: getPeriodStartDate(timePeriod),
@@ -3874,7 +3878,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid featuring creatorDisplay rightsStatus rightsCleared contentType contentForm',
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid featuring creatorDisplay rightsStatus rightsCleared contentType contentForm createdAt uploadedAt',
                     populate: [
                         {
                             path: 'bids',
@@ -3995,6 +3999,8 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                         releaseYear: entry.mediaId.releaseYear ?? null,
                         primaryLocation: entry.mediaId.primaryLocation || null,
                         addedBy: entry.mediaId.addedBy || entry.addedBy,
+                        createdAt: entry.mediaId.createdAt || null,
+                        uploadedAt: entry.mediaId.uploadedAt || null,
                         status: entry.status || 'active',
                         queuedAt: entry.queuedAt,
                         playedAt: entry.playedAt,
@@ -4009,13 +4015,18 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                     };
                 })
                 .filter(media => media !== null)
-                .filter(media => media.status !== 'vetoed')
-                .sort((a, b) => (b.timePeriodBidValue || 0) - (a.timePeriodBidValue || 0));
+                .filter(media => media.status !== 'vetoed');
+
+        const sortedMedia = sortChartItems(processedMedia, chartSort, {
+            getDate: (item) => item.queuedAt || item.createdAt || item.uploadedAt,
+            getTip: (item) => item.timePeriodBidValue || 0,
+        });
 
         res.json({
             timePeriod: timePeriod,
-            media: processedMedia,
-            count: processedMedia.length,
+            sortBy: chartSort,
+            media: sortedMedia,
+            count: sortedMedia.length,
             periodStartDate: startDate,
             periodEndDate: now,
             locationFilter: locationPlaceId ? { placeId: locationPlaceId } : null,

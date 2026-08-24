@@ -14,6 +14,12 @@ import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import type { LibraryItem } from './TuneLibraryTable';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import { penceToPounds } from '../utils/currency';
+import { sortChartItems, type ChartSortKey } from '../utils/chartSort';
+import {
+  ChartSortPanel,
+  ChartSortTrigger,
+  CHART_LIBRARY_SORT_HINT,
+} from './ChartSortControl';
 
 const MEDIA_PAGE_SIZE = 10;
 
@@ -135,10 +141,12 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
 }) => {
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<TimePeriod>('all-time');
+  const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
@@ -155,7 +163,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
 
   useEffect(() => {
     setVisibleCount(MEDIA_PAGE_SIZE);
-  }, [selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, items]);
+  }, [selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, items, chartSort]);
 
   const topTags = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -196,11 +204,11 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
       });
     }
 
-    // Default chart order: this user's tip stake on each tune
-    return [...list].sort(
-      (a, b) => (b.globalUserMediaAggregate || 0) - (a.globalUserMediaAggregate || 0)
-    );
-  }, [items, selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery]);
+    return sortChartItems(list, chartSort, {
+      getDate: (item) => item.lastBidAt,
+      getTip: (item) => item.globalUserMediaAggregate || 0,
+    });
+  }, [items, selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, chartSort]);
 
   const visibleItems = filteredItems.slice(0, visibleCount);
 
@@ -265,6 +273,11 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
               ({formatTimePeriodLabel(selectedTimePeriod)})
             </span>
           </button>
+          <ChartSortTrigger
+            sort={chartSort}
+            open={showSortPanel}
+            onToggle={() => setShowSortPanel((open) => !open)}
+          />
           <button
             type="button"
             onClick={() => setShowBpmFilter((open) => !open)}
@@ -398,7 +411,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-white flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-purple-400" />
-                Sort by Time
+                Time Period
               </h3>
               <button
                 type="button"
@@ -425,6 +438,15 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
               ))}
             </div>
           </div>
+        )}
+
+        {showSortPanel && (
+          <ChartSortPanel
+            sort={chartSort}
+            onChange={setChartSort}
+            onHide={() => setShowSortPanel(false)}
+            hint={CHART_LIBRARY_SORT_HINT}
+          />
         )}
 
         {showBpmFilter && (

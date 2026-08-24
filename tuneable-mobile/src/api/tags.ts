@@ -30,7 +30,7 @@ export type TagProfileResponse = {
 export const tagAPI = {
   getProfile: async (
     slug: string,
-    params?: { page?: number; limit?: number; timePeriod?: string; type?: TagProfileScope }
+    params?: { page?: number; limit?: number; timePeriod?: string; type?: TagProfileScope; sortBy?: string }
   ): Promise<TagProfileResponse> => {
     const response = await api.get<TagProfileResponse>(
       `/tags/${encodeURIComponent(slug)}/profile`,

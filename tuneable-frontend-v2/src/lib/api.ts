@@ -507,10 +507,13 @@ export const partyAPI = {
     return response.data;
   },
   
-  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string }) => {
+  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; sortBy?: string }) => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
+    }
+    if (options?.sortBy) {
+      params.sortBy = options.sortBy;
     }
     const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`, { params });
     return response.data;
@@ -1109,7 +1112,7 @@ export const tagAPI = {
   },
   getProfile: async (
     slug: string,
-    params?: { page?: number; limit?: number; timePeriod?: string; type?: 'music' | 'podcast' }
+    params?: { page?: number; limit?: number; timePeriod?: string; type?: 'music' | 'podcast'; sortBy?: string }
   ) => {
     const response = await api.get(`/tags/${encodeURIComponent(slug)}/profile`, { params });
     return response.data as {
@@ -1197,7 +1200,7 @@ export const locationAPI = {
     return response.data as { location: Record<string, unknown> };
   },
 
-  getProfile: async (placeId: string, params?: { page?: number; limit?: number }) => {
+  getProfile: async (placeId: string, params?: { page?: number; limit?: number; timePeriod?: string; sortBy?: string }) => {
     const response = await api.get(`/locations/${encodeURIComponent(placeId)}/profile`, { params });
     return response.data;
   },

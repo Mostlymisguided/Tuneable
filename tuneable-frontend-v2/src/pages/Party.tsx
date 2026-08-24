@@ -22,6 +22,12 @@ import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, 
 import MediaChampions from '../components/MediaChampions';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
+import {
+  ChartSortPanel,
+  ChartSortTrigger,
+  CHART_ADDED_SORT_HINT,
+} from '../components/ChartSortControl';
+import { sortChartItems, type ChartSortKey } from '../utils/chartSort';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
@@ -265,12 +271,16 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Sorting state: default from ?period= query, else "today"
   const [selectedTimePeriod, setSelectedTimePeriod] = useState(initialPeriod);
+  const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
-  const useSortedQueue = selectedTimePeriod !== 'all-time' || !!selectedLocation?.placeId;
+  const useSortedQueue =
+    selectedTimePeriod !== 'all-time' ||
+    !!selectedLocation?.placeId ||
+    (isGlobalParty && chartSort !== 'most-tipped');
   
   // Search state (initial tag terms from URL for global party: ?tag= or ?tags=)
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
@@ -317,6 +327,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [showSearchPanel, setShowSearchPanel] = useState(false);
@@ -329,7 +340,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Reset visible count when party, time period, or BPM filter changes
   useEffect(() => {
     setVisibleMediaCount(MEDIA_PAGE_SIZE);
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmFilterRange]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmFilterRange, chartSort]);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
@@ -503,7 +514,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     } else {
       setSortedMedia([]);
     }
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
@@ -695,7 +706,10 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       const response = await partyAPI.getMediaSortedByTime(
         partyId,
         timePeriod,
-        locationPlaceId ? { locationPlaceId } : undefined
+        {
+          ...(locationPlaceId ? { locationPlaceId } : {}),
+          sortBy: chartSort,
+        }
       );
       setSortedMedia(response.media || []);
       if (Array.isArray((response as any).topLocations)) {
@@ -1589,8 +1603,22 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       media = media.filter((item: any) => mediaMatchesBpmFilter(item, bpmFilterRange));
     }
 
-    return media;
-  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange]);
+    return sortChartItems(media, chartSort, {
+      getDate: (item: any) => {
+        const mediaItem = item.mediaId || item;
+        return isGlobalParty
+          ? mediaItem.createdAt || item.createdAt || item.queuedAt
+          : item.queuedAt || mediaItem.createdAt || item.createdAt;
+      },
+      getTip: (item: any) => {
+        const mediaItem = item.mediaId || item;
+        if (typeof item.timePeriodBidValue === 'number') return item.timePeriodBidValue;
+        if (typeof item.partyMediaAggregate === 'number') return item.partyMediaAggregate;
+        if (typeof item.totalBidValue === 'number') return item.totalBidValue;
+        return mediaItem.globalMediaAggregate || 0;
+      },
+    });
+  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty]);
 
   const getDisplayMedia = () => displayMedia;
 
@@ -2621,6 +2649,11 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           ({formatTimePeriodLabel(selectedTimePeriod)})
                         </span>
                       </button>
+                      <ChartSortTrigger
+                        sort={chartSort}
+                        open={showSortPanel}
+                        onToggle={() => setShowSortPanel((open) => !open)}
+                      />
                       <button
                         type="button"
                         onClick={() => setShowBpmFilter((open) => !open)}
@@ -2769,7 +2802,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-white flex items-center">
                             <Clock className="h-4 w-4 mr-2 text-purple-400" />
-                            Sort by Time
+                            Time Period
                           </h3>
                           <button
                             type="button"
@@ -2795,6 +2828,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           ))}
                         </div>
                       </div>
+                    )}
+
+                    {showSortPanel && (
+                      <ChartSortPanel
+                        sort={chartSort}
+                        onChange={setChartSort}
+                        onHide={() => setShowSortPanel(false)}
+                        hint={
+                          isGlobalParty
+                            ? CHART_ADDED_SORT_HINT
+                            : 'Newest and oldest are when the tune was added to this party.'
+                        }
+                      />
                     )}
 
                     {showBpmFilter && (

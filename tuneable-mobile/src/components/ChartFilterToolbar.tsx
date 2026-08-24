@@ -10,6 +10,11 @@ import {
   getSelectedTagFilters,
 } from '@/src/lib/chartFilters';
 import { TIME_PERIODS, type TimePeriodKey } from '@/src/types/media';
+import {
+  CHART_SORT_OPTIONS,
+  chartSortLabel,
+  type ChartSortKey,
+} from '@/src/lib/chartSort';
 
 type PeriodOption = { key: string; label: string };
 
@@ -25,6 +30,11 @@ type Props = {
   onBpmFilterChange?: (range: BpmFilterRange) => void;
   showBpm?: boolean;
   showTime?: boolean;
+  sort?: ChartSortKey;
+  onSortChange?: (sort: ChartSortKey) => void;
+  showSortPanel?: boolean;
+  onToggleSortPanel?: () => void;
+  sortHint?: string;
   topTags: TopTagEntry[];
   showTagPanel: boolean;
   showTimePanel: boolean;
@@ -52,6 +62,11 @@ export function ChartFilterToolbar({
   onBpmFilterChange,
   showBpm = true,
   showTime = true,
+  sort = 'most-tipped',
+  onSortChange,
+  showSortPanel = false,
+  onToggleSortPanel,
+  sortHint,
   topTags,
   showTagPanel,
   showTimePanel,
@@ -101,13 +116,25 @@ export function ChartFilterToolbar({
           onPress={onToggleTagPanel}
         />
         {showTime ? (
-          <FilterTrigger
-            icon="time-outline"
-            label="Time"
-            active={showTimePanel}
-            detail={periodLabel}
-            onPress={onToggleTimePanel}
-          />
+          <>
+            <FilterTrigger
+              icon="time-outline"
+              label="Time"
+              active={showTimePanel}
+              detail={periodLabel}
+              onPress={onToggleTimePanel}
+            />
+            {onSortChange && onToggleSortPanel ? (
+              <FilterTrigger
+                icon="swap-vertical-outline"
+                label="Sort"
+                compact
+                active={showSortPanel || sort !== 'most-tipped'}
+                onPress={onToggleSortPanel}
+                accessibilityLabel={`Sort by ${chartSortLabel(sort)}`}
+              />
+            ) : null}
+          </>
         ) : null}
         {showBpm ? (
           <FilterTrigger
@@ -191,6 +218,28 @@ export function ChartFilterToolbar({
         </FilterPanel>
       ) : null}
 
+      {showTime && showSortPanel && onSortChange && onToggleSortPanel ? (
+        <FilterPanel title="Sort" onHide={onToggleSortPanel}>
+          <View style={styles.chips}>
+            {CHART_SORT_OPTIONS.map((option) => {
+              const active = sort === option.key;
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => onSortChange(option.key)}
+                  style={[styles.chip, active && styles.chipActive]}>
+                  <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {sortHint ? <Text style={styles.searchHint}>{sortHint}</Text> : null}
+        </FilterPanel>
+      ) : null}
+
       {showBpm && showBpmPanel && onBpmFilterChange && onToggleBpmPanel ? (
         <FilterPanel title="Filter by BPM" onHide={onToggleBpmPanel}>
           <View style={styles.chips}>
@@ -237,24 +286,38 @@ function FilterTrigger({
   detail,
   active,
   onPress,
+  compact = false,
+  accessibilityLabel,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   detail?: string;
   active: boolean;
   onPress: () => void;
+  compact?: boolean;
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.trigger, active && styles.triggerActive]}>
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || label}
+      style={[
+        styles.trigger,
+        compact && styles.triggerCompact,
+        active && styles.triggerActive,
+      ]}>
       <Ionicons name={icon} size={14} color={colors.accentLight} />
-      <Text style={styles.triggerLabel}>{label}</Text>
-      {detail ? (
-        <Text style={styles.triggerDetail} numberOfLines={1}>
-          ({detail})
-        </Text>
-      ) : null}
+      {compact ? null : (
+        <>
+          <Text style={styles.triggerLabel}>{label}</Text>
+          {detail ? (
+            <Text style={styles.triggerDetail} numberOfLines={1}>
+              ({detail})
+            </Text>
+          ) : null}
+        </>
+      )}
     </Pressable>
   );
 }
@@ -300,6 +363,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.08)',
     maxWidth: '48%',
+  },
+  triggerCompact: {
+    maxWidth: 40,
+    paddingHorizontal: 8,
   },
   triggerActive: {
     backgroundColor: 'rgba(55, 65, 81, 0.95)',

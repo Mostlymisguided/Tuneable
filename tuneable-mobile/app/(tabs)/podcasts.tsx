@@ -28,6 +28,12 @@ import {
   isEpisodePlayable,
   seriesTitle,
 } from '@/src/lib/podcast';
+import {
+  CHART_PODCAST_SORT_HINT,
+  sortChartItems,
+  toPodcastChartSort,
+  type ChartSortKey,
+} from '@/src/lib/chartSort';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
 import type { ResolvedLocation } from '@/src/types/user';
@@ -42,6 +48,7 @@ export default function PodcastsScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const [period, setPeriod] = useState<PodcastTimeRangeKey>('all');
+  const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
     null
@@ -50,6 +57,7 @@ export default function PodcastsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [visibleCount, setVisibleCount] = useState(PODCAST_CHART_PAGE_SIZE);
@@ -68,7 +76,7 @@ export default function PodcastsScreen() {
 
   useEffect(() => {
     setVisibleCount(PODCAST_CHART_PAGE_SIZE);
-  }, [period, locationPlaceId, selectedTagTerms, searchQuery]);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery, chartSort]);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -79,6 +87,7 @@ export default function PodcastsScreen() {
         const res = await podcastsAPI.getChart({
           limit: 50,
           timeRange: period,
+          sortBy: toPodcastChartSort(chartSort),
           locationPlaceId: locationPlaceId ?? undefined,
         });
         setEpisodes(res.episodes ?? []);
@@ -91,7 +100,7 @@ export default function PodcastsScreen() {
         setRefreshing(false);
       }
     },
-    [period, locationPlaceId]
+    [period, locationPlaceId, chartSort]
   );
 
   useFocusEffect(
@@ -111,8 +120,12 @@ export default function PodcastsScreen() {
   );
 
   const filteredEpisodes = useMemo(
-    () => filterPodcastEpisodes(episodes, filterState),
-    [episodes, filterState]
+    () =>
+      sortChartItems(filterPodcastEpisodes(episodes, filterState), chartSort, {
+        getDate: (item) => item.releaseDate || item.publishedAt,
+        getTip: (item) => item.globalMediaAggregate ?? 0,
+      }),
+    [episodes, filterState, chartSort]
   );
 
   const visibleEpisodes = useMemo(
@@ -226,6 +239,11 @@ export default function PodcastsScreen() {
               topTags={topTags}
               showTagPanel={showTagPanel}
               showTimePanel={showTimePanel}
+              sort={chartSort}
+              onSortChange={setChartSort}
+              showSortPanel={showSortPanel}
+              onToggleSortPanel={() => setShowSortPanel((open) => !open)}
+              sortHint={CHART_PODCAST_SORT_HINT}
               showSearchPanel={showSearchPanel}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}
               onToggleTimePanel={() => setShowTimePanel((open) => !open)}

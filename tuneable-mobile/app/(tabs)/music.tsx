@@ -25,6 +25,11 @@ import {
   filterChartMedia,
   hasActiveChartFilters,
 } from '@/src/lib/chartFilters';
+import {
+  CHART_ADDED_SORT_HINT,
+  sortChartItems,
+  type ChartSortKey,
+} from '@/src/lib/chartSort';
 import { computeLocationQuickPicks } from '@/src/lib/location';
 import {
   formatArtist,
@@ -46,6 +51,7 @@ export default function MusicScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
+  const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [locationPlaceId, setLocationPlaceId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(
     null
@@ -55,6 +61,7 @@ export default function MusicScreen() {
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmPanel, setShowBpmPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
@@ -74,7 +81,7 @@ export default function MusicScreen() {
 
   useEffect(() => {
     setVisibleCount(CHART_PAGE_SIZE);
-  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange]);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange, chartSort]);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -83,6 +90,7 @@ export default function MusicScreen() {
     try {
       const res = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, period, {
         locationPlaceId: locationPlaceId ?? undefined,
+        sortBy: chartSort,
       });
       setMedia(res.media ?? []);
     } catch (err) {
@@ -93,7 +101,7 @@ export default function MusicScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, locationPlaceId]);
+  }, [period, locationPlaceId, chartSort]);
 
   useFocusEffect(
     useCallback(() => {
@@ -112,8 +120,11 @@ export default function MusicScreen() {
   );
 
   const filteredMedia = useMemo(
-    () => filterChartMedia(media, filterState),
-    [media, filterState]
+    () =>
+      sortChartItems(filterChartMedia(media, filterState), chartSort, {
+        getTip: (item) => getChartTipPence(item, period),
+      }),
+    [media, filterState, chartSort, period]
   );
 
   const visibleMedia = useMemo(
@@ -157,18 +168,14 @@ export default function MusicScreen() {
       updateBalance(res.updatedBalance);
     }
     setMedia((prev) =>
-      prev
-        .map((m) => {
-          if (mediaId(m) !== id) return m;
-          return {
-            ...m,
-            partyMediaAggregate: (m.partyMediaAggregate ?? 0) + tipPence,
-            timePeriodBidValue: (m.timePeriodBidValue ?? 0) + tipPence,
-          };
-        })
-        .sort(
-          (a, b) => getChartTipPence(b, period) - getChartTipPence(a, period)
-        )
+      prev.map((m) => {
+        if (mediaId(m) !== id) return m;
+        return {
+          ...m,
+          partyMediaAggregate: (m.partyMediaAggregate ?? 0) + tipPence,
+          timePeriodBidValue: (m.timePeriodBidValue ?? 0) + tipPence,
+        };
+      })
     );
     return res;
   };
@@ -223,6 +230,11 @@ export default function MusicScreen() {
               topTags={topTags}
               showTagPanel={showTagPanel}
               showTimePanel={showTimePanel}
+              sort={chartSort}
+              onSortChange={setChartSort}
+              showSortPanel={showSortPanel}
+              onToggleSortPanel={() => setShowSortPanel((open) => !open)}
+              sortHint={CHART_ADDED_SORT_HINT}
               showBpmPanel={showBpmPanel}
               showSearchPanel={showSearchPanel}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}

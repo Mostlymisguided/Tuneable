@@ -74,7 +74,7 @@ export const locationAPI = {
 
   getProfile: async (
     placeId: string,
-    params?: { page?: number; limit?: number; timePeriod?: string }
+    params?: { page?: number; limit?: number; timePeriod?: string; sortBy?: string }
   ): Promise<LocationProfileResponse> => {
     const response = await api.get<LocationProfileResponse>(
       `/locations/${encodeURIComponent(placeId)}/profile`,

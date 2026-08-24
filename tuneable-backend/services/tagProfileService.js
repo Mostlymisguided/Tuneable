@@ -12,6 +12,7 @@ const { generateSlug, getExistingTagParty } = require('./tagPartyService');
 const { loadBidsByMediaId } = require('./relatedMediaService');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const ADDED_BY_FIELDS = 'username profilePic uuid';
@@ -647,7 +648,7 @@ async function findPodcastMediaForTag({ displayName, canonicalTag, selectFields 
 /**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
-async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type } = {}) {
+async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type, sortBy = 'most-tipped' } = {}) {
   const resolved = await resolveTagFromSlug(rawSlug);
   if (!resolved) {
     const err = new Error('Tag not found');
@@ -664,7 +665,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const isVirtualTag = typeof releaseYear === 'number' || typeof bpm === 'number';
   const contentScope = isVirtualTag ? 'music' : parseContentScope(type);
 
-  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags genres category uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared podcastTitle podcastSeries description';
+  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags genres category uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared podcastTitle podcastSeries description createdAt uploadedAt';
 
   const matched = contentScope === 'podcast'
     ? await findPodcastMediaForTag({ displayName, canonicalTag, selectFields: MEDIA_FIELDS })
@@ -687,13 +688,22 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
     { limit: 3 }
   );
 
+  const chartSort = normalizeChartSort(sortBy);
   const ranked = startDate
     ? await rankMatchedMediaByPeriod(matched, startDate)
     : matched;
 
-  const total = ranked.length;
-  const pageSlice = ranked.slice(skip, skip + limitNum);
-  const tipTotal = ranked.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
+  const ordered = sortChartItems(ranked, chartSort, {
+    getDate: (item) =>
+      contentScope === 'podcast'
+        ? item.releaseDate || item.createdAt || item.uploadedAt
+        : item.createdAt || item.uploadedAt,
+    getTip: (item) => item.timePeriodBidValue ?? item.globalMediaAggregate ?? 0,
+  });
+
+  const total = ordered.length;
+  const pageSlice = ordered.slice(skip, skip + limitNum);
+  const tipTotal = ordered.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
   // Attach active bids (with tipper user info) for supporters display on the page slice only
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
@@ -722,6 +732,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
       kind: kind || (releaseYear != null ? 'year' : bpm != null ? 'bpm' : 'tag'),
     },
     timePeriod: period,
+    sortBy: chartSort,
     contentScope,
     stats: {
       mediaCount: total,

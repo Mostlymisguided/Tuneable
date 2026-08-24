@@ -28,11 +28,14 @@ export const partyAPI = {
   getMediaSortedByTime: async (
     partyId: string,
     timePeriod: string,
-    options?: { locationPlaceId?: string }
+    options?: { locationPlaceId?: string; sortBy?: string }
   ): Promise<SortedMediaResponse> => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
+    }
+    if (options?.sortBy) {
+      params.sortBy = options.sortBy;
     }
     const response = await api.get<SortedMediaResponse>(
       `/parties/${partyId}/media/sorted/${timePeriod}`,

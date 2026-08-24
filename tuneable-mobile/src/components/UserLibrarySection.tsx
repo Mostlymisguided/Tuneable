@@ -12,6 +12,11 @@ import {
   filterChartMedia,
   hasActiveChartFilters,
 } from '@/src/lib/chartFilters';
+import {
+  CHART_LIBRARY_SORT_HINT,
+  sortChartItems,
+  type ChartSortKey,
+} from '@/src/lib/chartSort';
 import { isUploadPlayable, mediaId } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
@@ -64,6 +69,7 @@ function toChartMediaItem(item: UserLibraryItem): ChartMediaItem {
     sources: item.sources ?? {},
     partyMediaAggregate: item.globalUserMediaAggregate ?? 0,
     globalMediaAggregate: item.globalMediaAggregate ?? 0,
+    lastBidAt: item.lastBidAt ?? null,
     contentForm: item.contentForm,
     bids: (item.bids ?? []).map((bid) => ({
       amount: bid.amount,
@@ -139,11 +145,15 @@ export function UserLibrarySection({
   compactHeader = false,
 }: Props) {
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
+  const [chartSort, setChartSort] = useState<ChartSortKey>(
+    sortBy === 'recent' ? 'newest' : 'most-tipped'
+  );
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmPanel, setShowBpmPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
@@ -162,19 +172,13 @@ export function UserLibrarySection({
 
   useEffect(() => {
     setVisibleCount(LIBRARY_PAGE_SIZE);
-  }, [period, selectedTagTerms, searchQuery, bpmFilterRange, items]);
+  }, [period, selectedTagTerms, searchQuery, bpmFilterRange, items, chartSort]);
 
   const periodFiltered = useMemo(() => {
-    const list = showTime
+    return showTime
       ? items.filter((item) => itemInPeriod(item, period))
       : [...items];
-    if (sortBy !== 'recent') return list;
-    return list.sort((a, b) => {
-      const aTime = a.lastBidAt ? new Date(a.lastBidAt).getTime() : 0;
-      const bTime = b.lastBidAt ? new Date(b.lastBidAt).getTime() : 0;
-      return bTime - aTime;
-    });
-  }, [items, period, showTime, sortBy]);
+  }, [items, period, showTime]);
 
   const chartItems = useMemo(
     () => periodFiltered.map(toChartMediaItem),
@@ -188,11 +192,16 @@ export function UserLibrarySection({
 
   const filtered = useMemo(() => {
     const list = filterChartMedia(chartItems, filterState);
-    if (sortBy === 'recent') return list;
-    return [...list].sort(
-      (a, b) => (b.partyMediaAggregate ?? 0) - (a.partyMediaAggregate ?? 0)
-    );
-  }, [chartItems, filterState, sortBy]);
+    const effectiveSort: ChartSortKey = showTime
+      ? chartSort
+      : sortBy === 'recent'
+        ? 'newest'
+        : 'most-tipped';
+    return sortChartItems(list, effectiveSort, {
+      getDate: (item) => item.lastBidAt,
+      getTip: (item) => item.partyMediaAggregate ?? 0,
+    });
+  }, [chartItems, filterState, chartSort, showTime, sortBy]);
 
   const visibleCap = previewLimit ?? Number.POSITIVE_INFINITY;
   const visible = useMemo(
@@ -318,6 +327,11 @@ export function UserLibrarySection({
           topTags={topTags}
           showTagPanel={showTagPanel}
           showTimePanel={showTimePanel}
+          sort={chartSort}
+          onSortChange={setChartSort}
+          showSortPanel={showSortPanel}
+          onToggleSortPanel={() => setShowSortPanel((open) => !open)}
+          sortHint={CHART_LIBRARY_SORT_HINT}
           showBpmPanel={showBpmPanel}
           showSearchPanel={showSearchPanel}
           onToggleTagPanel={() => setShowTagPanel((open) => !open)}

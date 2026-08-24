@@ -30,6 +30,12 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import {
+  ChartSortPanel,
+  ChartSortTrigger,
+  CHART_PODCAST_SORT_HINT,
+} from '../components/ChartSortControl';
+import { toPodcastChartSort, type ChartSortKey } from '../utils/chartSort';
+import {
   getCountryPickFromLocation,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
@@ -200,7 +206,7 @@ const Podcasts: React.FC = () => {
     genre: '',
     tag: '',
     timeRange: 'all',
-    sortBy: 'globalMediaAggregate'
+    sortBy: 'most-tipped' as ChartSortKey
   });
   const [availableFilters, setAvailableFilters] = useState({
     categories: [] as string[],
@@ -209,6 +215,7 @@ const Podcasts: React.FC = () => {
   });
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
@@ -410,7 +417,7 @@ const Podcasts: React.FC = () => {
       if (filters.genre) params.append('genre', filters.genre);
       if (filters.tag) params.append('tag', filters.tag);
       params.append('timeRange', filters.timeRange);
-      params.append('sortBy', filters.sortBy);
+      params.append('sortBy', toPodcastChartSort(filters.sortBy));
       params.append('limit', '50');
       if (selectedLocation?.placeId) {
         params.append('locationPlaceId', selectedLocation.placeId);
@@ -1241,8 +1248,6 @@ const Podcasts: React.FC = () => {
     setFilters((prev) => ({ ...prev, timeRange }));
   };
 
-  const hasActiveFilters = filters.category || filters.genre || filters.tag || filters.timeRange !== 'all';
-
   // Share functionality
   const shareUrl = window.location.href;
   const shareText = `Check out the top podcast episodes on Tuneable! Support your favourite Creators and discover new content.`;
@@ -1457,6 +1462,11 @@ const Podcasts: React.FC = () => {
                 ({formatTimeRangeLabel(filters.timeRange)})
               </span>
             </button>
+            <ChartSortTrigger
+              sort={filters.sortBy}
+              open={showSortPanel}
+              onToggle={() => setShowSortPanel((open) => !open)}
+            />
             <button
               type="button"
               onClick={() => setShowSearchPanel((open) => !open)}
@@ -1615,7 +1625,7 @@ const Podcasts: React.FC = () => {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-white flex items-center">
                   <Clock className="h-4 w-4 mr-2 text-purple-400" />
-                  Sort by Time
+                  Time Period
                 </h3>
                 <button type="button" onClick={() => setShowTimeFilter(false)} className="text-sm text-gray-400 hover:text-white">
                   Hide
@@ -1636,7 +1646,7 @@ const Podcasts: React.FC = () => {
                   </button>
                 ))}
               </div>
-              {(availableFilters.categories.length > 0 || availableFilters.genres.length > 0 || hasActiveFilters) && (
+              {(availableFilters.categories.length > 0 || availableFilters.genres.length > 0) && (
                 <div className="mt-4 pt-4 border-t border-gray-700/50 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {availableFilters.categories.length > 0 && (
                     <div>
@@ -1668,22 +1678,18 @@ const Podcasts: React.FC = () => {
                       </select>
                     </div>
                   )}
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1">Sort By</label>
-                    <select
-                      value={filters.sortBy}
-                      onChange={(e) => setFilters((f) => ({ ...f, sortBy: e.target.value }))}
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 text-sm focus:border-purple-500 focus:outline-none"
-                    >
-                      <option value="globalMediaAggregate">Total Tips</option>
-                      <option value="playCount">Play Count</option>
-                      <option value="popularity">Popularity</option>
-                      <option value="releaseDate">Release Date</option>
-                    </select>
-                  </div>
                 </div>
               )}
             </div>
+          )}
+
+          {showSortPanel && (
+            <ChartSortPanel
+              sort={filters.sortBy}
+              onChange={(next) => setFilters((f) => ({ ...f, sortBy: next }))}
+              onHide={() => setShowSortPanel(false)}
+              hint={CHART_PODCAST_SORT_HINT}
+            />
           )}
 
           {showSearchPanel && (

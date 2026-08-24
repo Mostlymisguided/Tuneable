@@ -1831,9 +1831,14 @@ router.get('/chart', async (req, res) => {
       genre, 
       tag,
       timeRange = 'all',
-      sortBy = 'globalMediaAggregate', // 'globalMediaAggregate', 'playCount', 'popularity', 'releaseDate'
+      sortBy = 'globalMediaAggregate', // most-tipped aliases + newest/oldest/releaseDate/playCount/popularity
       locationPlaceId: locationPlaceIdRaw,
     } = req.query;
+
+    const isDateSort = sortBy === 'newest' || sortBy === 'oldest' || sortBy === 'releaseDate';
+    const dateMongoSort = sortBy === 'oldest'
+      ? { releaseDate: 1, createdAt: 1 }
+      : { releaseDate: -1, createdAt: -1 };
     
     const limitNum = Math.min(parseInt(limit), 200);
     const locationPlaceId = typeof locationPlaceIdRaw === 'string' ? locationPlaceIdRaw.trim() : '';
@@ -1940,7 +1945,34 @@ router.get('/chart', async (req, res) => {
           const useStoredGlobalAggregate = !!locationPlaceId && !bidTimeStartDate;
           let rankedMediaIds;
 
-          if (useStoredGlobalAggregate) {
+          if (isDateSort) {
+            let candidateIds = filteredMediaIds;
+            if (!useStoredGlobalAggregate) {
+              const rankBidQuery = {
+                status: 'active',
+                mediaId: { $in: filteredMediaIds },
+              };
+              if (bidTimeStartDate) {
+                rankBidQuery.createdAt = { $gte: bidTimeStartDate };
+              }
+              const bids = await Bid.find(rankBidQuery).select('mediaId amount');
+              const tippedIds = new Set();
+              bids.forEach((bid) => {
+                if ((bid.amount || 0) > 0 && bid.mediaId) {
+                  tippedIds.add(bid.mediaId.toString());
+                }
+              });
+              candidateIds = locationPlaceId
+                ? filteredMediaIds
+                : filteredMediaIds.filter((id) => tippedIds.has(id));
+            }
+            const ranked = await Media.find({ _id: { $in: candidateIds } })
+              .select('_id')
+              .sort(dateMongoSort)
+              .limit(limitNum)
+              .lean();
+            rankedMediaIds = ranked.map((m) => m._id.toString());
+          } else if (useStoredGlobalAggregate) {
             const ranked = await Media.find({ _id: { $in: filteredMediaIds } })
               .select('_id globalMediaAggregate')
               .sort({ globalMediaAggregate: -1 })
@@ -2026,6 +2058,7 @@ router.get('/chart', async (req, res) => {
       let sortObj = {};
       switch (sortBy) {
         case 'globalMediaAggregate':
+        case 'most-tipped':
           sortObj = { globalMediaAggregate: -1, popularity: -1 };
           break;
         case 'playCount':
@@ -2035,7 +2068,11 @@ router.get('/chart', async (req, res) => {
           sortObj = { popularity: -1, globalMediaAggregate: -1 };
           break;
         case 'releaseDate':
-          sortObj = { releaseDate: -1 };
+        case 'newest':
+          sortObj = { releaseDate: -1, createdAt: -1 };
+          break;
+        case 'oldest':
+          sortObj = { releaseDate: 1, createdAt: 1 };
           break;
         default:
           sortObj = { globalMediaAggregate: -1, popularity: -1 };

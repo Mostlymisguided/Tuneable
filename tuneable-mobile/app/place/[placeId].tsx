@@ -21,6 +21,13 @@ import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import {
+  CHART_ADDED_SORT_HINT,
+  CHART_SORT_OPTIONS,
+  chartSortLabel,
+  sortChartItems,
+  type ChartSortKey,
+} from '@/src/lib/chartSort';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
@@ -54,7 +61,9 @@ export default function PlaceProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
+  const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [showTimePanel, setShowTimePanel] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -66,6 +75,7 @@ export default function PlaceProfileScreen() {
         const data = await locationAPI.getProfile(placeId, {
           limit: 50,
           timePeriod: period,
+          sortBy: chartSort,
         });
         const place = data.place;
         setPlaceName(place?.name || place?.display || 'Place');
@@ -94,13 +104,21 @@ export default function PlaceProfileScreen() {
         setRefreshing(false);
       }
     },
-    [placeId, period]
+    [placeId, period, chartSort]
   );
 
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load])
+  );
+
+  const sortedMedia = useMemo(
+    () =>
+      sortChartItems(media, chartSort, {
+        getDate: (item) => item.createdAt || item.queuedAt,
+      }),
+    [media, chartSort]
   );
 
   const mosaicCovers = useMemo(
@@ -113,11 +131,11 @@ export default function PlaceProfileScreen() {
   );
 
   const onPlayItem = (item: ChartMediaItem) => {
-    const playable = media.filter(isUploadPlayable);
+    const playable = sortedMedia.filter(isUploadPlayable);
     const index = playable.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) {
-      const fallback = media.findIndex((m) => mediaId(m) === mediaId(item));
-      void setQueueAndPlay(media, Math.max(0, fallback));
+      const fallback = sortedMedia.findIndex((m) => mediaId(m) === mediaId(item));
+      void setQueueAndPlay(sortedMedia, Math.max(0, fallback));
       return;
     }
     void setQueueAndPlay(playable, index);
@@ -211,18 +229,37 @@ export default function PlaceProfileScreen() {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Top Tunes</Text>
-        <Pressable
-          onPress={() => setShowTimePanel((open) => !open)}
-          style={[
-            styles.timeTrigger,
-            (showTimePanel || period !== 'all-time') && styles.timeTriggerActive,
-          ]}>
-          <Ionicons name="time-outline" size={14} color={colors.accentLight} />
-          <Text style={styles.timeTriggerLabel}>Time</Text>
-          <Text style={styles.timeTriggerDetail} numberOfLines={1}>
-            ({formatTimePeriodLabel(period)})
-          </Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => {
+              setShowSortPanel(false);
+              setShowTimePanel((open) => !open);
+            }}
+            style={[
+              styles.timeTrigger,
+              (showTimePanel || period !== 'all-time') && styles.timeTriggerActive,
+            ]}>
+            <Ionicons name="time-outline" size={14} color={colors.accentLight} />
+            <Text style={styles.timeTriggerLabel}>Time</Text>
+            <Text style={styles.timeTriggerDetail} numberOfLines={1}>
+              ({formatTimePeriodLabel(period)})
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setShowTimePanel(false);
+              setShowSortPanel((open) => !open);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort by ${chartSortLabel(chartSort)}`}
+            style={[
+              styles.timeTrigger,
+              styles.sortTrigger,
+              (showSortPanel || chartSort !== 'most-tipped') && styles.timeTriggerActive,
+            ]}>
+            <Ionicons name="swap-vertical-outline" size={14} color={colors.accentLight} />
+          </Pressable>
+        </View>
       </View>
 
       {showTimePanel ? (
@@ -251,6 +288,34 @@ export default function PlaceProfileScreen() {
           </View>
         </View>
       ) : null}
+
+      {showSortPanel ? (
+        <View style={styles.timePanel}>
+          <View style={styles.timePanelHeader}>
+            <Text style={styles.timePanelTitle}>Sort</Text>
+            <Pressable onPress={() => setShowSortPanel(false)} hitSlop={8}>
+              <Text style={styles.timePanelHide}>Hide</Text>
+            </Pressable>
+          </View>
+          <View style={styles.timeChips}>
+            {CHART_SORT_OPTIONS.map((option) => {
+              const active = chartSort === option.key;
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => setChartSort(option.key)}
+                  style={[styles.timeChip, active && styles.timeChipActive]}>
+                  <Text
+                    style={[styles.timeChipText, active && styles.timeChipTextActive]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.sortHint}>{CHART_ADDED_SORT_HINT}</Text>
+        </View>
+      ) : null}
     </View>
   );
 
@@ -273,7 +338,7 @@ export default function PlaceProfileScreen() {
         </View>
       ) : (
         <FlatList
-          data={media}
+          data={sortedMedia}
           keyExtractor={(item, index) => mediaId(item) || `place-media-${index}`}
           ListHeaderComponent={listHeader}
           contentContainerStyle={{
@@ -469,6 +534,21 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
     marginBottom: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sortTrigger: {
+    paddingHorizontal: 8,
+  },
+  sortHint: {
+    marginTop: 8,
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
   },
   sectionTitle: {
     color: colors.text,

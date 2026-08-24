@@ -11,6 +11,7 @@ const mapboxGeocoding = require('./mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const VALID_TIME_PERIODS = new Set([
@@ -22,7 +23,7 @@ const VALID_TIME_PERIODS = new Set([
 ]);
 
 const MEDIA_FIELDS =
-  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared';
+  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared createdAt uploadedAt';
 
 /**
  * Normalize a Mapbox placeId from a URL/path segment.
@@ -313,7 +314,7 @@ async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
 /**
  * Place profile: origin-scoped media ranked by tip aggregate.
  */
-async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time' } = {}) {
+async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped' } = {}) {
   const placeId = normalizePlaceId(rawPlaceId);
   if (!placeId) {
     const err = new Error('Place not found');
@@ -346,13 +347,19 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   const relatedPlaces = computeRelatedPlaces(matched, placeId, place.featureType, { limit: 8 });
   const relatedTags = computeRelatedTags(matched, { limit: 8 });
 
+  const chartSort = normalizeChartSort(sortBy);
   const ranked = startDate
     ? await rankMatchedMediaByPeriod(matched, startDate)
     : matched;
 
-  const total = ranked.length;
-  const pageSlice = ranked.slice(skip, skip + limitNum);
-  const tipTotal = ranked.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
+  const ordered = sortChartItems(ranked, chartSort, {
+    getDate: (item) => item.createdAt || item.uploadedAt,
+    getTip: (item) => item.timePeriodBidValue ?? item.globalMediaAggregate ?? 0,
+  });
+
+  const total = ordered.length;
+  const pageSlice = ordered.slice(skip, skip + limitNum);
+  const tipTotal = ordered.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
@@ -364,6 +371,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   return {
     place,
     timePeriod: period,
+    sortBy: chartSort,
     stats: {
       mediaCount: total,
       globalPlaceAggregate: tipTotal,

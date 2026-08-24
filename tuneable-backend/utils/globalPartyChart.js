@@ -11,6 +11,7 @@ const {
   enrichMediaWithPlayability,
   availablePlatformsFromSources,
 } = require('./mediaPlayability');
+const { normalizeChartSort, mediaChartMongoSort } = require('./chartSort');
 
 const GLOBAL_PARTY_TUNES_FILTER = {
   contentType: { $in: ['music'] },
@@ -79,6 +80,13 @@ function artistNameFromMedia(media) {
     return media.artist[0].name;
   }
   return media.artist || 'Unknown Artist';
+}
+
+function chartMediaDateFields(media) {
+  return {
+    createdAt: media.createdAt || null,
+    uploadedAt: media.uploadedAt || null,
+  };
 }
 
 function withPublicPlayability(media, sourcesObj) {
@@ -499,8 +507,10 @@ async function fetchAllTimeGlobalChart({
   supportersLimit = DEFAULT_SUPPORTERS_LIMIT,
   limit = null,
   offset = 0,
+  sortBy = 'most-tipped',
 } = {}) {
   const startTime = Date.now();
+  const chartSort = normalizeChartSort(sortBy);
 
   const query = Media.find({
     ...GLOBAL_PARTY_TUNES_FILTER,
@@ -508,7 +518,7 @@ async function fetchAllTimeGlobalChart({
     status: { $ne: 'vetoed' },
   })
     .select(MEDIA_CHART_SELECT)
-    .sort({ globalMediaAggregate: -1 })
+    .sort(mediaChartMongoSort(chartSort))
     .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
     .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
     .populate('addedBy', 'username profilePic uuid')
@@ -566,6 +576,7 @@ async function fetchAllTimeGlobalChart({
       globalMediaAggregateTop: media.globalMediaAggregateTop || 0,
       globalMediaAggregateTopUser: media.globalMediaAggregateTopUser,
       status: 'active',
+      ...chartMediaDateFields(media),
       queuedAt: media.createdAt || new Date(),
       playedAt: null,
       completedAt: null,
@@ -625,8 +636,10 @@ async function fetchPeriodGlobalChart({
   supportersLimit = DEFAULT_SUPPORTERS_LIMIT,
   limit = null,
   offset = 0,
+  sortBy = 'most-tipped',
 } = {}) {
   const startTime = Date.now();
+  const chartSort = normalizeChartSort(sortBy);
   const startDate = getPeriodStartDate(timePeriod);
   const placeId = typeof locationPlaceId === 'string' && locationPlaceId.trim()
     ? locationPlaceId.trim()
@@ -635,7 +648,7 @@ async function fetchPeriodGlobalChart({
   // All-time with no location filter must use the slim chart path — loading every
   // active bid into memory for ranking OOMs / 500s on production-sized datasets.
   if (!startDate && !placeId) {
-    return fetchAllTimeGlobalChart({ userId, supportersLimit, limit, offset });
+    return fetchAllTimeGlobalChart({ userId, supportersLimit, limit, offset, sortBy: chartSort });
   }
 
   let matchingMediaIds;
@@ -711,35 +724,48 @@ async function fetchPeriodGlobalChart({
   const chartLimit = effectiveChartLimit(limit);
   const startOffset = typeof offset === 'number' && offset > 0 ? offset : 0;
 
-  let mediaList;
+  const dateSort = chartSort === 'newest' || chartSort === 'oldest';
+  let candidateIds;
   if (useStoredGlobalAggregate) {
-    mediaList = await Media.find({
+    candidateIds = matchingMediaIds;
+  } else {
+    const idSet = new Set(Object.keys(mediaBidValues));
+    if (placeId) {
+      for (const id of matchingMediaIds) idSet.add(id);
+    }
+    candidateIds = [...idSet].filter((id) => placeId || (mediaBidValues[id] || 0) > 0);
+  }
+
+  let mediaList;
+  if (dateSort || useStoredGlobalAggregate) {
+    const mongoSort = dateSort
+      ? mediaChartMongoSort(chartSort)
+      : { globalMediaAggregate: -1 };
+    const fetched = await Media.find({
       ...GLOBAL_PARTY_TUNES_FILTER,
-      _id: { $in: matchingMediaIds },
+      _id: { $in: candidateIds },
       status: { $ne: 'vetoed' },
     })
       .select(MEDIA_CHART_SELECT)
-      .sort({ globalMediaAggregate: -1 })
+      .sort(mongoSort)
       .skip(startOffset)
       .limit(chartLimit)
       .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
       .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
       .populate('addedBy', 'username profilePic uuid')
       .lean();
-    mediaList = mediaList.map((media) => ({
+    mediaList = fetched.map((media) => ({
       media,
-      timePeriodBidValue: media.globalMediaAggregate || 0,
+      timePeriodBidValue: useStoredGlobalAggregate
+        ? media.globalMediaAggregate || 0
+        : mediaBidValues[media._id.toString()] || 0,
     }));
   } else {
-    const idSet = new Set(Object.keys(mediaBidValues));
-    if (placeId) {
-      for (const id of matchingMediaIds) idSet.add(id);
-    }
-    const rankedIds = [...idSet]
+    const rankedIds = candidateIds
       .sort((a, b) => (mediaBidValues[b] || 0) - (mediaBidValues[a] || 0))
       .slice(startOffset, startOffset + chartLimit);
 
-    mediaList = await Media.find({
+    const fetched = await Media.find({
       ...GLOBAL_PARTY_TUNES_FILTER,
       _id: { $in: rankedIds },
       status: { $ne: 'vetoed' },
@@ -750,12 +776,11 @@ async function fetchPeriodGlobalChart({
       .populate('addedBy', 'username profilePic uuid')
       .lean();
 
-    mediaList = mediaList
+    mediaList = fetched
       .map((media) => {
         const id = media._id.toString();
         return { media, timePeriodBidValue: mediaBidValues[id] || 0 };
       })
-      .filter((row) => placeId || row.timePeriodBidValue > 0)
       .sort((a, b) => {
         const diff = b.timePeriodBidValue - a.timePeriodBidValue;
         if (diff !== 0) return diff;
@@ -811,6 +836,7 @@ async function fetchPeriodGlobalChart({
       globalMediaAggregateTop: media.globalMediaAggregateTop || 0,
       globalMediaAggregateTopUser: media.globalMediaAggregateTopUser,
       status: 'active',
+      ...chartMediaDateFields(media),
       queuedAt: media.createdAt || new Date(),
       playedAt: null,
       completedAt: null,

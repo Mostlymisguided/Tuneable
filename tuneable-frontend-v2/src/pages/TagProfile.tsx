@@ -10,6 +10,13 @@ import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlaya
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
+import {
+  ChartSortPanel,
+  ChartSortTrigger,
+  CHART_ADDED_SORT_HINT,
+  CHART_PODCAST_SORT_HINT,
+} from '../components/ChartSortControl';
+import { type ChartSortKey } from '../utils/chartSort';
 import PodcastQueueMediaCard, {
   type PodcastEpisodeCardData,
 } from '../components/PodcastQueueMediaCard';
@@ -151,7 +158,9 @@ const TagProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<TimePeriod>('all-time');
+  const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [showTimeFilter, setShowTimeFilter] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
   const [tipTarget, setTipTarget] = useState<PodcastEpisodeCardData | null>(null);
   const [isPlacingTip, setIsPlacingTip] = useState(false);
   const [fetchingPlayId, setFetchingPlayId] = useState<string | null>(null);
@@ -169,6 +178,7 @@ const TagProfile: React.FC = () => {
             limit: 50,
             timePeriod: selectedTimePeriod,
             type: isPodcast ? 'podcast' : 'music',
+            sortBy: chartSort,
           })
           .catch((err: unknown) => {
             if (!isPodcast) throw err;
@@ -229,7 +239,7 @@ const TagProfile: React.FC = () => {
         if (!silent) setLoading(false);
       }
     },
-    [slug, selectedTimePeriod, isPodcast]
+    [slug, selectedTimePeriod, isPodcast, chartSort]
   );
 
   useEffect(() => {
@@ -554,7 +564,7 @@ const TagProfile: React.FC = () => {
         {/* Top Tunes */}
         <div className="mb-8 px-2 md:px-0">
           <div className="mb-3 md:mb-4">
-            <div className="flex flex-wrap justify-center sm:justify-end">
+            <div className="flex flex-wrap justify-center sm:justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowTimeFilter((open) => !open)}
@@ -570,6 +580,11 @@ const TagProfile: React.FC = () => {
                   ({formatTimePeriodLabel(selectedTimePeriod)})
                 </span>
               </button>
+              <ChartSortTrigger
+                sort={chartSort}
+                open={showSortPanel}
+                onToggle={() => setShowSortPanel((open) => !open)}
+              />
             </div>
             {!loading && !error && media.length > 0 && (
               <div className="flex justify-center mt-2 sm:mt-3">
@@ -593,7 +608,7 @@ const TagProfile: React.FC = () => {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-white flex items-center">
                   <Clock className="h-4 w-4 mr-2 text-purple-400" />
-                  Sort by Time
+                  Time Period
                 </h3>
                 <button
                   type="button"
@@ -620,6 +635,15 @@ const TagProfile: React.FC = () => {
                 ))}
               </div>
             </div>
+          )}
+
+          {showSortPanel && (
+            <ChartSortPanel
+              sort={chartSort}
+              onChange={setChartSort}
+              onHide={() => setShowSortPanel(false)}
+              hint={isPodcast ? CHART_PODCAST_SORT_HINT : CHART_ADDED_SORT_HINT}
+            />
           )}
 
           {(() => {
