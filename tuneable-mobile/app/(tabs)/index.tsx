@@ -326,15 +326,6 @@ export default function HomeScreen() {
           <View style={styles.catalogLinks}>
             <Pressable
               style={styles.catalogChip}
-              onPress={() => router.push('/books')}
-              accessibilityRole="button"
-              accessibilityLabel="Open books"
-            >
-              <Ionicons name="book-outline" size={16} color={colors.accentLight} />
-              <Text style={styles.catalogChipText}>Books</Text>
-            </Pressable>
-            <Pressable
-              style={styles.catalogChip}
               onPress={() => router.push('/(tabs)/podcasts')}
               accessibilityRole="button"
               accessibilityLabel="Open podcasts"
