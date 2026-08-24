@@ -7,6 +7,12 @@ struct PodcastSeriesProfileView: View {
     @State private var stats: PodcastSeriesStats?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var searchText = ""
+
+    private var appliedSearch: String {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count >= 2 ? trimmed : ""
+    }
 
     var body: some View {
         Group {
@@ -38,6 +44,22 @@ struct PodcastSeriesProfileView: View {
                             .font(.headline)
                             .foregroundStyle(AppTheme.textPrimary)
                             .padding(.horizontal)
+                        if isLoading && !episodes.isEmpty {
+                            ProgressView()
+                                .tint(AppTheme.textPrimary)
+                                .frame(maxWidth: .infinity)
+                        }
+                        if !appliedSearch.isEmpty && !isLoading && episodes.isEmpty {
+                            Text("No episodes in this show match “\(appliedSearch)”.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .padding(.horizontal)
+                        } else if !isLoading && episodes.isEmpty {
+                            Text("No episodes in this show yet.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .padding(.horizontal)
+                        }
                         LazyVStack(spacing: 0) {
                             ForEach(episodes) { ep in
                                 NavigationLink(value: ep) {
@@ -58,8 +80,15 @@ struct PodcastSeriesProfileView: View {
         .navigationTitle(series?.title ?? "Series")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .searchable(text: $searchText, prompt: "Search episodes in this show")
         .refreshable { await load() }
-        .onAppear { Task { await load() } }
+        .task(id: appliedSearch) {
+            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+            }
+            await load()
+        }
     }
 
     private func seriesHeader(_ s: PodcastSeriesDetail) -> some View {
@@ -120,7 +149,11 @@ struct PodcastSeriesProfileView: View {
         isLoading = true
         errorMessage = nil
         do {
-            let res = try await PodcastService.shared.getSeries(seriesId: seriesId)
+            let res = try await PodcastService.shared.getSeries(
+                seriesId: seriesId,
+                autoImport: appliedSearch.isEmpty,
+                q: appliedSearch.isEmpty ? nil : appliedSearch
+            )
             series = res.series
             episodes = res.episodes ?? []
             stats = res.stats

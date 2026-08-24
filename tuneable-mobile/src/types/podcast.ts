@@ -109,6 +109,8 @@ export interface PodcastSeriesResponse {
   episodes?: PodcastEpisode[];
   stats?: PodcastSeriesStats;
   sortBy?: PodcastShowSortKey | string;
+  query?: string;
+  matchedCount?: number;
   offset?: number;
   limit?: number;
   hasMore?: boolean;

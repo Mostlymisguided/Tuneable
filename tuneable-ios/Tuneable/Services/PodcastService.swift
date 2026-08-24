@@ -95,12 +95,17 @@ final class PodcastService {
         private enum CodingKeys: String, CodingKey { case series, episodes, stats }
     }
 
-    func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0, autoImport: Bool = true) async throws -> SeriesDetailResponse {
+    func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0, autoImport: Bool = true, q: String? = nil) async throws -> SeriesDetailResponse {
+        let trimmed = q?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let searching = trimmed.count >= 2
         var items: [URLQueryItem] = [
             URLQueryItem(name: "limit", value: "\(limit)"),
             URLQueryItem(name: "offset", value: "\(offset)"),
+            URLQueryItem(name: "autoImport", value: (autoImport && !searching) ? "true" : "false"),
         ]
-        items.append(URLQueryItem(name: "autoImport", value: autoImport ? "true" : "false"))
+        if searching {
+            items.append(URLQueryItem(name: "q", value: trimmed))
+        }
         let res: SeriesDetailResponse = try await client.get("/podcasts/series/\(seriesId)", queryItems: items)
         return res
     }

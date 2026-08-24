@@ -117,9 +117,11 @@ const PodcastSeriesProfile: React.FC = () => {
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'mostTipped' | 'duration'>('mostTipped');
   const [currentPage, setCurrentPage] = useState(1);
   const episodesPerPage = 20;
+  const appliedSearch = debouncedSearch.trim().length >= 2 ? debouncedSearch.trim() : '';
   
   // Tipping state
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -165,13 +167,18 @@ const PodcastSeriesProfile: React.FC = () => {
 
   useEffect(() => {
     if (seriesId) {
-      // First load series info (fast)
-      fetchSeriesInfo().then(() => {
-        // Then load episodes (slower, with import)
-        fetchEpisodes();
-      });
+      fetchSeriesInfo();
     }
   }, [seriesId]);
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    const timer = window.setTimeout(
+      () => setDebouncedSearch(trimmed),
+      trimmed ? 300 : 0
+    );
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!seriesId) return;
@@ -258,6 +265,10 @@ const PodcastSeriesProfile: React.FC = () => {
       if (!refresh) {
         params.append('autoImport', 'false'); // Skip auto-import on initial load
       }
+      params.append('sortBy', sortBy);
+      if (appliedSearch) {
+        params.append('q', appliedSearch);
+      }
       
       setLoadingMessage('Fetching episodes...');
       setLoadingProgress(50);
@@ -287,6 +298,10 @@ const PodcastSeriesProfile: React.FC = () => {
         if (data.importInfo && data.importInfo.imported > 0) {
           toast.success(`Imported ${data.importInfo.imported} new episode${data.importInfo.imported === 1 ? '' : 's'}`);
         }
+      } else if (appliedSearch) {
+        setEpisodes([]);
+        setEpisodeCount(0);
+        setLoadingProgress(100);
       } else {
         // No episodes exist, trigger import with limit=10
         setLoadingMessage('Importing episodes from external sources...');
@@ -395,6 +410,13 @@ const PodcastSeriesProfile: React.FC = () => {
       setLoadingStage('');
     }
   };
+
+  useEffect(() => {
+    if (seriesId) {
+      fetchEpisodes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seriesId, appliedSearch]);
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -510,22 +532,9 @@ const PodcastSeriesProfile: React.FC = () => {
     }
   };
   
-  // Filter and sort episodes
+  // Sort episodes (search is applied server-side)
   const getFilteredAndSortedEpisodes = () => {
-    let filtered = episodes;
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(ep =>
-        ep.title.toLowerCase().includes(query) ||
-        ep.description?.toLowerCase().includes(query) ||
-        ep.host?.some(h => h.name.toLowerCase().includes(query))
-      );
-    }
-    
-    // Apply sort
-    const sorted = [...filtered].sort((a, b) => {
+    const sorted = [...episodes].sort((a, b) => {
       switch (sortBy) {
         case 'newest':
           const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
@@ -1146,7 +1155,12 @@ const PodcastSeriesProfile: React.FC = () => {
         {/* Episodes List */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-            <h2 className="text-2xl font-bold">Episodes</h2>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              Episodes
+              {isLoadingEpisodes && episodes.length > 0 ? (
+                <Loader2 className="h-5 w-5 text-purple-400 animate-spin" />
+              ) : null}
+            </h2>
             
             {/* Search and Controls */}
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -1157,9 +1171,20 @@ const PodcastSeriesProfile: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search episodes..."
-                  className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
+                  placeholder="Search episodes in this show..."
+                  aria-label="Search episodes in this show"
+                  className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-9 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
                 />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    aria-label="Clear episode search"
+                  >
+                    ×
+                  </button>
+                ) : null}
               </div>
               
               {/* Sort Dropdown */}
@@ -1188,13 +1213,13 @@ const PodcastSeriesProfile: React.FC = () => {
           </div>
           
           {/* Search Results Count */}
-          {!isLoadingEpisodes && (searchQuery || getFilteredAndSortedEpisodes().length !== episodes.length) && (
+          {!isLoadingEpisodes && appliedSearch && (
             <p className="text-gray-400 text-sm mb-4">
-              Showing {getFilteredAndSortedEpisodes().length} of {episodes.length} episodes
+              Showing {episodes.length} of {stats?.totalEpisodes ?? episodes.length} episodes
             </p>
           )}
           
-          {isLoadingEpisodes ? (
+          {isLoadingEpisodes && episodes.length === 0 && !appliedSearch ? (
             <div className="text-center py-12 bg-gray-800/50 rounded-lg">
               <RefreshCw className="h-12 w-12 text-purple-400 animate-spin mx-auto mb-4" />
               
@@ -1271,16 +1296,16 @@ const PodcastSeriesProfile: React.FC = () => {
                 💡 Tip: Episodes are automatically imported from Taddy, RSS feeds, and other sources
               </p>
             </div>
-          ) : episodes.length === 0 ? (
+          ) : isLoadingEpisodes && episodes.length === 0 && appliedSearch ? (
             <div className="text-center py-12 bg-gray-800/50 rounded-lg">
-              <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No episodes found for this podcast series</p>
-              <p className="text-gray-500 text-sm mt-2">Episodes will be imported automatically when available</p>
+              <Loader2 className="h-10 w-10 text-purple-400 animate-spin mx-auto mb-4" />
+              <p className="text-gray-400">Searching this show…</p>
             </div>
-          ) : getFilteredAndSortedEpisodes().length === 0 ? (
+          ) : episodes.length === 0 ? (
+            appliedSearch ? (
             <div className="text-center py-12 bg-gray-800/50 rounded-lg">
               <Search className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No episodes match your search</p>
+              <p className="text-gray-400">No episodes in this show match “{appliedSearch}”</p>
               <button
                 onClick={() => setSearchQuery('')}
                 className="mt-4 text-purple-400 hover:text-purple-300"
@@ -1288,6 +1313,13 @@ const PodcastSeriesProfile: React.FC = () => {
                 Clear search
               </button>
             </div>
+            ) : (
+            <div className="text-center py-12 bg-gray-800/50 rounded-lg">
+              <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">No episodes found for this podcast series</p>
+              <p className="text-gray-500 text-sm mt-2">Episodes will be imported automatically when available</p>
+            </div>
+            )
           ) : (
             <>
             <div className="space-y-4">
@@ -1454,7 +1486,7 @@ const PodcastSeriesProfile: React.FC = () => {
             )}
             
             {/* Load More Episodes Button - Only show on last page */}
-            {!searchQuery && currentPage === totalPages && (
+            {!appliedSearch && currentPage === totalPages && (
               <div className="flex flex-col items-center mt-6 space-y-4">
                 <button
                   onClick={handleLoadMore}

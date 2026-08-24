@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -8,6 +8,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,8 @@ import {
 
 const ABOUT_PREVIEW_CHARS = 180;
 const EPISODE_PAGE_SIZE = 25;
+const SEARCH_DEBOUNCE_MS = 300;
+const MIN_SEARCH_LENGTH = 2;
 
 function hostLabel(series: PodcastSeriesRef | null): string | null {
   const names = [
@@ -73,8 +76,11 @@ export default function PodcastShowScreen() {
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [tipTarget, setTipTarget] = useState<PodcastEpisode | null>(null);
   const [sortBy, setSortBy] = useState<PodcastShowSortKey>('mostTipped');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const episodeRequestSeq = useRef(0);
   const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
   const [locationRankings, setLocationRankings] = useState<MediaLocationRanking[]>(
     []
@@ -83,11 +89,21 @@ export default function PodcastShowScreen() {
   const [sharing, setSharing] = useState(false);
   const setQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
 
-  const load = useCallback(
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    const handle = setTimeout(
+      () => {
+        setSearchQuery(trimmed.length >= MIN_SEARCH_LENGTH ? trimmed : '');
+      },
+      trimmed ? SEARCH_DEBOUNCE_MS : 0
+    );
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  const loadMeta = useCallback(
     async (isRefresh = false) => {
       if (!id) return;
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      if (!isRefresh) setLoading(true);
       setError(null);
       try {
         const [info, tagRes, locationRes, champRes] = await Promise.all([
@@ -120,41 +136,58 @@ export default function PodcastShowScreen() {
           setLocationRankings([]);
           setChampions([]);
         }
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      try {
-        setLoadingEpisodes(true);
-        let data = await podcastsAPI.getSeries(id, {
-          autoImport: false,
-          limit: EPISODE_PAGE_SIZE,
-          offset: 0,
-          sortBy,
-        });
-        // Only hit RSS/import when the catalog is empty.
-        if ((data.episodes?.length ?? 0) === 0) {
-          data = await podcastsAPI.getSeries(id, {
-            autoImport: true,
-            limit: EPISODE_PAGE_SIZE,
-            offset: 0,
-            sortBy,
-          });
-        }
-        if (data.series) setSeries(data.series);
-        if (data.stats) setStats(data.stats);
-        setEpisodes(data.episodes ?? []);
-        setHasMore(Boolean(data.hasMore));
-      } catch (err) {
-        setError(getApiErrorMessage(err, 'Failed to load episodes'));
       } finally {
         setLoading(false);
-        setRefreshing(false);
-        setLoadingEpisodes(false);
       }
     },
-    [id, sortBy]
+    [id]
+  );
+
+  const loadEpisodes = useCallback(async () => {
+    if (!id) return;
+    const seq = ++episodeRequestSeq.current;
+    setLoadingEpisodes(true);
+    try {
+      const params = {
+        autoImport: false,
+        limit: EPISODE_PAGE_SIZE,
+        offset: 0,
+        sortBy,
+        q: searchQuery || undefined,
+      };
+      let data = await podcastsAPI.getSeries(id, params);
+      // Only hit RSS/import when the catalog is empty, never while searching.
+      if ((data.episodes?.length ?? 0) === 0 && !searchQuery) {
+        data = await podcastsAPI.getSeries(id, {
+          ...params,
+          autoImport: true,
+        });
+      }
+      if (seq !== episodeRequestSeq.current) return;
+      if (data.series) setSeries(data.series);
+      if (data.stats) setStats(data.stats);
+      setEpisodes(data.episodes ?? []);
+      setHasMore(Boolean(data.hasMore));
+    } catch (err) {
+      if (seq !== episodeRequestSeq.current) return;
+      setError(getApiErrorMessage(err, 'Failed to load episodes'));
+    } finally {
+      if (seq === episodeRequestSeq.current) {
+        setLoadingEpisodes(false);
+      }
+    }
+  }, [id, sortBy, searchQuery]);
+
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setRefreshing(true);
+      try {
+        await Promise.all([loadMeta(isRefresh), loadEpisodes()]);
+      } finally {
+        if (isRefresh) setRefreshing(false);
+      }
+    },
+    [loadMeta, loadEpisodes]
   );
 
   const loadMoreEpisodes = useCallback(async () => {
@@ -166,6 +199,7 @@ export default function PodcastShowScreen() {
         limit: EPISODE_PAGE_SIZE,
         offset: episodes.length,
         sortBy,
+        q: searchQuery || undefined,
       });
       const incoming = data.episodes ?? [];
       setEpisodes((prev) => {
@@ -179,13 +213,25 @@ export default function PodcastShowScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [id, loadingMore, loadingEpisodes, hasMore, episodes.length, sortBy]);
+  }, [
+    id,
+    loadingMore,
+    loadingEpisodes,
+    hasMore,
+    episodes.length,
+    sortBy,
+    searchQuery,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load])
+      void loadMeta();
+    }, [loadMeta])
   );
+
+  useEffect(() => {
+    void loadEpisodes();
+  }, [loadEpisodes]);
 
   const about = useMemo(
     () => stripHtml(series?.description),
@@ -310,6 +356,8 @@ export default function PodcastShowScreen() {
             styles.list,
             { paddingBottom: Math.max(24, contentPaddingBottom) },
           ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -478,6 +526,43 @@ export default function PodcastShowScreen() {
                   <ActivityIndicator color={colors.accentLight} />
                 ) : null}
               </View>
+              <View style={styles.searchField}>
+                <Ionicons name="search" size={18} color={colors.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={searchInput}
+                  onChangeText={setSearchInput}
+                  placeholder="Search episodes in this show"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                  clearButtonMode="while-editing"
+                  accessibilityLabel="Search episodes in this show"
+                />
+                {searchInput.length > 0 ? (
+                  <Pressable
+                    onPress={() => setSearchInput('')}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear episode search">
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={colors.textMuted}
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+              {searchQuery && (loadingEpisodes || episodes.length > 0) ? (
+                <Text style={styles.searchMeta}>
+                  {loadingEpisodes && episodes.length === 0
+                    ? 'Searching…'
+                    : `${episodes.length}${hasMore ? '+' : ''} matching episode${
+                        episodes.length === 1 ? '' : 's'
+                      }`}
+                </Text>
+              ) : null}
               <View style={styles.sortRow}>
                 {PODCAST_SHOW_SORT_OPTIONS.map((option) => {
                   const active = sortBy === option.key;
@@ -511,7 +596,11 @@ export default function PodcastShowScreen() {
           }
           ListEmptyComponent={
             !loadingEpisodes ? (
-              <Text style={styles.empty}>No episodes in this show yet.</Text>
+              <Text style={styles.empty}>
+                {searchQuery
+                  ? `No episodes in this show match “${searchQuery}”.`
+                  : 'No episodes in this show yet.'}
+              </Text>
             ) : null
           }
           onEndReachedThreshold={0.4}
@@ -726,6 +815,30 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: '700',
+  },
+  searchField: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 15,
+  },
+  searchMeta: {
+    alignSelf: 'stretch',
+    color: colors.textMuted,
+    fontSize: 13,
+    marginBottom: 10,
   },
   sortRow: {
     alignSelf: 'stretch',

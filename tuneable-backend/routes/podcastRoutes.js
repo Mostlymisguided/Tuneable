@@ -22,6 +22,10 @@ const {
   getSeriesEpisodeSort,
   withSeriesCoverArt,
 } = require('../utils/podcastCoverArt');
+const {
+  buildSeriesEpisodeMatch,
+  seriesEpisodeMatch,
+} = require('../utils/podcastSeriesQuery');
 
 const router = express.Router();
 
@@ -2579,12 +2583,6 @@ router.get('/series/:seriesId/import-progress', async (req, res) => {
   }
 });
 
-const SERIES_EPISODE_MATCH = (seriesId) => ({
-  podcastSeries: seriesId,
-  contentType: { $in: ['spoken'] },
-  contentForm: { $in: ['podcastepisode'] }
-});
-
 async function fetchSeriesEpisodePage({
   seriesId,
   sortBy,
@@ -2592,8 +2590,10 @@ async function fetchSeriesEpisodePage({
   limit,
   offset,
   slim,
+  q,
 }) {
-  let query = Media.find(SERIES_EPISODE_MATCH(seriesId))
+  const { match } = buildSeriesEpisodeMatch(seriesId, q);
+  let query = Media.find(match)
     .sort(getSeriesEpisodeSort(sortBy))
     .populate('podcastSeries', 'title coverArt genres tags')
     .select(
@@ -2626,7 +2626,7 @@ async function computeSeriesEpisodeStats(seriesId) {
   ]);
   const stats = statsResult[0] || { totalTips: 0, episodeCount: 0, episodesWithTips: 0 };
   const avgTip = stats.episodesWithTips > 0 ? stats.totalTips / stats.episodesWithTips : 0;
-  const topEpisode = await Media.findOne(SERIES_EPISODE_MATCH(seriesId))
+  const topEpisode = await Media.findOne(seriesEpisodeMatch(seriesId))
     .sort({ globalMediaAggregate: -1 })
     .select('_id title globalMediaAggregate')
     .lean();
@@ -2667,6 +2667,11 @@ router.get('/series/:seriesId', async (req, res) => {
     const { seriesId } = req.params;
     const { autoImport = 'true', refresh = 'false', loadMore = 'false', offset = '0' } = req.query;
     const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : 'mostTipped';
+    const { match: episodeMatch, query: searchQuery } = buildSeriesEpisodeMatch(
+      seriesId,
+      req.query.q
+    );
+    const searching = Boolean(searchQuery);
     // Only paginate when the client sends `limit`. Web still loads the full catalog.
     const applyLimit = Object.prototype.hasOwnProperty.call(req.query, 'limit');
     const requestedLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
@@ -2689,13 +2694,14 @@ router.get('/series/:seriesId', async (req, res) => {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
 
-    const existingEpisodeCount = await Media.countDocuments(SERIES_EPISODE_MATCH(seriesId));
+    const existingEpisodeCount = await Media.countDocuments(seriesEpisodeMatch(seriesId));
 
     // Auto-import episodes from external source if series has external IDs
     let importedCount = 0;
     let importErrors = [];
     const maxEpisodesToImport = applyLimit ? requestedLimit : 20;
-    const shouldImport = autoImport === 'true' || loadMore === 'true';
+    // Searching the catalog should never kick off RSS/API import.
+    const shouldImport = !searching && (autoImport === 'true' || loadMore === 'true');
     
     // Don't block the show page on RSS/API import when episodes already exist.
     // Import only for an empty catalog, an explicit refresh, or "load more".
@@ -3692,7 +3698,7 @@ router.get('/series/:seriesId', async (req, res) => {
     const seriesObj = series.toObject ? series.toObject() : series;
     const seriesCoverArt = seriesObj.coverArt || null;
 
-    const [episodes, stats] = await Promise.all([
+    const [episodes, stats, matchedCount] = await Promise.all([
       fetchSeriesEpisodePage({
         seriesId,
         sortBy,
@@ -3700,13 +3706,18 @@ router.get('/series/:seriesId', async (req, res) => {
         limit: requestedLimit,
         offset: episodeOffset,
         slim: applyLimit,
+        q: searchQuery,
       }),
       computeSeriesEpisodeStats(seriesId),
+      applyLimit && searching ? Media.countDocuments(episodeMatch) : Promise.resolve(null),
     ]);
 
     const serializedEpisodes = serializeSeriesEpisodes(episodes, seriesCoverArt);
+    const resultCount = searching
+      ? (matchedCount ?? serializedEpisodes.length)
+      : stats.totalEpisodes;
     const hasMore = applyLimit
-      ? episodeOffset + serializedEpisodes.length < stats.totalEpisodes
+      ? episodeOffset + serializedEpisodes.length < resultCount
       : false;
 
     // Clean up progress after a delay (to allow final poll)
@@ -3719,6 +3730,8 @@ router.get('/series/:seriesId', async (req, res) => {
       episodes: serializedEpisodes,
       stats,
       sortBy,
+      query: searchQuery || undefined,
+      matchedCount: searching ? resultCount : undefined,
       offset: episodeOffset,
       limit: applyLimit ? requestedLimit : serializedEpisodes.length,
       hasMore,
