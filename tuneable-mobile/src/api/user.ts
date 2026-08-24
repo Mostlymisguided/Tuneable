@@ -76,6 +76,7 @@ export const userAPI = {
       tagLimit?: number;
       checkTagLimit?: number;
       locationPlaceId?: string;
+      badgeLimit?: number;
     }
   ): Promise<ChampionTitlesResponse> => {
     const response = await api.get<ChampionTitlesResponse>(

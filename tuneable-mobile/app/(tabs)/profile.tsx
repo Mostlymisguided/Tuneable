@@ -19,11 +19,11 @@ import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard'
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
+import { championBadgesFromResponse } from '@/src/lib/championBadges';
 import { canUploadMedia } from '@/src/lib/permissions';
 import { colors } from '@/src/theme/colors';
 import type {
-  MediaChampionTitle,
-  TipTagChampion,
+  ChampionBadge,
   TuneBytesTagRanking,
   User,
   UserLibraryItem,
@@ -36,8 +36,7 @@ export default function ProfileScreen() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
-  const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
-  const [mediaChampions, setMediaChampions] = useState<MediaChampionTitle[]>([]);
+  const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,14 +62,14 @@ export default function ProfileScreen() {
               .getChampionTitles(userId, {
                 mediaLimit: 8,
                 checkMediaLimit: 40,
+                badgeLimit: 8,
               })
-              .catch(() => ({ tags: [], media: [] })),
+              .catch(() => ({ tags: [], media: [], badges: [] })),
           ]);
         setProfileUser(profileRes.user);
         setLibrary(libraryRes.library ?? []);
         setRankings(rankingsRes.tuneBytesTagRankings ?? []);
-        setTipTagChampions(championsRes.tags ?? []);
-        setMediaChampions(championsRes.media ?? []);
+        setChampionBadges(championBadgesFromResponse(championsRes));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load profile');
       } finally {
@@ -127,8 +126,7 @@ export default function ProfileScreen() {
               <UserProfileHero
                 user={heroUser}
                 rankings={rankings}
-                tipTagChampions={tipTagChampions}
-                mediaChampions={mediaChampions}
+                championBadges={championBadges}
                 isOwnProfile
                 onWalletPress={() => router.push('/wallet')}
                 onSettingsPress={() => setSettingsOpen(true)}

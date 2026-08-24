@@ -9,8 +9,17 @@ const Media = require('../models/Media');
 const { isValidObjectId } = require('../utils/validators');
 const { resolveTagFromSlug, collectTagVariants, generateSlug, mediaBpmQuery } = require('./tagProfileService');
 const { getCanonicalTag, tagsMatch, normalizeTagForStorage } = require('../utils/tagNormalizer');
+const {
+  DEFAULT_BADGE_LIMIT,
+  getChampionScopePicksFromLocation,
+  locationFromPick,
+  medalForRank,
+  pickFallbackChampionBadges,
+  selectFallbackScopes,
+  withLocation,
+} = require('../utils/championBadges');
 
-/** Minimum distinct tippers in-scope before crowning Champions. */
+/** Minimum distinct tippers in-scope before crowning Champions. Solo supporters still count. */
 const MIN_TIPPERS_FOR_CHAMPION = 1;
 
 /** Top N tippers are titled Champions (#1 / #2 / #3). */
@@ -536,7 +545,7 @@ async function getScopedUserTagChampionTitles(userObjectId, userIdStr, options =
       rank: ranking.rank,
       totalAmount: ranking.totalAmount,
       totalUsers: result?.tipperCount || 0,
-      medal: ['gold', 'silver', 'bronze'][ranking.rank - 1] || null,
+      medal: medalForRank(ranking.rank),
     });
 
     if (titles.length >= tagLimit) break;
@@ -545,39 +554,13 @@ async function getScopedUserTagChampionTitles(userObjectId, userIdStr, options =
   return titles.sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
 }
 
-/**
- * Champion titles (#1–#3) held by a user globally.
- * Tags from cached tagRankings; media from bid aggregate rank checks.
- */
-async function getUserChampionTitles(userId, options = {}) {
+async function getUserMediaChampionTitles(userObjectId, userIdStr, options = {}) {
   const mediaLimit = Math.min(Math.max(parseInt(options.mediaLimit, 10) || 10, 1), 30);
   const checkMediaLimit = Math.min(Math.max(parseInt(options.checkMediaLimit, 10) || 40, 5), 100);
-
-  const userObjectId = await resolveUserObjectId(userId);
-  if (!userObjectId) return null;
-
-  const User = require('../models/User');
-  const user = await User.findById(userObjectId).select('tagRankings').lean();
-  const userIdStr = userObjectId.toString();
   const locationPlaceId =
     typeof options.locationPlaceId === 'string' && options.locationPlaceId.trim()
       ? options.locationPlaceId.trim()
       : null;
-
-  const tags = locationPlaceId
-    ? await getScopedUserTagChampionTitles(userObjectId, userIdStr, options)
-    : (user?.tagRankings || [])
-        .filter((r) => r.rank >= 1 && r.rank <= CHAMPION_PODIUM_SIZE)
-        .map((r) => ({
-          entityType: 'tag',
-          tag: r.tag,
-          rank: r.rank,
-          totalAmount: r.aggregate,
-          totalUsers: r.totalUsers,
-          percentile: r.percentile,
-          medal: ['gold', 'silver', 'bronze'][r.rank - 1] || null,
-        }))
-        .sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
 
   const userBidMatch = { userId: userObjectId, status: 'active' };
   if (locationPlaceId) {
@@ -599,8 +582,13 @@ async function getUserChampionTitles(userId, options = {}) {
 
   const media = [];
   for (const row of userMediaAggregates) {
+    const rankMatch = { mediaId: row._id, status: 'active' };
+    if (locationPlaceId) {
+      rankMatch.bidderLocationAncestorIds = locationPlaceId;
+    }
+
     const rankResult = await Bid.aggregate([
-      { $match: { mediaId: row._id, status: 'active' } },
+      { $match: rankMatch },
       {
         $group: {
           _id: '$userId',
@@ -625,20 +613,168 @@ async function getUserChampionTitles(userId, options = {}) {
       title: mediaDoc.title,
       totalAmount: row.totalAmount,
       bidCount: row.bidCount,
-      medal: ['gold', 'silver', 'bronze'][rank - 1] || null,
+      medal: medalForRank(rank),
     });
 
     if (media.length >= mediaLimit) break;
   }
 
-  media.sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+  return media.sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+}
+
+function mapGlobalTagChampionTitles(tagRankings) {
+  return (tagRankings || [])
+    .filter((r) => r.rank >= 1 && r.rank <= CHAMPION_PODIUM_SIZE)
+    .map((r) => ({
+      entityType: 'tag',
+      tag: r.tag,
+      rank: r.rank,
+      totalAmount: r.aggregate,
+      totalUsers: r.totalUsers,
+      percentile: r.percentile,
+      medal: medalForRank(r.rank),
+    }))
+    .sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);
+}
+
+async function getUserPlaceChampionTitle(userIdStr, placeId, location) {
+  const result = await getLocationChampions(placeId, { limit: CHAMPION_PODIUM_SIZE });
+  if (!result) return null;
+
+  const ranking = (result.rankings || []).find(
+    (entry) => entry.user?._id?.toString() === userIdStr
+  );
+  if (!ranking || ranking.rank > CHAMPION_PODIUM_SIZE) return null;
+
+  return {
+    entityType: 'place',
+    rank: ranking.rank,
+    totalAmount: ranking.totalAmount,
+    bidCount: ranking.bidCount,
+    totalUsers: result.tipperCount || 0,
+    medal: medalForRank(ranking.rank),
+    location: {
+      placeId: location?.placeId || placeId,
+      label: location?.label || result.place?.name || placeId,
+      featureType: location?.featureType || result.place?.featureType || null,
+      ancestorIds: location?.ancestorIds || [],
+    },
+  };
+}
+
+async function loadScopedPlaceTitles(userObjectId, userIdStr, location, options = {}) {
+  const [tags, media, placeTitle] = await Promise.all([
+    getScopedUserTagChampionTitles(userObjectId, userIdStr, {
+      locationPlaceId: location.placeId,
+      tagLimit: options.tagLimit || 5,
+      checkTagLimit: options.checkTagLimit || 12,
+    }),
+    getUserMediaChampionTitles(userObjectId, userIdStr, {
+      locationPlaceId: location.placeId,
+      mediaLimit: options.mediaLimit || 5,
+      checkMediaLimit: options.checkMediaLimit || 12,
+    }),
+    getUserPlaceChampionTitle(userIdStr, location.placeId, location),
+  ]);
+
+  return { location, tags: tags || [], media, placeTitle };
+}
+
+/**
+ * Champion titles (#1–#3) held by a user.
+ * Global tags + media first; if the row is not full, fill from home-location
+ * combined titles and place-only (#1 #London) badges.
+ */
+async function getUserChampionTitles(userId, options = {}) {
+  const mediaLimit = Math.min(Math.max(parseInt(options.mediaLimit, 10) || 10, 1), 30);
+  const checkMediaLimit = Math.min(Math.max(parseInt(options.checkMediaLimit, 10) || 40, 5), 100);
+  const badgeLimit = Math.min(
+    Math.max(parseInt(options.badgeLimit, 10) || DEFAULT_BADGE_LIMIT, 1),
+    20
+  );
+
+  const userObjectId = await resolveUserObjectId(userId);
+  if (!userObjectId) return null;
+
+  const User = require('../models/User');
+  const user = await User.findById(userObjectId).select('tagRankings homeLocation').lean();
+  const userIdStr = userObjectId.toString();
+  const locationPlaceId =
+    typeof options.locationPlaceId === 'string' && options.locationPlaceId.trim()
+      ? options.locationPlaceId.trim()
+      : null;
+
+  const allPicks = getChampionScopePicksFromLocation(user?.homeLocation || null);
+
+  if (locationPlaceId) {
+    const pick = allPicks.find((p) => p.placeId === locationPlaceId);
+    const location = pick
+      ? locationFromPick(pick, allPicks)
+      : { placeId: locationPlaceId, label: null, featureType: null, ancestorIds: [] };
+    const tags = (
+      (await getScopedUserTagChampionTitles(userObjectId, userIdStr, options)) || []
+    ).map((title) => withLocation(title, location, 'place'));
+    const media = (
+      await getUserMediaChampionTitles(userObjectId, userIdStr, {
+        ...options,
+        locationPlaceId,
+      })
+    ).map((title) => withLocation(title, location, 'place'));
+    const badges = pickFallbackChampionBadges({
+      globalTags: [],
+      globalMedia: [],
+      scopedPlaces: [{ location, tags, media, placeTitle: null }],
+      limit: badgeLimit,
+    });
+
+    return {
+      tags,
+      media,
+      places: [],
+      badges,
+      podiumSize: CHAMPION_PODIUM_SIZE,
+      scope: 'place',
+      locationPlaceId,
+    };
+  }
+
+  const tags = mapGlobalTagChampionTitles(user?.tagRankings).map((title) =>
+    withLocation(title, null, 'global')
+  );
+  const media = (
+    await getUserMediaChampionTitles(userObjectId, userIdStr, {
+      mediaLimit,
+      checkMediaLimit,
+    })
+  ).map((title) => withLocation(title, null, 'global'));
+
+  let places = [];
+  let scopedPlaces = [];
+  if (tags.length + media.length < badgeLimit && allPicks.length > 0) {
+    const scopes = selectFallbackScopes(allPicks);
+    scopedPlaces = await Promise.all(
+      scopes.map((pick) =>
+        loadScopedPlaceTitles(userObjectId, userIdStr, locationFromPick(pick, allPicks))
+      )
+    );
+    places = scopedPlaces.map((place) => place.placeTitle).filter(Boolean);
+  }
+
+  const badges = pickFallbackChampionBadges({
+    globalTags: tags,
+    globalMedia: media,
+    scopedPlaces,
+    limit: badgeLimit,
+  });
 
   return {
     tags,
     media,
+    places,
+    badges,
     podiumSize: CHAMPION_PODIUM_SIZE,
-    scope: locationPlaceId ? 'place' : 'global',
-    locationPlaceId,
+    scope: 'global',
+    locationPlaceId: null,
   };
 }
 

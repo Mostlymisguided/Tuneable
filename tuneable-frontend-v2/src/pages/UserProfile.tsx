@@ -116,11 +116,19 @@ import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import {
   formatLocation,
-  getChampionScopePicksFromLocation,
+  getPlaceProfilePath,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import {
+  championBadgeKey,
+  championBadgeLocationLabel,
+  championBadgePath,
+  championBadgePrimaryLabel,
+  championBadgeTitle,
+  type ChampionBadge,
+} from '../utils/championBadges';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -282,36 +290,7 @@ const UserProfile: React.FC = () => {
     totalUsers: number;
     percentile: number;
   }>>([]);
-  const [tipTagChampions, setTipTagChampions] = useState<Array<{
-    tag: string;
-    rank: number;
-    totalUsers: number;
-    percentile: number;
-    totalAmount: number;
-  }>>([]);
-  const [mediaChampionTitles, setMediaChampionTitles] = useState<Array<{
-    rank: number;
-    uuid?: string;
-    mediaId: string;
-    title: string;
-    totalAmount: number;
-    bidCount?: number;
-  }>>([]);
-  const [scopedTipTagChampions, setScopedTipTagChampions] = useState<Array<{
-    tag: string;
-    rank: number;
-    totalUsers: number;
-    totalAmount: number;
-  }>>([]);
-  const [scopedMediaChampionTitles, setScopedMediaChampionTitles] = useState<Array<{
-    rank: number;
-    uuid?: string;
-    mediaId: string;
-    title: string;
-    totalAmount: number;
-    bidCount?: number;
-  }>>([]);
-  const [selectedChampionScopePlaceId, setSelectedChampionScopePlaceId] = useState('');
+  const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [showArtistChampions, setShowArtistChampions] = useState(false);
   const [showTuneBytesTagRankings, setShowTuneBytesTagRankings] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -467,13 +446,6 @@ const UserProfile: React.FC = () => {
 
   // Check if viewing own profile
   const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
-  const championScopePicks = useMemo(
-    () => getChampionScopePicksFromLocation(user?.homeLocation || null),
-    [user?.homeLocation]
-  );
-  const selectedChampionScope = championScopePicks.find(
-    (pick) => pick.placeId === selectedChampionScopePlaceId
-  ) || null;
 
   // Helper functions for loading additional data
   const loadLabelAffiliations = async () => {
@@ -519,37 +491,41 @@ const UserProfile: React.FC = () => {
 
   const loadChampionTitles = async () => {
     try {
-      const response = await userAPI.getChampionTitles(userId!, { mediaLimit: 8, checkMediaLimit: 40 });
-      setTipTagChampions(response.tags || []);
-      setMediaChampionTitles(response.media || []);
+      const response = await userAPI.getChampionTitles(userId!, {
+        mediaLimit: 8,
+        checkMediaLimit: 40,
+        badgeLimit: 8,
+      });
+      const badges = (response.badges || []) as ChampionBadge[];
+      if (badges.length > 0) {
+        setChampionBadges(badges);
+        return;
+      }
+      const fallback: ChampionBadge[] = [
+        ...(response.tags || []).map((ranking: { tag: string; rank: number; totalAmount?: number }) => ({
+          entityType: 'tag' as const,
+          tag: ranking.tag,
+          rank: ranking.rank,
+          totalAmount: ranking.totalAmount,
+          location: null,
+          scope: 'global',
+        })),
+        ...(response.media || []).map((title: { mediaId: string; uuid?: string; title: string; rank: number; totalAmount?: number }) => ({
+          entityType: 'media' as const,
+          mediaId: title.mediaId,
+          uuid: title.uuid,
+          title: title.title,
+          rank: title.rank,
+          totalAmount: title.totalAmount,
+          location: null,
+          scope: 'global',
+        })),
+      ];
+      setChampionBadges(fallback);
     } catch (err: any) {
       console.error('Error loading champion titles:', err);
     }
   };
-
-  const loadScopedChampionTitles = useCallback(async (locationPlaceId: string) => {
-    if (!userId || !locationPlaceId) {
-      setScopedTipTagChampions([]);
-      setScopedMediaChampionTitles([]);
-      return;
-    }
-
-    try {
-      const response = await userAPI.getChampionTitles(userId, {
-        mediaLimit: 8,
-        checkMediaLimit: 40,
-        tagLimit: 8,
-        checkTagLimit: 24,
-        locationPlaceId,
-      });
-      setScopedTipTagChampions(response.tags || []);
-      setScopedMediaChampionTitles(response.media || []);
-    } catch (err: any) {
-      console.error('Error loading scoped champion titles:', err);
-      setScopedTipTagChampions([]);
-      setScopedMediaChampionTitles([]);
-    }
-  }, [userId]);
 
   const loadTipHistory = async () => {
     if (!isOwnProfile) return;
@@ -937,31 +913,6 @@ const UserProfile: React.FC = () => {
     const frameId = requestAnimationFrame(openPicker);
     return () => cancelAnimationFrame(frameId);
   }, [isOwnProfile, loading, user, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (!championScopePicks.length) {
-      setSelectedChampionScopePlaceId('');
-      setScopedTipTagChampions([]);
-      setScopedMediaChampionTitles([]);
-      return;
-    }
-
-    setSelectedChampionScopePlaceId((current) => {
-      if (current && championScopePicks.some((pick) => pick.placeId === current)) {
-        return current;
-      }
-      return championScopePicks[championScopePicks.length - 1]?.placeId || '';
-    });
-  }, [championScopePicks]);
-
-  useEffect(() => {
-    if (!selectedChampionScopePlaceId) {
-      setScopedTipTagChampions([]);
-      setScopedMediaChampionTitles([]);
-      return;
-    }
-    loadScopedChampionTitles(selectedChampionScopePlaceId);
-  }, [selectedChampionScopePlaceId, loadScopedChampionTitles]);
 
   // Load tip history when viewing tip history tab
   useEffect(() => {
@@ -2188,113 +2139,43 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
 
-              {/* Tip champion badges (by aggregate tips on tags) */}
-              {tipTagChampions.length > 0 &&
+              {/* Champion badges (global, location-combined, and place-only) */}
+              {championBadges.length > 0 &&
                 !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
                 <div className="mb-4 w-full max-w-lg">
                   <CollapsibleBadgeWrap
-                    title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}
+                    title={isOwnProfile ? 'Your Champion Badges' : 'Champion Badges'}
                     icon={<Crown className="h-4 w-4 text-amber-400 flex-shrink-0" />}
                   >
-                    {tipTagChampions.map((ranking) => (
-                      <Link
-                        key={`tip-${ranking.tag}-${ranking.rank}`}
-                        to={getTagProfilePath(ranking.tag)}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
-                        title={`#${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.totalAmount)} tipped · ${ranking.totalUsers} tippers`}
-                      >
-                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span>#{ranking.rank}</span>
-                        <span className="opacity-90">#{ranking.tag}</span>
-                      </Link>
-                    ))}
-                  </CollapsibleBadgeWrap>
-                </div>
-              )}
-
-              {/* Media champion badges */}
-              {mediaChampionTitles.length > 0 &&
-                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
-                <div className="mb-4 w-full max-w-lg">
-                  <CollapsibleBadgeWrap
-                    title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}
-                    icon={<Music className="h-4 w-4 text-amber-400 flex-shrink-0" />}
-                  >
-                    {mediaChampionTitles.map((title) => (
-                      <Link
-                        key={`media-${title.mediaId}-${title.rank}`}
-                        to={`/tune/${title.uuid || title.mediaId}`}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all max-w-full ${championBadgeStyles(title.rank)}`}
-                        title={`#${title.rank} Champion of "${title.title}" · ${penceToPounds(title.totalAmount)} tipped`}
-                      >
-                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="flex-shrink-0">#{title.rank}</span>
-                        <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
-                      </Link>
-                    ))}
-                  </CollapsibleBadgeWrap>
-                </div>
-              )}
-
-              {/* Place-scoped champion badges */}
-              {championScopePicks.length > 0 &&
-                (scopedTipTagChampions.length > 0 || scopedMediaChampionTitles.length > 0) &&
-                !((user as any)?.preferences?.anonymousMode && !isOwnProfile) && (
-                <div className="mb-4 w-full max-w-lg">
-                  <CollapsibleBadgeWrap
-                    key={selectedChampionScopePlaceId}
-                    title={
-                      selectedChampionScope?.label
-                        ? `${selectedChampionScope.label} Champion Badges`
-                        : 'Local Champion Badges'
-                    }
-                    icon={<MapPin className="h-4 w-4 text-emerald-400 flex-shrink-0" />}
-                    extra={
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {championScopePicks.map((pick) => {
-                          const isActive = pick.placeId === selectedChampionScopePlaceId;
-                          return (
-                            <button
-                              key={pick.placeId}
-                              type="button"
-                              onClick={() => setSelectedChampionScopePlaceId(pick.placeId)}
-                              className={`px-3 py-1.5 rounded-full border text-xs sm:text-sm transition-all ${
-                                isActive
-                                  ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-100'
-                                  : 'bg-black/20 border-white/10 text-gray-300 hover:border-emerald-400/30'
-                              }`}
-                            >
-                              {pick.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    }
-                  >
-                    {scopedTipTagChampions.map((ranking) => (
-                      <Link
-                        key={`scoped-tip-${selectedChampionScopePlaceId}-${ranking.tag}-${ranking.rank}`}
-                        to={getTagProfilePath(ranking.tag)}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
-                        title={`${selectedChampionScope?.label || 'Local'} · #${ranking.rank} Champion of #${ranking.tag} · ${penceToPounds(ranking.totalAmount)} tipped`}
-                      >
-                        <Crown className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span>#{ranking.rank}</span>
-                        <span className="opacity-90">#{ranking.tag}</span>
-                      </Link>
-                    ))}
-                    {scopedMediaChampionTitles.map((title) => (
-                      <Link
-                        key={`scoped-media-${selectedChampionScopePlaceId}-${title.mediaId}-${title.rank}`}
-                        to={`/tune/${title.uuid || title.mediaId}`}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all max-w-full ${championBadgeStyles(title.rank)}`}
-                        title={`${selectedChampionScope?.label || 'Local'} · #${title.rank} Champion of "${title.title}" · ${penceToPounds(title.totalAmount)} tipped`}
-                      >
-                        <Music className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="flex-shrink-0">#{title.rank}</span>
-                        <span className="opacity-90 truncate max-w-[9rem]">{title.title}</span>
-                      </Link>
-                    ))}
+                    {championBadges.map((badge, index) => {
+                      const to = championBadgePath(badge, getTagProfilePath, getPlaceProfilePath);
+                      if (!to) return null;
+                      const locationLabel = championBadgeLocationLabel(badge);
+                      const amount = penceToPounds(badge.totalAmount || 0);
+                      return (
+                        <Link
+                          key={championBadgeKey(badge, index)}
+                          to={to}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all max-w-full ${championBadgeStyles(badge.rank)}`}
+                          title={`${championBadgeTitle(badge)} · ${amount} tipped`}
+                        >
+                          {badge.entityType === 'place' ? (
+                            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                          ) : badge.entityType === 'media' ? (
+                            <Music className="h-3.5 w-3.5 flex-shrink-0" />
+                          ) : (
+                            <Crown className="h-3.5 w-3.5 flex-shrink-0" />
+                          )}
+                          <span className="flex-shrink-0">#{badge.rank}</span>
+                          <span className="opacity-90 truncate max-w-[9rem]">
+                            {championBadgePrimaryLabel(badge)}
+                          </span>
+                          {locationLabel ? (
+                            <span className="opacity-80 truncate max-w-[6rem]">{locationLabel}</span>
+                          ) : null}
+                        </Link>
+                      );
+                    })}
                   </CollapsibleBadgeWrap>
                 </div>
               )}

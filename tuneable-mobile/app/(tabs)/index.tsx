@@ -35,7 +35,13 @@ import {
 } from '@/src/lib/media';
 import { hasHomeLocation } from '@/src/lib/onboarding';
 import { canUploadMedia } from '@/src/lib/permissions';
-import { getTagProfileHref } from '@/src/lib/tagNormalizer';
+import {
+  championBadgeHref,
+  championBadgeKey,
+  championBadgeLocationLabel,
+  championBadgePrimaryLabel,
+  championBadgesFromResponse,
+} from '@/src/lib/championBadges';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import {
@@ -44,8 +50,7 @@ import {
 } from '@/src/types/media';
 import {
   DEFAULT_PROFILE_PIC,
-  type MediaChampionTitle,
-  type TipTagChampion,
+  type ChampionBadge,
   type UserLibraryItem,
   type UserStats,
 } from '@/src/types/user';
@@ -64,6 +69,8 @@ type HomeBadge = {
   key: string;
   rank: number;
   label: string;
+  locationLabel: string | null;
+  isPlace: boolean;
   href: Href;
 };
 
@@ -76,8 +83,7 @@ export default function HomeScreen() {
   const [rising, setRising] = useState<ChartMediaItem[]>([]);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
-  const [mediaChampions, setMediaChampions] = useState<MediaChampionTitle[]>([]);
+  const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,21 +102,24 @@ export default function HomeScreen() {
     [rising]
   );
 
-  const homeBadges = useMemo<HomeBadge[]>(() => {
-    const tags: HomeBadge[] = tipTagChampions.map((ranking) => ({
-      key: `tip-${ranking.tag}-${ranking.rank}`,
-      rank: ranking.rank,
-      label: `#${ranking.tag}`,
-      href: getTagProfileHref(ranking.tag),
-    }));
-    const media: HomeBadge[] = mediaChampions.map((title) => ({
-      key: `media-${title.mediaId}-${title.rank}`,
-      rank: title.rank,
-      label: title.title,
-      href: `/tune/${title.uuid || title.mediaId}` as Href,
-    }));
-    return [...tags, ...media];
-  }, [tipTagChampions, mediaChampions]);
+  const homeBadges = useMemo<HomeBadge[]>(
+    () =>
+      championBadges.flatMap((badge, index) => {
+        const href = championBadgeHref(badge);
+        if (!href) return [];
+        return [
+          {
+            key: championBadgeKey(badge, index),
+            rank: badge.rank,
+            label: championBadgePrimaryLabel(badge),
+            locationLabel: championBadgeLocationLabel(badge),
+            isPlace: badge.entityType === 'place',
+            href,
+          },
+        ];
+      }),
+    [championBadges]
+  );
 
   const visibleBadges = homeBadges.slice(0, HOME_BADGE_VISIBLE);
   const extraBadgeCount = Math.max(0, homeBadges.length - visibleBadges.length);
@@ -138,15 +147,15 @@ export default function HomeScreen() {
                   .getChampionTitles(userId, {
                     mediaLimit: 8,
                     checkMediaLimit: 40,
+                    badgeLimit: 8,
                   })
-                  .catch(() => ({ tags: [], media: [] }))
-              : Promise.resolve({ tags: [], media: [] }),
+                  .catch(() => ({ tags: [], media: [], badges: [] }))
+              : Promise.resolve({ tags: [], media: [], badges: [] }),
           ]);
         setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
         setLibrary(libraryRes.library ?? []);
         setStats(profileRes?.stats ?? null);
-        setTipTagChampions(championsRes.tags ?? []);
-        setMediaChampions(championsRes.media ?? []);
+        setChampionBadges(championBadgesFromResponse(championsRes));
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Failed to load home';
@@ -282,13 +291,24 @@ export default function HomeScreen() {
                         backgroundColor: `${palette.bg}22`,
                       },
                     ]}>
-                    <Ionicons name="trophy" size={11} color={palette.border} />
+                    <Ionicons
+                      name={badge.isPlace ? 'location' : 'trophy'}
+                      size={11}
+                      color={palette.border}
+                    />
                     <Text style={styles.badgeRank}>#{badge.rank}</Text>
                     <Text
                       style={[styles.badgeLabel, { color: palette.text }]}
                       numberOfLines={1}>
                       {badge.label}
                     </Text>
+                    {badge.locationLabel ? (
+                      <Text
+                        style={[styles.badgeLabel, { color: palette.text }]}
+                        numberOfLines={1}>
+                        {badge.locationLabel}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 );
               })}

@@ -173,16 +173,27 @@ export interface TuneBytesTagRankingsResponse {
   tuneBytesTagRankings: TuneBytesTagRanking[];
 }
 
+export interface ChampionBadgeLocation {
+  placeId: string;
+  label?: string | null;
+  featureType?: string | null;
+  ancestorIds?: string[];
+}
+
 export interface TipTagChampion {
+  entityType?: 'tag';
   tag: string;
   rank: number;
   totalAmount: number;
   bidCount?: number;
   totalUsers?: number;
   medal?: string | null;
+  scope?: string;
+  location?: ChampionBadgeLocation | null;
 }
 
 export interface MediaChampionTitle {
+  entityType?: 'media';
   mediaId: string;
   uuid?: string;
   title: string;
@@ -190,11 +201,30 @@ export interface MediaChampionTitle {
   totalAmount: number;
   bidCount?: number;
   medal?: string | null;
+  scope?: string;
+  location?: ChampionBadgeLocation | null;
 }
+
+export interface PlaceChampionTitle {
+  entityType: 'place';
+  rank: number;
+  totalAmount: number;
+  bidCount?: number;
+  totalUsers?: number;
+  medal?: string | null;
+  scope?: string;
+  location?: ChampionBadgeLocation | null;
+}
+
+export type ChampionBadge = (TipTagChampion | MediaChampionTitle | PlaceChampionTitle) & {
+  entityType: 'tag' | 'media' | 'place';
+};
 
 export interface ChampionTitlesResponse {
   tags: TipTagChampion[];
   media: MediaChampionTitle[];
+  places?: PlaceChampionTitle[];
+  badges?: ChampionBadge[];
   podiumSize?: number;
   scope?: string;
   locationPlaceId?: string | null;

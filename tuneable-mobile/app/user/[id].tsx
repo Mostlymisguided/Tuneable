@@ -16,9 +16,9 @@ import { UserProfileHero } from '@/src/components/UserProfileHero';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { colors } from '@/src/theme/colors';
+import { championBadgesFromResponse } from '@/src/lib/championBadges';
 import type {
-  MediaChampionTitle,
-  TipTagChampion,
+  ChampionBadge,
   TuneBytesTagRanking,
   User,
   UserLibraryItem,
@@ -30,8 +30,7 @@ export default function PublicUserProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
-  const [tipTagChampions, setTipTagChampions] = useState<TipTagChampion[]>([]);
-  const [mediaChampions, setMediaChampions] = useState<MediaChampionTitle[]>([]);
+  const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,14 +53,14 @@ export default function PublicUserProfileScreen() {
               .getChampionTitles(id, {
                 mediaLimit: 8,
                 checkMediaLimit: 40,
+                badgeLimit: 8,
               })
-              .catch(() => ({ tags: [], media: [] })),
+              .catch(() => ({ tags: [], media: [], badges: [] })),
           ]);
         setUser(profileRes.user);
         setLibrary(libraryRes.library ?? []);
         setRankings(rankingsRes.tuneBytesTagRankings ?? []);
-        setTipTagChampions(championsRes.tags ?? []);
-        setMediaChampions(championsRes.media ?? []);
+        setChampionBadges(championBadgesFromResponse(championsRes));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load profile');
       } finally {
@@ -124,8 +123,7 @@ export default function PublicUserProfileScreen() {
           <UserProfileHero
             user={user}
             rankings={rankings}
-            tipTagChampions={tipTagChampions}
-            mediaChampions={mediaChampions}
+            championBadges={championBadges}
           />
           <UserLibrarySection
             items={library}

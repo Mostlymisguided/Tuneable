@@ -1356,6 +1356,7 @@ export const userAPI = {
       locationPlaceId?: string;
       tagLimit?: number;
       checkTagLimit?: number;
+      badgeLimit?: number;
     }
   ) => {
     const response = await api.get(`/users/${userId}/champion-titles`, { params });

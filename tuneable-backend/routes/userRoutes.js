@@ -4752,12 +4752,12 @@ router.get('/:userId/tag-rankings', async (req, res) => {
 });
 
 // @route   GET /api/users/:userId/champion-titles
-// @desc    Tip-based #1–#3 champion titles (tags + media) for a user profile
+// @desc    Tip-based #1–#3 champion titles (tags, media, places) for a user profile
 // @access  Public
 router.get('/:userId/champion-titles', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { mediaLimit, checkMediaLimit, locationPlaceId, tagLimit, checkTagLimit } = req.query;
+    const { mediaLimit, checkMediaLimit, locationPlaceId, tagLimit, checkTagLimit, badgeLimit } = req.query;
 
     const { getUserChampionTitles } = require('../services/mediaChampionsService');
     const result = await getUserChampionTitles(userId, {
@@ -4766,6 +4766,7 @@ router.get('/:userId/champion-titles', async (req, res) => {
       locationPlaceId,
       tagLimit,
       checkTagLimit,
+      badgeLimit,
     });
 
     if (!result) {

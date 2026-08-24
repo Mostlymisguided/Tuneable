@@ -10,9 +10,17 @@ import {
 } from '@/src/lib/location';
 import { hasHomeLocation } from '@/src/lib/onboarding';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
+import {
+  championBadgeHref,
+  championBadgeKey,
+  championBadgeLocationLabel,
+  championBadgePrimaryLabel,
+  fallbackChampionBadges,
+} from '@/src/lib/championBadges';
 import type { ResolvedLocation } from '@/src/types/user';
 import {
   DEFAULT_PROFILE_PIC,
+  type ChampionBadge,
   type MediaChampionTitle,
   type TipTagChampion,
   type TuneBytesTagRanking,
@@ -65,6 +73,7 @@ type SocialLink = {
 type Props = {
   user: User;
   rankings: TuneBytesTagRanking[];
+  championBadges?: ChampionBadge[];
   tipTagChampions?: TipTagChampion[];
   mediaChampions?: MediaChampionTitle[];
   isOwnProfile?: boolean;
@@ -75,6 +84,7 @@ type Props = {
 export function UserProfileHero({
   user,
   rankings,
+  championBadges,
   tipTagChampions = [],
   mediaChampions = [],
   isOwnProfile = false,
@@ -85,8 +95,10 @@ export function UserProfileHero({
   const secondaryLabel = formatLocationLabel(user.secondaryLocation);
   const homeSet = hasHomeLocation(user.homeLocation);
   const role = elevatedRoleLabel(user.role);
-  const tipTags = tipTagChampions.slice(0, MAX_BADGES);
-  const mediaTitles = mediaChampions.slice(0, MAX_BADGES);
+  const titles =
+    championBadges && championBadges.length > 0
+      ? championBadges.slice(0, MAX_BADGES)
+      : fallbackChampionBadges(tipTagChampions, mediaChampions).slice(0, MAX_BADGES);
   const discovery = rankings.slice(0, 5);
 
   const socialLinks: SocialLink[] = [];
@@ -298,50 +310,20 @@ export function UserProfileHero({
         </View>
       ) : null}
 
-      {tipTags.length > 0 ? (
+      {titles.length > 0 ? (
         <BadgeSection
           icon="trophy"
           iconColor="#fbbf24"
-          title={isOwnProfile ? 'Your Tip Champion Badges' : 'Tip Champion Badges'}>
-          {tipTags.map((ranking) => {
-            const palette = badgeColors(ranking.rank);
+          title={isOwnProfile ? 'Your Champion Badges' : 'Champion Badges'}>
+          {titles.map((badge, index) => {
+            const palette = badgeColors(badge.rank);
+            const href = championBadgeHref(badge);
+            const locationLabel = championBadgeLocationLabel(badge);
             return (
               <Pressable
-                key={`tip-${ranking.tag}-${ranking.rank}`}
-                onPress={() =>
-                  router.push(getTagProfileHref(ranking.tag) as Href)
-                }
-                style={[
-                  styles.badge,
-                  {
-                    borderColor: palette.border,
-                    backgroundColor: `${palette.bg}22`,
-                  },
-                ]}>
-                <Ionicons name="trophy" size={12} color={palette.border} />
-                <Text style={styles.badgeText}>#{ranking.rank}</Text>
-                <Text style={[styles.badgeMeta, { color: palette.text }]}>
-                  #{ranking.tag}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </BadgeSection>
-      ) : null}
-
-      {mediaTitles.length > 0 ? (
-        <BadgeSection
-          icon="musical-notes"
-          iconColor="#fbbf24"
-          title={isOwnProfile ? 'Your Tune Champion Badges' : 'Tune Champion Badges'}>
-          {mediaTitles.map((title) => {
-            const palette = badgeColors(title.rank);
-            const id = title.uuid || title.mediaId;
-            return (
-              <Pressable
-                key={`media-${title.mediaId}-${title.rank}`}
+                key={championBadgeKey(badge, index)}
                 onPress={() => {
-                  if (id) router.push(`/tune/${id}`);
+                  if (href) router.push(href);
                 }}
                 style={[
                   styles.badge,
@@ -351,16 +333,27 @@ export function UserProfileHero({
                     maxWidth: '100%',
                   },
                 ]}>
-                <Ionicons name="trophy" size={12} color={palette.border} />
-                <Text style={styles.badgeText}>#{title.rank}</Text>
+                <Ionicons
+                  name={badge.entityType === 'place' ? 'location' : 'trophy'}
+                  size={12}
+                  color={palette.border}
+                />
+                <Text style={styles.badgeText}>#{badge.rank}</Text>
                 <Text
                   style={[
                     styles.badgeMeta,
                     { color: palette.text, flexShrink: 1 },
                   ]}
                   numberOfLines={1}>
-                  {title.title}
+                  {championBadgePrimaryLabel(badge)}
                 </Text>
+                {locationLabel ? (
+                  <Text
+                    style={[styles.badgeMeta, { color: palette.text }]}
+                    numberOfLines={1}>
+                    {locationLabel}
+                  </Text>
+                ) : null}
               </Pressable>
             );
           })}
