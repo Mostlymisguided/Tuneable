@@ -51,7 +51,6 @@ const CreatorUpload = lazy(() => import('./pages/CreatorUpload'));
 import LibraryEnrich from './pages/LibraryEnrich';
 import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
-import DefaultTipOnboardingModal from './components/DefaultTipOnboardingModal';
 import Onboarding from './pages/Onboarding';
 import { needsOnboarding } from './utils/authHelpers';
 import Notifications from './pages/Notifications';
@@ -199,7 +198,6 @@ const AppContent = () => {
       <div className="min-h-screen">
         <Navbar />
         <OnboardingRedirect />
-        <DefaultTipOnboardingModal />
         <main className="pt-16 pb-32">
           <Routes>
             <Route path="/" element={<Navigate to="/party/global?period=all-time" replace />} />

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
-import { hasHomeLocation } from '@/src/lib/onboarding';
+import { DEFAULT_TIP_POUNDS, hasHomeLocation } from '@/src/lib/onboarding';
 import { requestAndRegisterPush } from '@/src/lib/pushNotifications';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
@@ -20,6 +20,9 @@ export function DashboardPrompts() {
   if (!user) return null;
 
   const showLocation = !hasHomeLocation(user.homeLocation);
+  const currentDefaultTip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
+  const showDefaultTip =
+    !user.onboarding?.defaultTipPromptSeenAt && !dismissed.has('defaultTip');
   const showNotifications =
     !user.hasPushDevice &&
     !user.onboarding?.notificationsPromptSeenAt &&
@@ -27,7 +30,7 @@ export function DashboardPrompts() {
   const showEmail = !user.emailVerified && !dismissed.has('email');
   const showPic = !hasCustomProfilePic(user.profilePic) && !dismissed.has('pic');
 
-  if (!showLocation && !showNotifications && !showEmail && !showPic) return null;
+  if (!showLocation && !showDefaultTip && !showNotifications && !showEmail && !showPic) return null;
 
   const sendVerification = async () => {
     setSendingEmail(true);
@@ -77,6 +80,18 @@ export function DashboardPrompts() {
     }
   };
 
+  const dismissDefaultTip = async () => {
+    setDismissed((prev) => new Set(prev).add('defaultTip'));
+    try {
+      await authAPI.updateProfile({
+        onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
+      });
+      await refreshUser();
+    } catch {
+      // Local dismiss still hides it this session
+    }
+  };
+
   return (
     <View>
       {showLocation ? (
@@ -86,6 +101,16 @@ export function DashboardPrompts() {
           body="Tips influence charts where you are. Set home, or allow location while the app is open."
           actionLabel="Set location"
           onAction={() => router.push('/set-home-location')}
+        />
+      ) : null}
+      {showDefaultTip ? (
+        <PromptCard
+          icon="cash-outline"
+          title="Set your default tip"
+          body={`Adding a tune to your library places a tip. Currently £${currentDefaultTip.toFixed(2)} — change it, or keep this amount.`}
+          actionLabel="Set tip"
+          onAction={() => router.push('/edit-profile')}
+          onDismiss={() => void dismissDefaultTip()}
         />
       ) : null}
       {showNotifications ? (

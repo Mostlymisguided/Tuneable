@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, MapPin, Navigation, User, X, CheckCircle } from 'lucide-react';
+import { Mail, MapPin, Navigation, User, X, CheckCircle, Coins } from 'lucide-react';
 import { emailAPI, authAPI } from '../lib/api';
 import { toast } from 'react-toastify';
-import { hasCustomProfilePic } from '../constants';
+import { hasCustomProfilePic, DEFAULT_TIP_POUNDS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { formatLocation } from '../utils/locationHelpers';
@@ -14,6 +14,12 @@ interface User {
   uuid?: string;
   emailVerified?: boolean;
   profilePic?: string;
+  onboarding?: {
+    defaultTipPromptSeenAt?: string;
+  };
+  preferences?: {
+    defaultTip?: number;
+  };
   homeLocation?: {
     city?: string;
     region?: string;
@@ -74,6 +80,15 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     const userId = user._id || user.id || user.uuid;
     if (userId) {
       navigate(`/user/${userId}?settings=true&tab=profile&action=uploadPic`);
+    } else {
+      toast.error('Unable to navigate to profile');
+    }
+  };
+
+  const handleSetDefaultTip = () => {
+    const userId = user._id || user.id || user.uuid;
+    if (userId) {
+      navigate(`/user/${userId}?settings=true&tab=notifications`);
     } else {
       toast.error('Unable to navigate to profile');
     }
@@ -143,7 +158,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       description: 'Verify your email address to unlock all features',
       icon: Mail,
       action: handleEmailVerification,
-      priority: 2
+      priority: 3
     });
   }
 
@@ -155,7 +170,20 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       description: 'Add a profile picture to personalize your account',
       icon: User,
       action: handleAddProfilePicture,
-      priority: 3
+      priority: 4
+    });
+  }
+
+  if (!user.onboarding?.defaultTipPromptSeenAt) {
+    const currentTip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
+    prompts.push({
+      id: 'defaultTip',
+      title: 'Set your default tip',
+      description: `Adding a tune to your library places a tip. Currently £${currentTip.toFixed(2)} — change it, or keep this amount.`,
+      icon: Coins,
+      action: handleSetDefaultTip,
+      actionLabel: 'Set tip',
+      priority: 2,
     });
   }
 
@@ -197,6 +225,18 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     setDismissedPrompts(prev => new Set([...prev, promptId]));
     if (promptId === 'currentLocation') {
       dismissPrompt();
+    }
+    if (promptId === 'defaultTip') {
+      void (async () => {
+        try {
+          await authAPI.updateProfile({
+            onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
+          });
+          await refreshUser();
+        } catch {
+          // Local dismiss still hides it this session
+        }
+      })();
     }
     if (onDismiss) {
       onDismiss(promptId);

@@ -2918,6 +2918,15 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
   }
 });
 
+function markDefaultTipPromptSeen(user) {
+  if (!user.onboarding) {
+    user.onboarding = {};
+  }
+  if (!user.onboarding.defaultTipPromptSeenAt) {
+    user.onboarding.defaultTipPromptSeenAt = new Date();
+  }
+}
+
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
@@ -3049,6 +3058,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
 
       user.preferences.defaultTip = defaultTip;
+      markDefaultTipPromptSeen(user);
     }
 
     if (preferences?.favoriteTags !== undefined) {
@@ -3288,6 +3298,7 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
         });
       }
       user.preferences.defaultTip = defaultTip;
+      markDefaultTipPromptSeen(user);
     }
 
     await user.save();

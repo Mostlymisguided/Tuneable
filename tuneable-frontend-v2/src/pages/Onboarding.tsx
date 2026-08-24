@@ -1,13 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
-  Coins,
   Loader2,
   MapPin,
   Music,
   Navigation,
-  Sparkles,
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -26,19 +24,18 @@ import {
   refreshCurrentLocation,
 } from '../utils/currentLocationCache';
 
-type OnboardingStep = 'tip' | 'location' | 'import';
+type OnboardingStep = 'location' | 'import';
 type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
 
-const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
 const ONBOARDING_IMPORT_LIMIT = 25;
 const SPOTIFY_READONLY_COPY =
   'Tuneable only reads your likes. We cannot change your Spotify library, playlists, or playback.';
 
-const STEP_ORDER: OnboardingStep[] = ['tip', 'location', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['location', 'import'];
 
 function parseStep(value: string | null): OnboardingStep {
-  if (value === 'location' || value === 'import') return value;
-  return 'tip';
+  if (value === 'import') return 'import';
+  return 'location';
 }
 
 function parseImportSource(value: string | null): ImportSource | null {
@@ -55,8 +52,6 @@ const Onboarding: React.FC = () => {
   const importSource = parseImportSource(searchParams.get('source'));
 
   const [isSaving, setIsSaving] = useState(false);
-
-  const [defaultTip, setDefaultTip] = useState(DEFAULT_TIP_POUNDS.toFixed(2));
 
   const [homeLocation, setHomeLocation] = useState<ResolvedLocation | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -83,23 +78,12 @@ const Onboarding: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    // Only leave the wizard when onboarding is fully finished — tip step alone must not redirect
+    // Only leave the wizard when onboarding is fully finished
     if (user.onboarding?.completedAt) {
       const tags = user.preferences?.favoriteTags ?? [];
       navigate(buildOnboardingCompletePath(tags), { replace: true });
     }
   }, [user, navigate]);
-
-  useEffect(() => {
-    if (!user) return;
-    // Suggest £1.11 until the user saves a tip during onboarding
-    if (!user.onboarding?.defaultTipPromptSeenAt) {
-      setDefaultTip(DEFAULT_TIP_POUNDS.toFixed(2));
-    } else {
-      const tip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
-      setDefaultTip(tip.toFixed(2));
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -201,7 +185,7 @@ const Onboarding: React.FC = () => {
       });
 
       const items = data.items || [];
-      const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
+      const tip = user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
       const actionable = items.filter((i: { matchStatus: string; selected?: boolean }) =>
         i.matchStatus !== 'in_library' && (source !== 'youtube' || i.selected !== false)
       );
@@ -222,7 +206,7 @@ const Onboarding: React.FC = () => {
       setIsImportLoading(false);
       setImportProgressMessage(null);
     }
-  }, [defaultTip, user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]);
+  }, [user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]);
 
   useEffect(() => {
     if (step !== 'import') return;
@@ -243,53 +227,9 @@ const Onboarding: React.FC = () => {
     params.set('step', next);
     if (next !== 'import') {
       params.delete('source');
+      params.delete('requestAccess');
     }
     setSearchParams(params, { replace: true });
-  };
-
-  const markTipSeen = async (tipAmount?: number) => {
-    const payload: Record<string, unknown> = {
-      onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
-    };
-    if (tipAmount !== undefined) {
-      payload.preferences = { defaultTip: tipAmount };
-    }
-    await authAPI.updateProfile(payload);
-    await refreshUser();
-  };
-
-  const saveTipStep = async () => {
-    const parsedTip = parseFloat(defaultTip);
-    if (Number.isNaN(parsedTip) || parsedTip < 0.01) {
-      toast.error('Default tip must be at least £0.01');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await markTipSeen(parsedTip);
-      goToStep('location');
-    } catch (error: unknown) {
-      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
-        || 'Failed to save default tip';
-      toast.error(message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const skipTipStep = async () => {
-    setIsSaving(true);
-    try {
-      await markTipSeen();
-      goToStep('location');
-    } catch (error: unknown) {
-      const message = (error as { response?: { data?: { error?: string } } })?.response?.data?.error
-        || 'Failed to continue';
-      toast.error(message);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const requestDeviceLocation = async () => {
@@ -386,6 +326,7 @@ const Onboarding: React.FC = () => {
     const params = new URLSearchParams(searchParams);
     params.set('step', 'import');
     params.set('source', source);
+    if (source !== 'spotify') params.delete('requestAccess');
     setSearchParams(params, { replace: true });
   };
 
@@ -393,6 +334,7 @@ const Onboarding: React.FC = () => {
     const params = new URLSearchParams(searchParams);
     params.set('step', 'import');
     params.delete('source');
+    params.delete('requestAccess');
     setImportPreview(null);
     setSearchParams(params, { replace: true });
   };
@@ -411,7 +353,7 @@ const Onboarding: React.FC = () => {
       startImportFromSource(source);
       return;
     }
-    if (source === 'spotify' && !spotifyOauthAvailable) {
+    if (source === 'spotify' && (!spotifyOauthAvailable || searchParams.get('requestAccess') === '1')) {
       startImportFromSource(source);
       return;
     }
@@ -443,7 +385,7 @@ const Onboarding: React.FC = () => {
     setIsImportLoading(true);
     setImportProgressMessage('Preparing import…');
     try {
-      const tip = user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS;
+      const tip = user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
       const previewStarted = importSource === 'soundcloud'
         ? await userAPI.startSoundCloudImportPreview(ONBOARDING_IMPORT_LIMIT, 'spotify_only')
         : importSource === 'youtube'
@@ -514,24 +456,6 @@ const Onboarding: React.FC = () => {
     }
   };
 
-  const userBalance = user?.balance != null ? penceToPoundsNumber(user.balance) : 0;
-
-  const parsedDefaultTip = useMemo(() => {
-    const parsed = parseFloat(defaultTip);
-    return Number.isFinite(parsed) && parsed >= 0.01 ? parsed : DEFAULT_TIP_POUNDS;
-  }, [defaultTip]);
-
-  const tunesCovered = useMemo(() => {
-    if (userBalance <= 0 || parsedDefaultTip < 0.01) return null;
-    return Math.floor((userBalance + 0.0001) / parsedDefaultTip);
-  }, [userBalance, parsedDefaultTip]);
-
-  const tunesCoveredLabel = useMemo(() => {
-    if (tunesCovered == null) return null;
-    if (tunesCovered >= 100) return '100+';
-    return String(tunesCovered);
-  }, [tunesCovered]);
-
   return (
     <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-2xl flex-col px-4 py-8">
       <div className="mb-8 text-center">
@@ -555,94 +479,6 @@ const Onboarding: React.FC = () => {
       </div>
 
       <div className="flex-1 rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
-        {step === 'tip' && (
-          <div className="space-y-6">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-600/20 text-purple-300">
-                <Coins className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-white">Tip to add music to your library</h2>
-                <p className="mt-2 text-sm text-gray-400">
-                  Adding a tune to your library means placing a tip. Your default is set to{' '}
-                  <strong className="text-white">£{DEFAULT_TIP_POUNDS.toFixed(2)}</strong>. Change it below if you
-                  wish, or skip and keep this amount. You can update it any time in settings.
-                </p>
-              </div>
-            </div>
-
-            {userBalance > 0 && (
-              <div className="flex items-center gap-3 rounded-xl border border-green-800/50 bg-green-900/20 p-4 text-sm text-green-200">
-                <Sparkles className="h-5 w-5 shrink-0" />
-                <span>
-                  You have <strong>£{userBalance.toFixed(2)}</strong> welcome credit to start tipping.
-                </span>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="onboarding-default-tip" className="mb-2 block text-sm font-medium text-white">
-                Your default tip (£)
-              </label>
-              <input
-                id="onboarding-default-tip"
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={defaultTip}
-                onChange={(e) => setDefaultTip(e.target.value)}
-                className="w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-3 text-lg text-white focus:border-purple-500 focus:outline-none"
-              />
-              <div className="mt-3 flex flex-wrap gap-2">
-                {QUICK_TIP_OPTIONS.map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => setDefaultTip(amount.toFixed(2))}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                      Math.abs(parseFloat(defaultTip) - amount) < 0.001
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-                  >
-                    £{amount.toFixed(2)}
-                  </button>
-                ))}
-              </div>
-              {tunesCoveredLabel != null && (
-                <p className="mt-3 text-sm text-gray-400">
-                  At <strong className="text-white">£{parsedDefaultTip.toFixed(2)}</strong>, your
-                  balance covers about{' '}
-                  <strong className="text-white">{tunesCoveredLabel}</strong>{' '}
-                  {tunesCovered === 1 ? 'tune' : 'tunes'}.
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={skipTipStep}
-                disabled={isSaving}
-                className="rounded-xl border border-gray-600 px-5 py-3 font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50 sm:order-1 sm:flex-1"
-              >
-                Skip for now
-              </button>
-              <button
-                type="button"
-                onClick={saveTipStep}
-                disabled={isSaving}
-                className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500 disabled:opacity-50 sm:order-2 sm:flex-[1.4]"
-              >
-                {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-                {Math.abs(parsedDefaultTip - DEFAULT_TIP_POUNDS) < 0.001
-                  ? `Continue with £${DEFAULT_TIP_POUNDS.toFixed(2)}`
-                  : `Save £${parsedDefaultTip.toFixed(2)} and continue`}
-              </button>
-            </div>
-          </div>
-        )}
-
         {step === 'location' && (
           <div className="space-y-6">
             <div className="flex items-start gap-3">
@@ -720,16 +556,9 @@ const Onboarding: React.FC = () => {
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => goToStep('tip')}
-                className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800 sm:order-1"
-              >
-                Back
-              </button>
-              <button
-                type="button"
                 onClick={skipLocationStep}
                 disabled={isSaving}
-                className="rounded-xl border border-gray-600 px-5 py-3 font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50 sm:order-2 sm:flex-1"
+                className="rounded-xl border border-gray-600 px-5 py-3 font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50 sm:order-1 sm:flex-1"
               >
                 Skip for now
               </button>
@@ -757,7 +586,7 @@ const Onboarding: React.FC = () => {
                 <p className="mt-2 text-sm text-gray-400">
                   Bring in likes from Spotify or SoundCloud, or a public YouTube playlist. Each imported
                   track gets a tip at your default
-                  (£{(user?.preferences?.defaultTip ?? parseFloat(defaultTip) ?? DEFAULT_TIP_POUNDS).toFixed(2)}).
+                  (£{(user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS).toFixed(2)}).
                   You can skip and do this later.
                 </p>
               </div>
@@ -883,12 +712,14 @@ const Onboarding: React.FC = () => {
                       Review all tracks before importing →
                     </button>
                   </div>
-                ) : importSource === 'spotify' && !spotifyConnected && !spotifyOauthAvailable ? (
+                ) : importSource === 'spotify' && !spotifyConnected && (!spotifyOauthAvailable || searchParams.get('requestAccess') === '1' || spotifyRequestStatus === 'pending' || spotifyRequestStatus === 'rejected') ? (
                   <div className="space-y-3">
                     <p className="text-sm text-gray-400">
                       {spotifyRequestStatus === 'pending'
                         ? 'Request pending — Connect will unlock after we add your Spotify account to the tester list.'
-                        : 'Spotify import is currently limited to testers. Request access with the email on your Spotify account.'}
+                        : searchParams.get('requestAccess') === '1'
+                          ? 'Spotify couldn’t connect this account because it isn’t on the tester list yet. Request access with the email on your Spotify account (spotify.com/account/overview).'
+                          : 'Spotify import is currently limited to testers. Request access with the email on your Spotify account.'}
                     </p>
                     <input
                       type="email"

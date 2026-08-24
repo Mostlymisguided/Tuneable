@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -20,7 +20,6 @@ import { authAPI } from '@/src/api/auth';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
-import { formatPoundsFromPence } from '@/src/lib/format';
 import { formatLocationLabel } from '@/src/lib/location';
 import {
   getCurrentLocationStatus,
@@ -44,24 +43,21 @@ import type { ResolvedLocation } from '@/src/types/user';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type OnboardingStep = 'tip' | 'location' | 'notifications' | 'import';
-type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
+type OnboardingStep = 'location' | 'notifications' | 'import';
+type ImportSource = 'soundcloud' | 'youtube';
 
-const STEP_ORDER: OnboardingStep[] = ['tip', 'location', 'notifications', 'import'];
-const QUICK_TIP_OPTIONS = [0.11, 0.5, 1.11, 5, 11.11];
+const STEP_ORDER: OnboardingStep[] = ['location', 'notifications', 'import'];
 const ONBOARDING_IMPORT_LIMIT = 25;
-const SPOTIFY_READONLY_COPY =
-  'Tuneable only reads your likes. We cannot change your Spotify library, playlists, or playback.';
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'location' || raw === 'import' || raw === 'notifications') return raw;
-  return 'tip';
+  if (raw === 'import' || raw === 'notifications') return raw;
+  return 'location';
 }
 
 function parseSource(value: string | string[] | undefined): ImportSource | null {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'soundcloud' || raw === 'spotify' || raw === 'youtube') return raw;
+  if (raw === 'soundcloud' || raw === 'youtube') return raw;
   return null;
 }
 
@@ -83,13 +79,11 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [defaultTip, setDefaultTip] = useState(DEFAULT_TIP_POUNDS.toFixed(2));
   const [homeLocation, setHomeLocation] = useState<ResolvedLocation | null>(null);
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [requestingGps, setRequestingGps] = useState(false);
   const [locationFromGps, setLocationFromGps] = useState(false);
 
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [soundcloudConnected, setSoundcloudConnected] = useState(false);
   const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
   const [importLoading, setImportLoading] = useState(false);
@@ -99,16 +93,6 @@ export default function OnboardingScreen() {
     estimatedCost: number;
     userBalance: number;
   } | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    if (!user.onboarding?.defaultTipPromptSeenAt) {
-      setDefaultTip(DEFAULT_TIP_POUNDS.toFixed(2));
-    } else {
-      const tip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
-      setDefaultTip(tip.toFixed(2));
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -172,47 +156,6 @@ export default function OnboardingScreen() {
           ? { step: next, source }
           : { step: next },
     });
-  };
-
-  const markTipSeen = async (tipAmount?: number) => {
-    await authAPI.updateProfile({
-      onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
-      ...(tipAmount !== undefined
-        ? { preferences: { defaultTip: tipAmount } }
-        : {}),
-    });
-    await refreshUser();
-  };
-
-  const saveTipStep = async () => {
-    const parsed = parseFloat(defaultTip);
-    if (Number.isNaN(parsed) || parsed < 0.01) {
-      setError('Default tip must be at least £0.01');
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await markTipSeen(parsed);
-      goToStep('location');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to save default tip.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const skipTipStep = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await markTipSeen();
-      goToStep('location');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to continue.'));
-    } finally {
-      setSaving(false);
-    }
   };
 
   const requestDeviceLocation = async () => {
@@ -317,18 +260,12 @@ export default function OnboardingScreen() {
 
   const checkConnections = useCallback(async () => {
     try {
-      const [spotify, soundcloud] = await Promise.all([
-        userAPI.getSpotifyStatus(),
-        userAPI.getSoundCloudStatus(),
-      ]);
-      setSpotifyConnected(Boolean(spotify?.connected));
-      setSoundcloudConnected(Boolean(soundcloud?.connected));
-      return {
-        spotify: Boolean(spotify?.connected),
-        soundcloud: Boolean(soundcloud?.connected),
-      };
+      const soundcloud = await userAPI.getSoundCloudStatus();
+      const connected = Boolean(soundcloud?.connected);
+      setSoundcloudConnected(connected);
+      return { soundcloud: connected };
     } catch {
-      return { spotify: false, soundcloud: false };
+      return { soundcloud: false };
     }
   }, []);
 
@@ -351,13 +288,11 @@ export default function OnboardingScreen() {
                 ONBOARDING_IMPORT_LIMIT,
                 'spotify_only'
               )
-            : source === 'youtube'
-              ? await userAPI.startYouTubeImportPreview(
-                  playlistUrl || youtubePlaylistUrl,
-                  ONBOARDING_IMPORT_LIMIT,
-                  'playlist'
-                )
-            : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
+            : await userAPI.startYouTubeImportPreview(
+                playlistUrl || youtubePlaylistUrl,
+                ONBOARDING_IMPORT_LIMIT,
+                'playlist'
+              );
         const data = await userAPI.waitForImportJob<{
           items?: Array<{ matchStatus: string; selected?: boolean }>;
           summary?: { userBalance?: number };
@@ -370,10 +305,7 @@ export default function OnboardingScreen() {
           );
         });
 
-        const tip =
-          user?.preferences?.defaultTip ??
-          parseFloat(defaultTip) ??
-          DEFAULT_TIP_POUNDS;
+        const tip = user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
         const items = data.items || [];
         const actionable = items.filter(
           (i) =>
@@ -397,7 +329,7 @@ export default function OnboardingScreen() {
         setImportProgress(null);
       }
     },
-    [defaultTip, user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]
+    [user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]
   );
 
   useEffect(() => {
@@ -407,17 +339,13 @@ export default function OnboardingScreen() {
 
     void (async () => {
       const connections = await checkConnections();
-      const connected =
-        sourceParam === 'soundcloud'
-          ? connections.soundcloud
-          : connections.spotify;
-      if (connected) {
+      if (connections.soundcloud) {
         await loadImportPreview(sourceParam);
       }
     })();
   }, [step, params.source, checkConnections, loadImportPreview]);
 
-  const connectImportSource = async (source: 'spotify' | 'soundcloud') => {
+  const connectImportSource = async () => {
     if (!token) {
       setError('You need to be signed in to connect an account.');
       return;
@@ -426,9 +354,9 @@ export default function OnboardingScreen() {
     setImportLoading(true);
     try {
       const redirect = Linking.createURL('onboarding', {
-        queryParams: { step: 'import', source },
+        queryParams: { step: 'import', source: 'soundcloud' },
       });
-      const startUrl = buildOAuthStartUrl(source, {
+      const startUrl = buildOAuthStartUrl('soundcloud', {
         linkAccount: true,
         token,
         customRedirect: redirect,
@@ -440,16 +368,12 @@ export default function OnboardingScreen() {
           setError(oauthError.replace(/_/g, ' '));
           return;
         }
-        goToStep('import', source);
+        goToStep('import', 'soundcloud');
         const connections = await checkConnections();
-        const connected =
-          source === 'soundcloud' ? connections.soundcloud : connections.spotify;
-        if (connected) {
-          await loadImportPreview(source);
+        if (connections.soundcloud) {
+          await loadImportPreview('soundcloud');
         } else {
-          setError(
-            `${source === 'soundcloud' ? 'SoundCloud' : 'Spotify'} did not connect. Try again.`
-          );
+          setError('SoundCloud did not connect. Try again.');
         }
       }
     } catch (err) {
@@ -470,9 +394,7 @@ export default function OnboardingScreen() {
       goToStep('import', 'youtube');
       return;
     }
-    const connected =
-      source === 'soundcloud' ? soundcloudConnected : spotifyConnected;
-    if (connected) {
+    if (soundcloudConnected) {
       if (importSource === source) {
         void loadImportPreview(source);
         return;
@@ -480,7 +402,7 @@ export default function OnboardingScreen() {
       goToStep('import', source);
       return;
     }
-    void connectImportSource(source);
+    void connectImportSource();
   };
 
   const runQuickImport = async () => {
@@ -489,23 +411,18 @@ export default function OnboardingScreen() {
     setImportProgress('Preparing import…');
     setError(null);
     try {
-      const tip =
-        user?.preferences?.defaultTip ??
-        parseFloat(defaultTip) ??
-        DEFAULT_TIP_POUNDS;
+      const tip = user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
       const previewStarted =
         importSource === 'soundcloud'
           ? await userAPI.startSoundCloudImportPreview(
               ONBOARDING_IMPORT_LIMIT,
               'spotify_only'
             )
-          : importSource === 'youtube'
-            ? await userAPI.startYouTubeImportPreview(
-                youtubePlaylistUrl,
-                ONBOARDING_IMPORT_LIMIT,
-                'playlist'
-              )
-          : await userAPI.startSpotifyImportPreview(ONBOARDING_IMPORT_LIMIT);
+          : await userAPI.startYouTubeImportPreview(
+              youtubePlaylistUrl,
+              ONBOARDING_IMPORT_LIMIT,
+              'playlist'
+            );
       const data = await userAPI.waitForImportJob<{
         items?: Array<{
           key: string;
@@ -550,9 +467,7 @@ export default function OnboardingScreen() {
       const executeStarted =
         importSource === 'soundcloud'
           ? await userAPI.startSoundCloudImportExecute(items, tip)
-          : importSource === 'youtube'
-            ? await userAPI.startYouTubeImportExecute(items, tip)
-          : await userAPI.startSpotifyImportExecute(items, tip);
+          : await userAPI.startYouTubeImportExecute(items, tip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
         updatedBalance: number;
@@ -574,21 +489,6 @@ export default function OnboardingScreen() {
       setImportProgress(null);
     }
   };
-
-  const parsedDefaultTip = useMemo(() => {
-    const parsed = parseFloat(defaultTip);
-    return Number.isFinite(parsed) && parsed >= 0.01
-      ? parsed
-      : DEFAULT_TIP_POUNDS;
-  }, [defaultTip]);
-
-  const userBalancePounds = user?.balance != null ? user.balance / 100 : 0;
-  const tunesCovered =
-    userBalancePounds > 0 && parsedDefaultTip >= 0.01
-      ? Math.floor((userBalancePounds + 0.0001) / parsedDefaultTip)
-      : null;
-  const tunesCoveredLabel =
-    tunesCovered == null ? null : tunesCovered >= 100 ? '100+' : String(tunesCovered);
 
   const busy = saving || importLoading || requestingGps;
 
@@ -637,94 +537,6 @@ export default function OnboardingScreen() {
           </View>
 
           <View style={styles.card}>
-            {step === 'tip' && (
-              <View style={styles.stepBody}>
-                <View style={styles.stepHeader}>
-                  <View style={styles.iconBubble}>
-                    <Ionicons name="cash-outline" size={20} color={colors.accentLight} />
-                  </View>
-                  <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>
-                      Tip to add music to your library
-                    </Text>
-                    <Text style={styles.stepText}>
-                      Your default is £{DEFAULT_TIP_POUNDS.toFixed(2)}. Change it
-                      below, continue, or skip and keep this amount.
-                    </Text>
-                  </View>
-                </View>
-
-                {userBalancePounds > 0 ? (
-                  <View style={styles.creditBanner}>
-                    <Text style={styles.creditText}>
-                      You have {formatPoundsFromPence(user?.balance)} welcome
-                      credit to start tipping.
-                    </Text>
-                  </View>
-                ) : null}
-
-                <Text style={styles.label}>Your default tip (£)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="decimal-pad"
-                  value={defaultTip}
-                  onChangeText={setDefaultTip}
-                  editable={!busy}
-                />
-                <View style={styles.chipRow}>
-                  {QUICK_TIP_OPTIONS.map((amount) => {
-                    const selected =
-                      Math.abs(parseFloat(defaultTip) - amount) < 0.001;
-                    return (
-                      <Pressable
-                        key={amount}
-                        style={[styles.chip, selected && styles.chipSelected]}
-                        onPress={() => setDefaultTip(amount.toFixed(2))}
-                        disabled={busy}>
-                        <Text
-                          style={[
-                            styles.chipText,
-                            selected && styles.chipTextSelected,
-                          ]}>
-                          £{amount.toFixed(2)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {tunesCoveredLabel != null ? (
-                  <Text style={styles.hint}>
-                    At £{parsedDefaultTip.toFixed(2)}, your balance covers about{' '}
-                    {tunesCoveredLabel}{' '}
-                    {tunesCovered === 1 ? 'tune' : 'tunes'}.
-                  </Text>
-                ) : null}
-
-                {error ? <Text style={styles.error}>{error}</Text> : null}
-
-                <Pressable
-                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy}
-                  onPress={() => void saveTipStep()}>
-                  {saving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryBtnText}>
-                      {Math.abs(parsedDefaultTip - DEFAULT_TIP_POUNDS) < 0.001
-                        ? `Continue with £${DEFAULT_TIP_POUNDS.toFixed(2)}`
-                        : `Save £${parsedDefaultTip.toFixed(2)} and continue`}
-                    </Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  style={[styles.secondaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy}
-                  onPress={() => void skipTipStep()}>
-                  <Text style={styles.secondaryBtnText}>Skip for now</Text>
-                </Pressable>
-              </View>
-            )}
-
             {step === 'location' && (
               <View style={styles.stepBody}>
                 <View style={styles.stepHeader}>
@@ -823,12 +635,6 @@ export default function OnboardingScreen() {
                   }}>
                   <Text style={styles.secondaryBtnText}>Skip for now</Text>
                 </Pressable>
-                <Pressable
-                  style={styles.backBtn}
-                  disabled={busy}
-                  onPress={() => goToStep('tip')}>
-                  <Text style={styles.backBtnText}>Back</Text>
-                </Pressable>
               </View>
             )}
 
@@ -883,33 +689,16 @@ export default function OnboardingScreen() {
                   <View style={styles.stepHeaderCopy}>
                     <Text style={styles.stepTitle}>Import your existing library</Text>
                     <Text style={styles.stepText}>
-                      Bring in likes from Spotify or SoundCloud, or a public
-                      YouTube playlist. Each track gets a tip at your default (£
-                      {(
-                        user?.preferences?.defaultTip ??
-                        parsedDefaultTip
-                      ).toFixed(2)}
+                      Bring in likes from SoundCloud or a public YouTube
+                      playlist. Each track gets a tip at your default (£
+                      {(user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS).toFixed(2)}
                       ).
                     </Text>
                   </View>
                 </View>
 
-                {!importLoading && !importPreview && !params.source ? (
+                {!importLoading && !importPreview && !importSource ? (
                   <View style={styles.importGrid}>
-                    <Pressable
-                      style={[styles.importCard, styles.spotifyCard]}
-                      disabled={busy}
-                      onPress={() => handleImportSourcePress('spotify')}>
-                      <Text style={styles.importTitle}>
-                        {spotifyConnected ? 'Import from Spotify' : 'Connect Spotify'}
-                      </Text>
-                      <Text style={styles.importSub}>
-                        {spotifyConnected
-                          ? 'Connected — tap to scan your likes'
-                          : 'Read-only access to your saved tracks'}
-                      </Text>
-                    </Pressable>
-                    <Text style={styles.privacyNote}>{SPOTIFY_READONLY_COPY}</Text>
                     <Pressable
                       style={[styles.importCard, styles.soundcloudCard]}
                       disabled={busy}
@@ -970,11 +759,7 @@ export default function OnboardingScreen() {
                           {importProgress ||
                             (importSource === 'youtube'
                               ? 'Matching playlist…'
-                              : `Scanning your ${
-                                  importSource === 'soundcloud'
-                                    ? 'SoundCloud'
-                                    : 'Spotify'
-                                } likes…`)}
+                              : `Scanning your SoundCloud likes…`)}
                         </Text>
                       </View>
                     ) : importPreview ? (
@@ -1008,11 +793,7 @@ export default function OnboardingScreen() {
                         <Text style={styles.hint}>
                           {importSource === 'youtube'
                             ? 'Matching playlist…'
-                            : `Scanning your ${
-                                importSource === 'soundcloud'
-                                  ? 'SoundCloud'
-                                  : 'Spotify'
-                              } likes…`}
+                            : `Scanning your SoundCloud likes…`}
                         </Text>
                       </View>
                     )}
@@ -1279,18 +1060,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 16,
   },
-  spotifyCard: {
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-  },
   soundcloudCard: {
     borderColor: 'rgba(249, 115, 22, 0.4)',
     backgroundColor: 'rgba(249, 115, 22, 0.1)',
-  },
-  importTitle: {
-    color: '#86efac',
-    fontSize: 16,
-    fontWeight: '700',
   },
   importTitleSc: {
     color: '#fdba74',
@@ -1306,13 +1078,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: colors.textMuted,
     fontSize: 13,
-  },
-  privacyNote: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: -4,
-    marginBottom: 2,
   },
   youtubeCard: {
     borderColor: 'rgba(239, 68, 68, 0.4)',
