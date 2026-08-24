@@ -249,7 +249,11 @@ const LibraryImport: React.FC = () => {
   const checkConnections = useCallback(async () => {
     try {
       const [spotify, soundcloud] = await Promise.all([
-        userAPI.getSpotifyStatus().catch(() => ({ connected: false })),
+        userAPI.getSpotifyStatus().catch(
+          (): Awaited<ReturnType<typeof userAPI.getSpotifyStatus>> => ({
+            connected: false,
+          })
+        ),
         userAPI.getSoundCloudStatus().catch(() => ({ connected: false })),
       ]);
       const next = {
