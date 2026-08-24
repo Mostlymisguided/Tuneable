@@ -6,7 +6,6 @@ import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
-import { booksAPI } from '@/src/api/books';
 import {
   type BpmFilterRange,
   computeTopTags,
@@ -19,7 +18,6 @@ import {
   type ChartSortKey,
 } from '@/src/lib/chartSort';
 import { isUploadPlayable, isWrittenMedia, mediaId } from '@/src/lib/media';
-import { getTipCurrentLocation } from '@/src/lib/currentLocation';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import type { ChartMediaItem, TimePeriodKey } from '@/src/types/media';
@@ -229,10 +227,11 @@ export function UserLibrarySection({
   };
 
   const playItem = (item: ChartMediaItem) => {
-    if (isBookLibraryItem(item) || isPodcastLibraryItem(item)) {
+    if (isBookLibraryItem(item)) return;
+    if (isPodcastLibraryItem(item)) {
       const id = mediaId(item);
       if (!id) return;
-      router.push(isBookLibraryItem(item) ? `/book/${id}` : `/podcast/${id}`);
+      router.push(`/podcast/${id}`);
       return;
     }
     const playable = filtered.filter(isUploadPlayable);
@@ -249,17 +248,7 @@ export function UserLibrarySection({
 
   const confirmTip = async (amountPounds: number, tags: string[]) => {
     if (!tipTarget) return;
-    if (isBookLibraryItem(tipTarget)) {
-      const res = await booksAPI.boost(
-        tipTarget.mediaId,
-        amountPounds,
-        getTipCurrentLocation()
-      );
-      if (typeof res.updatedBalance === 'number') {
-        onBalanceUpdate?.(res.updatedBalance);
-      }
-      return res;
-    }
+    if (isBookLibraryItem(tipTarget)) return;
     const res = await mediaAPI.placeGlobalBid(tipTarget.mediaId, amountPounds, {
       tags,
     });
@@ -398,12 +387,7 @@ export function UserLibrarySection({
               const id = mediaId(item);
               if (!id) return;
               const lib = findLibraryItem(item);
-              if (lib && isBookLibraryItem(lib)) {
-                router.push(`/book/${id}`);
-                return;
-              }
-              if (isBookLibraryItem(item)) {
-                router.push(`/book/${id}`);
+              if ((lib && isBookLibraryItem(lib)) || isBookLibraryItem(item)) {
                 return;
               }
               if (lib && isPodcastLibraryItem(lib)) {
@@ -419,7 +403,8 @@ export function UserLibrarySection({
             onPlay={() => playItem(item)}
             onTip={() => {
               const lib = findLibraryItem(item);
-              if (lib) setTipTarget(lib);
+              if (!lib || isBookLibraryItem(lib)) return;
+              setTipTarget(lib);
             }}
           />
         )}
