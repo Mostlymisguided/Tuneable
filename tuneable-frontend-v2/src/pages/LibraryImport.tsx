@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -194,6 +194,7 @@ const LibraryImport: React.FC = () => {
   const [showAdvancedLimit, setShowAdvancedLimit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const executeLockRef = useRef(false);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [progressCurrent, setProgressCurrent] = useState(0);
   const [progressTotal, setProgressTotal] = useState(0);
@@ -611,6 +612,8 @@ const LibraryImport: React.FC = () => {
   }, [shouldAutoScan, isConnected, step, isRekordbox, isYouTube, isLoading, source]);
 
   const runExecuteJob = async (payload: Array<Record<string, unknown>>, tip: number) => {
+    if (executeLockRef.current) return;
+    executeLockRef.current = true;
     setIsExecuting(true);
     setProgressMessage('Starting import…');
     setProgressCurrent(0);
@@ -643,6 +646,7 @@ const LibraryImport: React.FC = () => {
     } catch (error: any) {
       toast.error(error?.response?.data?.error || error?.message || 'Import failed');
     } finally {
+      executeLockRef.current = false;
       setIsExecuting(false);
       setProgressMessage(null);
       setProgressCurrent(0);
@@ -1945,7 +1949,9 @@ const LibraryImport: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded border ${STATUS_COLORS[item.matchStatus]}`}>
-                        {STATUS_LABELS[item.matchStatus]}
+                        {item.matchType === 'duplicate-in-batch'
+                          ? 'Already in this import'
+                          : STATUS_LABELS[item.matchStatus]}
                       </span>
                       {item.identityConfidence && (
                         <span

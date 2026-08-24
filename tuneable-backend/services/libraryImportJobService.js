@@ -158,7 +158,22 @@ function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, play
   return { jobId: job.id };
 }
 
+function findActiveExecuteJob(userId) {
+  const uid = String(userId);
+  for (const job of jobs.values()) {
+    if (String(job.userId) !== uid) continue;
+    if (job.type !== 'execute') continue;
+    if (job.status === 'queued' || job.status === 'running') return job;
+  }
+  return null;
+}
+
 function startExecuteJob(userId, source, { items, defaultTip } = {}) {
+  const existing = findActiveExecuteJob(userId);
+  if (existing) {
+    return { jobId: existing.id, alreadyRunning: true };
+  }
+
   const job = createJob({ userId, type: 'execute', source });
   const onProgress = progressReporter(job.id);
 

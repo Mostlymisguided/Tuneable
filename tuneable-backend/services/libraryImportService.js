@@ -18,12 +18,21 @@ const {
   mediaPrimaryArtistName,
   normalizeIsrc,
 } = require('../utils/mediaMatchUtils');
+const {
+  collectIdentity,
+  buildIdentityOrQuery,
+  trackFromImportItem,
+  createIdentitySeenSet,
+  rememberIdentity,
+  identityAlreadySeen,
+} = require('../utils/mediaIdentity');
 
 const DEFAULT_TIP = 1.11;
 const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 4000;
 const MATCH_CONCURRENCY = 8;
+const executingUsers = new Set();
 
 async function mapWithConcurrency(items, concurrency, mapper) {
   const list = items || [];
@@ -78,11 +87,14 @@ function buildExternalMediaFromTrack(track, {
     ? track.genres.filter((t) => typeof t === 'string' && t.trim())
     : (track.genre ? [String(track.genre).trim()].filter(Boolean) : []);
 
-  const isrc = normalizeIsrc(track.externalIds?.isrc);
+  const isrc = normalizeIsrc(track.externalIds?.isrc || track.isrc);
   const bpm = Number.isFinite(Number(track.bpm)) && Number(track.bpm) > 0
     ? Number(track.bpm)
     : null;
   const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
+  const externalIds = { ...(track.externalIds || {}) };
+  if (isrc) externalIds.isrc = isrc;
+  else delete externalIds.isrc;
 
   return {
     title: track.title,
@@ -95,7 +107,7 @@ function buildExternalMediaFromTrack(track, {
     releaseYear: track.releaseYear || null,
     releaseDatePrecision: track.releaseDatePrecision || null,
     sources: track.sources || {},
-    externalIds: track.externalIds || {},
+    externalIds,
     isrc: isrc || null,
     bpm,
     key,
@@ -108,48 +120,13 @@ function buildExternalMediaFromTrack(track, {
   };
 }
 
-function normalizePermalink(url) {
-  if (!url || typeof url !== 'string') return null;
-  try {
-    const u = new URL(url);
-    u.hash = '';
-    u.search = '';
-    let path = u.pathname.replace(/\/+$/, '');
-    return `${u.origin}${path}`.toLowerCase();
-  } catch {
-    return url.trim().toLowerCase().replace(/\/+$/, '');
-  }
-}
-
 /**
- * High-confidence catalog hit (IDs / ISRC / exact title+artist). Safe to auto-attach.
+ * High-confidence catalog hit (track IDs / ISRC / exact title+artist). Safe to auto-attach.
+ * Album IDs are ignored so two tracks from the same album do not collapse.
  */
 async function findExactCatalogMedia(track) {
-  const spotifyId = track.externalIds?.spotify || (track.sourceLabel === 'Spotify Likes' ? track.id : null);
-  const soundcloudId = track.externalIds?.soundcloud
-    || (track.sourceLabel === 'SoundCloud Likes' ? track.id : null);
-  const rekordboxId = track.externalIds?.rekordbox;
-  const youtubeId = track.externalIds?.youtube;
-  const musicbrainzId = track.externalIds?.musicbrainz;
-  const isrc = normalizeIsrc(track.externalIds?.isrc);
-  const soundcloudUrl = track.sources?.soundcloud;
-  const youtubeUrl = track.sources?.youtube;
-
-  const or = [];
-  if (spotifyId) or.push({ 'externalIds.spotify': String(spotifyId) });
-  if (soundcloudId) or.push({ 'externalIds.soundcloud': String(soundcloudId) });
-  if (rekordboxId) or.push({ 'externalIds.rekordbox': String(rekordboxId) });
-  if (youtubeId) or.push({ 'externalIds.youtube': String(youtubeId) });
-  if (musicbrainzId) or.push({ 'externalIds.musicbrainz': String(musicbrainzId) });
-  if (isrc) or.push({ isrc });
-  if (youtubeUrl) or.push({ 'sources.youtube': youtubeUrl });
-  if (soundcloudUrl) {
-    or.push({ 'sources.soundcloud': soundcloudUrl });
-    const normalized = normalizePermalink(soundcloudUrl);
-    if (normalized && normalized !== soundcloudUrl) {
-      or.push({ 'sources.soundcloud': normalized });
-    }
-  }
+  const identity = collectIdentity(track, track.sourceLabel || track.importSource);
+  const or = buildIdentityOrQuery(identity);
 
   if (or.length > 0) {
     const byExternal = await Media.findOne({
@@ -160,11 +137,11 @@ async function findExactCatalogMedia(track) {
     if (byExternal) return { media: byExternal, confidence: 'exact', matchType: 'external-id' };
   }
 
-  if (!track.title || !track.artist) return null;
+  if (!identity.title || !identity.artist) return null;
 
   const exact = await Media.findOne({
-    title: track.title,
-    'artist.name': track.artist,
+    title: identity.title,
+    'artist.name': identity.artist,
     status: { $ne: 'deleted' },
     deletedAt: null,
   }).lean();
@@ -301,6 +278,66 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
   }
 
   if (changed) await media.save();
+}
+
+function leanMediaForIndex(media) {
+  if (!media) return null;
+  const obj = typeof media.toObject === 'function' ? media.toObject() : media;
+  return {
+    _id: obj._id,
+    title: obj.title,
+    artist: obj.artist,
+    duration: obj.duration,
+    coverArt: obj.coverArt,
+    uuid: obj.uuid,
+    externalIds: obj.externalIds,
+    isrc: obj.isrc,
+    sources: obj.sources,
+  };
+}
+
+function flagDuplicateImportItems(items) {
+  const seen = createIdentitySeenSet();
+  const seenMedia = [];
+  for (const item of items) {
+    const track = trackFromImportItem(item);
+    const identity = collectIdentity(track, track.sourceLabel || track.importSource);
+    const catalogId = item.mediaId ? String(item.mediaId) : null;
+    let duplicate = identityAlreadySeen(seen, identity, catalogId);
+    if (!duplicate && seenMedia.length) {
+      const fuzzy = findFuzzyCatalogMatch(track, buildMediaIndexes(seenMedia));
+      if (fuzzy) duplicate = true;
+    }
+    if (duplicate && item.matchStatus !== 'in_library') {
+      item.matchStatus = 'in_library';
+      item.matchType = 'duplicate-in-batch';
+      item.selected = false;
+    }
+    rememberIdentity(seen, identity, catalogId);
+    seenMedia.push({
+      _id: catalogId || `pending:${item.key}`,
+      title: item.title || track.title,
+      artist: [{ name: item.artist || track.artist || '' }],
+      duration: item.duration || track.duration || 0,
+      externalIds: track.externalIds,
+      isrc: identity.isrc,
+      sources: track.sources,
+    });
+  }
+  return items;
+}
+
+async function loadUserLibraryMedia(userId) {
+  const bids = await Bid.find({ userId, status: 'active' }).select('mediaId').lean();
+  const ids = [...new Set(bids.map((b) => b.mediaId).filter(Boolean))];
+  if (!ids.length) return [];
+  return Media.find({
+    _id: { $in: ids },
+    status: { $ne: 'deleted' },
+    deletedAt: null,
+  })
+    .select('title artist duration coverArt uuid externalIds isrc sources')
+    .lean();
 }
 
 function mediaToPlayabilityFields(media) {
@@ -467,6 +504,8 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       }),
     };
   });
+
+  flagDuplicateImportItems(items);
 
   const selectedItems = items.filter((i) => i.selected);
   const estimatedTotal = selectedItems.reduce((sum, i) => sum + i.defaultTip, 0);
@@ -654,6 +693,16 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
     throw err;
   }
 
+  const lockKey = String(userId);
+  if (executingUsers.has(lockKey)) {
+    const err = new Error('An import is already running');
+    err.status = 409;
+    err.code = 'IMPORT_ALREADY_RUNNING';
+    throw err;
+  }
+  executingUsers.add(lockKey);
+
+  try {
   const results = {
     tipped: 0,
     skipped: 0,
@@ -664,10 +713,30 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
   };
 
   // Rows often look distinct (different Spotify/SC ids) but collapse onto one Media
-  // inside placeGlobalBid via ISRC / externalIds / title+artist.
-  const tippedMediaIds = new Set();
+  // via ISRC / track IDs / title+artist. Skip a second tip on that media.
   const skipIfInLibrary = (item) => item.skipIfInLibrary !== false;
   const total = selected.length;
+  const seen = createIdentitySeenSet();
+  const libraryMedia = await loadUserLibraryMedia(userId);
+  let libraryIndexes = buildMediaIndexes(libraryMedia);
+  for (const media of libraryMedia) {
+    rememberIdentity(seen, collectIdentity(media), media._id);
+  }
+
+  const emitProgress = (index, message) => {
+    report({
+      stage: 'tipping',
+      message: message || `Importing track ${index + 1} of ${total}…`,
+      current: index + 1,
+      total,
+      partial: {
+        tipped: results.tipped,
+        skipped: results.skipped,
+        failed: results.failed,
+        totalSpentPence: results.totalSpentPence,
+      },
+    });
+  };
 
   report({
     stage: 'tipping',
@@ -683,59 +752,70 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
     const label = item.title || item.key;
 
     try {
-      if (item.mediaId && mongoose.Types.ObjectId.isValid(item.mediaId)) {
-        const mediaIdStr = String(item.mediaId);
-        if (skipIfInLibrary(item) && tippedMediaIds.has(mediaIdStr)) {
+      const track = trackFromImportItem(item);
+      const identity = collectIdentity(track, importSource || track.sourceLabel);
+      const rejectedFuzzy = item.matchStatus === 'possible_match' && item.useSuggestedMatch === false;
+      let resolvedCatalogId = !rejectedFuzzy
+        && item.mediaId
+        && mongoose.Types.ObjectId.isValid(item.mediaId)
+        ? String(item.mediaId)
+        : null;
+
+      if (!rejectedFuzzy && !resolvedCatalogId) {
+        const exactHit = await findExactCatalogMedia(track);
+        if (exactHit?.media?._id) resolvedCatalogId = String(exactHit.media._id);
+      }
+      if (!rejectedFuzzy && !resolvedCatalogId) {
+        const fuzzyLibrary = findFuzzyCatalogMatch(track, libraryIndexes);
+        if (fuzzyLibrary?.media?._id) resolvedCatalogId = String(fuzzyLibrary.media._id);
+      }
+
+      if (skipIfInLibrary(item)) {
+        const alreadySeen = identityAlreadySeen(seen, identity, resolvedCatalogId);
+        if (alreadySeen) {
+          if (resolvedCatalogId && item.externalMedia) {
+            await mergeExternalIdsOntoMedia(resolvedCatalogId, item.externalMedia);
+          }
+          rememberIdentity(seen, identity, resolvedCatalogId);
           results.skipped++;
           results.items.push({
             key: item.key,
             title: label,
             status: 'skipped',
-            reason: 'already_tipped_in_batch',
-            mediaId: mediaIdStr,
+            reason: resolvedCatalogId ? 'already_in_library' : 'already_tipped_in_batch',
+            mediaId: resolvedCatalogId || null,
           });
-          report({
-            stage: 'tipping',
-            message: `Importing track ${index + 1} of ${total}…`,
-            current: index + 1,
-            total,
-            partial: {
-              tipped: results.tipped,
-              skipped: results.skipped,
-              failed: results.failed,
-              totalSpentPence: results.totalSpentPence,
-            },
-          });
+          emitProgress(index);
           continue;
         }
+      }
 
+      if (resolvedCatalogId) {
+        item.mediaId = resolvedCatalogId;
         const existingBid = await Bid.findOne({
           userId,
-          mediaId: item.mediaId,
+          mediaId: resolvedCatalogId,
           status: 'active',
         });
         if (existingBid && skipIfInLibrary(item)) {
-          tippedMediaIds.add(mediaIdStr);
+          if (item.externalMedia) {
+            await mergeExternalIdsOntoMedia(resolvedCatalogId, item.externalMedia);
+          }
+          rememberIdentity(seen, identity, resolvedCatalogId);
           results.skipped++;
-          results.items.push({ key: item.key, title: label, status: 'skipped', reason: 'already_in_library' });
-          report({
-            stage: 'tipping',
-            message: `Importing track ${index + 1} of ${total}…`,
-            current: index + 1,
-            total,
-            partial: {
-              tipped: results.tipped,
-              skipped: results.skipped,
-              failed: results.failed,
-              totalSpentPence: results.totalSpentPence,
-            },
+          results.items.push({
+            key: item.key,
+            title: label,
+            status: 'skipped',
+            reason: 'already_in_library',
+            mediaId: resolvedCatalogId,
           });
+          emitProgress(index);
           continue;
         }
       }
 
       const youtubeImport = isYoutubeImportSource(importSource, item);
-      const rejectedFuzzy = item.matchStatus === 'possible_match' && item.useSuggestedMatch === false;
       if (youtubeImport && rejectedFuzzy) {
         results.skipped++;
         results.items.push({
@@ -820,13 +900,18 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
       });
 
       const resolvedMediaId = out.media?._id?.toString();
+      rememberIdentity(seen, identity, resolvedMediaId);
+      if (out.media) {
+        const lean = leanMediaForIndex(out.media);
+        libraryIndexes = buildMediaIndexes([
+          ...(libraryIndexes.mediaList || []),
+          lean,
+        ].filter(Boolean));
+      }
 
       if (out.skipped) {
-        if (resolvedMediaId) {
-          tippedMediaIds.add(resolvedMediaId);
-          if (externalMedia) {
-            await mergeExternalIdsOntoMedia(resolvedMediaId, externalMedia);
-          }
+        if (resolvedMediaId && externalMedia) {
+          await mergeExternalIdsOntoMedia(resolvedMediaId, externalMedia);
         }
         results.skipped++;
         results.items.push({
@@ -837,7 +922,9 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
           mediaId: resolvedMediaId || null,
         });
       } else {
-        if (resolvedMediaId) tippedMediaIds.add(resolvedMediaId);
+        if (resolvedMediaId && externalMedia && mediaId === 'external') {
+          await mergeExternalIdsOntoMedia(resolvedMediaId, externalMedia);
+        }
         results.tipped++;
         results.totalSpentPence += Math.round(amount * 100);
         results.updatedBalance = out.updatedBalance;
@@ -914,6 +1001,9 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
   }
 
   return results;
+  } finally {
+    executingUsers.delete(lockKey);
+  }
 }
 
 async function executeSpotifyImport(userId, opts) {

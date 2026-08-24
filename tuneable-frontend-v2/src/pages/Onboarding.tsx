@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
@@ -71,6 +71,7 @@ const Onboarding: React.FC = () => {
     userBalance: number;
   } | null>(null);
   const [isImportLoading, setIsImportLoading] = useState(false);
+  const importLockRef = useRef(false);
   const [importProgressMessage, setImportProgressMessage] = useState<string | null>(null);
   const [importDone, setImportDone] = useState(false);
 
@@ -381,7 +382,8 @@ const Onboarding: React.FC = () => {
   };
 
   const runQuickImport = async () => {
-    if (!importSource) return;
+    if (!importSource || importLockRef.current) return;
+    importLockRef.current = true;
     setIsImportLoading(true);
     setImportProgressMessage('Preparing import…');
     try {
@@ -451,6 +453,7 @@ const Onboarding: React.FC = () => {
         || 'Import failed';
       toast.error(message);
     } finally {
+      importLockRef.current = false;
       setIsImportLoading(false);
       setImportProgressMessage(null);
     }

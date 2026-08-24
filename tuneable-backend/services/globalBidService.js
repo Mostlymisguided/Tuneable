@@ -13,6 +13,7 @@ const { normalizeTagForStorage } = require('../utils/tagNormalizer');
 const { applyTipChipsToMedia } = require('../utils/elementNormalizer');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
+const { collectIdentity, buildIdentityOrQuery } = require('../utils/mediaIdentity');
 
 /**
  * @param {string} userId
@@ -93,13 +94,26 @@ async function placeGlobalBid(userId, {
       ? Object.entries(sources).filter(([, url]) => !!url)
       : [];
 
-    if (externalIdEntries.length > 0) {
-      const externalLookup = externalIdEntries.map(([key, value]) => ({ [`externalIds.${key}`]: value }));
-      media = await Media.findOne({ $or: externalLookup });
+    const identity = collectIdentity({
+      title, artist, sources, externalIds, isrc: externalIsrc,
+    });
+    const identityOr = buildIdentityOrQuery(identity);
+
+    if (identityOr.length > 0) {
+      media = await Media.findOne({
+        $or: identityOr,
+        status: { $ne: 'deleted' },
+        deletedAt: null,
+      });
     }
 
     if (!media) {
-      media = await Media.findOne({ title, 'artist.name': artist });
+      media = await Media.findOne({
+        title,
+        'artist.name': artist,
+        status: { $ne: 'deleted' },
+        deletedAt: null,
+      });
     }
 
     if (!media && sourceEntries.length === 0 && externalIdEntries.length === 0) {
@@ -123,6 +137,9 @@ async function placeGlobalBid(userId, {
       );
 
       const resolvedIsrc = normalizeIsrc(externalIsrc || externalIds?.isrc);
+      const storedExternalIds = externalIdEntries
+        .filter(([key, value]) => key && value && key !== 'isrc')
+        .concat(resolvedIsrc ? [['isrc', resolvedIsrc]] : []);
       const resolvedBpm = Number.isFinite(Number(externalBpm)) && Number(externalBpm) > 0
         ? Number(externalBpm)
         : undefined;
@@ -136,7 +153,7 @@ async function placeGlobalBid(userId, {
         coverArt: coverArt || DEFAULT_COVER_ART,
         duration: duration || 0,
         sources: new Map(sourceEntries),
-        externalIds: new Map(externalIdEntries),
+        externalIds: new Map(storedExternalIds),
         isrc: resolvedIsrc || null,
         identityConfidence: identityConfidence || null,
         identityConfidenceSource: identityConfidenceSource || null,
