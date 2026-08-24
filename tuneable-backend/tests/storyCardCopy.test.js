@@ -32,6 +32,8 @@ describe('detectMediaKind / canonicalMediaPath', () => {
     expect(canonicalMediaPath('tune', 'abc')).toBe('/tune/abc');
     expect(canonicalMediaPath('episode', 'abc')).toBe('/podcasts/abc');
     expect(canonicalMediaPath('series', 'abc')).toBe('/podcast/abc');
+    expect(detectMediaKind({ contentForm: ['book'], contentType: ['written'] })).toBe('book');
+    expect(canonicalMediaPath('book', 'abc')).toBe('/book/abc');
   });
 });
 
@@ -40,6 +42,7 @@ describe('creatorLabel', () => {
     expect(creatorLabel({ creatorDisplay: 'A & B' })).toBe('A & B');
     expect(creatorLabel({ host: [{ name: 'Sam' }] })).toBe('Sam');
     expect(creatorLabel({ artist: [{ name: 'Four Tet' }] })).toBe('Four Tet');
+    expect(creatorLabel({ author: [{ name: 'Ursula K. Le Guin' }] })).toBe('Ursula K. Le Guin');
   });
 });
 

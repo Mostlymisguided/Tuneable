@@ -2717,4 +2717,44 @@ export const conversationAPI = {
   },
 };
 
+export const booksAPI = {
+  searchOpenLibrary: async (q: string, limit = 20) => {
+    const response = await api.get('/books/discovery/open-library/search', { params: { q, limit } });
+    return response.data as { books: any[]; count: number; query: string };
+  },
+  searchGoogleBooks: async (q: string, limit = 20) => {
+    const response = await api.get('/books/discovery/google-books/search', { params: { q, limit } });
+    return response.data as { books: any[]; count: number; disabled?: boolean; message?: string };
+  },
+  discoveryStatus: async () => {
+    const response = await api.get('/books/discovery/status');
+    return response.data as { openLibrary: boolean; googleBooks: boolean };
+  },
+  importBook: async (payload: Record<string, unknown>) => {
+    const response = await api.post('/books/import', payload);
+    return response.data as { created: boolean; match: string; book: any };
+  },
+  searchCatalog: async (q: string, params?: { limit?: number; offset?: number }) => {
+    const response = await api.get('/books/search', { params: { q, ...params } });
+    return response.data as { books: any[]; total: number; hasMore: boolean; query: string };
+  },
+  getChart: async (params?: {
+    limit?: number;
+    timePeriod?: string;
+    locationPlaceId?: string;
+    tag?: string;
+  }) => {
+    const response = await api.get('/books/chart', { params });
+    return response.data as { books: any[]; count: number; timePeriod?: string };
+  },
+  getBook: async (bookId: string) => {
+    const response = await api.get(`/books/${bookId}`);
+    return response.data as { book: any };
+  },
+  boost: async (bookId: string, amount: number, currentLocation?: unknown) => {
+    const response = await api.post(`/books/${bookId}/boost`, { amount, currentLocation });
+    return response.data as { book: any; updatedBalance: number; message: string };
+  },
+};
+
 export default api;

@@ -132,6 +132,7 @@ import {
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import { getMediaProfileUrl, isBookMedia } from '../utils/mediaNavigation';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -1394,16 +1395,23 @@ const UserProfile: React.FC = () => {
     return cf && (Array.isArray(cf) ? cf.includes('podcastepisode') : cf === 'podcastepisode');
   };
 
+  const isBookItem = (item: { contentForm?: string[] | string; contentType?: string[] | string }) =>
+    isBookMedia(item);
+
   // Play a single library item, routing to the correct player with a
   // type-consistent queue (podcasts → podcast player, tunes → web player).
   const handlePlayLibraryItem = (item: LibraryItem, _index?: number, sourceList?: LibraryItem[]) => {
     const baseList = sourceList ?? getSortedLibrary();
+    if (isBookItem(item)) {
+      navigate(getMediaProfileUrl({ _id: item.mediaId || item.mediaUuid, contentForm: item.contentForm }));
+      return;
+    }
     if (isPodcastItem(item)) {
       const list = baseList.filter(isPodcastItem);
       const index = list.findIndex((i) => i.mediaId === item.mediaId);
       handlePlayPodcastLibrary(item, Math.max(index, 0), list);
     } else {
-      const list = baseList.filter((i) => !isPodcastItem(i));
+      const list = baseList.filter((i) => !isPodcastItem(i) && !isBookItem(i));
       const index = list.findIndex((i) => i.mediaId === item.mediaId);
       handlePlayLibrary(item, Math.max(index, 0), list);
     }
@@ -2748,9 +2756,10 @@ const UserProfile: React.FC = () => {
                 showQueueButton={!!isOwnProfile}
                 artistColumnLabel="Artist / Show"
                 itemPath={(item) =>
-                  isPodcastItem(item)
-                    ? `/podcasts/${item.mediaId || item.mediaUuid}`
-                    : `/tune/${item.mediaId || item.mediaUuid}`
+                  getMediaProfileUrl({
+                    _id: item.mediaId || item.mediaUuid,
+                    contentForm: item.contentForm,
+                  })
                 }
               />
             )}
@@ -2808,9 +2817,10 @@ const UserProfile: React.FC = () => {
                         {index + 1}
                       </div>
                       <Link
-                        to={isPodcastQueueItem(item)
-                          ? `/podcasts/${item.mediaUuid || item.mediaId}`
-                          : `/tune/${item.mediaUuid || item.mediaId}`}
+                        to={getMediaProfileUrl({
+                          _id: item.mediaUuid || item.mediaId,
+                          contentForm: item.contentForm,
+                        })}
                         className="flex-shrink-0"
                       >
                         <img
@@ -2822,9 +2832,10 @@ const UserProfile: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <Link
-                            to={isPodcastQueueItem(item)
-                              ? `/podcasts/${item.mediaUuid || item.mediaId}`
-                              : `/tune/${item.mediaUuid || item.mediaId}`}
+                            to={getMediaProfileUrl({
+                              _id: item.mediaUuid || item.mediaId,
+                              contentForm: item.contentForm,
+                            })}
                             className="text-left text-white font-semibold truncate hover:text-purple-300 transition-colors"
                           >
                             {item.title}
@@ -2898,12 +2909,10 @@ const UserProfile: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {listeningHistory.map((entry) => {
-                  const isPodcast = Array.isArray(entry.media.contentForm)
-                    ? entry.media.contentForm.includes('podcastepisode')
-                    : entry.media.contentForm === 'podcastepisode';
-                  const path = isPodcast
-                    ? `/podcasts/${entry.media.uuid || entry.media._id}`
-                    : `/tune/${entry.media.uuid || entry.media._id}`;
+                  const path = getMediaProfileUrl({
+                    _id: entry.media.uuid || entry.media._id,
+                    contentForm: entry.media.contentForm,
+                  });
                   return (
                     <div key={entry._id} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
                       <div className="flex items-start gap-4">

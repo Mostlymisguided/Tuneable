@@ -58,6 +58,16 @@ describe('isMediaPlayable', () => {
       contentForm: ['podcastepisode'],
     })).toBe(true);
   });
+
+  it('does not play catalog books even with an attached file', () => {
+    expect(isMediaPlayable({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'cleared',
+      rightsCleared: true,
+      contentType: ['written'],
+      contentForm: ['book'],
+    })).toBe(false);
+  });
 });
 
 describe('getPlayabilityBlockReason', () => {
@@ -138,6 +148,18 @@ describe('enrichMediaWithPlayability', () => {
     });
     expect(presented.isPlayable).toBe(true);
     expect(presented.sources.enclosure).toBe(enclosure);
+  });
+
+  it('marks catalog books as not playable and not awaiting audio upload', () => {
+    const presented = enrichMediaWithPlayability({
+      title: 'The Hobbit',
+      sources: { openLibrary: 'https://openlibrary.org/works/OL45883W' },
+      contentType: ['written'],
+      contentForm: ['book'],
+    });
+    expect(presented.isPlayable).toBe(false);
+    expect(presented.awaitingUpload).toBe(false);
+    expect(presented.hasHostedAudio).toBe(false);
   });
 });
 

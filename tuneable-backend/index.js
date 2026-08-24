@@ -22,6 +22,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const youtubeRoutes = require('./routes/youtube');
 const authRoutes = require('./routes/authRoutes'); // Import OAuth routes
 const podcastRoutes = require('./routes/podcastRoutes'); // Import consolidated Podcast routes
+const bookRoutes = require('./routes/bookRoutes');
 const bidMetricsRoutes = require('./routes/bidMetricsRoutes'); // Import bid metrics routes
 const instagramWebhooks = require('./routes/instagramWebhooks'); // Instagram webhooks
 const creatorRoutes = require('./routes/creatorRoutes'); // Import creator application routes
@@ -719,6 +720,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/youtube', youtubeRoutes);
 app.use('/api/auth', authRoutes); // OAuth routes
 app.use('/api/podcasts', podcastRoutes); // Consolidated Podcast routes
+app.use('/api/books', bookRoutes);
 app.use('/api/bid-metrics', bidMetricsRoutes); // Bid metrics API routes
 app.use('/api/claims', require('./routes/claimRoutes')); // Tune ownership claims
 app.use('/api/creator', creatorRoutes); // Creator application routes

@@ -23,6 +23,12 @@ describe('parseContentScope', () => {
     expect(parseContentScope('spoken')).toBe('podcast');
     expect(parseContentScope(['podcast'])).toBe('podcast');
   });
+
+  it('accepts written aliases', () => {
+    expect(parseContentScope('written')).toBe('written');
+    expect(parseContentScope('book')).toBe('written');
+    expect(parseContentScope(['article'])).toBe('written');
+  });
 });
 
 describe('collectTagVariants', () => {

@@ -14,6 +14,7 @@ const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const WRITTEN_FORMS = ['book', 'article'];
 const VALID_TIME_PERIODS = new Set([
   'all-time',
   'today',
@@ -120,7 +121,7 @@ function mediaOriginQuery(placeId) {
   return {
     status: 'active',
     contentType: 'music',
-    contentForm: { $nin: PODCAST_FORMS },
+    contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
     $or: [
       { 'primaryLocation.placeId': placeId },
       { 'primaryLocation.ancestorIds': placeId },
@@ -471,6 +472,7 @@ function originQueryForMedia(placeId, media) {
     ? media.contentForm
     : [media.contentForm].filter(Boolean);
   const isPodcast = forms.some((f) => PODCAST_FORMS.includes(f));
+  const isWritten = forms.some((f) => WRITTEN_FORMS.includes(f));
 
   if (isPodcast) {
     const rankingForms = forms.includes('podcastseries')
@@ -479,6 +481,18 @@ function originQueryForMedia(placeId, media) {
     return {
       status: 'active',
       contentForm: { $in: rankingForms },
+      $or: [
+        { 'primaryLocation.placeId': placeId },
+        { 'primaryLocation.ancestorIds': placeId },
+      ],
+    };
+  }
+
+  if (isWritten) {
+    return {
+      status: 'active',
+      contentType: { $in: ['written'] },
+      contentForm: { $in: WRITTEN_FORMS },
       $or: [
         { 'primaryLocation.placeId': placeId },
         { 'primaryLocation.ancestorIds': placeId },

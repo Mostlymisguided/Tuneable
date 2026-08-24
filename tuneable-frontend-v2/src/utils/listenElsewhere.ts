@@ -6,12 +6,13 @@
 import {
   getPlayabilityBlockReason,
   isMediaPlayable,
+  isWrittenMedia,
   normalizeSources,
   type PlayabilityFields,
 } from './mediaPlayability';
 import { getCreatorDisplay } from './creatorDisplay';
 
-export type ListenElsewhereKind = 'youtube' | 'search';
+export type ListenElsewhereKind = 'youtube' | 'search' | 'openLibrary' | 'googleBooks';
 
 export type ListenElsewhereTarget = {
   url: string;
@@ -29,6 +30,7 @@ type MediaLike = PlayabilityFields & {
   rightsStatus?: 'cleared' | 'pending' | 'disputed';
   rightsCleared?: boolean;
   contentForm?: string | string[];
+  isbn?: string | null;
 };
 
 const GOOGLE_SEARCH = 'https://www.google.com/search';
@@ -56,6 +58,7 @@ export function shouldOfferListenElsewhere(
   media: MediaLike | null | undefined
 ): boolean {
   if (!media?.title?.trim()) return false;
+  if (isWrittenMedia(media)) return false;
   if (isMediaPlayable(media)) return false;
   if (getPlayabilityBlockReason(media) === 'disputed') return false;
   return true;
@@ -84,6 +87,39 @@ export function getListenElsewhereTarget(
     url: buildGoogleListenUrl(media.title!.trim(), artistForQuery),
     kind: 'search',
     label: LISTEN_ELSEWHERE_LABEL,
+  };
+}
+
+export function getReadElsewhereTarget(
+  media: MediaLike | null | undefined
+): ListenElsewhereTarget | null {
+  if (!media?.title?.trim()) return null;
+  const sources = normalizeSources(media.sources);
+  if (sources.openLibrary) {
+    return { url: sources.openLibrary, kind: 'openLibrary', label: 'Open Library' };
+  }
+  if (sources.googleBooks || sources.googleBooksPreview) {
+    return {
+      url: sources.googleBooks || sources.googleBooksPreview,
+      kind: 'googleBooks',
+      label: 'Google Books',
+    };
+  }
+  if (media.isbn) {
+    return {
+      url: `https://openlibrary.org/isbn/${media.isbn}`,
+      kind: 'openLibrary',
+      label: 'Open Library',
+    };
+  }
+  const author = getCreatorDisplay(media);
+  const q = [media.title.trim(), author && author !== 'Unknown Artist' ? author : '']
+    .filter(Boolean)
+    .join(' ');
+  return {
+    url: `https://www.google.com/search?q=${encodeURIComponent(q + ' book')}`,
+    kind: 'search',
+    label: 'Find this book',
   };
 }
 

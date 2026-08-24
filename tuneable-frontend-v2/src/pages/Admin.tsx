@@ -2802,6 +2802,8 @@ const Admin: React.FC = () => {
                         <option value="podcast">Podcast</option>
                         <option value="episode">Episode</option>
                         <option value="audiobook">Audiobook</option>
+                        <option value="book">Book</option>
+                        <option value="article">Article</option>
                         <option value="video">Video</option>
                       </select>
                     </div>

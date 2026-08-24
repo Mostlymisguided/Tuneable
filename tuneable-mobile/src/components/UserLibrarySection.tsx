@@ -6,6 +6,7 @@ import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
+import { booksAPI } from '@/src/api/books';
 import {
   type BpmFilterRange,
   computeTopTags,
@@ -17,7 +18,8 @@ import {
   sortChartItems,
   type ChartSortKey,
 } from '@/src/lib/chartSort';
-import { isUploadPlayable, mediaId } from '@/src/lib/media';
+import { isUploadPlayable, isWrittenMedia, mediaId } from '@/src/lib/media';
+import { getTipCurrentLocation } from '@/src/lib/currentLocation';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import type { ChartMediaItem, TimePeriodKey } from '@/src/types/media';
@@ -96,6 +98,10 @@ function isPodcastLibraryItem(item: UserLibraryItem | ChartMediaItem): boolean {
   return (forms || []).some((f) =>
     ['podcast', 'podcastseries', 'episode', 'podcastepisode'].includes(f)
   );
+}
+
+function isBookLibraryItem(item: UserLibraryItem | ChartMediaItem): boolean {
+  return isWrittenMedia(item);
 }
 
 type SortMode = 'amount' | 'recent';
@@ -223,17 +229,37 @@ export function UserLibrarySection({
   };
 
   const playItem = (item: ChartMediaItem) => {
-    const index = filtered.findIndex((m) => mediaId(m) === mediaId(item));
+    if (isBookLibraryItem(item) || isPodcastLibraryItem(item)) {
+      const id = mediaId(item);
+      if (!id) return;
+      router.push(isBookLibraryItem(item) ? `/book/${id}` : `/podcast/${id}`);
+      return;
+    }
+    const playable = filtered.filter(isUploadPlayable);
+    const index = playable.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) return;
-    void setQueueAndPlay(filtered, index);
+    void setQueueAndPlay(playable, index);
   };
 
   const onPlayQueue = () => {
-    void setQueueAndPlay(filtered, 0);
+    const playable = filtered.filter(isUploadPlayable);
+    if (playable.length === 0) return;
+    void setQueueAndPlay(playable, 0);
   };
 
   const confirmTip = async (amountPounds: number, tags: string[]) => {
     if (!tipTarget) return;
+    if (isBookLibraryItem(tipTarget)) {
+      const res = await booksAPI.boost(
+        tipTarget.mediaId,
+        amountPounds,
+        getTipCurrentLocation()
+      );
+      if (typeof res.updatedBalance === 'number') {
+        onBalanceUpdate?.(res.updatedBalance);
+      }
+      return res;
+    }
     const res = await mediaAPI.placeGlobalBid(tipTarget.mediaId, amountPounds, {
       tags,
     });
@@ -372,6 +398,14 @@ export function UserLibrarySection({
               const id = mediaId(item);
               if (!id) return;
               const lib = findLibraryItem(item);
+              if (lib && isBookLibraryItem(lib)) {
+                router.push(`/book/${id}`);
+                return;
+              }
+              if (isBookLibraryItem(item)) {
+                router.push(`/book/${id}`);
+                return;
+              }
               if (lib && isPodcastLibraryItem(lib)) {
                 router.push(`/podcast/${id}`);
                 return;

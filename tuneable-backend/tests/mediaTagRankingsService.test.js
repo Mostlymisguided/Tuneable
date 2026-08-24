@@ -8,6 +8,7 @@ const {
   uniqueTagLabels,
   isPodcastMedia,
   isPodcastSeries,
+  rankingKind,
 } = require('../services/mediaTagRankingsService');
 
 describe('isPodcastMedia / isPodcastSeries', () => {
@@ -18,6 +19,17 @@ describe('isPodcastMedia / isPodcastSeries', () => {
     expect(isPodcastSeries({ contentForm: ['podcastseries'] })).toBe(true);
     expect(isPodcastSeries({ contentForm: ['podcastepisode'] })).toBe(false);
     expect(isPodcastMedia({ contentForm: ['tune'], contentType: ['music'] })).toBe(false);
+    expect(isPodcastMedia({ contentForm: ['book'], contentType: ['written'] })).toBe(false);
+  });
+});
+
+describe('rankingKind', () => {
+  it('ranks books as written, not music', () => {
+    expect(rankingKind({ contentType: ['written'], contentForm: ['book'] })).toBe('written');
+    expect(rankingKind({ contentType: ['music'], contentForm: ['tune'] })).toBe('music');
+    expect(
+      rankingKind({ contentType: ['spoken'], contentForm: ['podcastepisode'] })
+    ).toBe('episode');
   });
 });
 

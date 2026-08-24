@@ -100,6 +100,10 @@ export function hrefFromNotificationUrl(url?: string | null): Href | null {
   if (podcast) {
     return { pathname: '/podcast/[id]', params: { id: podcast[1] } };
   }
+  const book = path.match(/^\/book\/([^/?#]+)/);
+  if (book) {
+    return { pathname: '/book/[id]', params: { id: book[1] } };
+  }
   const user = path.match(/^\/user\/([^/?#]+)/);
   if (user) {
     return { pathname: '/user/[id]', params: { id: user[1] } };

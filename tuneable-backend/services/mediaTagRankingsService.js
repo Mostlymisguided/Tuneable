@@ -12,6 +12,7 @@ const {
   itemMatchesTag,
   PODCAST_FORMS,
 } = require('./tagProfileService');
+const { isWrittenMedia, WRITTEN_FORMS } = require('../utils/mediaKinds');
 
 const MAX_RANKING_TAGS = 8;
 const EPISODE_FORMS = ['podcastepisode', 'podcast', 'episode'];
@@ -19,9 +20,8 @@ const SERIES_FORMS = ['podcastseries'];
 
 function mediaForms(media) {
   if (!media) return [];
-  return Array.isArray(media.contentForm)
-    ? media.contentForm.filter(Boolean)
-    : [media.contentForm].filter(Boolean);
+  const forms = media.contentForm ?? media.contentForm;
+  return Array.isArray(forms) ? forms.filter(Boolean) : [forms].filter(Boolean);
 }
 
 function isPodcastMedia(media) {
@@ -35,6 +35,13 @@ function isPodcastMedia(media) {
 
 function isPodcastSeries(media) {
   return mediaForms(media).includes('podcastseries');
+}
+
+function rankingKind(media) {
+  if (isPodcastSeries(media)) return 'series';
+  if (isPodcastMedia(media)) return 'episode';
+  if (isWrittenMedia(media)) return 'written';
+  return 'music';
 }
 
 function uniqueTagLabels(labels) {
@@ -114,6 +121,7 @@ async function rankMusicForTag(media, tag) {
   const query = {
     tags: tag,
     contentType: { $in: ['music'] },
+    contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
   };
   const [higherCount, total] = await Promise.all([
     Media.countDocuments({ ...query, globalMediaAggregate: { $gt: aggregate } }),
@@ -185,6 +193,22 @@ async function rankPodcastSeriesForTag(series, tag) {
   return rankingRow(tag, higher + 1, matchingIds.length, myTotal);
 }
 
+async function rankWrittenForTag(media, tag) {
+  const aggregate = media.globalMediaAggregate || 0;
+  const query = {
+    tags: tag,
+    contentType: { $in: ['written'] },
+    contentForm: { $in: WRITTEN_FORMS },
+  };
+  const [higherCount, total] = await Promise.all([
+    Media.countDocuments({ ...query, globalMediaAggregate: { $gt: aggregate } }),
+    Media.countDocuments(query),
+  ]);
+  const pool = Math.max(total, 1);
+  const rank = Math.min(higherCount + 1, pool);
+  return rankingRow(tag, rank, pool, aggregate);
+}
+
 async function getMediaTagRankings(media, { limit = 10 } = {}) {
   if (!media) return [];
   const tags = collectRankingTags(media);
@@ -192,15 +216,20 @@ async function getMediaTagRankings(media, { limit = 10 } = {}) {
 
   const max = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 20);
   const rankings = [];
+  const kind = rankingKind(media);
 
-  if (isPodcastSeries(media)) {
+  if (kind === 'series') {
     for (const tag of tags) {
       const row = await rankPodcastSeriesForTag(media, tag);
       if (row) rankings.push(row);
     }
-  } else if (isPodcastMedia(media)) {
+  } else if (kind === 'episode') {
     for (const tag of tags) {
       rankings.push(await rankPodcastEpisodeForTag(media, tag));
+    }
+  } else if (kind === 'written') {
+    for (const tag of tags) {
+      rankings.push(await rankWrittenForTag(media, tag));
     }
   } else {
     for (const tag of tags) {
@@ -218,6 +247,8 @@ module.exports = {
   uniqueTagLabels,
   isPodcastMedia,
   isPodcastSeries,
+  rankingKind,
+  isWrittenMedia,
   MAX_RANKING_TAGS,
   EPISODE_FORMS,
   SERIES_FORMS,

@@ -26,6 +26,7 @@ const MIN_TIPPERS_FOR_CHAMPION = 1;
 const CHAMPION_PODIUM_SIZE = 3;
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const WRITTEN_FORMS = ['book', 'article'];
 
 /**
  * Resolve media UUID or ObjectId to a Media document _id.
@@ -201,7 +202,7 @@ async function resolveTagMediaIds(rawSlug) {
   const musicFilter = {
     status: 'active',
     contentType: 'music',
-    contentForm: { $nin: PODCAST_FORMS },
+    contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
   };
 
   if (typeof releaseYear === 'number') {
@@ -416,7 +417,7 @@ async function getArtistChampions({ userId, name } = {}, options = {}) {
   let mediaQuery = {
     status: 'active',
     contentType: 'music',
-    contentForm: { $nin: PODCAST_FORMS },
+    contentForm: { $nin: [...PODCAST_FORMS, ...WRITTEN_FORMS] },
   };
 
   let artistLabel = typeof name === 'string' ? name.trim() : null;

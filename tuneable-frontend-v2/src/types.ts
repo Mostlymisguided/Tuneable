@@ -293,6 +293,8 @@ export interface Media {
   pages?: number;
   wordCount?: number;
   language?: string;
+  isbn?: string | null;
+  publisher?: string | null;
   
   // Platform sources
   sources: Record<string, string>;
