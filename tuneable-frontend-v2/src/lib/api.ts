@@ -2808,4 +2808,75 @@ export const booksAPI = {
   },
 };
 
+export const rightsAPI = {
+  getMeta: async () => {
+    const response = await api.get('/rights/admin/meta');
+    return response.data as {
+      statuses: string[];
+      roles: string[];
+      sources: string[];
+      templates: string[];
+      replyTo: string;
+    };
+  },
+  getQueues: async () => {
+    const response = await api.get('/rights/admin/queues');
+    return response.data as {
+      counts: {
+        limbo: number;
+        followUps: number;
+        open: number;
+        inbound: number;
+        stalled: number;
+      };
+    };
+  },
+  getLimbo: async (params?: { page?: number; limit?: number; uncontacted?: boolean }) => {
+    const response = await api.get('/rights/admin/limbo', { params });
+    return response.data as { media: any[]; total: number; page: number; limit: number };
+  },
+  getCases: async (params?: {
+    queue?: string;
+    status?: string;
+    source?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    mediaId?: string;
+  }) => {
+    const response = await api.get('/rights/admin/cases', { params });
+    return response.data as { cases: any[]; total: number; page: number; limit: number };
+  },
+  getCase: async (id: string) => {
+    const response = await api.get(`/rights/admin/cases/${id}`);
+    return response.data as { case: any };
+  },
+  createCase: async (body: {
+    mediaId: string;
+    party: {
+      displayName: string;
+      role?: string;
+      userId?: string | null;
+      contacts?: Array<{ type: string; value: string; notes?: string }>;
+    };
+    source?: string;
+    notes?: string;
+  }) => {
+    const response = await api.post('/rights/admin/cases', body);
+    return response.data as { case: any; created: boolean };
+  },
+  updateCase: async (id: string, body: Record<string, unknown>) => {
+    const response = await api.patch(`/rights/admin/cases/${id}`, body);
+    return response.data as { case: any };
+  },
+  sendOutreach: async (id: string, body: Record<string, unknown>) => {
+    const response = await api.post(`/rights/admin/cases/${id}/outreach`, body);
+    return response.data as { case: any };
+  },
+  previewOutreach: async (id: string, body: { template?: string; customMessage?: string }) => {
+    const response = await api.post(`/rights/admin/cases/${id}/preview`, body);
+    return response.data as { template: string; subject: string; text: string };
+  },
+};
+
 export default api;

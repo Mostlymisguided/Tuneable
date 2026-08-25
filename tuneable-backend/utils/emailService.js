@@ -1177,6 +1177,56 @@ async function sendPayoutRejectedNotification(payoutRequest, user, reason) {
   }
 }
 
+function textToHtml(text) {
+  const he = require('he');
+  return he.encode(String(text || '')).replace(/\n/g, '<br>');
+}
+
+/**
+ * Rights-ops outreach. Reply-to is a human mailbox (EMAIL_REPLY_TO),
+ * not the Resend from-address.
+ */
+async function sendRightsOutreachEmail({ to, subject, text, caseId }) {
+  const replyTo = process.env.EMAIL_REPLY_TO || 'hi@tuneable.stream';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
+      <p style="font-size: 12px; color: #6b7280; letter-spacing: 0.04em;">TUNEABLE RIGHTS</p>
+      <div style="line-height: 1.65; font-size: 15px;">${textToHtml(text)}</div>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 28px 0;">
+      <p style="color: #6b7280; font-size: 12px; line-height: 1.5;">
+        Reply to this email to continue the conversation (${replyTo}).
+        This message is about a listing on Tuneable.
+      </p>
+    </div>
+  `;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      replyTo,
+      subject,
+      html,
+      text,
+      tags: [
+        { name: 'category', value: 'rights_outreach' },
+        ...(caseId ? [{ name: 'case_id', value: String(caseId).slice(0, 40) }] : []),
+      ],
+    });
+
+    if (error) {
+      console.error('Error sending rights outreach email:', error);
+      throw new Error(error.message || 'Failed to send rights outreach email');
+    }
+
+    console.log('Rights outreach email sent:', data?.id, 'to', to);
+    return data;
+  } catch (error) {
+    console.error('Error sending rights outreach email:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -1195,5 +1245,6 @@ module.exports = {
   sendWarningEmail,
   sendPayoutRequestNotification,
   sendPayoutCompletedNotification,
-  sendPayoutRejectedNotification
+  sendPayoutRejectedNotification,
+  sendRightsOutreachEmail,
 };

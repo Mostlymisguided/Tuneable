@@ -369,6 +369,7 @@ app.use('/api/podcasts', podcastRoutes); // Consolidated Podcast routes
 app.use('/api/books', bookRoutes);
 app.use('/api/bid-metrics', bidMetricsRoutes); // Bid metrics API routes
 app.use('/api/claims', require('./routes/claimRoutes')); // Tune ownership claims
+app.use('/api/rights', require('./routes/rightsRoutes')); // Rights-ops cases / outreach
 app.use('/api/creator', creatorRoutes); // Creator application routes
 app.use('/api/reports', reportRoutes); // Report routes
 app.use('/api/email', emailRoutes); // Email routes

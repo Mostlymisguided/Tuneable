@@ -11,6 +11,19 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 const { sendEmail } = require('../utils/emailService');
 const { isValidObjectId } = require('../utils/validators');
 
+function openRightsCaseIfCopyright(report, media) {
+  if (report?.category !== 'copyright') return Promise.resolve();
+  try {
+    const rightsCaseService = require('../services/rightsCaseService');
+    return rightsCaseService.openFromCopyrightReport(report, media).catch((error) => {
+      console.error('Failed to open rights case from copyright report:', error);
+    });
+  } catch (error) {
+    console.error('Failed to open rights case from copyright report:', error);
+    return Promise.resolve();
+  }
+}
+
 // Submit a report for a media item
 router.post('/media/:mediaId/report', authMiddleware, async (req, res) => {
   try {
@@ -67,6 +80,8 @@ router.post('/media/:mediaId/report', authMiddleware, async (req, res) => {
     });
 
     await report.save();
+
+    await openRightsCaseIfCopyright(report, media);
 
     // Populate reporter info for email
     await report.populate('reportedBy', 'username email uuid');
@@ -182,6 +197,7 @@ router.post('/:mediaId/report', authMiddleware, async (req, res, next) => {
     });
 
     await report.save();
+    await openRightsCaseIfCopyright(report, media);
     await report.populate('reportedBy', 'username email uuid');
 
     try {

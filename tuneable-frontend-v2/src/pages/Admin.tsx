@@ -22,11 +22,13 @@ import {
   DollarSign,
   Gift,
   Sparkles,
-  Undo2
+  Undo2,
+  Scale
 } from 'lucide-react';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import SpotifyImportRequestsAdmin from '../components/SpotifyImportRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
+import RightsAdmin from '../components/RightsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
@@ -199,6 +201,7 @@ const Admin: React.FC = () => {
   const [refundPage, setRefundPage] = useState(1);
   const [refundTotalPages, setRefundTotalPages] = useState(1);
   const [pendingRefundCount, setPendingRefundCount] = useState(0);
+  const [rightsAttentionCount, setRightsAttentionCount] = useState(0);
   const [selectedRefundRequest, setSelectedRefundRequest] = useState<any | null>(null);
   const [refundAction, setRefundAction] = useState<'approve' | 'reject' | null>(null);
   const [refundRejectionReason, setRefundRejectionReason] = useState('');
@@ -1199,6 +1202,7 @@ const Admin: React.FC = () => {
     { id: 'users-labels', name: 'Users Labels Collectives', icon: Users },
     { id: 'bids-media-vetoes', name: 'Bids Media Vetoes', icon: DollarSign },
     { id: 'reports', name: 'Reports Apps Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
+    { id: 'rights', name: 'Rights', icon: Scale, hasNotification: rightsAttentionCount > 0 },
     { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
     { id: 'refunds', name: 'Tip Refunds', icon: Undo2, hasNotification: pendingRefundCount > 0 },
     { id: 'ledger', name: 'Ledger', icon: Database },
@@ -3861,6 +3865,10 @@ const Admin: React.FC = () => {
               />
             )}
           </div>
+        )}
+
+        {activeTab === 'rights' && (
+          <RightsAdmin onAttentionCountChange={setRightsAttentionCount} />
         )}
 
         {activeTab === 'payouts' && (

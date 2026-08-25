@@ -88,6 +88,13 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
     await claim.save();
 
     try {
+      const rightsCaseService = require('../services/rightsCaseService');
+      await rightsCaseService.attachClaim(claim);
+    } catch (rightsError) {
+      console.error('Failed to attach claim to rights case:', rightsError);
+    }
+
+    try {
       const user = await User.findById(userId);
       await sendClaimNotification(claim, media, user);
     } catch (emailError) {
@@ -342,6 +349,15 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
     claim.reviewedBy = req.user._id;
     claim.reviewedAt = new Date();
     await claim.save();
+
+    if (status === 'approved') {
+      try {
+        const rightsCaseService = require('../services/rightsCaseService');
+        await rightsCaseService.syncFromClaimReview(claim);
+      } catch (rightsError) {
+        console.error('Failed to sync rights cases from claim review:', rightsError);
+      }
+    }
 
     try {
       const notificationService = require('../services/notificationService');
