@@ -27,16 +27,19 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
 
-  if (!loaded) {
+  useEffect(() => {
+    const t = setTimeout(() => {
+      SplashScreen.hideAsync();
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!loaded && !error) {
     return null;
   }
 

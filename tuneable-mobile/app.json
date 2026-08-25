@@ -31,10 +31,7 @@
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "WAKE_LOCK"
+        "ACCESS_FINE_LOCATION"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -76,13 +73,6 @@
           "photosPermission": "Tuneable uses your photos so you can set a profile picture.",
           "cameraPermission": "Tuneable uses your camera so you can take a profile picture.",
           "microphonePermission": false
-        }
-      ],
-      [
-        "expo-audio",
-        {
-          "microphonePermission": false,
-          "recordAudioAndroid": false
         }
       ]
     ],
