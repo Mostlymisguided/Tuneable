@@ -22,11 +22,21 @@ export const paymentAPI = {
     return response.data;
   },
 
-  updateBalance: async (amount: number) => {
+  updateBalance: async (amount: number, stripeSessionId?: string) => {
     const response = await api.post<{
       message?: string;
       balance?: number;
-    }>('/payments/update-balance', { amount });
+      alreadyProcessed?: boolean;
+    }>('/payments/update-balance', { amount, stripeSessionId });
+    return response.data;
+  },
+
+  confirmCheckoutSession: async (sessionId: string) => {
+    const response = await api.post<{
+      message?: string;
+      balance?: number;
+      alreadyProcessed?: boolean;
+    }>('/payments/confirm-checkout-session', { stripeSessionId: sessionId });
     return response.data;
   },
 

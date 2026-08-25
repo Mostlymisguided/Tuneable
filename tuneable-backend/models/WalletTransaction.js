@@ -90,8 +90,11 @@ const walletTransactionSchema = new mongoose.Schema({
 // INDEXES
 // ========================================
 walletTransactionSchema.index({ userId: 1, createdAt: -1 }); // User's transaction history (most recent first)
-walletTransactionSchema.index({ stripeSessionId: 1 }); // Lookup by Stripe session
-walletTransactionSchema.index({ stripePaymentIntentId: 1 }); // Lookup by Stripe payment intent
+walletTransactionSchema.index(
+  { stripeSessionId: 1 },
+  { unique: true, sparse: true, name: 'stripeSessionId_idempotent' }
+); // Idempotent Stripe checkout credits
+walletTransactionSchema.index({ stripePaymentIntentId: 1 }, { sparse: true }); // Lookup by Stripe payment intent
 walletTransactionSchema.index(
   { storeTransactionId: 1 },
   { unique: true, sparse: true }

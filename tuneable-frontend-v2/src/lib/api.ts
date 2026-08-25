@@ -321,9 +321,17 @@ export const paymentAPI = {
     return response.data;
   },
   
-  updateBalance: async (amount: number) => {
+  confirmCheckoutSession: async (sessionId: string) => {
+    const response = await api.post('/payments/confirm-checkout-session', {
+      stripeSessionId: sessionId,
+    });
+    return response.data;
+  },
+
+  updateBalance: async (amount: number, stripeSessionId?: string) => {
     const response = await api.post('/payments/update-balance', {
       amount,
+      stripeSessionId,
     });
     return response.data;
   },

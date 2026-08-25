@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { paymentAPI } from '../lib/api';
@@ -51,55 +51,57 @@ const Wallet: React.FC = () => {
     return Math.ceil(total * 100) / 100;
   };
 
+  const handledCheckoutRef = useRef(false);
+
   // Check for payment success/cancel in URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const canceled = urlParams.get('canceled');
     const amount = urlParams.get('amount');
+    const sessionId = urlParams.get('session_id');
 
-    if (success === 'true' && amount) {
-      // Wait a moment for webhook to process, then use fallback if needed
-      // The backend will check if webhook already processed it and avoid duplicates
-      const checkAndUpdateBalance = async () => {
+    if (success === 'true') {
+      if (handledCheckoutRef.current) return;
+      handledCheckoutRef.current = true;
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      const finalizeTopUp = async () => {
         try {
-          // Wait longer for webhook to process (5 seconds) to reduce race conditions
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          // Refresh user data first to get latest balance
+          if (sessionId) {
+            const response = await paymentAPI.confirmCheckoutSession(sessionId);
+            if (response.balance !== undefined) {
+              updateBalance(response.balance);
+            } else if (refreshUser) {
+              await refreshUser();
+            }
+            const credited = amount ? `£${amount}` : 'funds';
+            toast.success(
+              response.alreadyProcessed
+                ? `${credited} already added to your wallet`
+                : `Successfully added ${credited} to your wallet!`
+            );
+            return;
+          }
+
           if (refreshUser) {
             await refreshUser();
           }
-          
-          // Call update-balance endpoint - it will check for existing webhook transaction
-          const response = await paymentAPI.updateBalance(parseFloat(amount));
-          
-          if (response.message === 'Payment already processed by webhook') {
-            // Webhook already handled it
-            toast.success(`Successfully added £${amount} to your wallet!`);
-          } else {
-            // Fallback was used (or webhook hadn't processed yet)
-            toast.success(`Successfully added £${amount} to your wallet!`);
-          }
-          
-          // Update balance in context
-          if (response.balance !== undefined) {
-            updateBalance(response.balance);
-          } else if (refreshUser) {
-            refreshUser();
+          if (amount) {
+            toast.success(`Payment received. Your wallet will update shortly.`);
           }
         } catch (error) {
-          console.error('Failed to update balance:', error);
-          toast.error('Payment successful but failed to update balance. Please refresh the page.');
+          console.error('Failed to confirm top-up:', error);
+          if (refreshUser) {
+            await refreshUser();
+          }
+          toast.error('Payment successful but wallet is still updating. Please refresh in a moment.');
         }
       };
-      
-      checkAndUpdateBalance();
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+
+      finalizeTopUp();
     } else if (canceled === 'true') {
       toast.info('Payment was canceled');
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [refreshUser, updateBalance]);

@@ -41,6 +41,7 @@ export default function WalletScreen() {
     success?: string;
     canceled?: string;
     amount?: string;
+    session_id?: string;
   }>();
   const [customAmount, setCustomAmount] = useState('5.00');
   const [loading, setLoading] = useState(false);
@@ -51,18 +52,28 @@ export default function WalletScreen() {
   const verifyingRef = useRef(false);
 
   const finalizeStripeSuccess = useCallback(
-    async (amountPounds: number) => {
+    async (amountPounds: number, sessionId?: string) => {
       setStatusMessage('Confirming payment…');
       try {
-        await new Promise((r) => setTimeout(r, 2500));
-        await refreshUser();
-        const response = await paymentAPI.updateBalance(amountPounds);
-        if (typeof response.balance === 'number') {
-          updateBalance(response.balance);
-        } else {
-          await refreshUser();
+        if (sessionId) {
+          const response = await paymentAPI.confirmCheckoutSession(sessionId);
+          if (typeof response.balance === 'number') {
+            updateBalance(response.balance);
+          } else {
+            await refreshUser();
+          }
+          setStatusMessage(
+            response.alreadyProcessed
+              ? `£${amountPounds.toFixed(2)} already added to your wallet.`
+              : `Added £${amountPounds.toFixed(2)} to your wallet.`
+          );
+          return;
         }
-        setStatusMessage(`Added £${amountPounds.toFixed(2)} to your wallet.`);
+
+        await refreshUser();
+        setStatusMessage(
+          `Payment received. Your wallet will update shortly.`
+        );
       } catch (err) {
         console.error(err);
         await refreshUser();
@@ -196,8 +207,10 @@ export default function WalletScreen() {
     if (useStoreIap) return;
     if (params.success === 'true' && params.amount) {
       const amount = Number.parseFloat(params.amount);
+      const sessionId =
+        typeof params.session_id === 'string' ? params.session_id : undefined;
       if (!Number.isNaN(amount) && amount > 0) {
-        void finalizeStripeSuccess(amount);
+        void finalizeStripeSuccess(amount, sessionId);
       }
       router.replace('/wallet');
     } else if (params.canceled === 'true') {
@@ -271,7 +284,8 @@ export default function WalletScreen() {
         const q = parsed.queryParams || {};
         if (q.success === 'true' && q.amount) {
           const amount = Number.parseFloat(String(q.amount));
-          if (!Number.isNaN(amount)) await finalizeStripeSuccess(amount);
+          const sessionId = q.session_id ? String(q.session_id) : undefined;
+          if (!Number.isNaN(amount)) await finalizeStripeSuccess(amount, sessionId);
         } else if (q.canceled === 'true') {
           setStatusMessage('Checkout canceled.');
         }
