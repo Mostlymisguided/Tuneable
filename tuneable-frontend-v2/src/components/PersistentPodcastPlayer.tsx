@@ -10,6 +10,7 @@ import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from 'react-toastify';
+import { clearMediaSession, updateMediaSession } from '../utils/mediaSession';
 
 /** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */
 const SkipBack15Icon: React.FC<{ className?: string }> = ({ className }) => (
@@ -20,12 +21,12 @@ const SkipBack15Icon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-/** Almost-complete circle, arrow clockwise, "15" inside (skip forward 15s). */
-const SkipForward15Icon: React.FC<{ className?: string }> = ({ className }) => (
+/** Almost-complete circle, arrow clockwise, "30" inside (skip forward 30s). */
+const SkipForward30Icon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 6.8 A 12 12 0 1 1 14 29.2" />
     <path d="M14 29.2 L11.5 25.8 L16.5 25.8 Z" fill="currentColor" stroke="none" />
-    <text x="18" y="18.5" textAnchor="middle" dominantBaseline="middle" fill="currentColor" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif">15</text>
+    <text x="18" y="18.5" textAnchor="middle" dominantBaseline="middle" fill="currentColor" fontSize="8" fontWeight="600" fontFamily="system-ui, sans-serif">30</text>
   </svg>
 );
 
@@ -190,7 +191,51 @@ const PersistentPodcastPlayer: React.FC = () => {
   };
 
   const skipBack = () => handleSeek(Math.max(0, currentTime - 15));
-  const skipForward = () => handleSeek(Math.min(duration || 0, currentTime + 15));
+  const skipForward = () => handleSeek(Math.min(duration || 0, currentTime + 30));
+
+  useEffect(() => {
+    if (!currentEpisode) {
+      clearMediaSession();
+      return;
+    }
+    const coverArt =
+      currentEpisode.coverArt ??
+      currentEpisode.podcastSeries?.coverArt ??
+      DEFAULT_COVER_ART;
+    const artist =
+      currentEpisode.podcastSeries?.title ?? currentEpisode.podcastTitle ?? '';
+    updateMediaSession({
+      title: currentEpisode.title,
+      artist,
+      artwork: coverArt,
+      duration,
+      position: currentTime,
+      playbackRate,
+      playing: isPlaying,
+      handlers: {
+        play: () => {
+          if (!isPlaying) togglePlayPause();
+        },
+        pause: () => {
+          if (isPlaying) togglePlayPause();
+        },
+        seekbackward: (offset) => handleSeek(Math.max(0, currentTime - offset)),
+        seekforward: (offset) =>
+          handleSeek(Math.min(duration || 0, currentTime + offset)),
+        seekto: (time) => handleSeek(time),
+        nexttrack: () => usePodcastPlayerStore.getState().next(),
+      },
+    });
+  }, [
+    currentEpisode,
+    isPlaying,
+    currentTime,
+    duration,
+    playbackRate,
+    togglePlayPause,
+  ]);
+
+  useEffect(() => () => clearMediaSession(), []);
 
   const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleSeek(parseFloat(e.target.value));
@@ -261,6 +306,9 @@ const PersistentPodcastPlayer: React.FC = () => {
   const episodeId = currentEpisode?._id ?? currentEpisode?.id;
   const cover = currentEpisode?.coverArt ?? currentEpisode?.podcastSeries?.coverArt ?? DEFAULT_COVER_ART;
   const showTitle = currentEpisode?.podcastSeries?.title ?? currentEpisode?.podcastTitle ?? '';
+  const seriesHref = currentEpisode?.podcastSeries?._id
+    ? `/podcast/${currentEpisode.podcastSeries._id}`
+    : null;
 
   if (!currentEpisode) return null;
 
@@ -312,9 +360,16 @@ const PersistentPodcastPlayer: React.FC = () => {
                 )}
                 {!episodeId && <h4 className="text-sm font-semibold text-gray-400 truncate">No episode</h4>}
               </div>
-              {showTitle && (
+              {showTitle && seriesHref ? (
+                <Link
+                  to={seriesHref}
+                  className="text-xs text-amber-200/80 truncate mt-0.5 hover:text-amber-100 hover:underline"
+                >
+                  {showTitle}
+                </Link>
+              ) : showTitle ? (
                 <p className="text-xs text-amber-200/80 truncate mt-0.5">{showTitle}</p>
-              )}
+              ) : null}
             </div>
 
             <div className="text-xs text-gray-400 font-mono tabular-nums hidden sm:block">
@@ -377,9 +432,9 @@ const PersistentPodcastPlayer: React.FC = () => {
                 onClick={skipForward}
                 disabled={!isPlayerReady}
                 className="w-9 h-9 rounded-full bg-gray-700/80 hover:bg-gray-600 flex items-center justify-center text-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Forward 15 seconds"
+                title="Forward 30 seconds"
               >
-                <SkipForward15Icon className="w-5 h-5" />
+                <SkipForward30Icon className="w-5 h-5" />
               </button>
 
               <button

@@ -6,6 +6,7 @@ struct NowPlayingSheet: View {
 
     @State private var scrubberValue: Double = 0
     @State private var isScrubbing = false
+    @State private var seriesDestination: String?
 
     var body: some View {
         Group {
@@ -37,19 +38,25 @@ struct NowPlayingSheet: View {
     }
 
     private func content(episode: PodcastEpisode) -> some View {
-        VStack(spacing: 0) {
-            header
-            Spacer()
-            coverSection(episode: episode)
-            Spacer()
-            titleSection(episode: episode)
-            progressSection
-            controlsSection
-            playbackRateButton
-            Spacer(minLength: 32)
+        NavigationStack {
+            VStack(spacing: 0) {
+                header
+                Spacer()
+                coverSection(episode: episode)
+                Spacer()
+                titleSection(episode: episode)
+                progressSection
+                controlsSection
+                playbackRateButton
+                Spacer(minLength: 32)
+            }
+            .padding(.horizontal, 24)
+            .background(PurpleGradientBackground())
+            .navigationBarHidden(true)
+            .navigationDestination(item: $seriesDestination) { id in
+                PodcastSeriesProfileView(seriesId: id)
+            }
         }
-        .padding(.horizontal, 24)
-        .background(PurpleGradientBackground())
     }
 
     private var header: some View {
@@ -90,15 +97,29 @@ struct NowPlayingSheet: View {
     }
 
     private func titleSection(episode: PodcastEpisode) -> some View {
-        VStack(spacing: 4) {
+        let showName = episode.podcastSeries?.title ?? episode.podcastTitle ?? ""
+        let seriesId = episode.podcastSeries?._id
+        return VStack(spacing: 4) {
             Text(episode.title ?? "Untitled")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(AppTheme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-            Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.textSecondary)
+            if let seriesId, !seriesId.isEmpty, !showName.isEmpty {
+                Button {
+                    seriesDestination = seriesId
+                } label: {
+                    Text(showName)
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.accent)
+                        .underline()
+                }
+                .buttonStyle(.plain)
+            } else if !showName.isEmpty {
+                Text(showName)
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.textSecondary)
+            }
         }
         .padding(.vertical, 16)
     }
@@ -149,9 +170,9 @@ struct NowPlayingSheet: View {
             }
 
             Button {
-                podcastPlayer.skipForward(seconds: 15)
+                podcastPlayer.skipForward(seconds: 30)
             } label: {
-                Image(systemName: "goforward.15")
+                Image(systemName: "goforward.30")
                     .font(.system(size: 36))
                     .foregroundStyle(AppTheme.textPrimary)
             }

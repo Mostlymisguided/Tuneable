@@ -1,14 +1,27 @@
-import { Audio, type AVPlaybackStatus } from 'expo-av';
+import { type AudioPlayer, type AudioStatus } from 'expo-audio';
 import { create } from 'zustand';
-import type { PodcastEpisode } from '@/src/types/podcast';
+import {
+  DEFAULT_PODCAST_COVER,
+  type PodcastEpisode,
+} from '@/src/types/podcast';
 import {
   PODCAST_NO_PLAYABLE,
   PODCAST_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
 import {
+  createPersistentAudioPlayer,
+  destroyAudioPlayer,
+  ensurePlaybackAudioMode,
+  nextPlaybackSpeed,
+  PODCAST_SKIP_BACK_MS,
+  PODCAST_SKIP_FORWARD_MS,
+  publishLockScreen,
+} from '@/src/lib/playbackAudio';
+import {
   episodeId,
   getEpisodeAudioUrl,
   isEpisodePlayable,
+  seriesTitle,
 } from '@/src/lib/podcast';
 import { showToast } from '@/src/stores/toastStore';
 
@@ -19,6 +32,7 @@ type PodcastPlayerState = {
   isLoading: boolean;
   positionMs: number;
   durationMs: number;
+  playbackRate: number;
   error: string | null;
   setQueueAndPlay: (items: PodcastEpisode[], startIndex?: number) => Promise<void>;
   play: () => Promise<void>;
@@ -27,37 +41,19 @@ type PodcastPlayerState = {
   next: () => Promise<void>;
   previous: () => Promise<void>;
   seek: (positionMs: number) => Promise<void>;
+  skipBy: (deltaMs: number) => Promise<void>;
+  skipBack: () => Promise<void>;
+  skipForward: () => Promise<void>;
+  cyclePlaybackRate: () => Promise<void>;
   clear: () => Promise<void>;
 };
 
-let sound: Audio.Sound | null = null;
-let audioModeReady = false;
+let player: AudioPlayer | null = null;
+let statusSub: { remove: () => void } | null = null;
 let consecutiveLoadFailures = 0;
 let skipAfterFailureInFlight = false;
 let skipNoticeShown = false;
-
-async function ensureAudioMode() {
-  if (audioModeReady) return;
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    staysActiveInBackground: true,
-    shouldDuckAndroid: true,
-    playThroughEarpieceAndroid: false,
-  });
-  audioModeReady = true;
-}
-
-async function unloadSound() {
-  if (!sound) return;
-  try {
-    sound.setOnPlaybackStatusUpdate(null);
-    await sound.unloadAsync();
-  } catch {
-    // ignore
-  }
-  sound = null;
-}
+let finishHandled = false;
 
 function getStore(): PodcastPlayerState {
   return usePodcastPlayerStore.getState();
@@ -116,27 +112,68 @@ async function skipAfterFailure(reason: string) {
   }
 }
 
-function onStatus(status: AVPlaybackStatus) {
+function applyPlaybackRate() {
+  if (!player) return;
+  const rate = getStore().playbackRate;
+  try {
+    player.shouldCorrectPitch = true;
+    player.setPlaybackRate(rate);
+  } catch {
+    // ignore
+  }
+}
+
+function publishCurrentLockScreen(item: PodcastEpisode) {
+  if (!player) return;
+  publishLockScreen(player, {
+    title: item.title || 'Episode',
+    artist: seriesTitle(item),
+    albumTitle: 'Tuneable',
+    artworkUrl:
+      item.coverArt || item.podcastSeries?.coverArt || DEFAULT_PODCAST_COVER,
+  });
+}
+
+function onStatus(status: AudioStatus) {
   if (!status.isLoaded) {
-    if (status.error) {
-      void skipAfterFailure(status.error);
+    if (status.playbackState?.toLowerCase().includes('error')) {
+      void skipAfterFailure(status.reasonForWaitingToPlay || 'Failed to load audio');
     }
     return;
   }
 
   consecutiveLoadFailures = 0;
   skipNoticeShown = false;
+  const desiredRate = getStore().playbackRate;
+  if (Math.abs((status.playbackRate || 1) - desiredRate) > 0.01) {
+    applyPlaybackRate();
+  }
   usePodcastPlayerStore.setState({
-    isPlaying: status.isPlaying,
+    isPlaying: status.playing,
     isLoading: status.isBuffering,
-    positionMs: status.positionMillis ?? 0,
-    durationMs: status.durationMillis ?? 0,
+    positionMs: (status.currentTime ?? 0) * 1000,
+    durationMs: (status.duration ?? 0) * 1000,
     error: null,
   });
 
-  if (status.didJustFinish && !status.isLooping) {
+  if (status.didJustFinish && !status.loop && !finishHandled) {
+    finishHandled = true;
     void getStore().next();
   }
+}
+
+function ensurePlayer(): AudioPlayer {
+  if (player) return player;
+  player = createPersistentAudioPlayer();
+  statusSub = player.addListener('playbackStatusUpdate', onStatus);
+  return player;
+}
+
+function unloadPlayer() {
+  statusSub?.remove();
+  statusSub = null;
+  destroyAudioPlayer(player);
+  player = null;
 }
 
 async function loadAndPlay(item: PodcastEpisode) {
@@ -146,8 +183,9 @@ async function loadAndPlay(item: PodcastEpisode) {
     return;
   }
 
-  await ensureAudioMode();
-  await unloadSound();
+  await ensurePlaybackAudioMode();
+  const active = ensurePlayer();
+  finishHandled = false;
 
   usePodcastPlayerStore.setState({
     isLoading: true,
@@ -157,12 +195,10 @@ async function loadAndPlay(item: PodcastEpisode) {
   });
 
   try {
-    const created = await Audio.Sound.createAsync(
-      { uri },
-      { shouldPlay: true, progressUpdateIntervalMillis: 500 },
-      onStatus
-    );
-    sound = created.sound;
+    active.replace({ uri });
+    applyPlaybackRate();
+    active.play();
+    publishCurrentLockScreen(item);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
@@ -189,6 +225,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
   isLoading: false,
   positionMs: 0,
   durationMs: 0,
+  playbackRate: 1,
   error: null,
 
   setQueueAndPlay: async (items, startIndex = 0) => {
@@ -239,17 +276,18 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
   },
 
   play: async () => {
-    if (!sound) {
+    if (!player) {
       const item = get().queue[get().currentIndex];
       if (item) await loadAndPlay(item);
       return;
     }
-    await sound.playAsync();
+    player.play();
+    const item = get().queue[get().currentIndex];
+    if (item) publishCurrentLockScreen(item);
   },
 
   pause: async () => {
-    if (!sound) return;
-    await sound.pauseAsync();
+    player?.pause();
   },
 
   togglePlayPause: async () => {
@@ -286,14 +324,35 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
   },
 
   seek: async (positionMs) => {
-    if (!sound) return;
-    await sound.setPositionAsync(Math.max(0, positionMs));
+    if (!player) return;
+    await player.seekTo(Math.max(0, positionMs) / 1000);
+  },
+
+  skipBy: async (deltaMs) => {
+    const { positionMs, durationMs } = get();
+    const next = Math.max(0, Math.min(durationMs || Infinity, positionMs + deltaMs));
+    await get().seek(next);
+  },
+
+  skipBack: async () => {
+    await get().skipBy(-PODCAST_SKIP_BACK_MS);
+  },
+
+  skipForward: async () => {
+    await get().skipBy(PODCAST_SKIP_FORWARD_MS);
+  },
+
+  cyclePlaybackRate: async () => {
+    const next = nextPlaybackSpeed(get().playbackRate);
+    set({ playbackRate: next });
+    applyPlaybackRate();
   },
 
   clear: async () => {
-    await unloadSound();
+    unloadPlayer();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
+    finishHandled = false;
     set({
       queue: [],
       currentIndex: 0,

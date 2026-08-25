@@ -22,6 +22,7 @@ import {
   getNativeDuration,
   seekNativeAudio,
 } from '../services/nativeAudioPlayer';
+import { clearMediaSession, updateMediaSession } from '../utils/mediaSession';
 
 interface PlayerMedia {
   id: string;
@@ -437,6 +438,48 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       isSeekingRef.current = false;
     }, 100);
   };
+
+  useEffect(() => {
+    if (!media) {
+      clearMediaSession();
+      return;
+    }
+    const artistName =
+      typeof media.artist === 'string' ? media.artist : 'Tuneable';
+    updateMediaSession({
+      title: media.title,
+      artist: artistName,
+      artwork: media.coverArt,
+      duration,
+      position: currentTime,
+      playbackRate: 1,
+      playing: isPlaying,
+      handlers: {
+        play: () => {
+          if (!isPlaying) togglePlayPause();
+        },
+        pause: () => {
+          if (isPlaying) togglePlayPause();
+        },
+        seekbackward: (offset) => handleSeek(Math.max(0, currentTime - offset)),
+        seekforward: (offset) =>
+          handleSeek(Math.min(duration || 0, currentTime + offset)),
+        seekto: (time) => handleSeek(time),
+        previoustrack: previous,
+        nexttrack: next,
+      },
+    });
+  }, [
+    media,
+    isPlaying,
+    currentTime,
+    duration,
+    togglePlayPause,
+    next,
+    previous,
+  ]);
+
+  useEffect(() => () => clearMediaSession(), []);
 
   const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);
