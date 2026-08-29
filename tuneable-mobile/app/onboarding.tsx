@@ -38,20 +38,19 @@ import {
 } from '@/src/lib/oauth';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
-import { requestAndRegisterPush } from '@/src/lib/pushNotifications';
 import type { ResolvedLocation } from '@/src/types/user';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type OnboardingStep = 'location' | 'notifications' | 'import';
+type OnboardingStep = 'location' | 'import';
 type ImportSource = 'soundcloud' | 'youtube';
 
-const STEP_ORDER: OnboardingStep[] = ['location', 'notifications', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['location', 'import'];
 const ONBOARDING_IMPORT_LIMIT = 25;
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'import' || raw === 'notifications') return raw;
+  if (raw === 'import' || raw === 'notifications') return 'import';
   return 'location';
 }
 
@@ -191,48 +190,9 @@ export default function OnboardingScreen() {
     try {
       await authAPI.updateProfile({ homeLocation });
       await refreshUser();
-      goToStep('notifications');
+      goToStep('import');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save home location.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const markNotificationsSeen = async () => {
-    await authAPI.updateProfile({
-      onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
-    });
-    await refreshUser();
-  };
-
-  const allowNotificationsStep = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await requestAndRegisterPush();
-      if (result === 'denied') {
-        setError(
-          'Notifications were blocked. You can enable them later in Settings.'
-        );
-      }
-      await markNotificationsSeen();
-      goToStep('import');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Could not enable notifications.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const skipNotificationsStep = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      await markNotificationsSeen();
-      goToStep('import');
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to continue.'));
     } finally {
       setSaving(false);
     }
@@ -631,51 +591,9 @@ export default function OnboardingScreen() {
                   disabled={busy}
                   onPress={() => {
                     setError(null);
-                    goToStep('notifications');
+                    goToStep('import');
                   }}>
                   <Text style={styles.secondaryBtnText}>Skip for now</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {step === 'notifications' && (
-              <View style={styles.stepBody}>
-                <View style={styles.stepHeader}>
-                  <View style={styles.iconBubble}>
-                    <Ionicons name="notifications-outline" size={20} color={colors.accentLight} />
-                  </View>
-                  <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Stay in the loop</Text>
-                    <Text style={styles.stepText}>
-                      Get a ping when someone tips your tracks, or when you&apos;re
-                      out-tipped on a chart. You can skip and enable this later.
-                    </Text>
-                  </View>
-                </View>
-
-                {error ? <Text style={styles.error}>{error}</Text> : null}
-
-                <Pressable
-                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy}
-                  onPress={() => void allowNotificationsStep()}>
-                  {saving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryBtnText}>Allow notifications</Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  style={[styles.secondaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy}
-                  onPress={() => void skipNotificationsStep()}>
-                  <Text style={styles.secondaryBtnText}>Skip for now</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.backBtn}
-                  disabled={busy}
-                  onPress={() => goToStep('location')}>
-                  <Text style={styles.backBtnText}>Back</Text>
                 </Pressable>
               </View>
             )}
@@ -821,7 +739,7 @@ export default function OnboardingScreen() {
                 <Pressable
                   style={styles.backBtn}
                   disabled={busy}
-                  onPress={() => goToStep('notifications')}>
+                  onPress={() => goToStep('location')}>
                   <Text style={styles.backBtnText}>Back</Text>
                 </Pressable>
               </View>

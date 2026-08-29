@@ -68,6 +68,17 @@ export async function requestAndRegisterPush(): Promise<PushPermissionResult> {
   }
 }
 
+/**
+ * Show the OS permission sheet only if the user has not answered yet.
+ * In-app "Allow" UI is redundant — iOS/Android always require this dialog.
+ */
+export async function maybePromptForPush(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const existing = await Notifications.getPermissionsAsync();
+  if (existing.status === 'granted' || existing.canAskAgain === false) return;
+  await requestAndRegisterPush();
+}
+
 /** Re-register if the OS already granted permission (no prompt). */
 export async function syncPushTokenIfGranted(): Promise<void> {
   if (Platform.OS === 'web') return;

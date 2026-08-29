@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
-import { DEFAULT_TIP_POUNDS, hasHomeLocation } from '@/src/lib/onboarding';
-import { requestAndRegisterPush } from '@/src/lib/pushNotifications';
+import {
+  DEFAULT_TIP_POUNDS,
+  hasHomeLocation,
+  needsOnboarding,
+} from '@/src/lib/onboarding';
+import { maybePromptForPush } from '@/src/lib/pushNotifications';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import { hasCustomProfilePic } from '@/src/types/user';
@@ -15,7 +19,30 @@ export function DashboardPrompts() {
   const { user, refreshUser } = useAuth();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
-  const [enablingPush, setEnablingPush] = useState(false);
+  const pushAskStarted = useRef(false);
+
+  useEffect(() => {
+    if (!user || pushAskStarted.current) return;
+    if (needsOnboarding(user)) return;
+    if (user.hasPushDevice || user.onboarding?.notificationsPromptSeenAt) return;
+    pushAskStarted.current = true;
+    let cancelled = false;
+    void (async () => {
+      await maybePromptForPush();
+      if (cancelled) return;
+      try {
+        await authAPI.updateProfile({
+          onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
+        });
+        await refreshUser();
+      } catch {
+        // Token sync still runs on later logins if they granted
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, refreshUser]);
 
   if (!user) return null;
 
@@ -23,14 +50,10 @@ export function DashboardPrompts() {
   const currentDefaultTip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
   const showDefaultTip =
     !user.onboarding?.defaultTipPromptSeenAt && !dismissed.has('defaultTip');
-  const showNotifications =
-    !user.hasPushDevice &&
-    !user.onboarding?.notificationsPromptSeenAt &&
-    !dismissed.has('notifications');
   const showEmail = !user.emailVerified && !dismissed.has('email');
   const showPic = !hasCustomProfilePic(user.profilePic) && !dismissed.has('pic');
 
-  if (!showLocation && !showDefaultTip && !showNotifications && !showEmail && !showPic) return null;
+  if (!showLocation && !showDefaultTip && !showEmail && !showPic) return null;
 
   const sendVerification = async () => {
     setSendingEmail(true);
@@ -41,42 +64,6 @@ export function DashboardPrompts() {
       showToast(getApiErrorMessage(err, 'Could not send verification email.'), 'error');
     } finally {
       setSendingEmail(false);
-    }
-  };
-
-  const enableNotifications = async () => {
-    setEnablingPush(true);
-    try {
-      const result = await requestAndRegisterPush();
-      await authAPI.updateProfile({
-        onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
-      });
-      await refreshUser();
-      if (result === 'granted') {
-        showToast('Notifications on — we will ping you when someone tips your tracks.');
-        return;
-      }
-      if (result === 'denied') {
-        showToast('Notifications were blocked. You can enable them in Settings.', 'error');
-        return;
-      }
-      showToast('Could not register this device for push just yet.');
-    } catch (err) {
-      showToast(getApiErrorMessage(err, 'Could not enable notifications.'), 'error');
-    } finally {
-      setEnablingPush(false);
-    }
-  };
-
-  const dismissNotifications = async () => {
-    setDismissed((prev) => new Set(prev).add('notifications'));
-    try {
-      await authAPI.updateProfile({
-        onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
-      });
-      await refreshUser();
-    } catch {
-      // Local dismiss still hides it this session
     }
   };
 
@@ -111,16 +98,6 @@ export function DashboardPrompts() {
           actionLabel="Set tip"
           onAction={() => router.push('/edit-profile')}
           onDismiss={() => void dismissDefaultTip()}
-        />
-      ) : null}
-      {showNotifications ? (
-        <PromptCard
-          icon="notifications-outline"
-          title="Allow notifications"
-          body="Get a ping when someone tips your tracks, or when you are out-tipped."
-          actionLabel={enablingPush ? 'Enabling…' : 'Allow'}
-          onAction={() => void enableNotifications()}
-          onDismiss={() => void dismissNotifications()}
         />
       ) : null}
       {showEmail ? (
