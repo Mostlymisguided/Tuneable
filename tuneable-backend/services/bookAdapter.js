@@ -117,7 +117,7 @@ async function findExistingBook(payload) {
 }
 
 function buildBookDoc(payload, userId) {
-  const isbn = firstIsbn(payload?.isbn, payload?.isbns) || null;
+  const isbn = firstIsbn(payload?.isbn, payload?.isbns) || undefined;
   const authors = toAuthorDocs(payload);
   const openLibraryKey = payload?.openLibraryKey || payload?.externalIds?.openLibrary || null;
   const googleBooksId = payload?.googleBooksId || payload?.externalIds?.googleBooks || null;
@@ -135,7 +135,7 @@ function buildBookDoc(payload, userId) {
     ...BOOK_CLASSIFICATION,
     author: authors,
     creatorDisplay: authors.map((a) => a.name).join(', ') || null,
-    isbn,
+    ...(isbn ? { isbn } : {}),
     publisher: payload.publisher || null,
     pages: payload.pageCount || payload.pages || null,
     language: normalizeLanguageInput(payload.language),

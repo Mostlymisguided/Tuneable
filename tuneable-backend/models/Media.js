@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { uuidv7 } = require('uuidv7');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeLanguageInput } = require('../utils/language');
+const { normalizeIsbn } = require('../utils/isbn');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -203,7 +204,9 @@ const mediaSchema = new mongoose.Schema({
   }],
   explicit: { type: Boolean, default: false }, // Explicit content flag
   isrc: { type: String, default: null }, // International Standard Recording Code
-  isbn: { type: String, default: null }, // Normalized ISBN-13 (written / books)
+  // Omit when unknown — do not default to null. Unique indexes still index null,
+  // so a default of null makes the second song/book without an ISBN fail to save.
+  isbn: { type: String }, // Normalized ISBN-13 (written / books)
 
   /**
    * Soft identity quality for discovery / admin review.
@@ -580,6 +583,13 @@ mediaSchema.pre('save', function (next) {
     this.isrc = normalizeIsrc(this.isrc);
   }
 
+  if (this.isbn === null || this.isbn === '') {
+    this.$unset('isbn');
+  } else if (this.isbn) {
+    const normalizedIsbn = normalizeIsbn(this.isbn);
+    if (normalizedIsbn) this.isbn = normalizedIsbn;
+  }
+
   // MongoDB text indexes treat `language` as a stemming override (`en`, not `eng`).
   if (this.language) {
     this.language = normalizeLanguageInput(this.language);
@@ -692,7 +702,16 @@ mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
 mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
 mediaSchema.index({ "externalIds.soundcloud": 1 }); // Index for SoundCloud import matching
 mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify import matching
-mediaSchema.index({ isbn: 1 }, { unique: true, sparse: true });
+mediaSchema.index(
+  { isbn: 1 },
+  {
+    unique: true,
+    name: 'isbn_unique_partial',
+    // Sparse unique indexes still index null, so only one media row can have isbn:null.
+    // Partial index only uniqueness-checks actual ISBN strings.
+    partialFilterExpression: { isbn: { $type: 'string' } },
+  }
+);
 mediaSchema.index({ "externalIds.openLibrary": 1 });
 mediaSchema.index({ "externalIds.googleBooks": 1 });
 mediaSchema.index({ "sources.soundcloud": 1 }); // Index for SoundCloud permalink matching
@@ -1165,6 +1184,52 @@ mediaSchema.methods.replaceMediaOwners = function(owners, actorId, note) {
 // Schema method: Get total ownership percentage
 mediaSchema.methods.getTotalOwnershipPercentage = function() {
   return this.mediaOwners.reduce((sum, owner) => sum + owner.percentage, 0);
+};
+
+const ISBN_PARTIAL_INDEX_NAME = 'isbn_unique_partial';
+
+/**
+ * Drop the old unique+sparse isbn_1 index (which treats null as a value) and
+ * clear stored null/empty ISBNs so tipping songs without an ISBN can save.
+ */
+mediaSchema.statics.repairIsbnUniqueness = async function repairIsbnUniqueness() {
+  const coll = this.collection;
+  if (!coll) return { unsetCount: 0, dropped: [] };
+
+  const unsetResult = await coll.updateMany(
+    { $or: [{ isbn: null }, { isbn: '' }] },
+    { $unset: { isbn: 1 } }
+  );
+
+  const dropped = [];
+  const indexes = await coll.indexes();
+  for (const idx of indexes) {
+    const keys = idx.key && Object.keys(idx.key);
+    const isIsbnOnly = keys && keys.length === 1 && idx.key.isbn === 1;
+    if (!isIsbnOnly) continue;
+    const isDesiredPartial = idx.name === ISBN_PARTIAL_INDEX_NAME
+      && idx.unique
+      && idx.partialFilterExpression
+      && idx.partialFilterExpression.isbn
+      && idx.partialFilterExpression.isbn.$type === 'string';
+    if (isDesiredPartial) continue;
+    await coll.dropIndex(idx.name);
+    dropped.push(idx.name);
+  }
+
+  await coll.createIndex(
+    { isbn: 1 },
+    {
+      unique: true,
+      name: ISBN_PARTIAL_INDEX_NAME,
+      partialFilterExpression: { isbn: { $type: 'string' } },
+    }
+  );
+
+  return {
+    unsetCount: unsetResult.modifiedCount || 0,
+    dropped,
+  };
 };
 
 module.exports = mongoose.models.Media || mongoose.model('Media', mediaSchema);

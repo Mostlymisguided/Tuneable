@@ -88,4 +88,14 @@ describe('buildBookDoc', () => {
     }, 'user1');
     expect(doc.language).toBe('en');
   });
+
+  it('omits isbn when the payload has none so MongoDB unique indexes are not given null', () => {
+    const doc = buildBookDoc({
+      title: 'Untitled Zine',
+      authors: ['Unknown'],
+      source: 'openLibrary',
+    }, 'user1');
+    expect(doc).not.toHaveProperty('isbn');
+    expect(doc.externalIds.isbn).toBeUndefined();
+  });
 });

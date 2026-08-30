@@ -53,6 +53,21 @@ db.connectDB()
       });
     });
 
+    setImmediate(() => {
+      const Media = require('./models/Media');
+      Media.repairIsbnUniqueness()
+        .then((result) => {
+          if (result.unsetCount || (result.dropped && result.dropped.length)) {
+            console.log(
+              `Repaired media ISBN uniqueness: unset ${result.unsetCount} empty isbn field(s), dropped indexes [${(result.dropped || []).join(', ')}]`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to repair media ISBN uniqueness:', error);
+        });
+    });
+
     // Optional ongoing tags + location drip (ENRICHMENT_DRIP_ENABLED=true)
     try {
       const { startEnrichmentDripCron } = require('./services/enrichmentDripService');
