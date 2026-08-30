@@ -159,7 +159,6 @@ export function UserLibrarySection({
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmPanel, setShowBpmPanel] = useState(false);
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
   const [tipTarget, setTipTarget] = useState<UserLibraryItem | null>(null);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
@@ -348,11 +347,9 @@ export function UserLibrarySection({
           onToggleSortPanel={() => setShowSortPanel((open) => !open)}
           sortHint={CHART_LIBRARY_SORT_HINT}
           showBpmPanel={showBpmPanel}
-          showSearchPanel={showSearchPanel}
           onToggleTagPanel={() => setShowTagPanel((open) => !open)}
           onToggleTimePanel={() => setShowTimePanel((open) => !open)}
           onToggleBpmPanel={() => setShowBpmPanel((open) => !open)}
-          onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
           onClearFilters={clearClientFilters}
           hasActiveFilters={filtersActive}
           searchHint={searchHint}

@@ -64,7 +64,6 @@ export default function PodcastsScreen() {
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [visibleCount, setVisibleCount] = useState(PODCAST_CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
@@ -233,15 +232,6 @@ export default function PodcastsScreen() {
               locationQuickPicks={locationQuickPicks}
             />
 
-            <Pressable
-              style={styles.addPodcastBtn}
-              onPress={() => router.push('/podcast-search')}
-              accessibilityRole="button"
-              accessibilityLabel="Add Media">
-              <Ionicons name="add" size={18} color={colors.text} />
-              <Text style={styles.addPodcastText}>Add Media</Text>
-            </Pressable>
-
             <ChartFilterToolbar
               period={period}
               onPeriodChange={(next) => setPeriod(next as PodcastTimeRangeKey)}
@@ -259,14 +249,19 @@ export default function PodcastsScreen() {
               showSortPanel={showSortPanel}
               onToggleSortPanel={() => setShowSortPanel((open) => !open)}
               sortHint={CHART_PODCAST_SORT_HINT}
-              showSearchPanel={showSearchPanel}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}
               onToggleTimePanel={() => setShowTimePanel((open) => !open)}
-              onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
               onClearFilters={clearClientFilters}
               hasActiveFilters={filtersActive}
               searchPlaceholder="Title, series, or tag…"
-              searchHint="Filters the current podcast chart."
+              onAddMedia={() => {
+                const q = searchQuery.trim();
+                if (q) {
+                  router.push({ pathname: '/podcast-search', params: { q } });
+                  return;
+                }
+                router.push('/podcast-search');
+              }}
             />
 
             {playableCount > 0 ? (
@@ -340,24 +335,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 8,
-  },
-  addPodcastBtn: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  addPodcastText: {
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: 14,
   },
   playBtn: {
     alignSelf: 'center',

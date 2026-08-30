@@ -171,6 +171,15 @@ function episodeDedupeKey(ep: PodcastEpisode): string {
   return `${ep.title}|${ep.podcastTitle || ep.podcastSeries?.title || ''}`.toLowerCase();
 }
 
+function episodeMatchesLiveQuery(episode: PodcastEpisode, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const title = (episode.title || '').toLowerCase();
+  const series = (episode.podcastSeries?.title || episode.podcastTitle || '').toLowerCase();
+  const tags = (Array.isArray(episode.tags) ? episode.tags : []).join(' ').toLowerCase();
+  return title.includes(q) || series.includes(q) || tags.includes(q);
+}
+
 const TIME_RANGE_OPTIONS = [
   { key: 'all', label: 'All Time' },
   { key: 'year', label: 'This Year' },
@@ -221,7 +230,6 @@ const Podcasts: React.FC = () => {
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
   const [locationScope, setLocationScope] = useState<LocationScope>(() =>
@@ -278,6 +286,7 @@ const Podcasts: React.FC = () => {
   const [showShareDropdown, setShowShareDropdown] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const shareDropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Top Podcast Series
   const [topPodcastSeries, setTopPodcastSeries] = useState<Array<{
@@ -442,6 +451,13 @@ const Podcasts: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
 
   const fetchChart = async () => {
     setIsLoading(true);
@@ -1345,7 +1361,12 @@ const Podcasts: React.FC = () => {
     }
   };
 
-  const displayEpisodes = showSearchResults && searchResults.length > 0 ? searchResults : episodes;
+  const displayEpisodes = useMemo(() => {
+    if (showSearchResults) return searchResults;
+    const liveTerm = searchQuery.trim();
+    if (!liveTerm) return episodes;
+    return episodes.filter((episode) => episodeMatchesLiveQuery(episode, liveTerm));
+  }, [showSearchResults, searchResults, episodes, searchQuery]);
 
   const topLocations = useMemo(() => {
     if (displayEpisodes.length === 0) {
@@ -1505,21 +1526,6 @@ const Podcasts: React.FC = () => {
               open={showSortPanel}
               onToggle={() => setShowSortPanel((open) => !open)}
             />
-            <button
-              type="button"
-              onClick={() => setShowSearchPanel((open) => !open)}
-              className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-                showSearchPanel ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
-              }`}
-            >
-              <Search className="h-4 w-4 text-purple-400 flex-shrink-0" />
-              Search
-              {searchQuery.trim() && (
-                <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
-                  ({searchQuery.trim()})
-                </span>
-              )}
-            </button>
             <div className="relative" ref={shareDropdownRef}>
               {isMobile && 'share' in navigator ? (
                 <button
@@ -1730,45 +1736,62 @@ const Podcasts: React.FC = () => {
             />
           )}
 
-          {showSearchPanel && (
-            <div className="card p-4 sm:p-6 mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-semibold text-white">Search & Import</h3>
-                <button type="button" onClick={() => setShowSearchPanel(false)} className="text-sm text-gray-400 hover:text-white">
-                  Hide
-                </button>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="Search podcast episodes..."
-                    className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-4 py-3 border border-gray-600 focus:border-purple-500 focus:outline-none"
-                  />
-                </div>
-                <button
-                  onClick={handleSearch}
-                  disabled={isSearching || !searchQuery.trim()}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  {isSearching ? <><Loader className="h-5 w-5 animate-spin" /><span>Searching...</span></> : <><Search className="h-5 w-5" /><span>Search</span></>}
-                </button>
-                <button
-                  onClick={() => setShowImportSection(!showImportSection)}
-                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <LinkIcon className="h-5 w-5 text-purple-400" />
-                  <span className="text-sm font-medium text-white">Import</span>
-                  <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${showImportSection ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
+          <div className="w-full max-w-2xl mx-auto mt-3">
+            <div className="relative flex items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
+              <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.preventDefault();
+                }}
+                placeholder="Filter by title, series, or tag"
+                className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm sm:text-base"
+                aria-label="Filter podcasts in this chart"
+              />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!searchQuery.trim()) {
+                    searchInputRef.current?.focus();
+                    return;
+                  }
+                  void handleSearch();
+                }}
+                disabled={isSearching}
+                className="text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors flex items-center gap-2"
+              >
+                {isSearching ? <Loader className="h-4 w-4 animate-spin" /> : null}
+                Can't find it? Add New Media
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowImportSection(!showImportSection)}
+                className="text-sm font-medium text-gray-300 hover:text-white transition-colors flex items-center gap-1.5"
+              >
+                <LinkIcon className="h-4 w-4 text-purple-400" />
+                Import
+                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showImportSection ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+            {searchQuery.trim() && !showSearchResults && displayEpisodes.length > 0 && (
+              <p className="text-xs text-purple-300 mt-2 text-center">
+                {displayEpisodes.length} episode{displayEpisodes.length !== 1 ? 's' : ''} in chart match
+              </p>
+            )}
+            {searchQuery.trim() && !showSearchResults && displayEpisodes.length === 0 && episodes.length > 0 && (
+              <p className="text-xs text-gray-400 mt-2 text-center">
+                No matches in this chart — add it from the catalog
+              </p>
+            )}
 
-              {showImportSection && (
-                <div className="space-y-4 border-t border-gray-700/50 pt-4">
+            {showImportSection ? (
+              <div className="card p-4 sm:p-6 mt-3">
+                <div className="space-y-4">
                   <p className="text-xs text-gray-400">
                     Spotify &amp; Apple identify shows you care about; we match them to RSS / Podcast Index so episodes are fully playable on Tuneable.
                   </p>
@@ -1909,7 +1932,8 @@ const Podcasts: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            ) : null}
 
               {showSearchResults && searchResults.length > 0 && (
                 <button
@@ -1920,7 +1944,6 @@ const Podcasts: React.FC = () => {
                 </button>
               )}
             </div>
-          )}
         </div>
 
         {/* Episode queue */}

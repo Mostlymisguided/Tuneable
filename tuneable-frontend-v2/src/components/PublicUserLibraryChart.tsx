@@ -139,7 +139,6 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<TimePeriod>('all-time');
   const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
@@ -288,23 +287,6 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
             <span className="text-xs text-purple-300 font-normal">
               ({formatBpmFilterLabel(bpmFilterRange)})
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowSearchPanel((open) => !open)}
-            className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-              showSearchPanel || searchQuery.trim()
-                ? 'bg-gray-700 ring-1 ring-purple-500/50'
-                : 'bg-gray-800'
-            }`}
-          >
-            <Search className="h-4 w-4 text-purple-400 flex-shrink-0" />
-            Search
-            {searchQuery.trim() ? (
-              <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
-                ({searchQuery.trim()})
-              </span>
-            ) : null}
           </button>
         </div>
 
@@ -480,8 +462,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
         )}
       </div>
 
-      {showSearchPanel && (
-        <div className="mb-4 md:mb-6">
+      <div className="mb-4 md:mb-6">
           <div className="w-full max-w-2xl mx-auto">
             <div className="relative flex flex-1 items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
               <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
@@ -505,7 +486,6 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
             </div>
           </div>
         </div>
-      )}
 
       {isLoading ? (
         <div className="text-center py-8">

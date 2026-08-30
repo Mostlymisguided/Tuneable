@@ -16,6 +16,8 @@ import {
   type ChartSortKey,
 } from '@/src/lib/chartSort';
 
+export const ADD_NEW_MEDIA_CTA = "Can't find it? Add New Media";
+
 type PeriodOption = { key: string; label: string };
 
 type Props = {
@@ -39,15 +41,15 @@ type Props = {
   showTagPanel: boolean;
   showTimePanel: boolean;
   showBpmPanel?: boolean;
-  showSearchPanel: boolean;
   onToggleTagPanel: () => void;
   onToggleTimePanel: () => void;
   onToggleBpmPanel?: () => void;
-  onToggleSearchPanel: () => void;
   onClearFilters: () => void;
   hasActiveFilters: boolean;
   searchPlaceholder?: string;
   searchHint?: string;
+  onAddMedia?: () => void;
+  addMediaLabel?: string;
 };
 
 export function ChartFilterToolbar({
@@ -71,15 +73,15 @@ export function ChartFilterToolbar({
   showTagPanel,
   showTimePanel,
   showBpmPanel = false,
-  showSearchPanel,
   onToggleTagPanel,
   onToggleTimePanel,
   onToggleBpmPanel,
-  onToggleSearchPanel,
   onClearFilters,
   hasActiveFilters,
   searchPlaceholder = 'Title, artist, or tag…',
-  searchHint = 'Filters the current chart. Use Add for MusicBrainz search.',
+  searchHint,
+  onAddMedia,
+  addMediaLabel = ADD_NEW_MEDIA_CTA,
 }: Props) {
   const selectedTags = getSelectedTagFilters(selectedTagTerms);
   const topTagsPreview = topTags.slice(0, 8);
@@ -103,6 +105,36 @@ export function ChartFilterToolbar({
 
   return (
     <View style={styles.wrap}>
+      <View style={styles.searchBlock}>
+        <View style={styles.searchField}>
+          <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={onSearchQueryChange}
+            placeholder={searchPlaceholder}
+            placeholderTextColor={colors.textMuted}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+            blurOnSubmit
+            accessibilityLabel={searchPlaceholder}
+          />
+        </View>
+        {onAddMedia ? (
+          <Pressable
+            onPress={onAddMedia}
+            style={styles.addMediaBtn}
+            accessibilityRole="button"
+            accessibilityLabel={addMediaLabel}>
+            <Text style={styles.addMediaText}>{addMediaLabel}</Text>
+          </Pressable>
+        ) : searchHint ? (
+          <Text style={styles.searchHint}>{searchHint}</Text>
+        ) : null}
+      </View>
+
       <View style={styles.triggers}>
         <FilterTrigger
           icon="pricetag-outline"
@@ -145,13 +177,6 @@ export function ChartFilterToolbar({
             onPress={onToggleBpmPanel ?? (() => {})}
           />
         ) : null}
-        <FilterTrigger
-          icon="search-outline"
-          label="Search"
-          active={showSearchPanel || searchQuery.trim().length > 0}
-          detail={searchQuery.trim() || undefined}
-          onPress={onToggleSearchPanel}
-        />
       </View>
 
       {hasActiveFilters ? (
@@ -260,22 +285,6 @@ export function ChartFilterToolbar({
           </View>
         </FilterPanel>
       ) : null}
-
-      {showSearchPanel ? (
-        <FilterPanel title="Search chart" onHide={onToggleSearchPanel}>
-          <TextInput
-            value={searchQuery}
-            onChangeText={onSearchQueryChange}
-            placeholder={searchPlaceholder}
-            placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-          />
-          <Text style={styles.searchHint}>{searchHint}</Text>
-        </FilterPanel>
-      ) : null}
     </View>
   );
 }
@@ -347,6 +356,36 @@ function FilterPanel({
 const styles = StyleSheet.create({
   wrap: {
     marginBottom: 14,
+  },
+  searchBlock: {
+    marginBottom: 12,
+  },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 15,
+  },
+  addMediaBtn: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  addMediaText: {
+    color: '#c4b5fd',
+    fontSize: 14,
+    fontWeight: '600',
   },
   triggers: {
     flexDirection: 'row',
@@ -448,16 +487,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#fff',
-  },
-  searchInput: {
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.text,
-    fontSize: 15,
   },
   searchHint: {
     marginTop: 8,

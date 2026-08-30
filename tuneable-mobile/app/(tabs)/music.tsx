@@ -69,7 +69,6 @@ export default function MusicScreen() {
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmPanel, setShowBpmPanel] = useState(false);
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
   const [visibleCount, setVisibleCount] = useState(CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
@@ -224,15 +223,6 @@ export default function MusicScreen() {
               locationQuickPicks={locationQuickPicks}
             />
 
-            <Pressable
-              style={styles.addTunesBtn}
-              onPress={() => router.push('/music-search')}
-              accessibilityRole="button"
-              accessibilityLabel="Add Media">
-              <Ionicons name="add" size={18} color={colors.text} />
-              <Text style={styles.addTunesText}>Add Media</Text>
-            </Pressable>
-
             <ChartFilterToolbar
               period={period}
               onPeriodChange={(next) => setPeriod(next as TimePeriodKey)}
@@ -251,13 +241,19 @@ export default function MusicScreen() {
               onToggleSortPanel={() => setShowSortPanel((open) => !open)}
               sortHint={CHART_ADDED_SORT_HINT}
               showBpmPanel={showBpmPanel}
-              showSearchPanel={showSearchPanel}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}
               onToggleTimePanel={() => setShowTimePanel((open) => !open)}
               onToggleBpmPanel={() => setShowBpmPanel((open) => !open)}
-              onToggleSearchPanel={() => setShowSearchPanel((open) => !open)}
               onClearFilters={clearClientFilters}
               hasActiveFilters={filtersActive}
+              onAddMedia={() => {
+                const q = searchQuery.trim();
+                if (q) {
+                  router.push({ pathname: '/music-search', params: { q } });
+                  return;
+                }
+                router.push('/music-search');
+              }}
             />
 
             {playableCount > 0 ? (
@@ -332,24 +328,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 8,
-  },
-  addTunesBtn: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  addTunesText: {
-    color: colors.text,
-    fontWeight: '600',
-    fontSize: 14,
   },
   playBtn: {
     alignSelf: 'center',

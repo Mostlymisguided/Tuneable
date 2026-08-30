@@ -293,8 +293,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
     getTagTermsFromSearchParams(searchParams, partyId === 'global')
   );
-  // Unified search: live-filters queue; Enter / "Search library" queries Tuneable + external sources
+  // Unified search: live-filters queue; "Can't find it? Add New Media" queries Tuneable + MusicBrainz
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [lastLibrarySearchQuery, setLastLibrarySearchQuery] = useState('');
   const [addMediaResults, setAddMediaResults] = useState<{
     database: any[];
@@ -337,7 +338,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
 
@@ -2695,21 +2695,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           ({formatBpmFilterLabel(bpmFilterRange)})
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowSearchPanel((open) => !open)}
-                        className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-                          showSearchPanel ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
-                        }`}
-                      >
-                        <Search className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        Search
-                        {searchQuery.trim() ? (
-                          <span className="text-xs text-purple-300 font-normal truncate max-w-[8rem] sm:max-w-[12rem]">
-                            ({searchQuery.trim()})
-                          </span>
-                        ) : null}
-                      </button>
                     </div>
                     {getDisplayMedia().length > 0 && (
                       <div className="flex justify-center mt-2 sm:mt-3">
@@ -2907,41 +2892,42 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                   </div>
                 )}
 
-                {/* Unified search: live-filters queue; Enter / Search library adds from Tuneable + external */}
-                {showSearchPanel && !showVetoed && party && (
+                {/* Unified search: live-filters queue; Add New Media queries Tuneable + MusicBrainz */}
+                {!showVetoed && party && (
                   <div className="mb-4 md:mb-6">
                     <div className="w-full max-w-2xl mx-auto">
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative flex flex-1 items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
-                          <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleAddMediaSearch();
-                              }
-                            }}
-                            placeholder="Filter by title, artist or tag"
-                            className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm sm:text-base"
-                            aria-label="Search tunes in party or library"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddMediaSearch}
-                          disabled={isSearchingNewMedia || !searchQuery.trim()}
-                          className="px-4 py-2.5 bg-purple-800 hover:bg-purple-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors text-sm sm:text-base flex items-center justify-center gap-2 whitespace-nowrap"
-                        >
-                          {isSearchingNewMedia ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            'Search library'
-                          )}
-                        </button>
+                      <div className="relative flex items-center bg-gray-800 rounded-xl border border-gray-700 focus-within:border-purple-500 transition-colors">
+                        <Search className="ml-3 h-5 w-5 text-gray-400 flex-shrink-0" aria-hidden />
+                        <input
+                          ref={searchInputRef}
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.preventDefault();
+                          }}
+                          placeholder="Filter by title, artist or tag"
+                          className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm sm:text-base"
+                          aria-label="Filter tunes in this party"
+                        />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!searchQuery.trim()) {
+                            searchInputRef.current?.focus();
+                            return;
+                          }
+                          void handleAddMediaSearch();
+                        }}
+                        disabled={isSearchingNewMedia}
+                        className="mt-2 mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
+                      >
+                        {isSearchingNewMedia ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : null}
+                        Can't find it? Add New Media
+                      </button>
                       {searchQuery.trim() && getDisplayMedia().length > 0 && (
                         <p className="text-xs text-purple-300 mt-2 text-center">
                           {getDisplayMedia().length} tune{getDisplayMedia().length !== 1 ? 's' : ''} in party match — scroll down to tip
@@ -2949,7 +2935,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                       )}
                       {searchQuery.trim() && getDisplayMedia().length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
                         <p className="text-xs text-gray-400 mt-2 text-center">
-                          No matches in party — press Enter or Search library to find new tunes
+                          No matches in this chart — add it from MusicBrainz
                         </p>
                       )}
                       {queueSearchTerms.length > 0 && (
@@ -3387,7 +3373,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           )
                         : 'No tunes in queue yet'}
                     </p>
-                    <p className="text-gray-600 text-sm mt-2">Use the search bar above to find tunes and tip them into the party</p>
+                    <p className="text-gray-600 text-sm mt-2">Can't find it? Add New Media above to search MusicBrainz and tip it in</p>
                   </div>
                 )}
               </div>
