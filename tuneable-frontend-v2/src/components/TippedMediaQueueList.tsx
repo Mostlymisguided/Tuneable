@@ -13,6 +13,18 @@ import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
+import { usePlayableOnly } from '../hooks/usePlayableOnly';
+import { buildChartRankMap } from '../utils/playableFilterPref';
+import {
+  PlayableEmptyState,
+  PlayableFilterHint,
+  PlayableFilterTrigger,
+} from './PlayableFilterControl';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getCreatorDisplay } from '../utils/creatorDisplay';
+import { penceToPoundsNumber } from '../utils/currency';
+import { resolveTipStatInputs } from '../utils/tipStats';
+import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import BidConfirmationModal from './BidConfirmationModal';
 
@@ -65,6 +77,10 @@ export interface TippedQueueItem {
   sources?: Record<string, string>;
   contentType?: string[] | string;
   contentForm?: string[] | string;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsCleared?: boolean;
+  isPlayable?: boolean;
+  hasHostedAudio?: boolean;
 }
 
 interface TippedMediaQueueListProps {
@@ -77,6 +93,23 @@ interface TippedMediaQueueListProps {
   onTipPlaced?: () => void | Promise<void>;
   /** When false, the parent owns play-all (e.g. a music-screen-style button). Default true. */
   showPlayAll?: boolean;
+  /** When false, hide the Playable toggle (parent owns it). Default true. */
+  showPlayableFilter?: boolean;
+  playableOnly?: boolean;
+  onPlayableOnlyChange?: (next: boolean) => void;
+}
+
+function isQueueItemPlayable(item: TippedQueueItem) {
+  const enriched = enrichMediaWithPlayability({
+    sources: item.sources || {},
+    contentForm: item.contentForm,
+    contentType: item.contentType,
+    rightsStatus: item.rightsStatus,
+    rightsCleared: item.rightsCleared,
+    isPlayable: item.isPlayable,
+    hasHostedAudio: item.hasHostedAudio,
+  } as any);
+  return isMediaPlayable(enriched);
 }
 
 /**
@@ -89,11 +122,18 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   defaultTipTags,
   onTipPlaced,
   showPlayAll = true,
+  showPlayableFilter = true,
+  playableOnly: playableOnlyProp,
+  onPlayableOnlyChange,
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
     useWebPlayerStore();
+  const internalPref = usePlayableOnly('chart');
+  const playableOnly = playableOnlyProp ?? internalPref.playableOnly;
+  const setPlayableOnly =
+    onPlayableOnlyChange ?? internalPref.setPlayableOnly;
 
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
   const [itemToTip, setItemToTip] = useState<TippedQueueItem | null>(null);
@@ -122,14 +162,17 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     };
   }, []);
 
-  const isItemPlayable = (item: TippedQueueItem) => {
-    const enriched = enrichMediaWithPlayability({
-      sources: item.sources || {},
-      contentForm: item.contentForm,
-      contentType: item.contentType,
-    } as any);
-    return isMediaPlayable(enriched);
-  };
+  const chartRanks = useMemo(
+    () => buildChartRankMap(items, (item) => String(item._id || item.uuid || '')),
+    [items]
+  );
+
+  const visibleItems = useMemo(
+    () => (playableOnly ? items.filter(isQueueItemPlayable) : items),
+    [items, playableOnly]
+  );
+
+  const hiddenPlayableCount = items.length - visibleItems.length;
 
   const toQueueShape = (item: TippedQueueItem) => ({
     _id: item._id,
@@ -166,7 +209,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   });
 
   const startQueue = (startItem?: TippedQueueItem) => {
-    const playableItems = items.filter(isItemPlayable);
+    const playableItems = visibleItems.filter(isQueueItemPlayable);
 
     if (playableItems.length === 0) {
       if (startItem) {
@@ -245,33 +288,49 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     }
   };
 
-  const hasPlayable = items.some(isItemPlayable);
+  const hasPlayable = items.some(isQueueItemPlayable);
 
   return (
     <>
-      {header && (
-        <div
-          className={`flex items-center mb-3 md:mb-4 ${
-            showPlayAll ? 'justify-between' : ''
-          }`}
-        >
-          {header}
-          {showPlayAll && hasPlayable && (
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 md:mb-4">
+        {header ? <div className="min-w-0">{header}</div> : <div />}
+        <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+          {showPlayableFilter ? (
+            <PlayableFilterTrigger
+              playableOnly={playableOnly}
+              onToggle={() => setPlayableOnly(!playableOnly)}
+              hiddenCount={hiddenPlayableCount}
+            />
+          ) : null}
+          {showPlayAll && hasPlayable ? (
             <button
               type="button"
               onClick={() => startQueue()}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors flex-shrink-0"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors"
               aria-label="Play all"
             >
               <Play className="h-4 w-4" fill="currentColor" />
               Play
             </button>
-          )}
+          ) : null}
         </div>
-      )}
+      </div>
+      <PlayableFilterHint
+        playableOnly={playableOnly}
+        hiddenCount={hiddenPlayableCount}
+        onShowAll={() => setPlayableOnly(false)}
+      />
 
+      {visibleItems.length === 0 ? (
+        playableOnly && hiddenPlayableCount > 0 ? (
+          <PlayableEmptyState
+            hiddenCount={hiddenPlayableCount}
+            onShowAll={() => setPlayableOnly(false)}
+          />
+        ) : null
+      ) : (
       <div className="space-y-3">
-        {items.map((item, index) => {
+        {visibleItems.map((item, index) => {
           const queueShape = toQueueShape(item);
           const mediaData = normalizeQueueMediaData(queueShape);
 
@@ -280,6 +339,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
               key={item._id}
               item={queueShape}
               index={index}
+              rank={chartRanks.get(String(item._id || item.uuid || '')) ?? index + 1}
               mediaData={mediaData}
               showActions={false}
               isBidding={isPlacingTip}
@@ -291,6 +351,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
           );
         })}
       </div>
+      )}
 
       <BidConfirmationModal
         isOpen={!!itemToTip}
@@ -306,7 +367,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         mediaArtist={itemToTip ? getCreatorDisplay(itemToTip) : undefined}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingTip}
-        isNonPlayable={itemToTip ? !isItemPlayable(itemToTip) : false}
+        isNonPlayable={itemToTip ? !isQueueItemPlayable(itemToTip) : false}
         initialTags={defaultTipTags}
         user={user}
       />

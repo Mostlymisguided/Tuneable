@@ -21,6 +21,14 @@ import {
   ChartSortTrigger,
   CHART_LIBRARY_SORT_HINT,
 } from './ChartSortControl';
+import {
+  PlayableEmptyState,
+  PlayableFilterHint,
+  PlayableFilterTrigger,
+} from './PlayableFilterControl';
+import { usePlayableOnly } from '../hooks/usePlayableOnly';
+import { buildChartRankMap } from '../utils/playableFilterPref';
+import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
 
 const MEDIA_PAGE_SIZE = 10;
 
@@ -99,6 +107,19 @@ function mediaMatchesBpmFilter(item: LibraryItem, range: BpmFilterRange): boolea
   return true;
 }
 
+function libraryItemPlayable(item: LibraryItem): boolean {
+  return isMediaPlayable(
+    enrichMediaWithPlayability({
+      sources: item.sources || {},
+      contentForm: item.contentForm,
+      rightsStatus: item.rightsStatus,
+      rightsCleared: item.rightsCleared,
+      isPlayable: item.isPlayable,
+      hasHostedAudio: item.hasHostedAudio,
+    })
+  );
+}
+
 function libraryItemToQueueShape(item: LibraryItem) {
   return {
     ...item,
@@ -147,6 +168,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [visibleCount, setVisibleCount] = useState(MEDIA_PAGE_SIZE);
   const [isMobile, setIsMobile] = useState(false);
+  const { playableOnly, setPlayableOnly, togglePlayableOnly } = usePlayableOnly('library');
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 640px)');
@@ -158,7 +180,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
 
   useEffect(() => {
     setVisibleCount(MEDIA_PAGE_SIZE);
-  }, [selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, items, chartSort]);
+  }, [selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, items, chartSort, playableOnly]);
 
   const topTags = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -205,18 +227,30 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
     });
   }, [items, selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, chartSort]);
 
-  const visibleItems = filteredItems.slice(0, visibleCount);
+  const chartRanks = useMemo(
+    () => buildChartRankMap(filteredItems, (item) => item.mediaUuid || item.mediaId),
+    [filteredItems]
+  );
+
+  const displayedItems = useMemo(
+    () => (playableOnly ? filteredItems.filter(libraryItemPlayable) : filteredItems),
+    [filteredItems, playableOnly]
+  );
+
+  const hiddenPlayableCount = filteredItems.length - displayedItems.length;
+
+  const visibleItems = displayedItems.slice(0, visibleCount);
 
   const handlePlayQueue = () => {
-    if (filteredItems.length === 0) return;
-    onPlay(filteredItems[0], 0, filteredItems);
+    if (displayedItems.length === 0) return;
+    onPlay(displayedItems[0], 0, displayedItems);
   };
 
   const handleCardPlay = (_item: unknown, index: number) => {
     const libItem = visibleItems[index];
     if (!libItem) return;
-    const fullIndex = filteredItems.findIndex((i) => i.mediaId === libItem.mediaId);
-    onPlay(libItem, Math.max(fullIndex, 0), filteredItems);
+    const fullIndex = displayedItems.findIndex((i) => i.mediaId === libItem.mediaId);
+    onPlay(libItem, Math.max(fullIndex, 0), displayedItems);
   };
 
   const handleCardTip = (cardItem: unknown) => {
@@ -288,15 +322,25 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
               ({formatBpmFilterLabel(bpmFilterRange)})
             </span>
           </button>
+          <PlayableFilterTrigger
+            playableOnly={playableOnly}
+            onToggle={togglePlayableOnly}
+            hiddenCount={hiddenPlayableCount}
+          />
         </div>
+        <PlayableFilterHint
+          playableOnly={playableOnly}
+          hiddenCount={hiddenPlayableCount}
+          onShowAll={() => setPlayableOnly(false)}
+        />
 
-        {filteredItems.length > 0 && (
+        {displayedItems.length > 0 && (
           <div className="flex justify-center mt-2 sm:mt-3">
             <button
               type="button"
               onClick={handlePlayQueue}
               className="px-3 sm:px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 shadow-lg"
-              title={`Play ${filteredItems.length} track${filteredItems.length !== 1 ? 's' : ''} from the top`}
+              title={`Play ${displayedItems.length} track${displayedItems.length !== 1 ? 's' : ''} from the top`}
             >
               <Play className="h-4 w-4" />
               Play
@@ -491,7 +535,13 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto" />
         </div>
-      ) : filteredItems.length === 0 ? (
+      ) : displayedItems.length === 0 ? (
+        playableOnly && hiddenPlayableCount > 0 ? (
+          <PlayableEmptyState
+            hiddenCount={hiddenPlayableCount}
+            onShowAll={() => setPlayableOnly(false)}
+          />
+        ) : (
         <div className="text-center py-8 text-gray-400">
           <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
           <p>
@@ -500,6 +550,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
               : 'No tunes match these filters.'}
           </p>
         </div>
+        )
       ) : (
         <div className="space-y-3">
           {visibleItems.map((item, index) => {
@@ -515,6 +566,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
                 key={`lib-${item.mediaId}-${index}`}
                 item={queueShape}
                 index={index}
+                rank={chartRanks.get(item.mediaUuid || item.mediaId) ?? index + 1}
                 mediaData={mediaData}
                 showActions={false}
                 isBidding={false}
@@ -525,7 +577,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
               />
             );
           })}
-          {filteredItems.length > visibleCount && (
+          {displayedItems.length > visibleCount && (
             <div className="flex justify-center pt-4 pb-2">
               <button
                 type="button"
@@ -533,7 +585,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
                 className="px-6 py-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 font-medium transition-colors flex items-center gap-2"
               >
                 <ChevronDown className="h-5 w-5" />
-                Show more ({filteredItems.length - visibleCount} remaining)
+                Show more ({displayedItems.length - visibleCount} remaining)
               </button>
             </div>
           )}

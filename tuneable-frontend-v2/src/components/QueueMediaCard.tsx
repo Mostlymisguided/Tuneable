@@ -72,6 +72,8 @@ export interface QueueMediaCardProps {
   onTip: (item: any) => void;
   /** Override profile link (defaults to /tune/:uuid) */
   mediaHref?: string;
+  /** Chart position. Defaults to index + 1. Pass the pre-filter rank when hiding unplayable rows. */
+  rank?: number;
 }
 
 const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
@@ -84,6 +86,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   onPlay,
   onTip,
   mediaHref,
+  rank: rankProp,
 }) => {
   const routeLocation = useLocation();
   const tags = mediaData.tags ?? [];
@@ -186,7 +189,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     </button>
   );
 
-  const rank = index + 1;
+  const rank = rankProp ?? index + 1;
 
   return (
     <div className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">

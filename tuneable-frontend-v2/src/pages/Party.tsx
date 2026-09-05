@@ -45,6 +45,13 @@ import {
 } from '../utils/locationHelpers';
 import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { usePlayableOnly } from '../hooks/usePlayableOnly';
+import { buildChartRankMap } from '../utils/playableFilterPref';
+import {
+  PlayableEmptyState,
+  PlayableFilterHint,
+  PlayableFilterTrigger,
+} from '../components/PlayableFilterControl';
 
 // Define types directly to avoid import issues
 interface PartyMedia {
@@ -189,6 +196,13 @@ function toPlayerQueueItem(item: any) {
     isPlayable: mediaData?.isPlayable,
     contentForm: mediaData?.contentForm,
   };
+}
+
+function partyMediaKey(item: any): string {
+  const mediaData = item?.mediaId || item;
+  return String(
+    mediaData?._id || mediaData?.id || mediaData?.uuid || item?._id || item?.id || ''
+  );
 }
 
 function isPartyItemPlayable(item: any): boolean {
@@ -337,6 +351,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
+  const { playableOnly, setPlayableOnly, togglePlayableOnly } = usePlayableOnly('chart');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
@@ -347,7 +362,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   // Reset visible count when party, time period, or BPM filter changes
   useEffect(() => {
     setVisibleMediaCount(MEDIA_PAGE_SIZE);
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmFilterRange, chartSort, locationScope]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, bpmFilterRange, chartSort, locationScope, playableOnly]);
 
   // Player warning system
   const { showWarning, isWarningOpen, warningAction, onConfirm, onCancel, currentMediaTitle, currentMediaArtist } = usePlayerWarning();
@@ -1645,7 +1660,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     });
   }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty]);
 
-  const getDisplayMedia = () => displayMedia;
+  const chartRanks = useMemo(
+    () => buildChartRankMap(displayMedia, partyMediaKey),
+    [displayMedia]
+  );
+
+  const chartMedia = useMemo(
+    () => (playableOnly ? displayMedia.filter(isPartyItemPlayable) : displayMedia),
+    [displayMedia, playableOnly]
+  );
+
+  const hiddenPlayableCount = displayMedia.length - chartMedia.length;
+
+  const getDisplayMedia = () => chartMedia;
 
   // Helper function to calculate average bid for media (returns in pounds)
   // Uses PartyMediaBidAvg (party-specific average) when partyMediaEntry is provided
@@ -2695,7 +2722,17 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           ({formatBpmFilterLabel(bpmFilterRange)})
                         </span>
                       </button>
+                      <PlayableFilterTrigger
+                        playableOnly={playableOnly}
+                        onToggle={togglePlayableOnly}
+                        hiddenCount={hiddenPlayableCount}
+                      />
                     </div>
+                    <PlayableFilterHint
+                      playableOnly={playableOnly}
+                      hiddenCount={hiddenPlayableCount}
+                      onShowAll={() => setPlayableOnly(false)}
+                    />
                     {getDisplayMedia().length > 0 && (
                       <div className="flex justify-center mt-2 sm:mt-3">
                         <button
@@ -2933,7 +2970,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           {getDisplayMedia().length} tune{getDisplayMedia().length !== 1 ? 's' : ''} in party match — scroll down to tip
                         </p>
                       )}
-                      {searchQuery.trim() && getDisplayMedia().length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
+                      {searchQuery.trim() && getDisplayMedia().length === 0 && displayMedia.length > 0 && (
+                        <p className="text-xs text-gray-400 mt-2 text-center">
+                          Matches are catalog-only.{' '}
+                          <button
+                            type="button"
+                            onClick={() => setPlayableOnly(false)}
+                            className="text-purple-300 hover:text-white"
+                          >
+                            Show catalog
+                          </button>
+                        </p>
+                      )}
+                      {searchQuery.trim() && displayMedia.length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
                         <p className="text-xs text-gray-400 mt-2 text-center">
                           No matches in this chart — add it from MusicBrainz
                         </p>
@@ -3285,6 +3334,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                             key={`queued-${mediaData.id}-${index}`}
                             item={item}
                             index={index}
+                            rank={chartRanks.get(partyMediaKey(item)) ?? index + 1}
                             mediaData={mediaData}
                             showActions={isHost || isAdmin || !!getUserBid(item)}
                             isBidding={isBidding}
@@ -3375,6 +3425,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                     </p>
                     <p className="text-gray-600 text-sm mt-2">Can't find it? Add New Media above to search MusicBrainz and tip it in</p>
                   </div>
+                )}
+                {!showVetoed && getPartyMedia().length > 0 && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
+                  <PlayableEmptyState
+                    hiddenCount={hiddenPlayableCount}
+                    onShowAll={() => setPlayableOnly(false)}
+                  />
                 )}
               </div>
             ) : null}

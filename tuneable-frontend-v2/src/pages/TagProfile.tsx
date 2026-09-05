@@ -16,6 +16,11 @@ import {
   CHART_ADDED_SORT_HINT,
   CHART_PODCAST_SORT_HINT,
 } from '../components/ChartSortControl';
+import {
+  PlayableFilterHint,
+  PlayableFilterTrigger,
+} from '../components/PlayableFilterControl';
+import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { type ChartSortKey } from '../utils/chartSort';
 import PodcastQueueMediaCard, {
   type PodcastEpisodeCardData,
@@ -161,6 +166,7 @@ const TagProfile: React.FC = () => {
   const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
+  const { playableOnly, setPlayableOnly, togglePlayableOnly } = usePlayableOnly('chart');
   const [tipTarget, setTipTarget] = useState<PodcastEpisodeCardData | null>(null);
   const [isPlacingTip, setIsPlacingTip] = useState(false);
   const [fetchingPlayId, setFetchingPlayId] = useState<string | null>(null);
@@ -402,6 +408,11 @@ const TagProfile: React.FC = () => {
     [media, displayName]
   );
 
+  const hiddenPlayableCount = useMemo(
+    () => (isPodcast ? 0 : media.filter((item) => !isTagItemPlayable(item)).length),
+    [isPodcast, media]
+  );
+
   const handleTimePeriodChange = (period: TimePeriod) => {
     setSelectedTimePeriod(period);
   };
@@ -585,7 +596,21 @@ const TagProfile: React.FC = () => {
                 open={showSortPanel}
                 onToggle={() => setShowSortPanel((open) => !open)}
               />
+              {!isPodcast ? (
+                <PlayableFilterTrigger
+                  playableOnly={playableOnly}
+                  onToggle={togglePlayableOnly}
+                  hiddenCount={hiddenPlayableCount}
+                />
+              ) : null}
             </div>
+            {!isPodcast ? (
+              <PlayableFilterHint
+                playableOnly={playableOnly}
+                hiddenCount={hiddenPlayableCount}
+                onShowAll={() => setPlayableOnly(false)}
+              />
+            ) : null}
             {!loading && !error && media.length > 0 && (
               <div className="flex justify-center mt-2 sm:mt-3">
                 <button
@@ -708,6 +733,9 @@ const TagProfile: React.FC = () => {
                   header={heading}
                   defaultTipTags={[displayName]}
                   showPlayAll={false}
+                  showPlayableFilter={false}
+                  playableOnly={playableOnly}
+                  onPlayableOnlyChange={setPlayableOnly}
                   onTipPlaced={() => loadProfile({ silent: true })}
                 />
               );

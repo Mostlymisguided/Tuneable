@@ -21,6 +21,8 @@ import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
+import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
 import {
   CHART_ADDED_SORT_HINT,
   CHART_SORT_OPTIONS,
@@ -44,6 +46,7 @@ export default function PlaceProfileScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
+  const { playableOnly, setPlayableOnly } = usePlayableOnly('chart');
 
   const [placeName, setPlaceName] = useState('Place');
   const [subtitle, setSubtitle] = useState<string | null>(null);
@@ -121,6 +124,18 @@ export default function PlaceProfileScreen() {
     [media, chartSort]
   );
 
+  const chartRanks = useMemo(
+    () => buildChartRankMap(sortedMedia, mediaId),
+    [sortedMedia]
+  );
+
+  const displayedMedia = useMemo(
+    () => (playableOnly ? sortedMedia.filter(isUploadPlayable) : sortedMedia),
+    [playableOnly, sortedMedia]
+  );
+
+  const hiddenPlayableCount = sortedMedia.length - displayedMedia.length;
+
   const mosaicCovers = useMemo(
     () =>
       media.slice(0, 4).map((item, index) => ({
@@ -131,11 +146,11 @@ export default function PlaceProfileScreen() {
   );
 
   const onPlayItem = (item: ChartMediaItem) => {
-    const playable = sortedMedia.filter(isUploadPlayable);
+    const playable = displayedMedia.filter(isUploadPlayable);
     const index = playable.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) {
-      const fallback = sortedMedia.findIndex((m) => mediaId(m) === mediaId(item));
-      void setQueueAndPlay(sortedMedia, Math.max(0, fallback));
+      const fallback = displayedMedia.findIndex((m) => mediaId(m) === mediaId(item));
+      void setQueueAndPlay(displayedMedia, Math.max(0, fallback));
       return;
     }
     void setQueueAndPlay(playable, index);
@@ -259,8 +274,36 @@ export default function PlaceProfileScreen() {
             ]}>
             <Ionicons name="swap-vertical-outline" size={14} color={colors.accentLight} />
           </Pressable>
+          <Pressable
+            onPress={() => setPlayableOnly(!playableOnly)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              playableOnly ? 'Playable only, on' : 'Playable only, off'
+            }
+            style={[
+              styles.timeTrigger,
+              playableOnly && styles.timeTriggerActive,
+            ]}>
+            <Ionicons name="headset-outline" size={14} color={colors.accentLight} />
+            <Text style={styles.timeTriggerLabel}>Playable</Text>
+            <Text style={styles.timeTriggerDetail} numberOfLines={1}>
+              {playableOnly
+                ? hiddenPlayableCount > 0
+                  ? `(−${hiddenPlayableCount})`
+                  : ''
+                : '(All)'}
+            </Text>
+          </Pressable>
         </View>
       </View>
+
+      {playableOnly && hiddenPlayableCount > 0 ? (
+        <Pressable onPress={() => setPlayableOnly(false)} style={styles.hiddenHintBtn}>
+          <Text style={styles.hiddenHint}>
+            Showing playable only · {catalogHiddenLabel(hiddenPlayableCount)}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {showTimePanel ? (
         <View style={styles.timePanel}>
@@ -338,7 +381,7 @@ export default function PlaceProfileScreen() {
         </View>
       ) : (
         <FlatList
-          data={sortedMedia}
+          data={displayedMedia}
           keyExtractor={(item, index) => mediaId(item) || `place-media-${index}`}
           ListHeaderComponent={listHeader}
           contentContainerStyle={{
@@ -354,6 +397,18 @@ export default function PlaceProfileScreen() {
           }
           ListEmptyComponent={
             !loading ? (
+              playableOnly && sortedMedia.length > 0 && displayedMedia.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.empty}>No playable audio here yet.</Text>
+                  <Pressable
+                    style={styles.showCatalogBtn}
+                    onPress={() => setPlayableOnly(false)}>
+                    <Text style={styles.showCatalogText}>
+                      Show catalog ({hiddenPlayableCount})
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
               <Text style={styles.empty}>
                 {period === 'all-time' ? (
                   <>
@@ -366,11 +421,12 @@ export default function PlaceProfileScreen() {
                   </>
                 )}
               </Text>
+              )
             ) : null
           }
-          renderItem={({ item, index }) => (
+          renderItem={({ item }) => (
             <ChartTrackRow
-              rank={index + 1}
+              rank={chartRanks.get(mediaId(item)) ?? 0}
               item={item}
               tipPence={item.timePeriodBidValue ?? item.globalMediaAggregate}
               variant="rich"
@@ -537,6 +593,8 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
   },
@@ -654,5 +712,32 @@ const styles = StyleSheet.create({
   emptyStrong: {
     color: colors.text,
     fontWeight: '700',
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  hiddenHintBtn: {
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  hiddenHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  showCatalogBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  showCatalogText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

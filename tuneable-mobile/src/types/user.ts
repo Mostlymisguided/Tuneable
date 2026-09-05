@@ -123,6 +123,11 @@ export interface UserLibraryItem {
   tags?: string[];
   contentForm?: string[];
   sources?: Record<string, string>;
+  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsCleared?: boolean;
+  isPlayable?: boolean;
+  hasHostedAudio?: boolean;
+  playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
   globalMediaAggregate?: number;
   globalMediaAggregateAvg?: number;
   globalUserMediaAggregate?: number;

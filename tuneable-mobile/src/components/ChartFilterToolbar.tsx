@@ -15,6 +15,7 @@ import {
   chartSortLabel,
   type ChartSortKey,
 } from '@/src/lib/chartSort';
+import { catalogHiddenLabel } from '@/src/lib/playableFilterPref';
 
 export const ADD_NEW_MEDIA_CTA = "Can't find it? Add New Media";
 
@@ -50,6 +51,10 @@ type Props = {
   searchHint?: string;
   onAddMedia?: () => void;
   addMediaLabel?: string;
+  playableOnly?: boolean;
+  onPlayableOnlyChange?: (next: boolean) => void;
+  showPlayable?: boolean;
+  hiddenPlayableCount?: number;
 };
 
 export function ChartFilterToolbar({
@@ -82,6 +87,10 @@ export function ChartFilterToolbar({
   searchHint,
   onAddMedia,
   addMediaLabel = ADD_NEW_MEDIA_CTA,
+  playableOnly = false,
+  onPlayableOnlyChange,
+  showPlayable = false,
+  hiddenPlayableCount = 0,
 }: Props) {
   const selectedTags = getSelectedTagFilters(selectedTagTerms);
   const topTagsPreview = topTags.slice(0, 8);
@@ -177,7 +186,37 @@ export function ChartFilterToolbar({
             onPress={onToggleBpmPanel ?? (() => {})}
           />
         ) : null}
+        {showPlayable && onPlayableOnlyChange ? (
+          <FilterTrigger
+            icon="headset-outline"
+            label="Playable"
+            active={playableOnly}
+            detail={
+              playableOnly
+                ? hiddenPlayableCount > 0
+                  ? `−${hiddenPlayableCount}`
+                  : undefined
+                : 'All'
+            }
+            onPress={() => onPlayableOnlyChange(!playableOnly)}
+            accessibilityLabel={
+              playableOnly ? 'Playable only, on' : 'Playable only, off'
+            }
+          />
+        ) : null}
       </View>
+
+      {showPlayable && playableOnly && hiddenPlayableCount > 0 && onPlayableOnlyChange ? (
+        <Pressable
+          onPress={() => onPlayableOnlyChange(false)}
+          style={styles.hiddenHintBtn}
+          accessibilityRole="button"
+          accessibilityLabel={catalogHiddenLabel(hiddenPlayableCount)}>
+          <Text style={styles.hiddenHint}>
+            Showing playable only · {catalogHiddenLabel(hiddenPlayableCount)}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {hasActiveFilters ? (
         <Pressable style={styles.clearBtn} onPress={onClearFilters}>
@@ -493,5 +532,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 17,
+  },
+  hiddenHintBtn: {
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  hiddenHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

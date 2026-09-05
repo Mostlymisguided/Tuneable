@@ -18,10 +18,12 @@ import {
   type ChartSortKey,
 } from '@/src/lib/chartSort';
 import { isUploadPlayable, isWrittenMedia, mediaId } from '@/src/lib/media';
+import { buildChartRankMap } from '@/src/lib/playableFilterPref';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import type { ChartMediaItem, TimePeriodKey } from '@/src/types/media';
 import type { User, UserLibraryItem } from '@/src/types/user';
+import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 
 const LIBRARY_PAGE_SIZE = 10;
 
@@ -67,6 +69,11 @@ function toChartMediaItem(item: UserLibraryItem): ChartMediaItem {
     primaryLocation: item.primaryLocation ?? null,
     tags: item.tags ?? [],
     sources: item.sources ?? {},
+    rightsStatus: item.rightsStatus,
+    rightsCleared: item.rightsCleared,
+    isPlayable: item.isPlayable,
+    hasHostedAudio: item.hasHostedAudio,
+    playabilityBlockReason: item.playabilityBlockReason,
     partyMediaAggregate: item.globalUserMediaAggregate ?? 0,
     globalMediaAggregate: item.globalMediaAggregate ?? 0,
     lastBidAt: item.lastBidAt ?? null,
@@ -162,6 +169,7 @@ export function UserLibrarySection({
   const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
   const [tipTarget, setTipTarget] = useState<UserLibraryItem | null>(null);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
+  const { playableOnly, setPlayableOnly } = usePlayableOnly('library');
 
   const filterState = useMemo(
     () => ({
@@ -175,7 +183,7 @@ export function UserLibrarySection({
 
   useEffect(() => {
     setVisibleCount(LIBRARY_PAGE_SIZE);
-  }, [period, selectedTagTerms, searchQuery, bpmFilterRange, items, chartSort]);
+  }, [period, selectedTagTerms, searchQuery, bpmFilterRange, items, chartSort, playableOnly]);
 
   const periodFiltered = useMemo(() => {
     return showTime
@@ -193,7 +201,7 @@ export function UserLibrarySection({
     [chartItems]
   );
 
-  const filtered = useMemo(() => {
+  const matching = useMemo(() => {
     const list = filterChartMedia(chartItems, filterState);
     const effectiveSort: ChartSortKey = showTime
       ? chartSort
@@ -205,6 +213,18 @@ export function UserLibrarySection({
       getTip: (item) => item.partyMediaAggregate ?? 0,
     });
   }, [chartItems, filterState, chartSort, showTime, sortBy]);
+
+  const chartRanks = useMemo(
+    () => buildChartRankMap(matching, mediaId),
+    [matching]
+  );
+
+  const filtered = useMemo(
+    () => (playableOnly ? matching.filter(isUploadPlayable) : matching),
+    [matching, playableOnly]
+  );
+
+  const hiddenPlayableCount = matching.length - filtered.length;
 
   const visibleCap = previewLimit ?? Number.POSITIVE_INFINITY;
   const visible = useMemo(
@@ -271,9 +291,12 @@ export function UserLibrarySection({
     subtitle === undefined
       ? `${items.length} tune${items.length === 1 ? '' : 's'} tipped`
       : subtitle;
-  const emptyMessage = filtersActive
-    ? 'No tunes match these filters.'
-    : emptyLabel;
+  const emptyMessage =
+    playableOnly && matching.length > 0 && filtered.length === 0
+      ? 'No playable audio here yet.'
+      : filtersActive
+        ? 'No tunes match these filters.'
+        : emptyLabel;
   const showFilters = items.length > 0;
 
   const emptyState =
@@ -353,6 +376,10 @@ export function UserLibrarySection({
           onClearFilters={clearClientFilters}
           hasActiveFilters={filtersActive}
           searchHint={searchHint}
+          showPlayable
+          playableOnly={playableOnly}
+          onPlayableOnlyChange={setPlayableOnly}
+          hiddenPlayableCount={hiddenPlayableCount}
         />
       ) : null}
 
@@ -371,11 +398,26 @@ export function UserLibrarySection({
         keyExtractor={(item, index) => mediaId(item) || String(index)}
         scrollEnabled={false}
         contentContainerStyle={{ paddingBottom: contentPaddingBottom }}
-        ListEmptyComponent={emptyState}
+        ListEmptyComponent={
+          playableOnly && matching.length > 0 && filtered.length === 0 ? (
+            <View>
+              <Text style={styles.empty}>{emptyMessage}</Text>
+              <Pressable
+                style={styles.showCatalogBtn}
+                onPress={() => setPlayableOnly(false)}>
+                <Text style={styles.showCatalogText}>
+                  Show catalog ({hiddenPlayableCount})
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            emptyState
+          )
+        }
         ListFooterComponent={listFooter}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <ChartTrackRow
-            rank={index + 1}
+            rank={chartRanks.get(mediaId(item)) ?? 0}
             item={item}
             variant="rich"
             hideCatalogHint
@@ -466,6 +508,21 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
     color: colors.textSecondary,
+  },
+  showCatalogBtn: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  showCatalogText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 13,
   },
   emptyCard: {
     marginTop: 4,

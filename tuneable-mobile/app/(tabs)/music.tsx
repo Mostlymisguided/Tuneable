@@ -19,12 +19,14 @@ import { mediaAPI } from '@/src/api/media';
 import { partyAPI } from '@/src/api/party';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
+import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 import {
   type BpmFilterRange,
   computeTopTags,
   filterChartMedia,
   hasActiveChartFilters,
 } from '@/src/lib/chartFilters';
+import { buildChartRankMap } from '@/src/lib/playableFilterPref';
 import {
   CHART_ADDED_SORT_HINT,
   sortChartItems,
@@ -76,6 +78,7 @@ export default function MusicScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
+  const { playableOnly, setPlayableOnly } = usePlayableOnly('chart');
 
   const filterState = useMemo(
     () => ({ selectedTagTerms, searchQuery, bpmFilterRange }),
@@ -86,7 +89,7 @@ export default function MusicScreen() {
 
   useEffect(() => {
     setVisibleCount(CHART_PAGE_SIZE);
-  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange, chartSort, locationScope]);
+  }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange, chartSort, locationScope, playableOnly]);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -125,13 +128,26 @@ export default function MusicScreen() {
     [media, period]
   );
 
-  const filteredMedia = useMemo(
+  const matchingMedia = useMemo(
     () =>
       sortChartItems(filterChartMedia(media, filterState), chartSort, {
         getTip: (item) => getChartTipPence(item, period),
       }),
     [media, filterState, chartSort, period]
   );
+
+  const chartRanks = useMemo(
+    () => buildChartRankMap(matchingMedia, mediaId),
+    [matchingMedia]
+  );
+
+  const filteredMedia = useMemo(
+    () =>
+      playableOnly ? matchingMedia.filter(isUploadPlayable) : matchingMedia,
+    [matchingMedia, playableOnly]
+  );
+
+  const hiddenPlayableCount = matchingMedia.length - filteredMedia.length;
 
   const visibleMedia = useMemo(
     () => filteredMedia.slice(0, visibleCount),
@@ -187,15 +203,18 @@ export default function MusicScreen() {
   };
 
   const hasMore = visibleCount < filteredMedia.length;
-  const emptyMessage = filtersActive
-    ? 'No tunes match these filters.'
-    : selectedLocation?.placeId
-      ? locationScopeEmptyMessage(
-          'tunes',
-          formatLocation(selectedLocation),
-          locationScope
-        )
-      : 'No tunes in this period yet.';
+  const emptyMessage =
+    playableOnly && matchingMedia.length > 0 && filteredMedia.length === 0
+      ? 'No playable audio here yet.'
+      : filtersActive
+        ? 'No tunes match these filters.'
+        : selectedLocation?.placeId
+          ? locationScopeEmptyMessage(
+              'tunes',
+              formatLocation(selectedLocation),
+              locationScope
+            )
+          : 'No tunes in this period yet.';
 
   return (
     <Screen>
@@ -246,6 +265,10 @@ export default function MusicScreen() {
               onToggleBpmPanel={() => setShowBpmPanel((open) => !open)}
               onClearFilters={clearClientFilters}
               hasActiveFilters={filtersActive}
+              showPlayable
+              playableOnly={playableOnly}
+              onPlayableOnlyChange={setPlayableOnly}
+              hiddenPlayableCount={hiddenPlayableCount}
               onAddMedia={() => {
                 const q = searchQuery.trim();
                 if (q) {
@@ -278,7 +301,20 @@ export default function MusicScreen() {
         }
         ListEmptyComponent={
           !loading ? (
-            <Text style={styles.empty}>{emptyMessage}</Text>
+            playableOnly && matchingMedia.length > 0 && filteredMedia.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.empty}>{emptyMessage}</Text>
+                <Pressable
+                  style={styles.showCatalogBtn}
+                  onPress={() => setPlayableOnly(false)}>
+                  <Text style={styles.showCatalogText}>
+                    Show catalog ({hiddenPlayableCount})
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={styles.empty}>{emptyMessage}</Text>
+            )
           ) : null
         }
         ListFooterComponent={
@@ -292,9 +328,9 @@ export default function MusicScreen() {
             </Pressable>
           ) : null
         }
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <ChartTrackRow
-            rank={index + 1}
+            rank={chartRanks.get(mediaId(item)) ?? 0}
             item={item}
             variant="rich"
             tipPence={getChartTipPence(item, period)}
@@ -351,6 +387,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  showCatalogBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  showCatalogText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   showMoreBtn: {
     alignSelf: 'center',

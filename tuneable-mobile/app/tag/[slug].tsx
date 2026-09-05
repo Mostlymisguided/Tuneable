@@ -40,6 +40,8 @@ import {
   seriesTitle,
 } from '@/src/lib/podcast';
 import { getTagProfileHref, tagsMatch } from '@/src/lib/tagNormalizer';
+import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
+import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
@@ -111,6 +113,7 @@ export default function TagProfileScreen() {
   const { contentPaddingBottom } = usePlayerDockState();
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
   const setPodcastQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
+  const { playableOnly, setPlayableOnly } = usePlayableOnly('chart');
 
   const [tagName, setTagName] = useState(slug.replace(/-/g, ' '));
   const [tagKind, setTagKind] = useState<'tag' | 'year' | 'bpm'>('tag');
@@ -222,6 +225,21 @@ export default function TagProfileScreen() {
     [media, chartSort, isPodcast]
   );
 
+  const chartRanks = useMemo(
+    () => buildChartRankMap(sortedMedia, mediaId),
+    [sortedMedia]
+  );
+
+  const displayedMedia = useMemo(
+    () =>
+      !isPodcast && playableOnly
+        ? sortedMedia.filter(isUploadPlayable)
+        : sortedMedia,
+    [isPodcast, playableOnly, sortedMedia]
+  );
+
+  const hiddenPlayableCount = sortedMedia.length - displayedMedia.length;
+
   const mosaicCovers = useMemo(
     () =>
       media.slice(0, 4).map((item, index) => {
@@ -246,16 +264,16 @@ export default function TagProfileScreen() {
     () =>
       isPodcast
         ? episodes.filter(isEpisodePlayable).length
-        : sortedMedia.filter(isUploadPlayable).length,
-    [isPodcast, episodes, sortedMedia]
+        : displayedMedia.filter(isUploadPlayable).length,
+    [isPodcast, episodes, displayedMedia]
   );
 
   const onPlayItem = (item: ChartMediaItem) => {
-    const playable = sortedMedia.filter(isUploadPlayable);
+    const playable = displayedMedia.filter(isUploadPlayable);
     const index = playable.findIndex((m) => mediaId(m) === mediaId(item));
     if (index < 0) {
-      const fallback = sortedMedia.findIndex((m) => mediaId(m) === mediaId(item));
-      void setQueueAndPlay(sortedMedia, Math.max(0, fallback));
+      const fallback = displayedMedia.findIndex((m) => mediaId(m) === mediaId(item));
+      void setQueueAndPlay(displayedMedia, Math.max(0, fallback));
       return;
     }
     void setQueueAndPlay(playable, index);
@@ -279,7 +297,7 @@ export default function TagProfileScreen() {
       void setPodcastQueueAndPlay(episodes, 0);
       return;
     }
-    void setQueueAndPlay(sortedMedia, 0);
+    void setQueueAndPlay(displayedMedia, 0);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
@@ -402,8 +420,38 @@ export default function TagProfileScreen() {
             ]}>
             <Ionicons name="swap-vertical-outline" size={14} color={colors.accentLight} />
           </Pressable>
+          {!isPodcast ? (
+            <Pressable
+              onPress={() => setPlayableOnly(!playableOnly)}
+              accessibilityRole="button"
+              accessibilityLabel={
+                playableOnly ? 'Playable only, on' : 'Playable only, off'
+              }
+              style={[
+                styles.timeTrigger,
+                playableOnly && styles.timeTriggerActive,
+              ]}>
+              <Ionicons name="headset-outline" size={14} color={colors.accentLight} />
+              <Text style={styles.timeTriggerLabel}>Playable</Text>
+              <Text style={styles.timeTriggerDetail} numberOfLines={1}>
+                {playableOnly
+                  ? hiddenPlayableCount > 0
+                    ? `(−${hiddenPlayableCount})`
+                    : ''
+                  : '(All)'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
+
+      {!isPodcast && playableOnly && hiddenPlayableCount > 0 ? (
+        <Pressable onPress={() => setPlayableOnly(false)} style={styles.hiddenHintBtn}>
+          <Text style={styles.hiddenHint}>
+            Showing playable only · {catalogHiddenLabel(hiddenPlayableCount)}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {showTimePanel ? (
         <View style={styles.timePanel}>
@@ -495,7 +543,7 @@ export default function TagProfileScreen() {
         </View>
       ) : (
         <FlatList
-          data={sortedMedia}
+          data={isPodcast ? sortedMedia : displayedMedia}
           keyExtractor={(item, index) => mediaId(item) || `tag-media-${index}`}
           ListHeaderComponent={listHeader}
           contentContainerStyle={{
@@ -511,6 +559,21 @@ export default function TagProfileScreen() {
           }
           ListEmptyComponent={
             !loading ? (
+              !isPodcast &&
+              playableOnly &&
+              sortedMedia.length > 0 &&
+              displayedMedia.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.empty}>No playable audio here yet.</Text>
+                  <Pressable
+                    style={styles.showCatalogBtn}
+                    onPress={() => setPlayableOnly(false)}>
+                    <Text style={styles.showCatalogText}>
+                      Show catalog ({hiddenPlayableCount})
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
               <Text style={styles.empty}>
                 {period === 'all-time' ? (
                   tagKind === 'bpm' ? (
@@ -540,6 +603,7 @@ export default function TagProfileScreen() {
                   </>
                 )}
               </Text>
+              )
             ) : null
           }
           renderItem={({ item, index }) => {
@@ -562,7 +626,7 @@ export default function TagProfileScreen() {
             }
             return (
               <ChartTrackRow
-                rank={index + 1}
+                rank={chartRanks.get(mediaId(item)) ?? index + 1}
                 item={{
                   ...item,
                   tags: (item.tags || []).filter((t) => !tagsMatch(t, tagName)),
@@ -753,6 +817,8 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
   },
@@ -880,5 +946,32 @@ const styles = StyleSheet.create({
   emptyStrong: {
     color: colors.text,
     fontWeight: '700',
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  hiddenHintBtn: {
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  hiddenHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  showCatalogBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(126, 34, 206, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.4)',
+  },
+  showCatalogText: {
+    color: '#e9d5ff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
