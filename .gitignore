@@ -22,6 +22,7 @@ yarn-error.log*
 tuneable-backend/config/mongod.conf
 
 # MongoDB runtime data
+/.data/
 tuneable-backend/data/db/
 tuneable-backend/data/mongodb/
 tuneable-backend/data/mongodb-new/
