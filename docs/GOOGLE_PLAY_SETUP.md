@@ -93,19 +93,58 @@ After the build completes, download the `.aab` file from the EAS dashboard or th
 Navigate to **Store presence > Main store listing**:
 
 **App details:**
-- **Short description** (80 chars max): Brief tagline
-- **Full description** (4000 chars max): Detailed app description
-- **App icon**: Upload 512x512 PNG
-- **Feature graphic**: Upload 1024x500 image
+
+- **Short description** (80 chars max):
+  ```
+  Democratic music platform. Create parties, tip artists, and curate music together.
+  ```
+
+- **Full description** (4000 chars max):  
+  See the complete pre-written description in `/docs/BUSINESS_DESCRIPTIONS.md`
+  
+  **Quick version:**
+  ```
+  🎵 Tuneable - Where Music Meets Community
+  
+  Tuneable is a revolutionary social music platform that puts power back in the hands 
+  of listeners and artists. As a registered Community Interest Company (CIC), we're 
+  not driven by profit—we're driven by our mission to create a fairer, more democratic 
+  music ecosystem.
+  
+  ✨ What Makes Tuneable Different
+  • 70% of every tip goes directly to artists (committed to 90% at scale)
+  • Communities democratically curate music together
+  • Create and join music listening parties
+  • Support artists directly through tipping
+  • Multi-platform music search (YouTube, Spotify, Apple Music)
+  
+  🎪 Features
+  • Real-time synchronized listening parties
+  • Democratic queue management—tip to influence what plays next
+  • Direct artist tipping and support
+  • Discover podcasts, video, and more
+  • Join the global music chart
+  • Earn TuneBytes rewards
+  
+  Download now and be part of the change.
+  
+  tuneable.stream | Community Interest Company
+  70% to artists today. 90% at scale. Community-owned future.
+  ```
+  
+  *For the complete optimized 4000-character description, copy from BUSINESS_DESCRIPTIONS.md*
+
+- **App icon**: Upload 512x512 PNG (already at `/tuneable-mobile/assets/images/icon.png`)
+- **Feature graphic**: Upload 1024x500 image (needs to be created)
 - **Phone screenshots**: Upload at least 2 screenshots
 
 **Categorization:**
 - **App category**: Music & Audio
-- **Tags**: Select relevant tags
+- **Tags**: music, social, community, artists, streaming, parties
 - **Content rating**: Complete the questionnaire
 
 **Contact details:**
-- **Email**: Your support email
+- **Email**: t@tuneable.stream
 - **Phone**: (optional)
 - **Website**: https://tuneable.stream
 
