@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Play } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { mediaAPI, partyAPI } from '../lib/api';
@@ -13,6 +13,7 @@ import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
@@ -20,11 +21,6 @@ import {
   PlayableFilterHint,
   PlayableFilterTrigger,
 } from './PlayableFilterControl';
-import { getMediaProfileUrl } from '../utils/mediaNavigation';
-import { getCreatorDisplay } from '../utils/creatorDisplay';
-import { penceToPoundsNumber } from '../utils/currency';
-import { resolveTipStatInputs } from '../utils/tipStats';
-import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import BidConfirmationModal from './BidConfirmationModal';
 
@@ -209,6 +205,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   });
 
   const startQueue = (startItem?: TippedQueueItem) => {
+    if (!requireAuthToPlay()) return;
     const playableItems = visibleItems.filter(isQueueItemPlayable);
 
     if (playableItems.length === 0) {

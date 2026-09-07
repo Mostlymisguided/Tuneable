@@ -12,7 +12,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 // Helper function to format time (seconds to MM:SS)
 const formatTime = (seconds: number): string => {

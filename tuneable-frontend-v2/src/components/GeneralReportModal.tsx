@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle, Lightbulb } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { SUPPORT_EMAIL } from '../constants';
 
 interface GeneralReportModalProps {

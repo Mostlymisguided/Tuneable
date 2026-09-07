@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
   Music, 
@@ -74,6 +74,7 @@ import {
   getListenElsewhereTarget,
   openListenElsewhere,
 } from '../utils/listenElsewhere';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import ProductionStackEditor from '../components/ProductionStackEditor';
@@ -223,6 +224,10 @@ interface RecommendedMediaItem {
   sources?: Record<string, string>;
   contentType?: string[];
   contentForm?: string[];
+  isPlayable?: boolean;
+  rightsStatus?: string;
+  rightsCleared?: boolean;
+  hasHostedAudio?: boolean;
   creatorDisplay?: string | null;
   bids?: Array<{
     amount?: number;
@@ -1594,6 +1599,7 @@ const TuneProfile: React.FC = () => {
   // Handle play button click
   const handlePlaySong = () => {
     if (!media) return;
+    if (!requireAuthToPlay()) return;
 
     if (!isMediaPlayable(media)) {
       toast.info(
@@ -1697,11 +1703,16 @@ const TuneProfile: React.FC = () => {
       sources: item.sources || {},
       contentForm: item.contentForm,
       contentType: item.contentType,
+      isPlayable: item.isPlayable,
+      rightsStatus: item.rightsStatus,
+      rightsCleared: item.rightsCleared,
+      hasHostedAudio: item.hasHostedAudio,
     } as any);
     return isMediaPlayable(enriched);
   };
 
   const startRecommendedQueue = (items: RecommendedMediaItem[], startItem?: RecommendedMediaItem) => {
+    if (!requireAuthToPlay()) return;
     const playableItems = items.filter(isRecommendedPlayable);
 
     if (playableItems.length === 0) {

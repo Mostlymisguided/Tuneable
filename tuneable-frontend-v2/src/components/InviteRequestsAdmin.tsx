@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Mail, MessageSquare, CheckCircle, XCircle, Clock, Copy } from 'lucide-react';
 import { userAPI } from '../lib/api';
 

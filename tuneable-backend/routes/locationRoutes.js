@@ -1,4 +1,5 @@
 const express = require('express');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const mapboxGeocoding = require('../services/mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getLocationProfile } = require('../services/locationProfileService');
@@ -69,7 +70,7 @@ router.post('/resolve', async (req, res) => {
  * GET /api/locations/:placeId/profile
  * Place profile — media originating from this Mapbox place (or descendants).
  */
-router.get('/:placeId/profile', async (req, res) => {
+router.get('/:placeId/profile', optionalAuthMiddleware, async (req, res) => {
   try {
     const { placeId } = req.params;
     const { page = 1, limit = 50, timePeriod = 'all-time', sortBy } = req.query;
@@ -78,7 +79,13 @@ router.get('/:placeId/profile', async (req, res) => {
       return res.status(400).json({ error: 'Place id is required' });
     }
 
-    const profile = await getLocationProfile(placeId, { page, limit, timePeriod, sortBy });
+    const profile = await getLocationProfile(placeId, {
+      page,
+      limit,
+      timePeriod,
+      sortBy,
+      authenticated: Boolean(req.user),
+    });
     res.json(profile);
   } catch (error) {
     if (error.status === 404) {

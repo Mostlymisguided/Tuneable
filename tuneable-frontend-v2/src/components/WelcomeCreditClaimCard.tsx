@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Gift, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { emailAPI, userAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';

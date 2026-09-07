@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle } from 'lucide-react';
 import { reportAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 interface ReportModalProps {
   isOpen: boolean;

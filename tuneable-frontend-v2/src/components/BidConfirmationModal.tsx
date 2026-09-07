@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus, Navigation } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/locationHelpers';
 import { partyAPI } from '../lib/api';
 import type { Party } from '../types';

@@ -1,8 +1,9 @@
 /**
  * Client-side playability checks (mirrors tuneable-backend/utils/mediaPlayability.js).
  *
- * Pending-rights uploads are not playable. Direct audio URLs should already be
- * stripped by the API; the client still refuses to play pending/disputed tracks.
+ * Pending-rights uploads are not playable. The API strips stream URLs for guests
+ * while still setting isPlayable; trust that flag for UI. Direct audio URLs
+ * should already be stripped for unplayable tracks.
  */
 
 export type SupportMode = 'tip';
@@ -97,6 +98,10 @@ export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
   if (!media) return false;
   if (isWrittenMedia(media)) return false;
 
+  // API may strip stream URLs for guests while still marking the track playable.
+  if (media.isPlayable === true) return true;
+  if (media.isPlayable === false) return false;
+
   const sources = normalizeSources(media.sources);
 
   if (isPodcastLike(media)) {
@@ -106,8 +111,6 @@ export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
   if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
     return false;
   }
-
-  if (media.isPlayable === false) return false;
 
   return !!(sources.upload && media.rightsCleared === true);
 }

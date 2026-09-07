@@ -36,6 +36,7 @@ export interface PodcastEpisodeCardData {
   sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
+  isPlayable?: boolean;
   isExternal?: boolean;
   source?: 'local' | 'podcastindex' | 'taddy' | 'apple';
   bids?: Array<{

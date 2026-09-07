@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, DollarSign, Gift, Loader2 } from 'lucide-react';
 import { userAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
 
 interface UserTopUpModalProps {

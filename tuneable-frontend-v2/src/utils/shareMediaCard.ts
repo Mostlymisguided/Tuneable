@@ -1,4 +1,4 @@
-import { toast } from 'react-toastify';
+import { toast } from './toast';
 import { getApiBaseUrl } from './platform';
 
 export type StoryCardFormat = 'story' | 'og';

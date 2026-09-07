@@ -5,7 +5,7 @@ import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
 import PlayerWarningModal from '../components/PlayerWarningModal';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Music, Users, MapPin, Coins, Heart } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
 import { isLocationMatch } from '../utils/locationHelpers';

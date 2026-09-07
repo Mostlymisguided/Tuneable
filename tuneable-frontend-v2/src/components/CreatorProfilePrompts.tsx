@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Facebook, Music2, Youtube, MapPin, X, CheckCircle } from 'lucide-react';
 import { emailAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 interface User {
   _id?: string;

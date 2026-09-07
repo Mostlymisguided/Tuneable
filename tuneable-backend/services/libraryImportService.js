@@ -347,7 +347,7 @@ function mediaToPlayabilityFields(media) {
   const sources = media.sources instanceof Map
     ? Object.fromEntries(media.sources)
     : (media.sources || {});
-  return enrichMediaWithPlayability({ ...media, sources });
+  return enrichMediaWithPlayability({ ...media, sources }, { authenticated: true });
 }
 
 function trackKey(track, source) {

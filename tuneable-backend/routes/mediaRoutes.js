@@ -7,6 +7,7 @@ const Comment = require('../models/Comment');
 const Claim = require('../models/Claim');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
@@ -30,7 +31,7 @@ const {
   applyTipChipsToMedia,
   normalizeElementList,
 } = require('../utils/elementNormalizer');
-const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 const {
   attachGearIdsToProductionStack,
   refreshGearStats,
@@ -40,6 +41,8 @@ const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const Gear = require('../models/Gear');
+
+router.use(optionalAuthMiddleware);
 
 /**
  * Extract release year from releaseDate or use provided releaseYear
@@ -1098,7 +1101,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         title: media.title,
         sources: sourcesObj,
         rightsCleared: media.rightsCleared,
-        ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }),
+        ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }, playabilityOptionsFromRequest(req)),
       },
     });
   } catch (error) {
@@ -1201,7 +1204,7 @@ router.get('/', async (req, res) => {
     res.json({
       media: media.map((item) => ({
         ...item,
-        ...enrichMediaWithPlayability(item),
+        ...enrichMediaWithPlayability(item, playabilityOptionsFromRequest(req)),
       })),
       pagination: {
         page: parseInt(page),
@@ -1272,7 +1275,7 @@ router.get('/public', async (req, res) => {
     res.json({
       media: media.map((item) => ({
         ...item,
-        ...enrichMediaWithPlayability(item),
+        ...enrichMediaWithPlayability(item, playabilityOptionsFromRequest(req)),
       })),
       pagination: {
         page: parseInt(page),
@@ -1644,7 +1647,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       creatorDisplay: populatedMedia.creatorDisplay || formatCreatorDisplay(populatedMedia.artist || [], populatedMedia.featuring || []), // Display string for UI
       globalMediaAggregateTopRank: rank, // Add computed rank
       globalMediaAggregate: calculatedGlobalMediaAggregate, // Override with calculated value from all bids
-      ...enrichMediaWithPlayability({ ...mediaObj, sources: sourcesObj }),
+      ...enrichMediaWithPlayability({ ...mediaObj, sources: sourcesObj }, playabilityOptionsFromRequest(req)),
       // Tip count/supporters must match Bid collection (Media.bids can be stale)
       bids: allBids.map((bid) => (typeof bid.toObject === 'function' ? bid.toObject() : bid)),
       tipCount: allBids.length,
@@ -1699,6 +1702,7 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
         if (!Number.isFinite(parsed)) return 8;
         return Math.min(Math.max(parsed, 0), 16);
       })(),
+      authenticated: Boolean(req.user),
     });
 
     res.json({

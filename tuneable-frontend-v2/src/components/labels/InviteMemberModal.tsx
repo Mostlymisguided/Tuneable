@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, UserPlus, Search, Mail, Loader2 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../../utils/toast';
 import { labelAPI, userAPI } from '../../lib/api';
 import { DEFAULT_PROFILE_PIC } from '../../constants';
 

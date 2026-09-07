@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ledgerAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { 
   Database, 
   Search, 

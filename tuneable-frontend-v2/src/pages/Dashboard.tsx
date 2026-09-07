@@ -5,7 +5,7 @@ import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI, artistEscrowAPI } fro
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
@@ -22,6 +22,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
 
 interface SearchResult {
@@ -548,6 +549,7 @@ Join here: ${inviteLink}`.trim();
   };
 
   const handlePlay = (item: LibraryItem, _index: number) => {
+    if (!requireAuthToPlay()) return;
     try {
       // Use sorted library to maintain the order the user sees.
       // Sources come from the library payload — no per-track profile fetches.

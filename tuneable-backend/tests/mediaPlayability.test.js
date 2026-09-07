@@ -116,13 +116,25 @@ describe('enrichMediaWithPlayability', () => {
     expect(presented.playabilityBlockReason).toBe('rights');
   });
 
-  it('keeps upload URLs for cleared playable tracks', () => {
+  it('strips upload URLs for guests even when the track is playable', () => {
     const presented = enrichMediaWithPlayability({
       sources: { upload: UPLOAD },
       rightsStatus: 'cleared',
       rightsCleared: true,
       contentForm: ['tune'],
     });
+    expect(presented.isPlayable).toBe(true);
+    expect(presented.sources.upload).toBeUndefined();
+    expect(presented.hasHostedAudio).toBe(true);
+  });
+
+  it('keeps upload URLs for authenticated listeners', () => {
+    const presented = enrichMediaWithPlayability({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'cleared',
+      rightsCleared: true,
+      contentForm: ['tune'],
+    }, { authenticated: true });
     expect(presented.isPlayable).toBe(true);
     expect(presented.sources.upload).toBe(UPLOAD);
     expect(presented.hasHostedAudio).toBe(true);
@@ -139,13 +151,24 @@ describe('enrichMediaWithPlayability', () => {
     expect(presented.sources.upload).toBe(UPLOAD);
   });
 
-  it('keeps podcast enclosure URLs', () => {
+  it('strips podcast enclosure URLs for guests', () => {
     const enclosure = 'https://cdn.example/ep.mp3';
     const presented = enrichMediaWithPlayability({
       sources: { enclosure },
       rightsStatus: 'pending',
       contentForm: ['podcastepisode'],
     });
+    expect(presented.isPlayable).toBe(true);
+    expect(presented.sources.enclosure).toBeUndefined();
+  });
+
+  it('keeps podcast enclosure URLs for authenticated listeners', () => {
+    const enclosure = 'https://cdn.example/ep.mp3';
+    const presented = enrichMediaWithPlayability({
+      sources: { enclosure },
+      rightsStatus: 'pending',
+      contentForm: ['podcastepisode'],
+    }, { authenticated: true });
     expect(presented.isPlayable).toBe(true);
     expect(presented.sources.enclosure).toBe(enclosure);
   });

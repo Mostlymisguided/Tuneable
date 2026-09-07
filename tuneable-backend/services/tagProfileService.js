@@ -681,7 +681,7 @@ async function findPodcastMediaForTag({ displayName, canonicalTag, selectFields 
 /**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
-async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type, sortBy = 'most-tipped' } = {}) {
+async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type, sortBy = 'most-tipped', authenticated = false } = {}) {
   const resolved = await resolveTagFromSlug(rawSlug);
   if (!resolved) {
     const err = new Error('Tag not found');
@@ -744,7 +744,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
     ...m,
-    ...enrichMediaWithPlayability(m),
+    ...enrichMediaWithPlayability(m, { authenticated }),
     bids: bidsByMediaId.get(m._id.toString()) || [],
   }));
 

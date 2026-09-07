@@ -10,7 +10,7 @@ import { resolveUploadAudioUrl } from '../utils/audioUrls';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import {
   isNativeAudioPlatform,
   loadNativeTrack,

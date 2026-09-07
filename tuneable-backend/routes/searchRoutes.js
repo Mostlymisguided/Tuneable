@@ -6,15 +6,18 @@ const Media = require('../models/Media'); // Unified media model
 const { transformResponse } = require('../utils/uuidTransform');
 const { getQuotaStatus, getQuotaHistory, resetQuota } = require('../services/quotaTracker');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { getCoverArtUrl, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { extractYouTubeVideoId, getYouTubeThumbnail } = require('../utils/youtubeUtils');
-const { enrichMediaWithPlayability, normalizeSources } = require('../utils/mediaPlayability');
+const { enrichMediaWithPlayability, normalizeSources, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 }); // Cache results for 10 minutes, clean every 2 mins
 
+router.use(optionalAuthMiddleware);
+
 // Search local database first (using Media model)
-const searchLocalDatabase = async (query, source = 'musicbrainz', limit = 20) => {
+const searchLocalDatabase = async (query, source = 'musicbrainz', limit = 20, playabilityOptions = {}) => {
     try {
         console.log(`Searching local database for: "${query}" (source: ${source})`);
         
@@ -69,7 +72,7 @@ const searchLocalDatabase = async (query, source = 'musicbrainz', limit = 20) =>
             const playability = enrichMediaWithPlayability({
                 ...mediaItem,
                 sources,
-            });
+            }, playabilityOptions);
 
             // Get primary artist name
             const artistName = Array.isArray(mediaItem.artist) && mediaItem.artist.length > 0
@@ -131,7 +134,7 @@ router.get('/', async (req, res) => {
         } else {
             // Step 1: Search local database first
             console.log('Step 1: Searching local database...');
-            const localResults = await searchLocalDatabase(query, source, 20);
+            const localResults = await searchLocalDatabase(query, source, 20, playabilityOptionsFromRequest(req));
             
             if (localResults.length > 0) {
                 console.log(`Found ${localResults.length} local results, returning local database results`);

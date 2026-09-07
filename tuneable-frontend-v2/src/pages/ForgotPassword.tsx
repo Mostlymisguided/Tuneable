@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { authAPI } from '../lib/api';
 

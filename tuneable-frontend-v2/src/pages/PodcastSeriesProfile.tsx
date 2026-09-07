@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI } from '../lib/api';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -36,6 +36,7 @@ import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getEpisodeDisplayTags } from '../utils/podcastTags';
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { shareStoryCardWithToast } from '../utils/shareMediaCard';
 
@@ -641,6 +642,7 @@ const PodcastSeriesProfile: React.FC = () => {
 
   const handlePlayEpisode = (episode: Episode, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireAuthToPlay()) return;
     const ep = {
       _id: episode._id,
       title: episode.title,

@@ -9,7 +9,7 @@ import { mediaAPI } from '../lib/api';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { clearMediaSession, updateMediaSession } from '../utils/mediaSession';
 
 /** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */

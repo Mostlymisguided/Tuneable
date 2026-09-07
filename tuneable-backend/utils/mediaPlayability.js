@@ -4,7 +4,8 @@
  * Playable music requires an uploaded file (sources.upload) AND cleared rights.
  * Pending library-import audio stays hosted for a later claim, but is not
  * streamed and direct audio URLs are stripped from public API responses.
- * Podcast/spoken content may use other direct audio source keys.
+ * Stream URLs for playable tracks are also omitted unless the requester is
+ * authenticated. Podcast/spoken content may use other direct audio source keys.
  */
 
 const { isWrittenMedia } = require('./mediaKinds');
@@ -115,9 +116,18 @@ function isRightsPendingClaimable(media) {
 }
 
 /**
+ * Options for public media payloads.
+ * Stream URLs are only included when the requester is authenticated,
+ * unless exposeDirectAudio is set for trusted admin/import responses.
+ */
+function playabilityOptionsFromRequest(req, extra = {}) {
+  return { authenticated: Boolean(req && req.user), ...extra };
+}
+
+/**
  * Playability fields plus public-safe sources.
- * Direct audio URLs are omitted unless the track is actually playable
- * (or options.exposeDirectAudio is set for trusted admin responses).
+ * isPlayable stays true for guests so play UI still shows; direct audio URLs
+ * are omitted unless authenticated (or options.exposeDirectAudio).
  */
 function enrichMediaWithPlayability(media, options = {}) {
   const originalSources = normalizeSources(media?.sources);
@@ -127,7 +137,10 @@ function enrichMediaWithPlayability(media, options = {}) {
   const hasHostedAudio = typeof media?.hasHostedAudio === 'boolean'
     ? media.hasHostedAudio
     : (!podcast && !written && hasDirectAudioSource(originalSources));
-  const exposeDirectAudio = options.exposeDirectAudio === true || playable || podcast;
+  const authenticated = options.authenticated === true;
+  const exposeDirectAudio =
+    options.exposeDirectAudio === true ||
+    (authenticated && (playable || podcast));
   const clientSources = exposeDirectAudio
     ? originalSources
     : stripDirectAudioSources(originalSources);
@@ -170,6 +183,7 @@ module.exports = {
   getSupportMode,
   getPlayabilityBlockReason,
   isRightsPendingClaimable,
+  playabilityOptionsFromRequest,
   enrichMediaWithPlayability,
   availablePlatformsFromSources,
   toClientMedia,

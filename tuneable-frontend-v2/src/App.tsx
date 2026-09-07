@@ -1,19 +1,19 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { ToastContainer, cssTransition } from 'react-toastify';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useState, useEffect, lazy, Suspense } from 'react';
-import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CurrentLocationProvider } from './contexts/CurrentLocationContext';
 import { useWebPlayerStore } from './stores/webPlayerStore';
 import { usePodcastPlayerStore } from './stores/podcastPlayerStore';
 import Navbar from './components/Navbar';
+import AppToaster from './components/AppToaster';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import MP3Player from './components/MP3Player';
 import PersistentPodcastPlayer from './components/PersistentPodcastPlayer';
 import { isMediaPlayable } from './utils/mediaPlayability';
+import { hasAuthToken, setPlayAuthRedirect } from './utils/playAuth';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
 import AuthCallback from './pages/AuthCallback';
@@ -65,13 +65,6 @@ import Conversations from './pages/Conversations';
 import ConversationDetail from './pages/ConversationDetail';
 import CreateConversation from './pages/CreateConversation';
 
-// Define fade transition for toast notifications
-// Duration is controlled by CSS animations (0.3s for fadeIn, 0.2s for fadeOut)
-const Fade = cssTransition({
-  enter: 'fadeIn',
-  exit: 'fadeOut'
-});
-
 // Component to handle simple conditional player rendering
 const PlayerRenderer = () => {
   const { currentMedia, ensureCurrentPlayable } = useWebPlayerStore();
@@ -94,7 +87,10 @@ const PlayerRenderer = () => {
 
   const mediaId = currentMedia?._id || currentMedia?.id;
   const canPlayCurrent =
-    !!currentMedia && isMediaPlayable(currentMedia) && detectMediaType(currentMedia) === 'audio';
+    hasAuthToken() &&
+    !!currentMedia &&
+    isMediaPlayable(currentMedia) &&
+    detectMediaType(currentMedia) === 'audio';
 
   // Auto-advance past catalog/unplayable items so the queue never stalls
   useEffect(() => {
@@ -191,10 +187,20 @@ const OnboardingRedirect = () => {
   return <Navigate to="/onboarding" replace />;
 };
 
+const PlayAuthRedirectBinder = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    setPlayAuthRedirect((url) => navigate(url));
+    return () => setPlayAuthRedirect(null);
+  }, [navigate]);
+  return null;
+};
+
 const AppContent = () => {
   return (
     <Router>
       <AuthDeepLinkListener />
+      <PlayAuthRedirectBinder />
       <div className="min-h-screen">
         <Navbar />
         <OnboardingRedirect />
@@ -413,19 +419,7 @@ const AppContent = () => {
           </Routes>
         </main>
         <PlayerRenderer />
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={true}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          transition={Fade}
-          style={{ zIndex: 10001 }}
-        />
+        <AppToaster />
       </div>
     </Router>
   );

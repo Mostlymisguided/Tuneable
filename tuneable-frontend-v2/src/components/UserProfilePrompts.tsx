@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, MapPin, Navigation, User, X, CheckCircle, Coins } from 'lucide-react';
 import { emailAPI, authAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { hasCustomProfilePic, DEFAULT_TIP_POUNDS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';

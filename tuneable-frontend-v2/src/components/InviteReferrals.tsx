@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { authAPI } from '../lib/api';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import type { InviteCode, Referral, ReferralsResponse } from '../types';

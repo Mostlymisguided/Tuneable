@@ -315,7 +315,7 @@ async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
 /**
  * Place profile: origin-scoped media ranked by tip aggregate.
  */
-async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped' } = {}) {
+async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped', authenticated = false } = {}) {
   const placeId = normalizePlaceId(rawPlaceId);
   if (!placeId) {
     const err = new Error('Place not found');
@@ -365,7 +365,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
     ...m,
-    ...enrichMediaWithPlayability(m),
+    ...enrichMediaWithPlayability(m, { authenticated }),
     bids: bidsByMediaId.get(m._id.toString()) || [],
   }));
 

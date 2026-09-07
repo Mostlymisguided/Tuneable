@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import DOMPurify from 'dompurify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
@@ -50,6 +50,7 @@ import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
@@ -1529,6 +1530,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   // Handle play button click – use podcast player (not music web player)
   const handlePlaySong = () => {
     if (!media) return;
+    if (!requireAuthToPlay()) return;
 
     const episode = {
       _id: media._id,
@@ -2211,6 +2213,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   );
 
   const handlePlaySeriesEpisode = (episode: any) => {
+    if (!requireAuthToPlay()) return;
     const playable = {
       _id: episode._id,
       id: episode.uuid,

@@ -18,6 +18,7 @@ const {
   enrichMediaWithPlayability,
   availablePlatformsFromSources,
   normalizeSources,
+  playabilityOptionsFromRequest,
 } = require('../utils/mediaPlayability');
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
@@ -1194,7 +1195,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
               rightsStatus: entry.mediaId.rightsStatus,
               rightsCleared: entry.mediaId.rightsCleared,
               contentForm: entry.mediaId.contentForm,
-            });
+            }, playabilityOptionsFromRequest(req));
 
             return {
                 _id: entry.mediaId?._id || null,
@@ -1572,7 +1573,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                 const playability = enrichMediaWithPlayability({
                     ...media,
                     sources: normalizeSources(media.sources),
-                });
+                }, playabilityOptionsFromRequest(req));
                 matchingMedia.push({
                     id: media._id,
                     uuid: media.uuid,
@@ -3979,7 +3980,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                     const playability = enrichMediaWithPlayability({
                         ...(typeof entry.mediaId.toObject === 'function' ? entry.mediaId.toObject() : entry.mediaId),
                         sources: normalizeSources(entry.mediaId.sources),
-                    });
+                    }, playabilityOptionsFromRequest(req));
                     const availablePlatforms = availablePlatformsFromSources(playability.sources);
 
                     const timePeriodBidValue = mediaBidValues[entry.mediaId._id.toString()] || 0;

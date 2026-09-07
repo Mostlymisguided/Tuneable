@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import LocationAutocomplete from '../components/LocationAutocomplete';

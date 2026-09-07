@@ -170,9 +170,9 @@ const limitPerPrimaryArtist = (records, limit, maxPerPrimaryArtist) => {
   return selected;
 };
 
-const formatMediaEntry = (record) => {
+const formatMediaEntry = (record, playabilityOptions = {}) => {
   const media = record.media;
-  const playability = enrichMediaWithPlayability(media);
+  const playability = enrichMediaWithPlayability(media, playabilityOptions);
   return {
     _id: media._id.toString(),
     uuid: media.uuid,
@@ -265,6 +265,7 @@ const attachBidsToPlaylistEntries = async (relatedMedia, fansAlsoTip) => {
 
 const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   const settings = { ...DEFAULT_OPTIONS, ...options };
+  const playabilityOptions = { authenticated: settings.authenticated === true };
 
   const source = await Media.findById(mediaId)
     .select('_id uuid title artist tags contentType contentForm relationships globalMediaAggregate')
@@ -320,7 +321,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
     candidateRecords,
     settings.relatedLimit,
     settings.maxPerPrimaryArtist
-  ).map(formatMediaEntry);
+  ).map((record) => formatMediaEntry(record, playabilityOptions));
 
   if (candidateRecords.length === 0 || settings.fansAlsoTipLimit <= 0) {
     relatedMedia = await attachBidsToEntries(relatedMedia);
@@ -439,7 +440,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
           sourceSupportTotal: fan.totalAmount,
           sourceSupportBidCount: fan.bidCount,
         },
-      }));
+      }, playabilityOptions));
       break;
     }
 

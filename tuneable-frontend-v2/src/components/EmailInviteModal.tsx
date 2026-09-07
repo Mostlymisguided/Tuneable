@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Send, Loader2 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { emailAPI } from '../lib/api';
 
 interface EmailInviteModalProps {

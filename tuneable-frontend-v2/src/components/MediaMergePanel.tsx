@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { GitMerge, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
 
 interface MediaSummary {

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Tag, Loader2, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
 import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_COVER_ART } from '../constants';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlayability';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -34,6 +35,7 @@ import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import {
   getEpisodeAudioUrl,
+  isEpisodePlayable,
   usePodcastPlayerStore,
   type PodcastPlayerEpisode,
 } from '../stores/podcastPlayerStore';
@@ -104,6 +106,7 @@ function toPodcastPlayerEpisode(episode: PodcastEpisodeCardData): PodcastPlayerE
     sources: episode.sources,
     audioUrl: episode.audioUrl,
     enclosure: episode.enclosure,
+    isPlayable: episode.isPlayable,
   };
 }
 
@@ -258,6 +261,7 @@ const TagProfile: React.FC = () => {
 
   const handlePodcastPlay = async (episode: PodcastEpisodeCardData, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireAuthToPlay()) return;
     const ep = {
       _id: episode._id,
       id: episode.id,
@@ -313,10 +317,11 @@ const TagProfile: React.FC = () => {
   };
 
   const handlePlayQueue = () => {
+    if (!requireAuthToPlay()) return;
     if (isPodcast) {
       const playable = episodes
         .map(toPodcastPlayerEpisode)
-        .filter((episode) => getEpisodeAudioUrl(episode));
+        .filter((episode) => isEpisodePlayable(episode));
       if (playable.length === 0) {
         toast.info('No playable episodes in this list.');
         return;

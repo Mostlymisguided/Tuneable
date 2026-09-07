@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI, locationAPI } from '../lib/api';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import {
   ChartSortPanel,
@@ -142,6 +143,7 @@ interface PodcastEpisode {
   sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
+  isPlayable?: boolean;
   minimumBid?: number;
   globalMediaBidTop?: number;
   globalMediaAggregateAvg?: number;
@@ -1165,6 +1167,7 @@ const Podcasts: React.FC = () => {
 
   const handleQueuePlay = async (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireAuthToPlay()) return;
     const ep = {
       _id: episode._id,
       id: episode.id,
@@ -1458,7 +1461,7 @@ const Podcasts: React.FC = () => {
     : displayEpisodes.slice(0, visibleEpisodeCount);
 
   const canPlayEpisode = (episode: PodcastEpisode) => {
-    if (!user) return false;
+    if (episode.isPlayable === true) return true;
     if (
       getEpisodeAudioUrl({
         title: episode.title,

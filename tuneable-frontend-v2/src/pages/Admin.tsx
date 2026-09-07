@@ -38,7 +38,7 @@ import IssueWarningModal from '../components/IssueWarningModal';
 import InviteReferrals from '../components/InviteReferrals';
 import UserTopUpModal from '../components/UserTopUpModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';

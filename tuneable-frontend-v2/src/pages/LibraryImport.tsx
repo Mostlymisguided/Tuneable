@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Search,
 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { userAPI } from '../lib/api';
 import { penceToPoundsNumber } from '../utils/currency';

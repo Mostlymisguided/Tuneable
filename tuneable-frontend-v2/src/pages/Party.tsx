@@ -6,7 +6,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI, searchAPI, locationAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
@@ -45,6 +45,7 @@ import {
 } from '../utils/locationHelpers';
 import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { hasAuthToken, requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
@@ -686,7 +687,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     // Only seed the player with a track the player itself considers playable.
     // Dropping rightsCleared on mapped items used to ping-pong with ensureCurrentPlayable
     // (React error #185 / blank screen on all-time global).
-    if (cleanedQueue.length > 0 && !store.currentMedia) {
+    if (cleanedQueue.length > 0 && !store.currentMedia && hasAuthToken()) {
       const firstPlayableIndex = cleanedQueue.findIndex((m) => isMediaPlayable(m));
       if (firstPlayableIndex >= 0) {
         setCurrentMedia(cleanedQueue[firstPlayableIndex], firstPlayableIndex);
@@ -2147,6 +2148,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Handle clicking play button on media in the queue
   const handlePlayMedia = (item: any, index: number) => {
+    if (!requireAuthToPlay()) return;
     const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
 
     if (cleanedQueue.length === 0) {
@@ -2175,6 +2177,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Handle playing the entire displayed queue from the top
   const handlePlayQueue = () => {
+    if (!requireAuthToPlay()) return;
     const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
 
     if (cleanedQueue.length === 0) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Users, Search, X, Check, Globe } from 'lucide-react';
 import { notificationAPI, userAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface User {

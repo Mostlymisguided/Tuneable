@@ -222,13 +222,14 @@ const SpotifyImportRequest = require('../models/SpotifyImportRequest');
 const Media = require('../models/Media');
 const ListeningHistory = require('../models/ListeningHistory');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
-const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -777,7 +778,7 @@ router.get('/invited', authMiddleware, async (req, res) => {
 });
 
 // Shared helper to fetch tune library for a user by their MongoDB _id
-async function fetchTuneLibraryForUser(user) {
+async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
     
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
@@ -984,7 +985,7 @@ async function fetchTuneLibraryForUser(user) {
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
           contentForm = media.contentForm || [];
-          playability = enrichMediaWithPlayability(media);
+          playability = enrichMediaWithPlayability(media, { authenticated });
           sources = playability.sources || {};
         } else {
           // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
@@ -1103,7 +1104,7 @@ async function buildPlaybackQueueResponse(user) {
       const media = mediaLookup.get(entry.mediaId?.toString());
       if (!media) return null;
 
-      const playability = enrichMediaWithPlayability(media);
+      const playability = enrichMediaWithPlayability(media, { authenticated: true });
       return {
         index,
         addedAt: entry.addedAt,
@@ -1170,7 +1171,7 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await fetchTuneLibraryForUser(user);
+    const result = await fetchTuneLibraryForUser(user, { authenticated: true });
     res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);
@@ -2070,7 +2071,7 @@ router.get('/me/import/jobs/:jobId', authMiddleware, async (req, res) => {
 // @route   GET /api/users/:userId/tune-library
 // @desc    Get a user's tune library (public profile data)
 // @access  Public
-router.get('/:userId/tune-library', async (req, res) => {
+router.get('/:userId/tune-library', optionalAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     let user;
@@ -2082,7 +2083,7 @@ router.get('/:userId/tune-library', async (req, res) => {
       return res.status(400).json({ error: 'Invalid user ID format' });
     }
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await fetchTuneLibraryForUser(user);
+    const result = await fetchTuneLibraryForUser(user, { authenticated: Boolean(req.user) });
     res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
 import { 
   Coins, 
@@ -111,6 +111,7 @@ import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
+import { requireAuthToPlay } from '../utils/playAuth';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import {
@@ -1292,6 +1293,7 @@ const UserProfile: React.FC = () => {
 
   // Handle playing media from Tune Library with auto-transition
   const handlePlayLibrary = (item: LibraryItem, _index: number, list?: LibraryItem[]) => {
+    if (!requireAuthToPlay()) return;
     try {
       // Use provided list or full library to maintain the order the user sees.
       // Sources come from the library payload — no per-track profile fetches.
@@ -1356,6 +1358,7 @@ const UserProfile: React.FC = () => {
 
   // Handle playing episodes from Podcast Library with auto-transition
   const handlePlayPodcastLibrary = (item: LibraryItem, index: number, list?: LibraryItem[]) => {
+    if (!requireAuthToPlay()) return;
     try {
       const sortedLibrary = list ?? getSortedPodcastLibrary();
 
@@ -1465,6 +1468,7 @@ const UserProfile: React.FC = () => {
   };
 
   const handlePlayQueueItem = (item: PlaybackQueueItem) => {
+    if (!requireAuthToPlay()) return;
     try {
       const queueItems = [...playbackQueue];
 

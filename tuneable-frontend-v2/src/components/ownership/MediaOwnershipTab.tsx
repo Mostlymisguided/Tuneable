@@ -10,7 +10,7 @@ import {
   ShieldAlert,
   Clock,
 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../../utils/toast';
 import { mediaAPI, claimAPI, userAPI } from '../../lib/api';
 
 interface BaseUser {

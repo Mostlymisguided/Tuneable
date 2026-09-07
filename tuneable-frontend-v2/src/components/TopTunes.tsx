@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -10,6 +10,7 @@ import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { requireAuthToPlay } from '../utils/playAuth';
 
 interface TopTunesSong {
   id: string;
@@ -103,6 +104,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   };
 
   const handlePlay = (song: TopTunesSong) => {
+    if (!requireAuthToPlay()) return;
     const mediaId = song._id || song.id;
     
     if (!mediaId) {

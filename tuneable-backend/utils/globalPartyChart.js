@@ -95,14 +95,14 @@ function chartMediaDateFields(media) {
   };
 }
 
-function withPublicPlayability(media, sourcesObj) {
+function withPublicPlayability(media, sourcesObj, options = {}) {
   return enrichMediaWithPlayability({
     ...media,
     sources: sourcesObj,
     contentForm: media.contentForm,
     rightsStatus: media.rightsStatus,
     rightsCleared: media.rightsCleared,
-  });
+  }, options);
 }
 
 /**
@@ -546,7 +546,11 @@ async function fetchAllTimeGlobalChart({
   const chartMedia = mediaList.map((media) => {
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
     const aggregate = media.globalMediaAggregate || 0;
-    const playability = withPublicPlayability(media, sourcesToObject(media.sources));
+    const playability = withPublicPlayability(
+      media,
+      sourcesToObject(media.sources),
+      { authenticated: Boolean(userId) }
+    );
 
     return {
       _id: media._id,
@@ -820,7 +824,11 @@ async function fetchPeriodGlobalChart({
 
   const chartMedia = mediaList.map(({ media, timePeriodBidValue }) => {
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
-    const playability = withPublicPlayability(media, sourcesToObject(media.sources));
+    const playability = withPublicPlayability(
+      media,
+      sourcesToObject(media.sources),
+      { authenticated: Boolean(userId) }
+    );
 
     return {
       _id: media._id,

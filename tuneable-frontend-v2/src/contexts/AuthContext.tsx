@@ -181,13 +181,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('user');
           setToken(null);
           setUser(null);
+          clearPlayers();
         }
+      } else {
+        clearPlayers();
       }
       setIsLoading(false);
     };
 
     initAuth();
   }, []);
+
+  const clearPlayers = () => {
+    const { useWebPlayerStore } = require('../stores/webPlayerStore');
+    useWebPlayerStore.getState().setCurrentMedia(null);
+    useWebPlayerStore.getState().setGlobalPlayerActive(false);
+    useWebPlayerStore.getState().setQueue([]);
+    const { usePodcastPlayerStore } = require('../stores/podcastPlayerStore');
+    usePodcastPlayerStore.getState().clear();
+  };
 
   const login = async (identifier: string, password: string): Promise<User> => {
     try {
@@ -224,14 +236,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Clear web player state on logout
-    const { useWebPlayerStore } = require('../stores/webPlayerStore');
-    useWebPlayerStore.getState().setCurrentMedia(null);
-    useWebPlayerStore.getState().setGlobalPlayerActive(false);
-    useWebPlayerStore.getState().setQueue([]);
-    // Clear podcast player state on logout
-    const { usePodcastPlayerStore } = require('../stores/podcastPlayerStore');
-    usePodcastPlayerStore.getState().clear();
+    clearPlayers();
   };
 
   const handleOAuthCallback = useCallback(async (token: string): Promise<User> => {

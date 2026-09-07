@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link as RouterLink, useSearchParams, useNavigate } from 'react-router-dom';
 import { searchAPI, partyAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
 import BidConfirmationModal from '../components/BidConfirmationModal';

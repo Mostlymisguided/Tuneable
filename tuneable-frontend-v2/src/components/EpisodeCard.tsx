@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Pause, Heart, DollarSign, Clock, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { stripHtml } from '../utils/stripHtml';
 
 interface Episode {

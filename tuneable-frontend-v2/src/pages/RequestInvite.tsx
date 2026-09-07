@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Mail, User, Send, CheckCircle, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 

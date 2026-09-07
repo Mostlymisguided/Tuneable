@@ -8,7 +8,7 @@ import {
   Navigation,
   CheckCircle2,
 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI, userAPI } from '../lib/api';
 import { buildOnboardingCompletePath } from '../utils/authHelpers';

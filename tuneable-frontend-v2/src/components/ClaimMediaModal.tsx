@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Award, Ban, CheckCircle, X } from 'lucide-react';
 import { claimAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
