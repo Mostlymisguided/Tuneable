@@ -1038,7 +1038,7 @@ const LibraryImport: React.FC = () => {
           artist,
         },
       });
-      const nextItem = data.item as ImportItem;
+      const nextItem = data.item as unknown as ImportItem;
       setItems((prev) => prev.map((row) => (
         row.key === item.key ? mergeRematchedYoutubeItem(row, nextItem) : row
       )));

@@ -17,7 +17,7 @@ interface ClickableArtistDisplayProps {
     creatorDisplay?: string;
     host?: Artist[] | string[];
     author?: Artist[] | string[];
-    contentForm?: string[];
+    contentForm?: string[] | string;
     podcastTitle?: string;
     podcastSeries?: { title?: string } | string | null;
   };
