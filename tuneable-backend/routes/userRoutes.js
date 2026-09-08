@@ -221,6 +221,12 @@ const InviteRequest = require('../models/InviteRequest');
 const SpotifyImportRequest = require('../models/SpotifyImportRequest');
 const Media = require('../models/Media');
 const ListeningHistory = require('../models/ListeningHistory');
+const {
+  ListeningHistoryError,
+  formatMediaArtist,
+  resolveMediaByIdentifier,
+  trackListeningSession,
+} = require('../services/listeningHistoryService');
 const authMiddleware = require('../middleware/authMiddleware');
 const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
@@ -1058,30 +1064,6 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
     return { library, total: library.length };
 }
 
-function formatMediaArtist(media) {
-  if (!media) return 'Unknown Artist';
-  if (media.creatorDisplay) return media.creatorDisplay;
-  if (Array.isArray(media.artist) && media.artist.length > 0) {
-    return media.artist
-      .map((artist) => (typeof artist === 'string' ? artist : artist?.name))
-      .filter(Boolean)
-      .join(', ');
-  }
-  if (typeof media.artist === 'string' && media.artist.trim()) {
-    return media.artist;
-  }
-  return 'Unknown Artist';
-}
-
-async function resolveMediaByIdentifier(identifier) {
-  if (!identifier) return null;
-  if (mongoose.Types.ObjectId.isValid(identifier)) {
-    const byId = await Media.findById(identifier);
-    if (byId) return byId;
-  }
-  return Media.findOne({ uuid: identifier });
-}
-
 async function buildPlaybackQueueResponse(user) {
   const queueEntries = Array.isArray(user?.playbackQueue) ? user.playbackQueue : [];
   if (queueEntries.length === 0) {
@@ -1412,78 +1394,19 @@ router.delete('/me/queue', authMiddleware, async (req, res) => {
   }
 });
 
-// Track a listening history session
+// Track a listening history session (and count a qualified play once per session)
 router.post('/me/listening-history/track', authMiddleware, async (req, res) => {
   try {
-    const {
-      mediaId,
-      sessionId,
-      sourceType = 'unknown',
-      startedAt,
-      currentTime = 0,
-      duration = 0,
-      completed = false,
-      mediaTitle,
-      mediaArtist,
-      mediaCoverArt,
-    } = req.body || {};
+    const { history, playCounted } = await trackListeningSession({
+      userId: req.user._id,
+      ...(req.body || {}),
+    });
 
-    if (!mediaId || !sessionId) {
-      return res.status(400).json({ error: 'mediaId and sessionId are required' });
-    }
-
-    const media = await resolveMediaByIdentifier(mediaId);
-    if (!media) {
-      return res.status(404).json({ error: 'Media not found' });
-    }
-
-    const now = new Date();
-    const numericPosition = Math.max(0, Number(currentTime) || 0);
-    const numericDuration = Math.max(0, Number(duration) || Number(media.duration) || 0);
-    const completionPercent = numericDuration > 0
-      ? Math.min(100, Math.round((numericPosition / numericDuration) * 1000) / 10)
-      : 0;
-
-    const existing = await ListeningHistory.findOne({ userId: req.user._id, sessionId });
-    const derivedCompleted = completed === true || completionPercent >= 90;
-    const listenDurationSeconds = Math.max(
-      numericPosition,
-      existing?.listenDurationSeconds || 0
-    );
-
-    const history = await ListeningHistory.findOneAndUpdate(
-      { userId: req.user._id, sessionId },
-      {
-        $setOnInsert: {
-          userId: req.user._id,
-          mediaId: media._id,
-          sessionId,
-          startedAt: startedAt ? new Date(startedAt) : now,
-        },
-        $set: {
-          mediaId: media._id,
-          sourceType,
-          mediaTitle: mediaTitle || media.title || '',
-          mediaArtist: mediaArtist || formatMediaArtist(media),
-          mediaCoverArt: mediaCoverArt || media.coverArt || '',
-          mediaDuration: numericDuration,
-          lastPlayedAt: now,
-          lastPositionSeconds: numericPosition,
-          listenDurationSeconds,
-          completionPercent,
-          status: derivedCompleted ? 'completed' : (listenDurationSeconds > 0 ? 'partial' : 'in_progress'),
-          completedAt: derivedCompleted ? (existing?.completedAt || now) : null,
-        },
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true,
-      }
-    );
-
-    res.json({ success: true, history });
+    res.json({ success: true, history, playCounted });
   } catch (error) {
+    if (error instanceof ListeningHistoryError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error tracking listening history:', error);
     res.status(500).json({ error: 'Error tracking listening history', details: error.message });
   }
@@ -1523,6 +1446,9 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
         lastPositionSeconds: entry.lastPositionSeconds || 0,
         listenDurationSeconds: entry.listenDurationSeconds || 0,
         completionPercent: entry.completionPercent || 0,
+        countedAsPlay: Boolean(entry.countedAsPlay),
+        qualifiedAt: entry.qualifiedAt || null,
+        client: entry.client || 'web',
         status: entry.status,
         media: media ? {
           _id: media._id,

@@ -81,6 +81,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     duration,
     sourceType: (media?.sourceType || (currentPartyId ? 'party' : 'direct')) as any,
     enabled: !!user && !!media,
+    isPlaying,
   });
 
 

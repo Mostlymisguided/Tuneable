@@ -259,6 +259,9 @@ interface ListeningHistoryItem {
   lastPositionSeconds: number;
   listenDurationSeconds: number;
   completionPercent: number;
+  countedAsPlay?: boolean;
+  qualifiedAt?: string | null;
+  client?: string;
   status: 'in_progress' | 'partial' | 'completed';
   media: {
     _id: string;

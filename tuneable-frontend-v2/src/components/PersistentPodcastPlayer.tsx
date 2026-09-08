@@ -68,6 +68,7 @@ const PersistentPodcastPlayer: React.FC = () => {
     duration,
     sourceType: (currentEpisode?.sourceType || 'direct') as any,
     enabled: !!user && !!currentEpisode,
+    isPlaying,
   });
 
   const resolveFullUrl = (url: string): string => {

@@ -14,8 +14,14 @@ import {
   episodeId,
   getEpisodeAudioUrl,
   isEpisodePlayable,
+  seriesTitle,
 } from '@/src/lib/podcast';
 import { showToast } from '@/src/stores/toastStore';
+import {
+  completeListeningHistory,
+  endListeningHistorySession,
+  syncListeningHistory,
+} from '@/src/lib/listeningHistoryTracker';
 
 type PodcastPlayerState = {
   queue: PodcastEpisode[];
@@ -154,7 +160,22 @@ function onStatus(status: AVPlaybackStatus) {
     error: null,
   });
 
+  const item = getStore().queue[getStore().currentIndex];
+  if (item) {
+    syncListeningHistory({
+      mediaId: episodeId(item),
+      title: item.title,
+      artist: seriesTitle(item),
+      coverArt: item.coverArt || (typeof item.podcastSeries === 'object' ? item.podcastSeries?.coverArt : undefined),
+      currentTime: (status.positionMillis ?? 0) / 1000,
+      duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
+      sourceType: 'direct',
+      isPlaying: status.isPlaying,
+    });
+  }
+
   if (status.didJustFinish && !status.isLooping) {
+    completeListeningHistory();
     void getStore().next();
   }
 }
@@ -166,6 +187,7 @@ async function loadAndPlay(item: PodcastEpisode) {
     return;
   }
 
+  await endListeningHistorySession();
   await ensureAudioMode();
   await unloadSound();
 
@@ -338,6 +360,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
   },
 
   clear: async () => {
+    endListeningHistorySession();
     await unloadSound();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;

@@ -305,4 +305,24 @@ export const userAPI = {
     );
     return response.data;
   },
+
+  trackListeningHistory: async (payload: {
+    mediaId: string;
+    sessionId: string;
+    sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+    startedAt?: string;
+    currentTime?: number;
+    duration?: number;
+    completed?: boolean;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string;
+    client?: 'web' | 'mobile' | 'ios';
+  }) => {
+    const response = await api.post('/users/me/listening-history/track', {
+      ...payload,
+      client: payload.client || 'mobile',
+    });
+    return response.data;
+  },
 };

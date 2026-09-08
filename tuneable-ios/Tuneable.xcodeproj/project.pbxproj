@@ -43,6 +43,8 @@
 		B00100000000000000000023 /* MusicMiniBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000023 /* MusicMiniBarView.swift */; };
 		B00100000000000000000024 /* MusicNowPlayingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000024 /* MusicNowPlayingSheet.swift */; };
 		B00100000000000000000025 /* MusicPlayerHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000025 /* MusicPlayerHostView.swift */; };
+		B00100000000000000000026 /* ListeningHistoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000026 /* ListeningHistoryService.swift */; };
+		B00100000000000000000027 /* ListeningHistoryTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00100000000000000000027 /* ListeningHistoryTracker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,6 +86,8 @@
 		F00100000000000000000023 /* MusicMiniBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicMiniBarView.swift; sourceTree = "<group>"; };
 		F00100000000000000000024 /* MusicNowPlayingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicNowPlayingSheet.swift; sourceTree = "<group>"; };
 		F00100000000000000000025 /* MusicPlayerHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlayerHostView.swift; sourceTree = "<group>"; };
+		F00100000000000000000026 /* ListeningHistoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHistoryService.swift; sourceTree = "<group>"; };
+		F00100000000000000000027 /* ListeningHistoryTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListeningHistoryTracker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -158,6 +162,8 @@
 				F00100000000000000000007 /* PartyService.swift */,
 				F00100000000000000000013 /* PodcastService.swift */,
 				F00100000000000000000020 /* SearchService.swift */,
+				F00100000000000000000026 /* ListeningHistoryService.swift */,
+				F00100000000000000000027 /* ListeningHistoryTracker.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -312,6 +318,8 @@
 				B00100000000000000000023 /* MusicMiniBarView.swift in Sources */,
 				B00100000000000000000024 /* MusicNowPlayingSheet.swift in Sources */,
 				B00100000000000000000025 /* MusicPlayerHostView.swift in Sources */,
+				B00100000000000000000026 /* ListeningHistoryService.swift in Sources */,
+				B00100000000000000000027 /* ListeningHistoryTracker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

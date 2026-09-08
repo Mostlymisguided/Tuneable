@@ -5,8 +5,13 @@ import {
   MUSIC_NO_PLAYABLE,
   MUSIC_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
-import { getUploadUrl, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { getUploadUrl, isUploadPlayable, mediaId, formatArtist } from '@/src/lib/media';
 import { showToast } from '@/src/stores/toastStore';
+import {
+  completeListeningHistory,
+  endListeningHistorySession,
+  syncListeningHistory,
+} from '@/src/lib/listeningHistoryTracker';
 
 type MusicPlayerState = {
   queue: ChartMediaItem[];
@@ -122,7 +127,22 @@ function onStatus(status: AVPlaybackStatus) {
     error: null,
   });
 
+  const item = getStore().queue[getStore().currentIndex];
+  if (item) {
+    syncListeningHistory({
+      mediaId: mediaId(item),
+      title: item.title,
+      artist: item.creatorDisplay || formatArtist(item.artist),
+      coverArt: item.coverArt,
+      currentTime: (status.positionMillis ?? 0) / 1000,
+      duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
+      sourceType: 'direct',
+      isPlaying: status.isPlaying,
+    });
+  }
+
   if (status.didJustFinish && !status.isLooping) {
+    completeListeningHistory();
     void getStore().next();
   }
 }
@@ -145,6 +165,7 @@ async function loadAndPlay(item: ChartMediaItem) {
     return;
   }
 
+  endListeningHistorySession();
   await ensureAudioMode();
   await unloadSound();
 
@@ -294,6 +315,7 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   },
 
   clear: async () => {
+    endListeningHistorySession();
     await unloadSound();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;

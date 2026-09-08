@@ -124,6 +124,7 @@ const PersistentWebPlayer: React.FC = () => {
     duration,
     sourceType: (currentMedia?.sourceType || (currentPartyId ? 'party' : 'unknown')) as any,
     enabled: !!user && !!currentMedia && playerType === 'youtube',
+    isPlaying,
   });
 
   const handleGlobalKeydown = useCallback((event: KeyboardEvent) => {

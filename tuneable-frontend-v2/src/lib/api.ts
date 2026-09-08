@@ -1552,9 +1552,36 @@ export const userAPI = {
     mediaTitle?: string;
     mediaArtist?: string;
     mediaCoverArt?: string;
+    client?: 'web' | 'mobile' | 'ios';
   }) => {
     const response = await api.post('/users/me/listening-history/track', payload);
     return response.data;
+  },
+
+  trackListeningHistoryKeepalive: (payload: {
+    mediaId: string;
+    sessionId: string;
+    sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+    startedAt?: string;
+    currentTime?: number;
+    duration?: number;
+    completed?: boolean;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string;
+    client?: 'web' | 'mobile' | 'ios';
+  }) => {
+    const token = authTokenGetter?.() ?? localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/users/me/listening-history/track`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ ...payload, client: payload.client || 'web' }),
+    }).catch(() => {});
   },
 
   getListeningHistory: async (params?: {
