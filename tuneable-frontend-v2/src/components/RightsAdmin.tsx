@@ -14,7 +14,8 @@ import {
   StickyNote,
   X,
 } from 'lucide-react';
-import { rightsAPI, RightsContactCandidate } from '../lib/api';
+import { rightsAPI } from '../lib/api';
+import type { RightsContactCandidate } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 
@@ -481,6 +482,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
           contacts.push({
             type: contact.type,
             value: contact.value,
+            notes: accepted.evidence || '',
             source: accepted.source,
             confidence: accepted.confidence,
           });
