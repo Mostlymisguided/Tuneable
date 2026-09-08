@@ -464,7 +464,7 @@ const mediaSchema = new mongoose.Schema({
   rightsStatus: {
     type: String,
     enum: ['cleared', 'pending', 'disputed'],
-    default: 'cleared',
+    default: 'pending',
     index: true,
   },
   rightsConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

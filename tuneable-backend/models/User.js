@@ -40,6 +40,7 @@ const userSchema = new mongoose.Schema({
   }],
   parentInviteCode: { type: String, required: false },
   parentInviteCodeId: { type: mongoose.Schema.Types.ObjectId }, // Reference to specific invite code object (optional, for tracking)
+  invitedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   balance: { type: Number, default: 0 }, // Wallet balance stored in PENCE (integer), not pounds
   // Example: 1050 represents £10.50, 3300 represents £33.00
   // Unspent promotional welcome credit still in the wallet (pence). Spent promo-first; revocable by admin.
@@ -101,8 +102,13 @@ const userSchema = new mongoose.Schema({
     allocatedAt: { type: Date, default: Date.now },
     claimedAt: { type: Date },
     status: { type: String, enum: ['pending', 'claimed'], default: 'pending' },
+    source: { type: String, enum: ['tip', 'affiliate'], default: 'tip' },
     _id: false
   }],
+  referralCommissionEarned: {
+    type: Number,
+    default: 0,
+  }, // Paid artist-invite affiliate earnings in PENCE (also added to artistEscrowBalance)
   totalEscrowEarned: { 
     type: Number, 
     default: 0 

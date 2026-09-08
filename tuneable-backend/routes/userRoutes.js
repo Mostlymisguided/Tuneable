@@ -234,7 +234,7 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
-const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
+const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 
 const router = express.Router();
@@ -463,6 +463,7 @@ router.post(
         }],
         parentInviteCode: resolvedParentCode || undefined,
         parentInviteCodeId: parentInviteCodeId || undefined, // Track which specific code was used
+        ...inviteAttributionFields(invite),
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',

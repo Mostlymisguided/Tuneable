@@ -1776,7 +1776,9 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
                 globalMediaAggregate: bidAmountPence, // Store in pence (schema grammar)
                 contentType: ['music'],
                 contentForm: ['tune'],
-                mediaType: ['mp3']
+                mediaType: ['mp3'],
+                rightsStatus: 'pending',
+                rightsCleared: false,
             };
 
             // Store original YouTube metadata if this is a YouTube video

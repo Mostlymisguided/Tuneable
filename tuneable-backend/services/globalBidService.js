@@ -176,6 +176,8 @@ async function placeGlobalBid(userId, {
         contentType: ['music'],
         contentForm: ['tune'],
         mediaType: ['mp3'],
+        rightsStatus: 'pending',
+        rightsCleared: false,
       });
       await media.save();
     }

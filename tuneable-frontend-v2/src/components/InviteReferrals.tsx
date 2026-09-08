@@ -140,6 +140,9 @@ const InviteReferrals: React.FC = () => {
             <span>New Code</span>
           </button>
         </div>
+        <p className="text-sm text-gray-300 mb-4">
+          Invite an artist with your code and you earn 10% of their paid tip revenue for their first year — taken from Tuneable&apos;s share, not theirs. It only applies to music they upload themselves.
+        </p>
         
         <p className="text-gray-300 mb-4">
           Create multiple invite codes to track signups from different sources (Reddit, Twitter, etc.)

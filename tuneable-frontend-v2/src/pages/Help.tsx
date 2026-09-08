@@ -174,8 +174,10 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Artist earnings</h3>
             <p className="text-gray-300">
               Verified creators receive 70% of each tip on their media via escrow. Tuneable keeps 30% today
-              and is committed to reducing that to 10% at scale. If the company reaches a £1 billion
-              valuation, we commit to community governance (a DAO for artists and users).{' '}
+              and is committed to reducing that to 10% at scale. Invite an artist with your code and you
+              earn 10% of their paid tips for a year, taken from Tuneable&apos;s share, on music they upload
+              themselves. If the company reaches a £1 billion valuation, we commit to community governance
+              (a DAO for artists and users).{' '}
               <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">
                 How money works
               </Link>

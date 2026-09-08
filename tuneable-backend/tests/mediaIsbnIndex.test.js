@@ -24,6 +24,8 @@ describe('media isbn uniqueness', () => {
       mediaType: ['mp3'],
     });
     expect(media.isbn).toBeUndefined();
+    expect(media.rightsStatus).toBe('pending');
+    expect(media.rightsCleared).toBe(false);
   });
 
   it('exposes repairIsbnUniqueness to drop the old null-indexing unique index', () => {

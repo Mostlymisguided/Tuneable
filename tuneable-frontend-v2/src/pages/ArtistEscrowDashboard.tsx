@@ -29,6 +29,8 @@ interface EscrowInfo {
   balancePounds: number;
   promoBalance?: number;
   promoBalancePounds?: number;
+  affiliateEarned?: number;
+  affiliateEarnedPounds?: number;
   totalEscrowEarned?: number;
   totalEscrowEarnedPounds?: number;
   lastPayoutTotalEarned?: number;
@@ -48,6 +50,7 @@ interface EscrowInfo {
     allocatedAt: string;
     claimedAt?: string;
     status: 'pending' | 'claimed';
+    source?: 'tip' | 'affiliate';
   }>;
   unclaimedAllocations: Array<{
     _id: string;
@@ -428,6 +431,12 @@ const ArtistEscrowDashboard: React.FC = () => {
               <p className="text-sm text-gray-300 mt-2">
                 {escrowInfo.history.length} allocation{escrowInfo.history.length !== 1 ? 's' : ''} in history
               </p>
+              {(escrowInfo.affiliateEarned || 0) > 0 && (
+                <p className="text-sm text-indigo-200 mt-2">
+                  Includes {penceToPounds(escrowInfo.affiliateEarned || 0)} from inviting artists
+                  (10% of their paid tips for year one).
+                </p>
+              )}
               {escrowInfo.totalEscrowEarned !== undefined && (
                 <p className="text-sm text-gray-400 mt-1">
                   Total earned: {penceToPounds(escrowInfo.totalEscrowEarned)}
@@ -957,7 +966,9 @@ const ArtistEscrowDashboard: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <h3 className="font-semibold text-white">
-                            {media?.title || 'Unknown Media'}
+                            {entry.source === 'affiliate'
+                              ? 'Artist invite commission'
+                              : (media?.title || 'Unknown Media')}
                           </h3>
                           <span className="text-lg font-bold text-yellow-400">
                             +{penceToPounds(entry.amount)}

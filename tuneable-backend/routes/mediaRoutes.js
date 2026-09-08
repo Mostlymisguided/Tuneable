@@ -33,6 +33,11 @@ const {
 } = require('../utils/elementNormalizer');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 const {
+  shouldClearRightsOnAttach,
+  pendingRightsFields,
+  clearedRightsFields,
+} = require('../utils/mediaRights');
+const {
   attachGearIdsToProductionStack,
   refreshGearStats,
   buildMediaGearQuery,
@@ -1009,19 +1014,28 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
 
     const isThirdParty = uploaderRole === 'third_party';
+    const clearRights = shouldClearRightsOnAttach({
+      uploaderRole,
+      isAdminUser: isAdmin(user),
+      existingOwner: media.mediaOwners?.find(
+        (o) => o.userId && o.userId.toString() === userId.toString()
+      ) || null,
+    });
     const verificationMethod = isThirdParty ? 'third_party_claim' : 'attach_upload';
     const verificationNotes = isThirdParty
       ? (rightsDisclaimer || 'Third-party upload with rights disclaimer')
-      : 'Audio attached to existing catalog entry';
+      : (clearRights
+        ? 'Audio attached to existing catalog entry'
+        : 'Operator attach — rights pending artist claim');
 
     if (!media.sources || typeof media.sources.set !== 'function') {
       media.sources = new Map(Object.entries(media.sources || {}));
     }
     media.sources.set('upload', fileUrl);
-    media.rightsCleared = true;
-    media.rightsStatus = 'cleared';
-    media.rightsConfirmedBy = userId;
-    media.rightsConfirmedAt = new Date();
+    Object.assign(
+      media,
+      clearRights ? clearedRightsFields(userId) : pendingRightsFields(userId, isAdmin(user) ? 'operator_attach' : null)
+    );
     if (!media.mediaType?.includes('mp3')) {
       media.mediaType = [...(media.mediaType || []), 'mp3'];
     }
@@ -1033,14 +1047,14 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       media.mediaOwners = media.mediaOwners || [];
       media.mediaOwners.push({
         userId,
-        percentage: isThirdParty ? 0 : 100,
-        role: isThirdParty ? 'contributor' : 'creator',
-        verified: !isThirdParty,
-        verifiedAt: isThirdParty ? null : new Date(),
-        verifiedBy: isThirdParty ? null : userId,
-        verificationMethod,
+        percentage: clearRights && !isThirdParty ? 100 : 0,
+        role: clearRights && !isThirdParty ? 'creator' : (isThirdParty ? 'contributor' : 'aux'),
+        verified: Boolean(clearRights && !isThirdParty),
+        verifiedAt: clearRights && !isThirdParty ? new Date() : null,
+        verifiedBy: clearRights && !isThirdParty ? userId : null,
+        verificationMethod: clearRights ? 'Self-upload' : verificationMethod,
         verificationNotes,
-        verificationSource: 'attach_upload',
+        verificationSource: clearRights ? 'upload' : 'operator_attach',
         addedBy: userId,
         addedAt: new Date(),
         lastUpdatedAt: new Date(),
@@ -1094,7 +1108,9 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     console.log(`✅ Attached upload to media "${media.title}" (${media.uuid}) by ${user.username}`);
 
     res.json({
-      message: 'Audio attached successfully — media is now playable',
+      message: clearRights
+        ? 'Audio attached successfully — media is now playable'
+        : 'Audio attached — listing stays catalog-only until a rights holder claims it',
       media: {
         _id: media._id,
         uuid: media.uuid,
@@ -3108,7 +3124,9 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           globalMediaAggregate: 0,
           contentType: ['music'],
           contentForm: ['tune'],
-          mediaType: ['mp3']
+          mediaType: ['mp3'],
+          rightsStatus: 'pending',
+          rightsCleared: false,
         });
 
         await media.save();
