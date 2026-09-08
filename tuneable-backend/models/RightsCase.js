@@ -6,6 +6,8 @@ const {
   CASE_SOURCES,
   OUTREACH_TEMPLATES,
   OPEN_STATUSES,
+  CONTACT_SOURCES,
+  CONTACT_CONFIDENCES,
   normalizePartyKey,
 } = require('../utils/rightsCaseHelpers');
 
@@ -17,6 +19,16 @@ const contactSchema = new mongoose.Schema({
   },
   value: { type: String, required: true, trim: true },
   notes: { type: String, trim: true },
+  source: {
+    type: String,
+    enum: CONTACT_SOURCES,
+    default: 'manual',
+  },
+  confidence: {
+    type: String,
+    enum: CONTACT_CONFIDENCES,
+    default: 'manual',
+  },
 }, { _id: false });
 
 const partySchema = new mongoose.Schema({

@@ -2857,7 +2857,15 @@ export const rightsAPI = {
       displayName: string;
       role?: string;
       userId?: string | null;
-      contacts?: Array<{ type: string; value: string; notes?: string }>;
+      labelId?: string | null;
+      collectiveId?: string | null;
+      contacts?: Array<{
+        type: string;
+        value: string;
+        notes?: string;
+        source?: string;
+        confidence?: string;
+      }>;
     };
     source?: string;
     notes?: string;
@@ -2877,6 +2885,26 @@ export const rightsAPI = {
     const response = await api.post(`/rights/admin/cases/${id}/preview`, body);
     return response.data as { template: string; subject: string; text: string };
   },
+  searchContacts: async (params: { name?: string; role?: string; mediaId?: string }) => {
+    const response = await api.get('/rights/admin/contacts', { params });
+    return response.data as { candidates: RightsContactCandidate[] };
+  },
 };
+
+export interface RightsContactCandidate {
+  id: string;
+  displayName: string;
+  role?: string | null;
+  email?: string | null;
+  contacts?: Array<{ type: string; value: string }>;
+  userId?: string | null;
+  labelId?: string | null;
+  collectiveId?: string | null;
+  source: string;
+  confidence: 'verified' | 'reused' | 'likely' | 'weak' | 'manual' | string;
+  evidence?: string;
+  usedOnCases?: number;
+  allowSend?: boolean;
+}
 
 export default api;

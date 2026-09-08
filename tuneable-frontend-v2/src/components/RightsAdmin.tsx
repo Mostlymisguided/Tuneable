@@ -10,9 +10,11 @@ import {
   RefreshCw,
   Scale,
   Send,
+  Search,
   StickyNote,
+  X,
 } from 'lucide-react';
-import { rightsAPI } from '../lib/api';
+import { rightsAPI, RightsContactCandidate } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 
@@ -56,6 +58,52 @@ const STATUS_COLORS: Record<string, string> = {
   takedown: 'bg-red-600',
 };
 
+const FALLBACK_ROLES = [
+  'artist',
+  'songwriter',
+  'composer',
+  'producer',
+  'host',
+  'guest',
+  'narrator',
+  'director',
+  'cinematographer',
+  'editor',
+  'author',
+  'publisher',
+  'label',
+  'collective',
+  'reporter',
+  'other',
+];
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  verified: 'bg-green-600',
+  reused: 'bg-blue-600',
+  likely: 'bg-amber-600',
+  weak: 'bg-gray-500',
+  manual: 'bg-gray-600',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  user: 'Tuneable user',
+  label: 'Label',
+  collective: 'Collective',
+  prior_case: 'Prior case',
+  media_owner: 'Listing owner',
+  media_credit: 'Linked credit',
+  media_label: 'Listing label',
+  manual: 'Manual',
+};
+
+function mediaIdFromSelection(limbo: any, rightsCase: any): string | undefined {
+  if (limbo?._id) return String(limbo._id);
+  const media = rightsCase?.mediaId;
+  if (!media) return undefined;
+  if (typeof media === 'object') return String(media._id || '');
+  return String(media);
+}
+
 const TEMPLATE_LABELS: Record<string, string> = {
   claim_keep_invite: 'Claim-keep invite',
   takedown_option: 'Takedown option',
@@ -94,6 +142,78 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function ContactCandidateList({
+  candidates,
+  loading,
+  acceptedId,
+  onAccept,
+  onDismiss,
+}: {
+  candidates: RightsContactCandidate[];
+  loading: boolean;
+  acceptedId?: string | null;
+  onAccept: (candidate: RightsContactCandidate) => void;
+  onDismiss: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-medium text-gray-200 flex items-center gap-2">
+        <Search className="h-4 w-4" />
+        Contact matches
+      </h4>
+      {loading && <p className="text-xs text-gray-500">Searching Tuneable users, labels, and prior cases…</p>}
+      {!loading && candidates.length === 0 && (
+        <p className="text-xs text-gray-500">No internal matches. Paste an email below if you found one elsewhere.</p>
+      )}
+      {candidates.map((candidate) => (
+        <div
+          key={candidate.id}
+          className={`rounded-lg p-2.5 text-xs ${acceptedId === candidate.id ? 'bg-purple-900/40 border border-purple-500' : 'bg-gray-700/70'}`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-white font-medium">{candidate.displayName}</p>
+              <p className="text-gray-400 mt-0.5">
+                {SOURCE_LABELS[candidate.source] || candidate.source}
+                {candidate.role ? ` · ${candidate.role}` : ''}
+                {candidate.usedOnCases ? ` · used on ${candidate.usedOnCases} case${candidate.usedOnCases === 1 ? '' : 's'}` : ''}
+              </p>
+            </div>
+            <span className={`inline-flex px-2 py-0.5 rounded text-white ${CONFIDENCE_COLORS[candidate.confidence] || 'bg-gray-600'}`}>
+              {candidate.confidence}
+            </span>
+          </div>
+          {candidate.email
+            ? <p className="text-gray-200 mt-1">{candidate.email}</p>
+            : <p className="text-gray-500 mt-1">No email on file</p>}
+          {candidate.evidence && <p className="text-gray-500 mt-1">{candidate.evidence}</p>}
+          {(candidate.contacts || []).filter((c) => c.type !== 'email').length > 0 && (
+            <p className="text-gray-500 mt-1">
+              {(candidate.contacts || []).filter((c) => c.type !== 'email').map((c) => `${c.type}: ${c.value}`).join(' · ')}
+            </p>
+          )}
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => onAccept(candidate)}
+              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded"
+            >
+              {acceptedId === candidate.id ? 'Selected' : 'Accept'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDismiss(candidate.id)}
+              className="px-2 py-1 bg-gray-600 hover:bg-gray-600/80 text-gray-200 rounded inline-flex items-center gap-1"
+            >
+              <X className="h-3 w-3" /> Not this
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => {
   const [queue, setQueue] = useState<QueueId>('limbo');
   const [counts, setCounts] = useState({ limbo: 0, followUps: 0, open: 0, inbound: 0, stalled: 0 });
@@ -112,13 +232,18 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   const [partyName, setPartyName] = useState('');
   const [partyRole, setPartyRole] = useState('artist');
   const [partyEmail, setPartyEmail] = useState('');
-  const [sendOnCreate, setSendOnCreate] = useState(true);
+  const [sendOnCreate, setSendOnCreate] = useState(false);
   const [template, setTemplate] = useState('claim_keep_invite');
   const [customMessage, setCustomMessage] = useState('');
   const [outreachTo, setOutreachTo] = useState('');
   const [manualNote, setManualNote] = useState('');
   const [caseStatus, setCaseStatus] = useState('');
   const [followUp, setFollowUp] = useState('');
+  const [roles, setRoles] = useState<string[]>(FALLBACK_ROLES);
+  const [candidates, setCandidates] = useState<RightsContactCandidate[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [accepted, setAccepted] = useState<RightsContactCandidate | null>(null);
 
   const limit = 25;
   const attention = counts.followUps + counts.inbound;
@@ -167,7 +292,10 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
   useEffect(() => {
     rightsAPI.getMeta()
-      .then((meta) => setReplyTo(meta.replyTo))
+      .then((meta) => {
+        setReplyTo(meta.replyTo);
+        if (meta.roles?.length) setRoles(meta.roles);
+      })
       .catch(() => undefined);
     refreshCounts();
   }, [refreshCounts]);
@@ -180,7 +308,53 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setPage(1);
     setSelectedCase(null);
     setSelectedLimbo(null);
+    setCandidates([]);
+    setAccepted(null);
+    setDismissedIds([]);
   }, [queue]);
+
+  const contactQueryName = selectedLimbo
+    ? partyName
+    : (selectedCase?.party?.displayName || '');
+  const contactQueryRole = selectedLimbo
+    ? partyRole
+    : (selectedCase?.party?.role || '');
+  const contactMediaId = mediaIdFromSelection(selectedLimbo, selectedCase);
+
+  useEffect(() => {
+    if (!selectedLimbo && !selectedCase) {
+      setCandidates([]);
+      return undefined;
+    }
+    if (!contactQueryName.trim() && !contactMediaId) {
+      setCandidates([]);
+      return undefined;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setContactsLoading(true);
+        const data = await rightsAPI.searchContacts({
+          name: contactQueryName.trim() || undefined,
+          role: contactQueryRole || undefined,
+          mediaId: contactMediaId || undefined,
+        });
+        setCandidates(data.candidates || []);
+      } catch (error) {
+        console.error('Failed to search contacts', error);
+        setCandidates([]);
+      } finally {
+        setContactsLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [selectedLimbo, selectedCase, contactQueryName, contactQueryRole, contactMediaId]);
+
+  const visibleCandidates = useMemo(
+    () => candidates.filter((c) => !dismissedIds.includes(c.id)),
+    [candidates, dismissedIds]
+  );
 
   const selectLimbo = (media: any) => {
     setSelectedCase(null);
@@ -191,7 +365,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setPartyEmail('');
     setTemplate('claim_keep_invite');
     setCustomMessage('');
-    setSendOnCreate(true);
+    setSendOnCreate(false);
+    setAccepted(null);
+    setDismissedIds([]);
   };
 
   const selectCase = (rightsCase: any) => {
@@ -204,6 +380,8 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setTemplate(rightsCase.source === 'report' ? 'copyright_reporter' : 'claim_keep_invite');
     setCustomMessage('');
     setManualNote('');
+    setAccepted(null);
+    setDismissedIds([]);
   };
 
   const reloadSelectedCase = async (id: string) => {
@@ -213,6 +391,62 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setFollowUp(toDatetimeLocal(data.case.nextFollowUpAt));
     await refreshCounts();
     await loadList();
+  };
+
+  const handleAcceptCandidate = async (candidate: RightsContactCandidate) => {
+    setAccepted(candidate);
+    if (candidate.displayName) setPartyName(candidate.displayName);
+    if (candidate.role) setPartyRole(candidate.role);
+    setSendOnCreate(false);
+
+    if (selectedLimbo) {
+      setPartyEmail(candidate.email || '');
+      return;
+    }
+
+    if (!selectedCase) return;
+    const existing = (selectedCase.party?.contacts || []) as Array<{ type: string; value: string }>;
+    const contacts = existing.map((c) => ({ ...c }));
+    for (const contact of candidate.contacts || []) {
+      if (!contact.value) continue;
+      const already = contacts.some(
+        (c) => c.type === contact.type && c.value.toLowerCase() === contact.value.toLowerCase()
+      );
+      if (!already) {
+        contacts.push({
+          type: contact.type,
+          value: contact.value,
+          notes: candidate.evidence || '',
+          source: candidate.source,
+          confidence: candidate.confidence,
+        } as any);
+      }
+    }
+    try {
+      setBusy(true);
+      await rightsAPI.updateCase(selectedCase._id, {
+        party: {
+          userId: candidate.userId || undefined,
+          labelId: candidate.labelId || undefined,
+          collectiveId: candidate.collectiveId || undefined,
+          contacts,
+        },
+      });
+      if (candidate.email) setOutreachTo(candidate.email);
+      toast.success(candidate.email ? 'Contact attached' : 'Match linked (no email on file)');
+      await reloadSelectedCase(selectedCase._id);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to attach contact');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDismissCandidate = (id: string) => {
+    setDismissedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    if (accepted?.id === id) {
+      setAccepted(null);
+    }
   };
 
   const handleCreateFromLimbo = async () => {
@@ -230,13 +464,37 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
       const match = (selectedLimbo.suggestedParties || []).find(
         (p: any) => p.displayName === partyName.trim() && p.role === partyRole
       );
+      const emailChanged = accepted?.email && partyEmail.trim().toLowerCase() !== accepted.email.toLowerCase();
+      const contacts = partyEmail.trim()
+        ? [{
+          type: 'email',
+          value: partyEmail.trim(),
+          notes: accepted?.evidence || '',
+          source: accepted && !emailChanged ? accepted.source : 'manual',
+          confidence: accepted && !emailChanged ? accepted.confidence : 'manual',
+        }]
+        : [];
+      if (accepted?.contacts) {
+        for (const contact of accepted.contacts) {
+          if (contact.type === 'email') continue;
+          if (!contact.value) continue;
+          contacts.push({
+            type: contact.type,
+            value: contact.value,
+            source: accepted.source,
+            confidence: accepted.confidence,
+          });
+        }
+      }
       const created = await rightsAPI.createCase({
         mediaId: selectedLimbo._id,
         party: {
           displayName: partyName.trim(),
           role: partyRole,
-          userId: match?.userId || undefined,
-          contacts: partyEmail.trim() ? [{ type: 'email', value: partyEmail.trim() }] : [],
+          userId: accepted?.userId || match?.userId || undefined,
+          labelId: accepted?.labelId || match?.labelId || undefined,
+          collectiveId: accepted?.collectiveId || match?.collectiveId || undefined,
+          contacts,
         },
         source: 'import',
       });
@@ -512,7 +770,13 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   {selectedLimbo.suggestedParties.map((party: any) => (
                     <button
                       key={`${party.role}-${party.displayName}`}
-                      onClick={() => { setPartyName(party.displayName); setPartyRole(party.role); }}
+                      onClick={() => {
+                        setPartyName(party.displayName);
+                        setPartyRole(party.role);
+                        setAccepted(null);
+                        setPartyEmail('');
+                        setSendOnCreate(false);
+                      }}
                       className={`px-2 py-1 rounded text-xs ${
                         partyName === party.displayName && partyRole === party.role
                           ? 'bg-purple-600 text-white'
@@ -532,11 +796,20 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
               <label className="block text-sm text-gray-300">
                 Role
                 <select value={partyRole} onChange={(e) => setPartyRole(e.target.value)} className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white">
-                  {['artist', 'songwriter', 'composer', 'producer', 'publisher', 'label', 'collective', 'other'].map((role) => (
+                  {roles.map((role) => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>
               </label>
+
+              <ContactCandidateList
+                candidates={visibleCandidates}
+                loading={contactsLoading}
+                acceptedId={accepted?.id}
+                onAccept={handleAcceptCandidate}
+                onDismiss={handleDismissCandidate}
+              />
+
               <label className="block text-sm text-gray-300">
                 Email
                 <input type="email" value={partyEmail} onChange={(e) => setPartyEmail(e.target.value)} placeholder="rights holder" className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
@@ -560,6 +833,11 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                 <input type="checkbox" checked={sendOnCreate} onChange={(e) => setSendOnCreate(e.target.checked)} />
                 Send email now (reply-to {replyTo})
               </label>
+              {accepted && !accepted.allowSend && (
+                <p className="text-xs text-amber-400">
+                  This match is not auto-send. Confirm the address before sending.
+                </p>
+              )}
               <button
                 onClick={handleCreateFromLimbo}
                 disabled={busy}
@@ -613,6 +891,14 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
               <p className="text-xs text-gray-500">
                 Case status does not change playability. Approve a claim or edit media rights for that.
               </p>
+
+              <ContactCandidateList
+                candidates={visibleCandidates}
+                loading={contactsLoading}
+                acceptedId={accepted?.id}
+                onAccept={handleAcceptCandidate}
+                onDismiss={handleDismissCandidate}
+              />
 
               <div>
                 <h4 className="text-sm font-medium text-gray-200 mb-2 flex items-center gap-2">

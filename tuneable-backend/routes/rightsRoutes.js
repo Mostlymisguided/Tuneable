@@ -46,6 +46,27 @@ router.get('/admin/limbo', adminMiddleware, async (req, res) => {
   }
 });
 
+router.get('/admin/contacts', adminMiddleware, async (req, res) => {
+  try {
+    const name = String(req.query.name || req.query.displayName || '').trim();
+    const mediaId = req.query.mediaId ? String(req.query.mediaId) : null;
+    if (name.length < 2 && !mediaId) {
+      return res.status(400).json({ error: 'name or mediaId is required' });
+    }
+    if (mediaId && !isValidObjectId(mediaId)) {
+      return res.status(400).json({ error: 'Invalid media id' });
+    }
+    const candidates = await rightsCaseService.findContactCandidates({
+      displayName: name,
+      role: req.query.role,
+      mediaId,
+    });
+    res.json({ candidates });
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
 router.get('/admin/cases', adminMiddleware, async (req, res) => {
   try {
     const result = await rightsCaseService.listCases(req.query);

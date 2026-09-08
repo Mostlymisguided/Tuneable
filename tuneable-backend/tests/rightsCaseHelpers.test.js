@@ -14,6 +14,8 @@ const {
   buildOutreachContent,
   OPEN_STATUSES,
   TERMINAL_STATUSES,
+  PARTY_ROLES,
+  rankAndDedupeContactCandidates,
 } = require('../utils/rightsCaseHelpers');
 
 describe('normalizePartyKey', () => {
@@ -38,8 +40,24 @@ describe('suggestedPartiesFromMedia', () => {
 
   it('falls back to creatorDisplay', () => {
     expect(suggestedPartiesFromMedia({ creatorDisplay: 'A & B' })).toEqual([
-      { displayName: 'A & B', role: 'artist', userId: null, collectiveId: null },
+      { displayName: 'A & B', role: 'artist', userId: null, collectiveId: null, labelId: null },
     ]);
+  });
+
+  it('includes media credit roles and labels', () => {
+    const parties = suggestedPartiesFromMedia({
+      host: [{ name: 'Jane Host' }],
+      author: [{ name: 'Ada' }],
+      director: [{ name: 'Jane Host' }],
+      label: [{ name: 'Warp', labelId: 'lab1' }],
+    });
+    expect(parties.map((p) => `${p.role}:${p.displayName}`)).toEqual([
+      'host:Jane Host',
+      'director:Jane Host',
+      'author:Ada',
+      'label:Warp',
+    ]);
+    expect(parties.find((p) => p.role === 'label')?.labelId).toBe('lab1');
   });
 });
 
@@ -110,3 +128,46 @@ describe('buildOutreachContent', () => {
     expect(content.text).toContain('Tried IG last week.');
   });
 });
+
+describe('PARTY_ROLES', () => {
+  it('includes media credit roles without duplicates', () => {
+    const expected = [
+      'songwriter', 'composer', 'host', 'guest', 'narrator',
+      'director', 'cinematographer', 'editor', 'author',
+    ];
+    expect(new Set(PARTY_ROLES).size).toBe(PARTY_ROLES.length);
+    expected.forEach((role) => expect(PARTY_ROLES).toContain(role));
+  });
+});
+
+describe('rankAndDedupeContactCandidates', () => {
+  it('prefers verified over reused and merges same user', () => {
+    const ranked = rankAndDedupeContactCandidates([
+      {
+        id: 'prior_case:1',
+        displayName: 'Jane',
+        email: 'jane@example.com',
+        userId: 'u1',
+        source: 'prior_case',
+        confidence: 'reused',
+        usedOnCases: 2,
+        contacts: [{ type: 'email', value: 'jane@example.com' }],
+      },
+      {
+        id: 'user:u1',
+        displayName: 'Jane Doe',
+        email: 'jane@example.com',
+        userId: 'u1',
+        source: 'user',
+        confidence: 'verified',
+        usedOnCases: 0,
+        contacts: [{ type: 'website', value: 'https://jane.example' }],
+      },
+    ]);
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].confidence).toBe('verified');
+    expect(ranked[0].usedOnCases).toBe(2);
+    expect(ranked[0].contacts.map((c) => c.type).sort()).toEqual(['email', 'website']);
+  });
+});
+

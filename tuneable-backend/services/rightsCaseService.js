@@ -9,6 +9,8 @@ const {
   FOLLOW_UP_STATUSES,
   PARTY_ROLES,
   CASE_SOURCES,
+  CONTACT_SOURCES,
+  CONTACT_CONFIDENCES,
   OUTREACH_TEMPLATES,
   normalizePartyKey,
   suggestedPartiesFromMedia,
@@ -19,8 +21,21 @@ const {
   defaultFollowUpAt,
   buildOutreachContent,
 } = require('../utils/rightsCaseHelpers');
+const { findContactCandidates } = require('./rightsContactLookupService');
 
-const MEDIA_SELECT = 'title artist featuring songwriter composer producer creatorDisplay coverArt uuid rightsStatus rightsCleared importSource importedBy globalMediaAggregate isrc status';
+const MEDIA_SELECT = 'title artist featuring songwriter composer producer host guest narrator director cinematographer editor author label creatorDisplay coverArt uuid rightsStatus rightsCleared importSource importedBy globalMediaAggregate isrc status';
+
+function normalizeContact(contact) {
+  const source = CONTACT_SOURCES.includes(contact.source) ? contact.source : 'manual';
+  const confidence = CONTACT_CONFIDENCES.includes(contact.confidence) ? contact.confidence : 'manual';
+  return {
+    type: contact.type || 'email',
+    value: String(contact.value).trim(),
+    notes: contact.notes || '',
+    source,
+    confidence,
+  };
+}
 
 const CASE_POPULATE = [
   { path: 'mediaId', select: MEDIA_SELECT },
@@ -29,6 +44,8 @@ const CASE_POPULATE = [
   { path: 'linkedClaimId', select: 'intent status submittedAt userId' },
   { path: 'linkedReportId', select: 'category status contactEmail createdAt' },
   { path: 'party.userId', select: 'username email' },
+  { path: 'party.labelId', select: 'name email' },
+  { path: 'party.collectiveId', select: 'name email' },
   { path: 'outreach.sentBy', select: 'username' },
 ];
 
@@ -112,19 +129,41 @@ async function createCase({
     throw error;
   }
 
+  const contacts = Array.isArray(party.contacts)
+    ? party.contacts.filter((c) => c?.value).map(normalizeContact)
+    : [];
+
   const existing = await findOpenCase(media._id, displayName);
   if (existing) {
+    let changed = false;
+    if (party.userId && !existing.party.userId) {
+      existing.party.userId = party.userId;
+      changed = true;
+    }
+    if (party.labelId && !existing.party.labelId) {
+      existing.party.labelId = party.labelId;
+      changed = true;
+    }
+    if (party.collectiveId && !existing.party.collectiveId) {
+      existing.party.collectiveId = party.collectiveId;
+      changed = true;
+    }
+    for (const contact of contacts) {
+      const already = (existing.party.contacts || []).some(
+        (c) => c.type === contact.type && String(c.value).toLowerCase() === contact.value.toLowerCase()
+      );
+      if (!already) {
+        existing.party.contacts.push(contact);
+        changed = true;
+      }
+    }
+    if (changed && primaryEmailFromParty(existing.party)) {
+      existing.status = statusAfterContactAdded(existing.status);
+    }
+    if (changed) await existing.save();
     await existing.populate(CASE_POPULATE);
     return { rightsCase: existing, created: false };
   }
-
-  const contacts = Array.isArray(party.contacts)
-    ? party.contacts.filter((c) => c?.value).map((c) => ({
-      type: c.type || 'email',
-      value: String(c.value).trim(),
-      notes: c.notes || '',
-    }))
-    : [];
 
   const hasEmail = contacts.some((c) => c.type === 'email');
   const initialStatus = status && CASE_STATUSES.includes(status)
@@ -293,6 +332,14 @@ async function listLimbo(query = {}) {
               songwriter: 1,
               composer: 1,
               producer: 1,
+              host: 1,
+              guest: 1,
+              narrator: 1,
+              director: 1,
+              cinematographer: 1,
+              editor: 1,
+              author: 1,
+              label: 1,
               creatorDisplay: 1,
               coverArt: 1,
               uuid: 1,
@@ -401,11 +448,7 @@ async function updateCase(id, patch, actorId) {
     if (Array.isArray(patch.party.contacts)) {
       rightsCase.party.contacts = patch.party.contacts
         .filter((c) => c?.value)
-        .map((c) => ({
-          type: c.type || 'email',
-          value: String(c.value).trim(),
-          notes: c.notes || '',
-        }));
+        .map(normalizeContact);
       if (primaryEmailFromParty(rightsCase.party)) {
         rightsCase.status = statusAfterContactAdded(rightsCase.status);
       }
@@ -626,4 +669,5 @@ module.exports = {
   syncFromClaimReview,
   openFromCopyrightReport,
   previewOutreach,
+  findContactCandidates,
 };
