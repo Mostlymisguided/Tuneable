@@ -2858,7 +2858,7 @@ export const rightsAPI = {
       };
     };
   },
-  getLimbo: async (params?: { page?: number; limit?: number; uncontacted?: boolean }) => {
+  getLimbo: async (params?: { page?: number; limit?: number; uncontacted?: boolean; search?: string }) => {
     const response = await api.get('/rights/admin/limbo', { params });
     return response.data as { media: any[]; total: number; page: number; limit: number };
   },

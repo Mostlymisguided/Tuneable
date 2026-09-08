@@ -263,7 +263,12 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     try {
       setLoading(true);
       if (queue === 'limbo') {
-        const data = await rightsAPI.getLimbo({ page, limit, uncontacted: true });
+        const data = await rightsAPI.getLimbo({
+          page,
+          limit,
+          uncontacted: true,
+          search: debouncedSearch.trim() || undefined,
+        });
         setLimbo(data.media || []);
         setCases([]);
         setTotal(data.total || 0);
@@ -644,14 +649,25 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         ))}
       </div>
 
-      {queue !== 'limbo' && (
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search party name or notes"
-          className="w-full max-w-md px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+          placeholder={queue === 'limbo' ? 'Search title, artist, or ISRC' : 'Search counterpart, email, title, or notes'}
+          className="w-full pl-9 pr-9 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
         />
-      )}
+        {search && (
+          <button
+            type="button"
+            onClick={() => { setSearch(''); setPage(1); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 bg-gray-800 rounded-lg overflow-hidden">
@@ -661,7 +677,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             </div>
           ) : queue === 'limbo' ? (
             limbo.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">No uncontacted pending media</div>
+              <div className="p-8 text-center text-gray-400">
+                {search.trim() ? 'No matching pending media' : 'No uncontacted pending media'}
+              </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-700">
                 <thead className="bg-gray-700">
@@ -696,7 +714,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             )
           ) : (
             cases.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">No cases in this queue</div>
+              <div className="p-8 text-center text-gray-400">
+                {search.trim() ? 'No matching cases' : 'No cases in this queue'}
+              </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-700">
                 <thead className="bg-gray-700">

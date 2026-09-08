@@ -20,6 +20,7 @@ const {
   statusAfterInboundReply,
   defaultFollowUpAt,
   buildOutreachContent,
+  escapeRegex,
 } = require('../utils/rightsCaseHelpers');
 const { findContactCandidates } = require('./rightsContactLookupService');
 
@@ -53,6 +54,39 @@ function parsePage(query) {
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 25));
   return { page, limit, skip: (page - 1) * limit };
+}
+
+function searchRegex(query) {
+  const search = String(query || '').trim();
+  if (!search) return null;
+  return new RegExp(escapeRegex(search), 'i');
+}
+
+function mediaSearchClause(rx) {
+  return {
+    $or: [
+      { title: rx },
+      { creatorDisplay: rx },
+      { creatorNames: rx },
+      { isrc: rx },
+      { 'artist.name': rx },
+      { 'featuring.name': rx },
+      { 'songwriter.name': rx },
+      { 'composer.name': rx },
+      { 'producer.name': rx },
+      { 'host.name': rx },
+      { 'guest.name': rx },
+      { 'narrator.name': rx },
+      { 'director.name': rx },
+      { 'author.name': rx },
+      { 'label.name': rx },
+    ],
+  };
+}
+
+async function mediaIdsMatchingSearch(rx, cap = 200) {
+  const rows = await Media.find(mediaSearchClause(rx)).select('_id').limit(cap).lean();
+  return rows.map((row) => row._id);
 }
 
 async function findOpenCase(mediaId, displayName) {
@@ -231,14 +265,15 @@ async function listCases(query = {}) {
   }
   if (query.assignedTo) filter.assignedTo = query.assignedTo;
   if (query.mediaId) filter.mediaId = query.mediaId;
-  if (query.search) {
-    const search = String(query.search).trim();
-    if (search) {
-      filter.$or = [
-        { 'party.displayName': { $regex: search, $options: 'i' } },
-        { notes: { $regex: search, $options: 'i' } },
-      ];
-    }
+  const rx = searchRegex(query.search);
+  if (rx) {
+    const mediaIds = await mediaIdsMatchingSearch(rx);
+    filter.$or = [
+      { 'party.displayName': rx },
+      { 'party.contacts.value': rx },
+      { notes: rx },
+      ...(mediaIds.length ? [{ mediaId: { $in: mediaIds } }] : []),
+    ];
   }
 
   const sort = queue === 'follow_ups'
@@ -267,6 +302,8 @@ async function listLimbo(query = {}) {
     rightsCleared: { $ne: true },
     status: { $nin: ['deleted', 'vetoed'] },
   };
+  const rx = searchRegex(query.search);
+  if (rx) Object.assign(match, mediaSearchClause(rx));
 
   const pipeline = [{ $match: match }];
 
