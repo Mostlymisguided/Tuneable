@@ -10,6 +10,7 @@ import { Music, Users, MapPin, Coins, Heart } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
 import { isLocationMatch } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import EntertainingLoader from '../components/EntertainingLoader';
 
 // Define types directly to avoid import issues
 interface PartyType {
@@ -629,11 +630,12 @@ const Parties: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
+      <EntertainingLoader
+        flavor="party"
+        size="page"
+        headline="Loading parties…"
+        detail="Finding rooms you can join."
+      />
     );
   }
 

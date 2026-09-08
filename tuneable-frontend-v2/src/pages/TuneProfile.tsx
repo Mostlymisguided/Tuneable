@@ -60,6 +60,7 @@ import TagClaimModal from '../components/TagClaimModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import MiniSupportersBar from '../components/MiniSupportersBar';
+import EntertainingLoader from '../components/EntertainingLoader';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
@@ -2102,9 +2103,11 @@ const TuneProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading Tune Profile...</div>
-      </div>
+      <EntertainingLoader
+        flavor="music"
+        size="page"
+        headline="Loading this tune…"
+      />
     );
   }
 

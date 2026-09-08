@@ -5,6 +5,7 @@ import { Loader2, Search, BookPlus } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_COVER_ART } from '../constants';
+import EntertainingLoader from '../components/EntertainingLoader';
 
 type DiscoveryBook = {
   source?: string;
@@ -140,6 +141,15 @@ const BookSearch: React.FC = () => {
           </button>
         </form>
 
+        {loading ? (
+          <EntertainingLoader
+            flavor="books"
+            size="section"
+            headline="Searching libraries…"
+            detail="Checking Tuneable, Open Library, and Google Books."
+          />
+        ) : (
+          <>
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">On Tuneable</h2>
           {catalog.length === 0 ? (
@@ -179,6 +189,8 @@ const BookSearch: React.FC = () => {
             renderDiscovery(googleBooks, 'No Google Books results.')
           )}
         </section>
+          </>
+        )}
       </div>
     </div>
   );

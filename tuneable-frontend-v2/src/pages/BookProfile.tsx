@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { BookOpen, Coins, ExternalLink, Loader2 } from 'lucide-react';
+import { BookOpen, Coins, ExternalLink } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import EntertainingLoader from '../components/EntertainingLoader';
 import MediaChampions from '../components/MediaChampions';
 import { getReadElsewhereTarget } from '../utils/listenElsewhere';
 import { getTipCurrentLocation } from '../utils/currentLocationCache';
@@ -69,9 +70,11 @@ const BookProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white pt-24 flex justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
-      </div>
+      <EntertainingLoader
+        flavor="books"
+        size="page"
+        headline="Loading this book…"
+      />
     );
   }
 

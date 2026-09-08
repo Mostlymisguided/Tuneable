@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { MapPin, Tag, Loader2, Music, Coins } from 'lucide-react';
+import { MapPin, Tag, Music, Coins } from 'lucide-react';
 import { locationAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -8,6 +8,7 @@ import { getMediaCoverArt } from '../utils/coverArt';
 import { penceToPounds } from '../utils/currency';
 import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import EntertainingLoader from '../components/EntertainingLoader';
 
 interface PlaceEntity {
   placeId: string;
@@ -242,10 +243,11 @@ const LocationProfile: React.FC = () => {
                 <div className="mb-3 md:mb-4">{heading}</div>
                 <div className="card bg-black/20 rounded-lg p-4 md:p-6">
                   {loading ? (
-                    <div className="flex items-center justify-center py-16 text-gray-300">
-                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                      Loading tracks…
-                    </div>
+                    <EntertainingLoader
+                      flavor="music"
+                      size="section"
+                      headline="Loading tracks…"
+                    />
                   ) : error ? (
                     <div className="text-center py-12 text-red-300">{error}</div>
                   ) : (

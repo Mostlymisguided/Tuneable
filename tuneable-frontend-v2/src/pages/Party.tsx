@@ -12,6 +12,7 @@ import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import EntertainingLoader from '../components/EntertainingLoader';
 import TipCtaLabel from '../components/TipCtaLabel';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
@@ -2353,11 +2354,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
+      <EntertainingLoader
+        flavor="party"
+        size="page"
+        headline="Loading this party…"
+        detail="Pulling the queue, tips, and who’s in the room."
+      />
     );
   }
 
@@ -3321,12 +3323,23 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                 </div>
 
                 {/* Media Queue - Show when NOT viewing vetoed */}
+                {!showVetoed && isLoadingSortedMedia && selectedTimePeriod !== 'all-time' && getDisplayMedia().length === 0 && (
+                  <EntertainingLoader
+                    flavor="party"
+                    size="section"
+                    headline="Sorting the queue…"
+                    detail="Ranking by tips for this time period."
+                  />
+                )}
                 {!showVetoed && getDisplayMedia().length > 0 && (
                   <div className="space-y-3">
                     {isLoadingSortedMedia && selectedTimePeriod !== 'all-time' ? (
-                      <div className="text-center py-8">
-                        <div className="text-gray-400">Loading sorted media...</div>
-                      </div>
+                      <EntertainingLoader
+                        flavor="party"
+                        size="section"
+                        headline="Sorting the queue…"
+                        detail="Ranking by tips for this time period."
+                      />
                     ) : (
                       getDisplayMedia().slice(0, visibleMediaCount).map((item: any, index: number) => {
                         const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { Tag, Loader2, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
+import { Tag, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
 import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -32,6 +32,7 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
+import EntertainingLoader from '../components/EntertainingLoader';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import {
   getEpisodeAudioUrl,
@@ -751,10 +752,11 @@ const TagProfile: React.FC = () => {
                 <div className="mb-3 md:mb-4">{heading}</div>
                 <div className="card bg-black/20 rounded-lg p-4 md:p-6">
                   {loading ? (
-                    <div className="flex items-center justify-center py-16 text-gray-300">
-                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                      {isPodcast ? 'Loading podcasts…' : 'Loading tracks…'}
-                    </div>
+                    <EntertainingLoader
+                      flavor={isPodcast ? 'podcast' : 'music'}
+                      size="section"
+                      headline={isPodcast ? 'Loading podcasts…' : 'Loading tracks…'}
+                    />
                   ) : error ? (
                     <div className="text-center py-12 text-red-300">{error}</div>
                   ) : (

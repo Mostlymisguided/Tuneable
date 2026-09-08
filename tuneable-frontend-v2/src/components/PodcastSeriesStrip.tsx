@@ -1,6 +1,7 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
+import EntertainingLoader from './EntertainingLoader';
 import { penceToPounds } from '../utils/currency';
 
 export interface PodcastSeriesItem {
@@ -26,9 +27,11 @@ const PodcastSeriesStrip: React.FC<PodcastSeriesStripProps> = ({
 }) => {
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
-      </div>
+      <EntertainingLoader
+        flavor="podcast"
+        size="inline"
+        headline="Loading top shows…"
+      />
     );
   }
 

@@ -18,6 +18,7 @@ import { stripHtml } from '../utils/stripHtml';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { requireAuthToPlay } from '../utils/playAuth';
+import EntertainingLoader from '../components/EntertainingLoader';
 
 interface PodcastEpisode {
   _id: string;
@@ -484,9 +485,12 @@ const PodcastSearch: React.FC = () => {
 
         {/* Results */}
         {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-          </div>
+          <EntertainingLoader
+            flavor="podcast"
+            size="section"
+            headline="Searching episodes…"
+            detail="Looking through Tuneable’s catalogue."
+          />
         ) : hasSearched && episodes.length === 0 ? (
           <div className="text-center py-20">
             <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />

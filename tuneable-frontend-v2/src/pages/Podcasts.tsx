@@ -8,6 +8,7 @@ import MediaChampions from '../components/MediaChampions';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import PodcastQueueMediaCard from '../components/PodcastQueueMediaCard';
 import PodcastSeriesStrip from '../components/PodcastSeriesStrip';
+import EntertainingLoader from '../components/EntertainingLoader';
 import { 
   Clock, 
   Music,
@@ -259,6 +260,7 @@ const Podcasts: React.FC = () => {
   const [episodesPerShow, setEpisodesPerShow] = useState(10);
   const [isImportingOpml, setIsImportingOpml] = useState(false);
   const [opmlFile, setOpmlFile] = useState<File | null>(null);
+  const [openingSeriesTitle, setOpeningSeriesTitle] = useState<string | null>(null);
   
   // Search pagination state
   const [searchOffset, setSearchOffset] = useState(0);
@@ -1236,6 +1238,7 @@ const Podcasts: React.FC = () => {
 
     // Otherwise, create or find the series first
     try {
+      setOpeningSeriesTitle(episode.podcastTitle || 'this show');
       const token = localStorage.getItem('token');
       
       // Prepare series data based on episode source
@@ -1295,6 +1298,8 @@ const Podcasts: React.FC = () => {
     } catch (error: any) {
       console.error('Error creating/finding series:', error);
       toast.error(error.message || 'Failed to load podcast series');
+    } finally {
+      setOpeningSeriesTitle(null);
     }
   };
 
@@ -1816,6 +1821,16 @@ const Podcasts: React.FC = () => {
                         {isImportingLink ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing...</span></> : <><LinkIcon className="h-5 w-5" /><span>Import</span></>}
                       </button>
                     </div>
+                    {isImportingLink && (
+                      <div className="mt-3">
+                        <EntertainingLoader
+                          flavor="podcast"
+                          size="inline"
+                          headline="Importing this show…"
+                          detail="Resolving the URL and pulling episodes from the feed."
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Import from Spotify</h4>
@@ -1954,10 +1969,17 @@ const Podcasts: React.FC = () => {
           <p className="text-center text-sm text-purple-300 mb-3">Search results</p>
         )}
 
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" />
-          </div>
+        {isLoading || isSearching ? (
+          <EntertainingLoader
+            flavor="podcast"
+            size="section"
+            headline={isSearching ? 'Searching shows & episodes…' : 'Loading the podcast chart…'}
+            detail={
+              isSearching
+                ? 'Checking Tuneable, Taddy, and Apple Podcasts.'
+                : 'Ranking tipped episodes.'
+            }
+          />
         ) : displayEpisodes.length === 0 ? (
           <div className="text-center py-20">
             <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
@@ -2055,6 +2077,19 @@ const Podcasts: React.FC = () => {
           </div>
         )}
       </div>
+
+      {openingSeriesTitle && (
+        <div className="fixed inset-0 z-50 bg-gray-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg">
+            <EntertainingLoader
+              flavor="podcast"
+              size="section"
+              headline={`Opening ${openingSeriesTitle}…`}
+              detail="Finding or creating this show on Tuneable, then we’ll load episodes."
+            />
+          </div>
+        </div>
+      )}
 
       {/* Bid Confirmation Modal */}
       <BidConfirmationModal

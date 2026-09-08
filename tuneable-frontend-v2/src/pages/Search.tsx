@@ -8,6 +8,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import EntertainingLoader from '../components/EntertainingLoader';
 import { useAuth } from '../contexts/AuthContext';
 
 // Define types directly to avoid import issues
@@ -684,6 +685,15 @@ const SearchPage: React.FC = () => {
       </div>
 
       {/* Results */}
+      {isLoading && results.length === 0 && (
+        <EntertainingLoader
+          flavor="music"
+          size="section"
+          headline="Searching the catalogue…"
+          detail="Checking Tuneable first, then MusicBrainz if we need a wider net."
+        />
+      )}
+
       {results.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

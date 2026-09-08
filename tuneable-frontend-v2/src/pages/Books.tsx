@@ -4,6 +4,7 @@ import { BookOpen, Search, Coins } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
+import EntertainingLoader from '../components/EntertainingLoader';
 
 type ChartBook = {
   _id: string;
@@ -86,7 +87,13 @@ const Books: React.FC = () => {
           ))}
         </div>
 
-        {loading && <p className="text-gray-400">Loading chart…</p>}
+        {loading && (
+          <EntertainingLoader
+            flavor="books"
+            size="section"
+            headline="Loading the books chart…"
+          />
+        )}
         {error && <p className="text-red-400">{error}</p>}
         {!loading && !error && books.length === 0 && (
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-gray-400">

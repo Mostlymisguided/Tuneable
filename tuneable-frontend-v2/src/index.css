@@ -146,6 +146,25 @@
   .animate-shake {
     animation: shake 0.5s ease-in-out;
   }
+
+  @keyframes loader-bar {
+    0%, 100% { transform: scaleY(0.28); opacity: 0.55; }
+    50% { transform: scaleY(1); opacity: 1; }
+  }
+
+  .entertaining-loader-bar {
+    animation: loader-bar 1.05s ease-in-out infinite;
+    transform-origin: bottom;
+  }
+
+  @keyframes loader-line-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .entertaining-loader-line {
+    animation: loader-line-in 0.35s ease-out;
+  }
 }
 
 /* Sonner toasts — dark glass to match .card, above the player dock */
