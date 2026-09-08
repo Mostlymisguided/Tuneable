@@ -20,7 +20,7 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
-import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { getCreatorDisplay, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
 import {
@@ -444,7 +444,7 @@ export default function PlaceProfileScreen() {
       <TipSheet
         visible={Boolean(tipTarget)}
         title={tipTarget?.title || 'Untitled'}
-        subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
+        subtitle={tipTarget ? getCreatorDisplay(tipTarget) : undefined}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={tipTarget}

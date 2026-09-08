@@ -208,6 +208,7 @@ async function importEpisodeIntoExistingSeries(episode, series, addedBy) {
   const current = imported.podcastSeries
     ? imported.podcastSeries.toString()
     : '';
+  let dirty = false;
   if (current !== seriesId) {
     imported.podcastSeries = series._id;
     if (!imported.relationships) imported.relationships = [];
@@ -221,8 +222,13 @@ async function importEpisodeIntoExistingSeries(episode, series, addedBy) {
         description: `Part of ${series.title}`,
       });
     }
-    await imported.save();
+    dirty = true;
   }
+  if (!imported.creatorDisplay && series.title) {
+    imported.creatorDisplay = series.title;
+    dirty = true;
+  }
+  if (dirty) await imported.save();
   return imported;
 }
 

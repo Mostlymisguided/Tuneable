@@ -9,6 +9,7 @@ const {
   normalizeSourceType,
   toNonNegativeNumber,
 } = require('../utils/playQualification');
+const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
 class ListeningHistoryError extends Error {
   constructor(status, message) {
@@ -19,18 +20,7 @@ class ListeningHistoryError extends Error {
 }
 
 function formatMediaArtist(media) {
-  if (!media) return 'Unknown Artist';
-  if (media.creatorDisplay) return media.creatorDisplay;
-  if (Array.isArray(media.artist) && media.artist.length > 0) {
-    return media.artist
-      .map((artist) => (typeof artist === 'string' ? artist : artist?.name))
-      .filter(Boolean)
-      .join(', ');
-  }
-  if (typeof media.artist === 'string' && media.artist.trim()) {
-    return media.artist;
-  }
-  return 'Unknown Artist';
+  return resolveCreatorDisplay(media);
 }
 
 async function resolveMediaByIdentifier(identifier) {

@@ -14,7 +14,7 @@ import {
   getCountryLabelFromLocation,
   getCountryPlaceProfileHref,
 } from '@/src/lib/location';
-import { formatArtist, isUploadPlayable } from '@/src/lib/media';
+import { getCreatorDisplay, isUploadPlayable } from '@/src/lib/media';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
@@ -128,7 +128,7 @@ export function ChartTrackRow({
             {item.title || 'Untitled'}
           </Text>
           <Text style={styles.artist} numberOfLines={1}>
-            {formatArtist(item.artist)}
+            {getCreatorDisplay(item)}
           </Text>
           {showHint ? (
             <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>
@@ -231,7 +231,7 @@ export function ChartTrackRow({
           <View style={styles.artistRow}>
             <Pressable style={styles.artistPress} onPress={onOpen}>
               <Text style={styles.artist} numberOfLines={1}>
-                {formatArtist(item.artist)}
+                {getCreatorDisplay(item)}
               </Text>
               {showHint ? (
                 <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>

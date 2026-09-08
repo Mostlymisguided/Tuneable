@@ -573,10 +573,11 @@ mediaSchema.pre('save', function (next) {
     }
   }
   
-  // Auto-generate creatorDisplay if not set and we have artist/featuring data
-  if (!this.creatorDisplay && (this.artist || this.featuring)) {
-    const { formatCreatorDisplay } = require('../utils/artistParser');
-    this.creatorDisplay = formatCreatorDisplay(this.artist || [], this.featuring || []);
+  // Auto-generate creatorDisplay from artist, show title, host, or author
+  if (!this.creatorDisplay) {
+    const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
+    const resolved = resolveCreatorDisplay(this, { fallback: null });
+    if (resolved) this.creatorDisplay = resolved;
   }
 
   if (this.isModified('isrc')) {

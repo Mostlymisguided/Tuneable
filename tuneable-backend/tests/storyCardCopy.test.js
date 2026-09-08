@@ -44,6 +44,16 @@ describe('creatorLabel', () => {
     expect(creatorLabel({ artist: [{ name: 'Four Tet' }] })).toBe('Four Tet');
     expect(creatorLabel({ author: [{ name: 'Ursula K. Le Guin' }] })).toBe('Ursula K. Le Guin');
   });
+
+  it('uses the podcast show title for episodes', () => {
+    expect(
+      creatorLabel({
+        contentForm: ['podcastepisode'],
+        host: [{ name: 'NPR' }],
+        podcastSeries: { title: 'This American Life' },
+      })
+    ).toBe('This American Life');
+  });
 });
 
 describe('pickBestChartRanking', () => {

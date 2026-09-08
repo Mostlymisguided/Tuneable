@@ -15,6 +15,11 @@ interface ClickableArtistDisplayProps {
     artists?: Artist[]; // Full artist array (backend sends this separately)
     featuring?: Artist[] | string[];
     creatorDisplay?: string;
+    host?: Artist[] | string[];
+    author?: Artist[] | string[];
+    contentForm?: string[];
+    podcastTitle?: string;
+    podcastSeries?: { title?: string } | string | null;
   };
   className?: string;
   showFeaturing?: boolean;

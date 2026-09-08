@@ -29,7 +29,7 @@ import {
   getPlaceProfileHref,
 } from '@/src/lib/location';
 import {
-  formatArtist,
+  getCreatorDisplay,
   getChartTipPence,
   mediaId,
 } from '@/src/lib/media';
@@ -94,7 +94,7 @@ export default function HomeScreen() {
       rising.map((item, index) => ({
         key: mediaId(item) || String(index),
         title: item.title || 'Untitled',
-        subtitle: formatArtist(item.artist),
+        subtitle: getCreatorDisplay(item),
         coverArt: item.coverArt,
         meta: formatPoundsFromPence(getChartTipPence(item, 'today')),
         badge: String(index + 1),

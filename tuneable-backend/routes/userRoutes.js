@@ -236,6 +236,7 @@ const { sendUserRegistrationNotification, sendEmailVerification } = require('../
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
+const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -855,7 +856,8 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
     
     // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources rightsStatus rightsCleared')
+      .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
+      .populate('podcastSeries', 'title')
       .populate('globalMediaAggregateTopUser', 'username uuid _id')
       .lean();
     
@@ -974,14 +976,8 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
         let playability = {};
 
         if (media) {
-          let artistName = 'Unknown Artist';
-          if (Array.isArray(media.artist) && media.artist.length > 0) {
-            artistName = media.artist[0].name || media.artist[0] || 'Unknown Artist';
-          } else if (typeof media.artist === 'string') {
-            artistName = media.artist;
-          }
           title = media.title || 'Unknown Title';
-          artist = artistName;
+          artist = resolveCreatorDisplay(media);
           coverArt = media.coverArt || null;
           duration = media.duration || null;
           bpm = media.bpm || null;
@@ -2737,7 +2733,8 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit))
-      .select('_id uuid title artist coverArt globalMediaAggregate createdAt uploadedAt mediaOwners');
+      .select('_id uuid title artist featuring creatorDisplay host author coverArt globalMediaAggregate createdAt uploadedAt mediaOwners contentForm contentType podcastSeries')
+      .populate('podcastSeries', 'title');
 
     const total = await Media.countDocuments(query);
 
@@ -2790,13 +2787,7 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
         owner.userId.toString() === userId.toString()
       );
 
-      // Extract artist name
-      let artistName = 'Unknown Artist';
-      if (Array.isArray(m.artist) && m.artist.length > 0) {
-        artistName = m.artist[0].name || m.artist[0] || 'Unknown Artist';
-      } else if (typeof m.artist === 'string') {
-        artistName = m.artist;
-      }
+      const artistName = resolveCreatorDisplay(m);
 
       // Calculate total bid amount from actual bids (fallback to stored value if bids not found)
       const mediaIdStr = m._id.toString();

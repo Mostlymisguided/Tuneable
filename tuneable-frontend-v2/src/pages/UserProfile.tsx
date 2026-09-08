@@ -2765,7 +2765,7 @@ const UserProfile: React.FC = () => {
                 onQueue={handleAddLibraryItemToQueue}
                 showTipButton={!!isOwnProfile}
                 showQueueButton={!!isOwnProfile}
-                artistColumnLabel="Artist / Show"
+                artistColumnLabel="Artist / Show / Author"
                 itemPath={(item) =>
                   getMediaProfileUrl({
                     _id: item.mediaId || item.mediaUuid,

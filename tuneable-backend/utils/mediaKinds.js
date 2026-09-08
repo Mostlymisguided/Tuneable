@@ -4,6 +4,8 @@
  */
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+const PODCAST_EPISODE_FORMS = ['podcast', 'episode', 'podcastepisode'];
+const PODCAST_SERIES_FORMS = ['podcastseries'];
 const WRITTEN_FORMS = ['book', 'article'];
 const WRITTEN_TYPES = ['written'];
 
@@ -32,6 +34,14 @@ function isBookMedia(media) {
   return mediaForms(media).includes('book');
 }
 
+function isPodcastEpisode(media) {
+  return mediaForms(media).some((form) => PODCAST_EPISODE_FORMS.includes(form));
+}
+
+function isPodcastSeries(media) {
+  return mediaForms(media).some((form) => PODCAST_SERIES_FORMS.includes(form));
+}
+
 const BOOK_CATALOG_QUERY = {
   status: 'active',
   contentType: { $in: ['written'] },
@@ -40,6 +50,8 @@ const BOOK_CATALOG_QUERY = {
 
 module.exports = {
   PODCAST_FORMS,
+  PODCAST_EPISODE_FORMS,
+  PODCAST_SERIES_FORMS,
   WRITTEN_FORMS,
   WRITTEN_TYPES,
   asList,
@@ -47,5 +59,7 @@ module.exports = {
   mediaTypes,
   isWrittenMedia,
   isBookMedia,
+  isPodcastEpisode,
+  isPodcastSeries,
   BOOK_CATALOG_QUERY,
 };

@@ -16,7 +16,7 @@ import { TipSheet } from '@/src/components/TipSheet';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
-import { formatArtist, mediaId } from '@/src/lib/media';
+import { getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { formatPlaybackSpeed } from '@/src/lib/playbackAudio';
 import { episodeId, seriesId, seriesTitle } from '@/src/lib/podcast';
 import {
@@ -58,7 +58,7 @@ export default function NowPlayingScreen() {
   const subtitle = episode
     ? seriesTitle(episode)
     : track
-      ? formatArtist(track.artist)
+      ? getCreatorDisplay(track)
       : '';
 
   const isPlaying = active === 'podcast' ? podcast.isPlaying : music.isPlaying;

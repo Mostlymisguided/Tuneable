@@ -82,17 +82,78 @@ export function mediaId(media: ChartMediaItem): string {
   return media.id || media._id || media.uuid || '';
 }
 
+const PLACEHOLDER_CREATOR = /^unknown(\s+(artist|author|podcast))?$/i;
+
+function isPlaceholderCreatorLabel(value?: string | null): boolean {
+  if (!value) return true;
+  return PLACEHOLDER_CREATOR.test(value.trim());
+}
+
+function namesFromCreators(creators: unknown): string[] {
+  if (!creators) return [];
+  if (typeof creators === 'string') {
+    const name = creators.trim();
+    return name && !isPlaceholderCreatorLabel(name) ? [name] : [];
+  }
+  if (!Array.isArray(creators)) return [];
+  return creators
+    .map((entry) => (typeof entry === 'string' ? entry : (entry as { name?: string })?.name))
+    .map((name) => (typeof name === 'string' ? name.trim() : ''))
+    .filter((name) => name && !isPlaceholderCreatorLabel(name));
+}
+
 export function formatArtist(
   artist: ChartMediaItem['artist'] | undefined
 ): string {
   if (!artist) return 'Unknown artist';
-  if (typeof artist === 'string') return artist || 'Unknown artist';
+  if (typeof artist === 'string') {
+    return isPlaceholderCreatorLabel(artist) ? 'Unknown artist' : artist;
+  }
   if (Array.isArray(artist)) {
-    const names = artist
-      .map((a) => (typeof a === 'string' ? a : a?.name))
-      .filter(Boolean) as string[];
+    const names = namesFromCreators(artist);
     return names.length ? names.join(', ') : 'Unknown artist';
   }
+  return 'Unknown artist';
+}
+
+function seriesTitleFromMedia(media: ChartMediaItem): string {
+  const series = media.podcastSeries;
+  if (series && typeof series === 'object' && series.title?.trim()) {
+    return series.title.trim();
+  }
+  if (media.podcastTitle?.trim()) return media.podcastTitle.trim();
+  return '';
+}
+
+function isPodcastEpisode(media: ChartMediaItem): boolean {
+  return (media.contentForm || []).some((form) =>
+    ['podcastepisode', 'episode', 'podcast'].includes(form)
+  );
+}
+
+/** Subtitle for mixed lists: artist, show title, or author. */
+export function getCreatorDisplay(
+  media: ChartMediaItem | null | undefined
+): string {
+  if (!media) return 'Unknown artist';
+  if (!isPlaceholderCreatorLabel(media.creatorDisplay)) {
+    return media.creatorDisplay!.trim();
+  }
+
+  const fromArtist = formatArtist(media.artist);
+  if (!isPlaceholderCreatorLabel(fromArtist)) return fromArtist;
+
+  if (isPodcastEpisode(media)) {
+    const showTitle = seriesTitleFromMedia(media);
+    if (showTitle) return showTitle;
+  }
+
+  const hosts = namesFromCreators(media.host);
+  if (hosts.length) return hosts.join(', ');
+
+  const authors = namesFromCreators(media.author);
+  if (authors.length) return authors.join(', ');
+
   return 'Unknown artist';
 }
 

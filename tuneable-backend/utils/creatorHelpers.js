@@ -3,6 +3,9 @@
  * Creators are stored as: { name: String, userId: ObjectId }
  */
 
+const { formatCreatorDisplay } = require('./artistParser');
+const { isPodcastEpisode } = require('./mediaKinds');
+
 /**
  * Convert string or array of strings to creator subdocuments
  * @param {string|string[]} input - Creator name(s)
@@ -59,6 +62,70 @@ function formatArtists(artists, featuring = []) {
   }
   
   return formatted;
+}
+
+function isPlaceholderCreatorLabel(value) {
+  if (value == null) return true;
+  const text = String(value).trim();
+  if (!text) return true;
+  return /^unknown(\s+(artist|author|podcast))?$/i.test(text);
+}
+
+function namesFromCreators(creators) {
+  if (!creators) return [];
+  if (typeof creators === 'string') {
+    const name = creators.trim();
+    return name && !isPlaceholderCreatorLabel(name) ? [name] : [];
+  }
+  if (!Array.isArray(creators)) return [];
+  return creators
+    .map((creator) => (typeof creator === 'string' ? creator : creator?.name))
+    .map((name) => (typeof name === 'string' ? name.trim() : ''))
+    .filter((name) => name && !isPlaceholderCreatorLabel(name));
+}
+
+function seriesTitleFromMedia(media) {
+  if (!media) return '';
+  const series = media.podcastSeries;
+  if (series && typeof series === 'object' && typeof series.title === 'string') {
+    const title = series.title.trim();
+    if (title) return title;
+  }
+  if (typeof media.podcastTitle === 'string' && media.podcastTitle.trim()) {
+    return media.podcastTitle.trim();
+  }
+  return '';
+}
+
+/**
+ * Display label for mixed lists (library, home, charts).
+ * Music uses artist/featuring; podcast episodes prefer the show title;
+ * books use author. Does not write into the music `artist` field.
+ */
+function resolveCreatorDisplay(media, { fallback = 'Unknown Artist' } = {}) {
+  if (!media) return fallback;
+
+  if (!isPlaceholderCreatorLabel(media.creatorDisplay)) {
+    return String(media.creatorDisplay).trim();
+  }
+
+  const fromArtists = formatCreatorDisplay(media.artist || [], media.featuring || []);
+  if (fromArtists && !isPlaceholderCreatorLabel(fromArtists)) {
+    return fromArtists;
+  }
+
+  if (isPodcastEpisode(media)) {
+    const showTitle = seriesTitleFromMedia(media);
+    if (showTitle) return showTitle;
+  }
+
+  const hosts = namesFromCreators(media.host);
+  if (hosts.length) return hosts.join(', ');
+
+  const authors = namesFromCreators(media.author);
+  if (authors.length) return authors.join(', ');
+
+  return fallback;
 }
 
 /**
@@ -162,6 +229,10 @@ module.exports = {
   extractCreatorNames,
   getPrimaryArtist,
   formatArtists,
+  isPlaceholderCreatorLabel,
+  namesFromCreators,
+  seriesTitleFromMedia,
+  resolveCreatorDisplay,
   findUserCredits,
   linkCreatorToUser,
   getMediaByUser,

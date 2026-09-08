@@ -5,6 +5,7 @@
 
 const { isPodcastMedia, isPodcastSeries } = require('./mediaTagRankingsService');
 const { isWrittenMedia } = require('../utils/mediaKinds');
+const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
 const MAX_CHART_RANK = 10;
 const MIN_CHART_POOL = 3;
@@ -62,26 +63,7 @@ function canonicalMediaPath(kind, mediaId) {
 }
 
 function creatorLabel(media) {
-  if (!media) return '';
-  if (typeof media.creatorDisplay === 'string' && media.creatorDisplay.trim()) {
-    return media.creatorDisplay.trim();
-  }
-
-  const fromList = (list) => {
-    if (!Array.isArray(list) || list.length === 0) return '';
-    return list
-      .map((entry) => (typeof entry === 'string' ? entry : entry?.name))
-      .filter(Boolean)
-      .join(', ');
-  };
-
-  return (
-    fromList(media.host) ||
-    fromList(media.author) ||
-    fromList(media.artist) ||
-    (typeof media.artist === 'string' ? media.artist : '') ||
-    ''
-  );
+  return resolveCreatorDisplay(media, { fallback: '' });
 }
 
 function isUsableRanking(row) {

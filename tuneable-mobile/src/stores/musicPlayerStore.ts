@@ -5,7 +5,7 @@ import {
   MUSIC_NO_PLAYABLE,
   MUSIC_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
-import { getUploadUrl, isUploadPlayable, mediaId, formatArtist } from '@/src/lib/media';
+import { getUploadUrl, isUploadPlayable, mediaId, getCreatorDisplay } from '@/src/lib/media';
 import { showToast } from '@/src/stores/toastStore';
 import {
   completeListeningHistory,
@@ -132,7 +132,7 @@ function onStatus(status: AVPlaybackStatus) {
     syncListeningHistory({
       mediaId: mediaId(item),
       title: item.title,
-      artist: item.creatorDisplay || formatArtist(item.artist),
+      artist: getCreatorDisplay(item),
       coverArt: item.coverArt,
       currentTime: (status.positionMillis ?? 0) / 1000,
       duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,

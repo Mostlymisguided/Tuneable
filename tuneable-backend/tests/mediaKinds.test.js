@@ -6,6 +6,8 @@
 const {
   isWrittenMedia,
   isBookMedia,
+  isPodcastEpisode,
+  isPodcastSeries,
   BOOK_CATALOG_QUERY,
   WRITTEN_FORMS,
 } = require('../utils/mediaKinds');
@@ -26,6 +28,14 @@ describe('isWrittenMedia / isBookMedia', () => {
     expect(
       isWrittenMedia({ contentType: ['spoken'], contentForm: ['podcastepisode'] })
     ).toBe(false);
+  });
+});
+
+describe('isPodcastEpisode / isPodcastSeries', () => {
+  it('splits episodes from series containers', () => {
+    expect(isPodcastEpisode({ contentForm: ['podcastepisode'] })).toBe(true);
+    expect(isPodcastEpisode({ contentForm: ['podcastseries'] })).toBe(false);
+    expect(isPodcastSeries({ contentForm: ['podcastseries'] })).toBe(true);
   });
 });
 

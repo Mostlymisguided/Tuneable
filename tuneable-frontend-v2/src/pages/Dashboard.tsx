@@ -2874,6 +2874,7 @@ Join here: ${inviteLink}`.trim();
             onPlay={handlePlay}
             onTip={handleOpenTipModal}
             showTipButton
+            artistColumnLabel="Artist / Show / Author"
             initialVisibleCount={5}
           />
         )}

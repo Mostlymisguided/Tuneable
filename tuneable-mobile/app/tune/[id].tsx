@@ -32,7 +32,7 @@ import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
 import {
-  formatArtist,
+  getCreatorDisplay,
   getPlayabilityBlockReason,
   isRightsPendingClaimable,
   isUploadPlayable,
@@ -153,9 +153,7 @@ export default function TuneProfileScreen() {
   const disputed = blockReason === 'disputed';
   const showClaimCta = Boolean(media && isRightsPendingClaimable(media));
   const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
-  const artist =
-    media?.creatorDisplay ||
-    (media ? formatArtist(media.artist) : 'Unknown artist');
+  const artist = media ? getCreatorDisplay(media) : 'Unknown artist';
   const tipTotal = media?.globalMediaAggregate ?? 0;
   const tipCount = media?.tipCount ?? media?.bids?.length ?? 0;
   const durationLabel = formatDuration(media?.duration);

@@ -11,6 +11,8 @@ export interface ChartMediaItem {
   title?: string;
   artist?: string | Array<string | { name?: string; userId?: string | { _id?: string; uuid?: string } }>;
   creatorDisplay?: string;
+  host?: Array<string | { name?: string }>;
+  author?: Array<string | { name?: string }>;
   duration?: number;
   coverArt?: string;
   partyMediaAggregate?: number;
