@@ -6,6 +6,7 @@ import {
   Coins,
   Loader2,
   Music,
+  Pencil,
   Plus,
   Minus,
   Sparkles,
@@ -53,6 +54,9 @@ interface ImportItem {
   crossRefSources?: string[];
   originalTitle?: string | null;
   originalArtist?: string | null;
+  parseStatus?: string | null;
+  needsIdentity?: boolean;
+  manualIdentityConfirmed?: boolean;
   mediaId?: string | null;
   mediaUuid?: string | null;
   suggestedTitle?: string | null;
@@ -87,6 +91,7 @@ interface ImportSummary {
   skippedJunk?: number;
   skippedUnparsed?: number;
   skippedNoMatch?: number;
+  needsIdentity?: number;
   skippedUnavailable?: number;
   mbHigh?: number;
   mbMedium?: number;
@@ -181,6 +186,78 @@ function parseSource(value: string | null): ImportSource {
   return 'spotify';
 }
 
+function youtubeExternalMediaWithIdentity(
+  item: ImportItem,
+  title: string,
+  artist: string,
+  extra: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const ext = { ...(item.externalMedia || {}) };
+  const ids = { ...((ext.externalIds as Record<string, unknown> | undefined) || {}) };
+  delete ids.musicbrainz;
+  delete ids.isrc;
+  return {
+    ...ext,
+    title,
+    artist,
+    externalIds: ids,
+    identityConfidence: extra.identityConfidence ?? 'unverified',
+    identityConfidenceSource: extra.identityConfidenceSource ?? 'none',
+    ...extra,
+  };
+}
+
+function patchYoutubeIdentity(item: ImportItem, title: string, artist: string): ImportItem {
+  return {
+    ...item,
+    title,
+    artist,
+    externalMedia: youtubeExternalMediaWithIdentity(item, title, artist),
+    identityConfidence: 'unverified',
+    identityConfidenceSource: 'none',
+    mediaId: null,
+    matchStatus: 'new',
+    needsIdentity: true,
+    selected: false,
+    manualIdentityConfirmed: false,
+    useSuggestedMatch: false,
+    suggestedTitle: null,
+    suggestedArtist: null,
+  };
+}
+
+function confirmYoutubeAsNew(item: ImportItem): ImportItem | null {
+  const title = item.title.trim();
+  const artist = item.artist.trim();
+  if (!title || !artist) return null;
+  return {
+    ...patchYoutubeIdentity(item, title, artist),
+    needsIdentity: false,
+    selected: true,
+    manualIdentityConfirmed: true,
+    identityConfidence: 'unverified',
+    identityConfidenceSource: 'admin_confirmed',
+    externalMedia: youtubeExternalMediaWithIdentity(item, title, artist, {
+      identityConfidence: 'unverified',
+      identityConfidenceSource: 'admin_confirmed',
+    }),
+  };
+}
+
+function mergeRematchedYoutubeItem(prev: ImportItem, next: ImportItem): ImportItem {
+  return {
+    ...next,
+    key: prev.key,
+    defaultTip: next.defaultTip ?? prev.defaultTip,
+    minTip: next.minTip ?? prev.minTip,
+    userBidTotalPence: next.userBidTotalPence ?? prev.userBidTotalPence,
+    originalTitle: next.originalTitle || prev.originalTitle,
+    originalArtist: next.originalArtist || prev.originalArtist,
+    coverArt: next.coverArt || prev.coverArt,
+    duration: next.duration || prev.duration,
+  };
+}
+
 const LibraryImport: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -231,6 +308,8 @@ const LibraryImport: React.FC = () => {
   const [spotifyAccountInput, setSpotifyAccountInput] = useState('');
   const [spotifyRequestNote, setSpotifyRequestNote] = useState('');
   const [spotifyRequestSubmitting, setSpotifyRequestSubmitting] = useState(false);
+  const [rematchingKey, setRematchingKey] = useState<string | null>(null);
+  const [identityOverrideKeys, setIdentityOverrideKeys] = useState<Set<string>>(() => new Set());
 
   const adminUser = isAdmin(user);
   const meta = SOURCE_META[source];
@@ -360,6 +439,8 @@ const LibraryImport: React.FC = () => {
     setProgressMessage(null);
     setProgressCurrent(0);
     setProgressTotal(0);
+    setRematchingKey(null);
+    setIdentityOverrideKeys(new Set());
   };
 
   const resetRekordboxState = () => {
@@ -660,7 +741,7 @@ const LibraryImport: React.FC = () => {
   }, [bulkTip]);
 
   const selectableItems = useMemo(
-    () => items.filter((i) => i.matchStatus !== 'in_library'),
+    () => items.filter((i) => i.matchStatus !== 'in_library' && !i.needsIdentity),
     [items]
   );
 
@@ -687,6 +768,18 @@ const LibraryImport: React.FC = () => {
 
   const newTrackCount = summary?.newTracks
     ?? items.filter((i) => i.matchStatus === 'new').length;
+
+  const needsIdentityCount = items.filter((i) => i.needsIdentity).length;
+
+  const reviewItems = useMemo(() => {
+    if (!isYouTube || !adminUser) return items;
+    const rank = (item: ImportItem) => {
+      if (item.needsIdentity) return 0;
+      if (item.matchStatus === 'possible_match') return 1;
+      return 2;
+    };
+    return [...items].sort((a, b) => rank(a) - rank(b));
+  }, [items, isYouTube, adminUser]);
 
   const actionableCount = selectableItems.length;
   const playableCount = playableItems.length;
@@ -781,14 +874,14 @@ const LibraryImport: React.FC = () => {
   const toggleAll = (selected: boolean) => {
     setItems((prev) => prev.map((i) => ({
       ...i,
-      selected: i.matchStatus === 'in_library' ? false : selected,
+      selected: i.matchStatus === 'in_library' || i.needsIdentity ? false : selected,
     })));
   };
 
   const selectPlayable = () => {
     setItems((prev) => prev.map((item) => ({
       ...item,
-      selected: item.matchStatus !== 'in_library' && item.isPlayable,
+      selected: item.matchStatus !== 'in_library' && !item.needsIdentity && item.isPlayable,
     })));
     toast.success(playableCount > 0
       ? `Selected ${playableCount} playable track${playableCount === 1 ? '' : 's'}`
@@ -799,7 +892,7 @@ const LibraryImport: React.FC = () => {
     let remaining = userBalance;
     const tip = tipMode === 'spread' ? MIN_TIP_POUNDS : tipAmount;
     setItems((prev) => prev.map((item) => {
-      if (item.matchStatus === 'in_library') {
+      if (item.matchStatus === 'in_library' || item.needsIdentity) {
         return { ...item, selected: false };
       }
       const amount = Number.isFinite(tip) && tip >= MIN_TIP_POUNDS ? tip : 1.11;
@@ -902,6 +995,72 @@ const LibraryImport: React.FC = () => {
     });
   }, [tipMode, selectedItems, userBalance]);
 
+  const buildExecutePayload = (targets: ImportItem[], amount: number) => (
+    targets.map((item) => ({
+      key: item.key,
+      title: item.title,
+      artist: item.artist,
+      selected: true,
+      mediaId: item.mediaId || undefined,
+      matchStatus: item.matchStatus,
+      useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
+      crossRefStatus: item.crossRefStatus || undefined,
+      identityConfidence: item.identityConfidence || undefined,
+      identityConfidenceSource: item.identityConfidenceSource || undefined,
+      manualIdentityConfirmed: item.manualIdentityConfirmed || undefined,
+      amount,
+      externalMedia: item.externalMedia,
+      skipIfInLibrary: true,
+    }))
+  );
+
+  const rematchYoutubeItem = async (item: ImportItem) => {
+    const title = item.title.trim();
+    const artist = item.artist.trim();
+    if (!title || !artist) {
+      toast.error('Enter artist and title before rematching');
+      return;
+    }
+    setRematchingKey(item.key);
+    try {
+      const data = await userAPI.rematchYouTubeImportItem({
+        key: item.key,
+        title,
+        artist,
+        duration: item.duration,
+        coverArt: item.coverArt,
+        originalTitle: item.originalTitle,
+        originalArtist: item.originalArtist,
+        album: item.album,
+        externalMedia: {
+          ...item.externalMedia,
+          title,
+          artist,
+        },
+      });
+      const nextItem = data.item as ImportItem;
+      setItems((prev) => prev.map((row) => (
+        row.key === item.key ? mergeRematchedYoutubeItem(row, nextItem) : row
+      )));
+      setIdentityOverrideKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(item.key);
+        return next;
+      });
+      if (nextItem.identityConfidence === 'verified' || nextItem.matchStatus === 'on_catalog') {
+        toast.success('Matched after correction');
+      } else if (nextItem.matchStatus === 'possible_match') {
+        toast.info('Possible match found — confirm or skip');
+      } else {
+        toast.info('Still no confident match — confirm as new or skip');
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || error?.message || 'Failed to rematch');
+    } finally {
+      setRematchingKey(null);
+    }
+  };
+
   const handleExecute = async () => {
     if (selectedItems.length === 0) {
       toast.error('Select at least one track');
@@ -920,24 +1079,22 @@ const LibraryImport: React.FC = () => {
       return;
     }
 
+    if (isYouTube) {
+      const blocked = selectedItems.filter((i) => i.needsIdentity && !i.manualIdentityConfirmed);
+      if (blocked.length > 0) {
+        toast.error('Confirm artist and title on unmatched tracks, or deselect them');
+        return;
+      }
+    }
+
     const effectiveTip = tipMode === 'spread' && selectedSpreadTip != null
       ? selectedSpreadTip
       : tipAmount;
 
     const payload = selectedItems.map((item) => ({
-      key: item.key,
-      title: item.title,
-      selected: true,
-      mediaId: item.mediaId || undefined,
-      matchStatus: item.matchStatus,
-      useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
-      crossRefStatus: item.crossRefStatus || undefined,
-      identityConfidence: item.identityConfidence || undefined,
-      amount: tipMode === 'spread' && selectedSpreadTip != null
+      ...buildExecutePayload([item], tipMode === 'spread' && selectedSpreadTip != null
         ? selectedSpreadTip
-        : parseFloat(tipAmounts[item.key] ?? bulkTip),
-      externalMedia: item.externalMedia,
-      skipIfInLibrary: true,
+        : parseFloat(tipAmounts[item.key] ?? bulkTip))[0],
     }));
 
     await runExecuteJob(payload, effectiveTip);
@@ -957,7 +1114,11 @@ const LibraryImport: React.FC = () => {
     let tip = cost.tip;
     let targets = scope === 'playable' ? [...playableItems] : [...selectableItems];
     if (isYouTube && scope === 'all') {
-      targets = items.filter((i) => i.selected && i.matchStatus !== 'in_library');
+      targets = items.filter((i) => (
+        i.selected
+        && i.matchStatus !== 'in_library'
+        && !i.needsIdentity
+      ));
     }
 
     if (tipMode === 'spread') {
@@ -995,19 +1156,7 @@ const LibraryImport: React.FC = () => {
       return;
     }
 
-    const payloadItems = targets.map((item) => ({
-      key: item.key,
-      title: item.title,
-      selected: true,
-      mediaId: item.mediaId || undefined,
-      matchStatus: item.matchStatus,
-      useSuggestedMatch: item.matchStatus === 'possible_match' ? !!item.useSuggestedMatch : undefined,
-      crossRefStatus: item.crossRefStatus || undefined,
-      identityConfidence: item.identityConfidence || undefined,
-      amount: tip,
-      externalMedia: item.externalMedia,
-      skipIfInLibrary: true,
-    }));
+    const payloadItems = buildExecutePayload(targets, tip);
 
     if (payloadItems.length === 0) {
       toast.error('No tracks to import');
@@ -1056,7 +1205,7 @@ const LibraryImport: React.FC = () => {
             {isRekordbox
               ? 'Admin: upload a Rekordbox XML export, pick playlists, then tip catalog entries into your library. Audio is not uploaded.'
               : isYouTube
-                ? 'Paste a public YouTube playlist URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm.'
+                ? 'Paste a public YouTube playlist URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm. Admins can correct artist and title when there is no confident match.'
                 : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
           </p>
           {source === 'spotify' ? (
@@ -1287,7 +1436,7 @@ const LibraryImport: React.FC = () => {
                     <p className="text-xs text-gray-400">{progressMessage}</p>
                   ) : (
                     <p className="text-xs text-gray-500 text-center">
-                      Confident MusicBrainz matches are ready to import. Weaker matches go to review. Junk/lyric channels are skipped.
+                      Confident MusicBrainz matches are ready to import. Weaker matches go to review. Junk/lyric channels are skipped.{adminUser ? ' Unmatched titles stay in review so you can correct artist and title.' : ''}
                     </p>
                   )}
                 </div>
@@ -1411,6 +1560,11 @@ const LibraryImport: React.FC = () => {
                   · skipped {summary.skippedNoMatch} unmatched
                 </span>
               ) : null}
+              {typeof summary.needsIdentity === 'number' && summary.needsIdentity > 0 ? (
+                <span className="ml-1 text-amber-300/90">
+                  · {summary.needsIdentity} need identity
+                </span>
+              ) : null}
               {typeof summary.skippedJunk === 'number' && summary.skippedJunk > 0 ? (
                 <span className="ml-1 text-amber-300/90">
                   · skipped {summary.skippedJunk} unreliable channel{summary.skippedJunk === 1 ? '' : 's'}
@@ -1465,6 +1619,12 @@ const LibraryImport: React.FC = () => {
                 <div className="text-lg font-semibold text-purple-300">{newTrackCount}</div>
                 <div className="text-xs text-gray-400 mt-0.5">New to Tuneable</div>
               </div>
+              {needsIdentityCount > 0 ? (
+                <div className="bg-gray-800/80 rounded-lg p-3 border border-amber-800/50 col-span-2 md:col-span-1">
+                  <div className="text-lg font-semibold text-amber-200">{needsIdentityCount}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Need identity</div>
+                </div>
+              ) : null}
             </div>
 
             {actionableCount > 0 ? (
@@ -1654,7 +1814,7 @@ const LibraryImport: React.FC = () => {
                         if (playableCount > 0) {
                           setItems((prev) => prev.map((item) => ({
                             ...item,
-                            selected: item.matchStatus !== 'in_library' && item.isPlayable,
+                            selected: item.matchStatus !== 'in_library' && !item.needsIdentity && item.isPlayable,
                           })));
                         } else {
                           toggleAll(true);
@@ -1669,6 +1829,7 @@ const LibraryImport: React.FC = () => {
                     >
                       Review tracks
                       {possibleMatchCount > 0 ? ` (${possibleMatchCount} possible)` : ''}
+                      {needsIdentityCount > 0 ? ` · ${needsIdentityCount} need identity` : ''}
                       {playableCount > 0 ? ` · ${playableCount} playable pre-selected` : ''}
                     </button>
                   </>
@@ -1768,6 +1929,9 @@ const LibraryImport: React.FC = () => {
               </div>
               {possibleMatchCount > 0 ? (
                 <span className="text-amber-300">{possibleMatchCount} possible match{possibleMatchCount === 1 ? '' : 'es'} to confirm</span>
+              ) : null}
+              {needsIdentityCount > 0 ? (
+                <span className="text-amber-300">{needsIdentityCount} need{needsIdentityCount === 1 ? 's' : ''} identity</span>
               ) : null}
             </div>
 
@@ -1909,27 +2073,44 @@ const LibraryImport: React.FC = () => {
             </div>
 
             <div className="space-y-2 mb-8 max-h-[45vh] overflow-y-auto pr-1">
-              {items.map((item) => (
+              {reviewItems.map((item) => {
+                const showIdentityEditor = Boolean(
+                  isYouTube
+                  && adminUser
+                  && item.matchStatus !== 'in_library'
+                  && (
+                    item.needsIdentity
+                    || item.matchStatus === 'possible_match'
+                    || identityOverrideKeys.has(item.key)
+                    || item.manualIdentityConfirmed
+                  )
+                );
+                const identityLocked = item.identityConfidence === 'verified'
+                  && !item.needsIdentity
+                  && !identityOverrideKeys.has(item.key);
+                return (
                 <div
                   key={item.key}
-                  className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  className={`flex items-start gap-3 p-3 rounded-lg border ${
                     item.matchStatus === 'in_library'
                       ? 'bg-gray-800/50 border-gray-700 opacity-60'
-                      : item.selected
-                        ? 'bg-gray-800 border-purple-700'
-                        : 'bg-gray-800 border-gray-700'
+                      : item.needsIdentity
+                        ? 'bg-gray-800 border-amber-800/80'
+                        : item.selected
+                          ? 'bg-gray-800 border-purple-700'
+                          : 'bg-gray-800 border-gray-700'
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={item.selected && item.matchStatus !== 'in_library'}
-                    disabled={item.matchStatus === 'in_library'}
+                    disabled={item.matchStatus === 'in_library' || Boolean(item.needsIdentity)}
                     onChange={(e) => {
                       setItems((prev) => prev.map((i) => (
                         i.key === item.key ? { ...i, selected: e.target.checked } : i
                       )));
                     }}
-                    className="w-4 h-4"
+                    className="w-4 h-4 mt-1"
                   />
                   <img
                     src={item.coverArt || DEFAULT_PROFILE_PIC}
@@ -1937,23 +2118,75 @@ const LibraryImport: React.FC = () => {
                     className="w-12 h-12 rounded object-cover flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{item.title}</div>
-                    <div className="text-sm text-gray-400 truncate">
-                      {item.artist}
-                      {item.bpm || item.musicalKey ? (
-                        <span className="text-gray-500">
-                          {item.bpm ? ` · ${Math.round(Number(item.bpm))} BPM` : ''}
-                          {item.musicalKey ? ` · ${item.musicalKey}` : ''}
-                        </span>
-                      ) : null}
-                    </div>
+                    {showIdentityEditor && !identityLocked ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                        <label className="text-xs text-gray-400 block">
+                          Title
+                          <input
+                            type="text"
+                            value={item.title}
+                            onChange={(e) => {
+                              const title = e.target.value;
+                              setItems((prev) => prev.map((i) => {
+                                if (i.key !== item.key) return i;
+                                if (i.matchStatus === 'possible_match') {
+                                  return { ...i, title, manualIdentityConfirmed: false };
+                                }
+                                return patchYoutubeIdentity(i, title, i.artist);
+                              }));
+                            }}
+                            className="mt-0.5 w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                          />
+                        </label>
+                        <label className="text-xs text-gray-400 block">
+                          Artist
+                          <input
+                            type="text"
+                            value={item.artist}
+                            onChange={(e) => {
+                              const artist = e.target.value;
+                              setItems((prev) => prev.map((i) => {
+                                if (i.key !== item.key) return i;
+                                if (i.matchStatus === 'possible_match') {
+                                  return { ...i, artist, manualIdentityConfirmed: false };
+                                }
+                                return patchYoutubeIdentity(i, i.title, artist);
+                              }));
+                            }}
+                            className="mt-0.5 w-full bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="font-medium truncate">{item.title}</div>
+                        <div className="text-sm text-gray-400 truncate">
+                          {item.artist}
+                          {item.bpm || item.musicalKey ? (
+                            <span className="text-gray-500">
+                              {item.bpm ? ` · ${Math.round(Number(item.bpm))} BPM` : ''}
+                              {item.musicalKey ? ` · ${item.musicalKey}` : ''}
+                            </span>
+                          ) : null}
+                        </div>
+                      </>
+                    )}
                     <div className="flex flex-wrap gap-1 mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded border ${STATUS_COLORS[item.matchStatus]}`}>
                         {item.matchType === 'duplicate-in-batch'
                           ? 'Already in this import'
                           : STATUS_LABELS[item.matchStatus]}
                       </span>
-                      {item.identityConfidence && (
+                      {item.needsIdentity ? (
+                        <span className="text-xs px-2 py-0.5 rounded border bg-amber-900/40 text-amber-100 border-amber-700">
+                          Needs identity
+                        </span>
+                      ) : null}
+                      {item.identityConfidenceSource === 'admin_confirmed' ? (
+                        <span className="text-xs px-2 py-0.5 rounded border bg-purple-900/40 text-purple-100 border-purple-700">
+                          Admin confirmed
+                        </span>
+                      ) : item.identityConfidence ? (
                         <span
                           className={`text-xs px-2 py-0.5 rounded border ${IDENTITY_COLORS[item.identityConfidence]}`}
                           title={item.identityConfidenceSource || undefined}
@@ -1964,7 +2197,7 @@ const LibraryImport: React.FC = () => {
                               ? 'Spotify catalog'
                               : IDENTITY_LABELS[item.identityConfidence]}
                         </span>
-                      )}
+                      ) : null}
                       {!item.isPlayable && item.matchStatus !== 'in_library' && (
                         <span className="text-xs px-2 py-0.5 rounded border bg-amber-900/30 text-amber-200 border-amber-700">
                           Awaiting audio
@@ -1984,6 +2217,12 @@ const LibraryImport: React.FC = () => {
                         {item.originalArtist ? ` · ${item.originalArtist}` : ''}
                       </div>
                     )}
+                    {isYouTube && (item.originalTitle || item.originalArtist) ? (
+                      <div className="mt-1 text-xs text-gray-500 truncate">
+                        YouTube: {item.originalTitle || 'untitled'}
+                        {item.originalArtist ? ` · ${item.originalArtist}` : ''}
+                      </div>
+                    ) : null}
                     {item.matchStatus === 'possible_match' && (
                       <div className="mt-2 text-xs text-amber-100/90 space-y-1.5">
                         <div>
@@ -2001,7 +2240,7 @@ const LibraryImport: React.FC = () => {
                             onClick={() => {
                               setItems((prev) => prev.map((i) => (
                                 i.key === item.key
-                                  ? { ...i, useSuggestedMatch: true, selected: true }
+                                  ? { ...i, useSuggestedMatch: true, selected: true, needsIdentity: false }
                                   : i
                               )));
                             }}
@@ -2037,8 +2276,57 @@ const LibraryImport: React.FC = () => {
                         </div>
                       </div>
                     )}
+                    {isYouTube && adminUser && item.matchStatus !== 'in_library' && identityLocked ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIdentityOverrideKeys((prev) => {
+                            const next = new Set(prev);
+                            next.add(item.key);
+                            return next;
+                          });
+                        }}
+                        className="mt-2 text-xs text-purple-300 hover:underline inline-flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Correct identity
+                      </button>
+                    ) : null}
+                    {showIdentityEditor && !identityLocked ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void rematchYoutubeItem(item)}
+                          disabled={rematchingKey === item.key || !item.title.trim() || !item.artist.trim()}
+                          className="px-2 py-0.5 rounded border bg-gray-900 border-gray-600 text-gray-200 hover:border-purple-500 disabled:opacity-50 inline-flex items-center gap-1 text-xs"
+                        >
+                          {rematchingKey === item.key ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                          Rematch MusicBrainz
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const confirmed = confirmYoutubeAsNew(item);
+                            if (!confirmed) {
+                              toast.error('Artist and title are required');
+                              return;
+                            }
+                            setItems((prev) => prev.map((i) => (i.key === item.key ? confirmed : i)));
+                            toast.success('Identity confirmed as new — selected for import');
+                          }}
+                          disabled={!item.title.trim() || !item.artist.trim()}
+                          className={`px-2 py-0.5 rounded border text-xs ${
+                            item.manualIdentityConfirmed
+                              ? 'bg-purple-700/50 border-purple-500 text-white'
+                              : 'bg-gray-900 border-gray-600 text-gray-200 hover:border-purple-500 disabled:opacity-50'
+                          }`}
+                        >
+                          Confirm as new
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                  {item.matchStatus !== 'in_library' && (
+                  {item.matchStatus !== 'in_library' && !item.needsIdentity && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         type="button"
@@ -2076,10 +2364,11 @@ const LibraryImport: React.FC = () => {
                     </div>
                   )}
                   {item.duration ? (
-                    <span className="text-xs text-gray-500 w-10 text-right">{formatDuration(item.duration)}</span>
+                    <span className="text-xs text-gray-500 w-10 text-right mt-1">{formatDuration(item.duration)}</span>
                   ) : null}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="sticky bottom-28 sm:bottom-32 z-40 bg-gray-900/95 border border-gray-700 rounded-xl p-4 backdrop-blur shadow-xl">

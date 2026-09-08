@@ -1793,6 +1793,21 @@ export const userAPI = {
     return response.data as { jobId: string; status: string };
   },
 
+  rematchYouTubeImportItem: async (payload: {
+    key: string;
+    title: string;
+    artist: string;
+    duration?: number;
+    coverArt?: string | null;
+    originalTitle?: string | null;
+    originalArtist?: string | null;
+    album?: string | null;
+    externalMedia?: Record<string, unknown>;
+  }) => {
+    const response = await api.post('/users/me/import/youtube/rematch', payload);
+    return response.data as { item: Record<string, unknown>; stats?: { high?: number; medium?: number; none?: number } };
+  },
+
   getSpotifyImportRequests: async (status?: string) => {
     const params = status ? { status } : {};
     const response = await api.get('/users/admin/spotify-import-requests', { params });

@@ -26,6 +26,13 @@ const {
   rememberIdentity,
   identityAlreadySeen,
 } = require('../utils/mediaIdentity');
+const { isAdmin } = require('../utils/permissionHelpers');
+const {
+  filterYouTubePreviewItems,
+  resolveYoutubeExecuteItem,
+  youtubeOnlyExternalIds,
+} = require('../utils/youtubeImportIdentity');
+const { unparsedSkipToImportTrack } = require('../utils/youtubePlaylistUtils');
 
 const DEFAULT_TIP = 1.11;
 const MIN_TIP = 0.01;
@@ -478,8 +485,10 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
       identityConfidenceSource,
       crossRefStatus: crossRef?.status || 'none',
       crossRefSources: crossRef?.sources || [],
-      originalTitle: crossRef?.originalTitle || null,
-      originalArtist: crossRef?.originalArtist || null,
+      originalTitle: crossRef?.originalTitle || track.originalTitle || null,
+      originalArtist: crossRef?.originalArtist || track.originalArtist || null,
+      parseStatus: track.parseStatus || null,
+      needsIdentity: Boolean(track.needsIdentity),
       mediaId: catalogId || null,
       mediaUuid: catalogMedia?.uuid || null,
       suggestedTitle: matchStatus === 'possible_match'
@@ -752,10 +761,40 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
     const label = item.title || item.key;
 
     try {
+      const youtubeImport = isYoutubeImportSource(importSource, item);
+      if (youtubeImport) {
+        const youtubeGate = resolveYoutubeExecuteItem(item, { isAdminUser: isAdmin(user) });
+        if (!youtubeGate.allowed) {
+          results.skipped++;
+          results.items.push({
+            key: item.key,
+            title: label,
+            status: 'skipped',
+            reason: youtubeGate.reason || 'unverified_youtube',
+          });
+          report({
+            stage: 'tipping',
+            message: `Importing track ${index + 1} of ${total}…`,
+            current: index + 1,
+            total,
+            partial: {
+              tipped: results.tipped,
+              skipped: results.skipped,
+              failed: results.failed,
+              totalSpentPence: results.totalSpentPence,
+            },
+          });
+          continue;
+        }
+        if (youtubeGate.item) Object.assign(item, youtubeGate.item);
+      }
+
       const track = trackFromImportItem(item);
       const identity = collectIdentity(track, importSource || track.sourceLabel);
       const rejectedFuzzy = item.matchStatus === 'possible_match' && item.useSuggestedMatch === false;
+      const adminConfirmedNew = item.identityConfidenceSource === 'admin_confirmed';
       let resolvedCatalogId = !rejectedFuzzy
+        && !adminConfirmedNew
         && item.mediaId
         && mongoose.Types.ObjectId.isValid(item.mediaId)
         ? String(item.mediaId)
@@ -765,7 +804,7 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
         const exactHit = await findExactCatalogMedia(track);
         if (exactHit?.media?._id) resolvedCatalogId = String(exactHit.media._id);
       }
-      if (!rejectedFuzzy && !resolvedCatalogId) {
+      if (!rejectedFuzzy && !adminConfirmedNew && !resolvedCatalogId) {
         const fuzzyLibrary = findFuzzyCatalogMatch(track, libraryIndexes);
         if (fuzzyLibrary?.media?._id) resolvedCatalogId = String(fuzzyLibrary.media._id);
       }
@@ -813,59 +852,6 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
           emitProgress(index);
           continue;
         }
-      }
-
-      const youtubeImport = isYoutubeImportSource(importSource, item);
-      if (youtubeImport && rejectedFuzzy) {
-        results.skipped++;
-        results.items.push({
-          key: item.key,
-          title: label,
-          status: 'skipped',
-          reason: 'rejected_youtube_match',
-        });
-        report({
-          stage: 'tipping',
-          message: `Importing track ${index + 1} of ${total}…`,
-          current: index + 1,
-          total,
-          partial: {
-            tipped: results.tipped,
-            skipped: results.skipped,
-            failed: results.failed,
-            totalSpentPence: results.totalSpentPence,
-          },
-        });
-        continue;
-      }
-
-      const verifiedYoutubeIdentity = item.identityConfidence === 'verified'
-        || item.crossRefStatus === 'musicbrainz_verified'
-        || item.crossRefStatus === 'isrc_verified'
-        || item.matchStatus === 'on_catalog'
-        || item.matchStatus === 'in_library'
-        || (item.matchStatus === 'possible_match' && item.useSuggestedMatch === true);
-      if (youtubeImport && !item.mediaId && !verifiedYoutubeIdentity) {
-        results.skipped++;
-        results.items.push({
-          key: item.key,
-          title: label,
-          status: 'skipped',
-          reason: 'unverified_youtube',
-        });
-        report({
-          stage: 'tipping',
-          message: `Importing track ${index + 1} of ${total}…`,
-          current: index + 1,
-          total,
-          partial: {
-            tipped: results.tipped,
-            skipped: results.skipped,
-            failed: results.failed,
-            totalSpentPence: results.totalSpentPence,
-          },
-        });
-        continue;
       }
 
       const mediaId = !rejectedFuzzy
@@ -1174,16 +1160,9 @@ async function executeRekordboxImport(userId, opts = {}) {
   return executeLibraryImport(userId, { ...opts, items, importSource: 'rekordbox' });
 }
 
-function filterYouTubePreview(preview, extraSummary = {}) {
-  const kept = [];
-  let skippedNoMatch = 0;
-  for (const item of preview.items || []) {
-    if (item.matchStatus === 'new' && item.identityConfidence !== 'verified') {
-      skippedNoMatch += 1;
-      continue;
-    }
-    kept.push(item);
-  }
+function filterYouTubePreview(preview, extraSummary = {}, { keepUnmatched = false } = {}) {
+  const filtered = filterYouTubePreviewItems(preview.items, { keepUnmatched });
+  const kept = filtered.items;
   const selectedForImport = kept.filter((i) => i.selected);
   return {
     ...preview,
@@ -1191,6 +1170,7 @@ function filterYouTubePreview(preview, extraSummary = {}) {
     items: kept,
     summary: {
       ...preview.summary,
+      ...extraSummary,
       total: kept.length,
       inLibrary: kept.filter((i) => i.matchStatus === 'in_library').length,
       onCatalog: kept.filter((i) => i.matchStatus === 'on_catalog').length,
@@ -1200,24 +1180,35 @@ function filterYouTubePreview(preview, extraSummary = {}) {
       identityUnverified: kept.filter((i) => i.identityConfidence === 'unverified').length,
       selectedCount: selectedForImport.length,
       estimatedTotal: selectedForImport.reduce((sum, i) => sum + i.defaultTip, 0),
-      skippedNoMatch,
-      ...extraSummary,
+      skippedNoMatch: filtered.skippedNoMatch,
+      needsIdentity: filtered.needsIdentity,
     },
   };
+}
+
+function unparsedSkipsToTracks(skipped, importSource) {
+  return (skipped || [])
+    .filter((row) => row.reason !== 'junk_channel' && row.reason !== 'unavailable')
+    .map((row) => unparsedSkipToImportTrack(row, { importSource: importSource || 'youtube_playlist' }));
 }
 
 async function previewYouTubeFetchedTracks(userId, user, fetched, extraSummary, onProgress) {
   const report = typeof onProgress === 'function' ? onProgress : () => {};
   const youtubeImportMatchService = require('./youtubeImportMatchService');
+  const keepUnmatched = isAdmin(user);
+  const importSource = extraSummary?.likesImport ? 'youtube_likes' : 'youtube_playlist';
+  const tracks = keepUnmatched
+    ? [...(fetched.tracks || []), ...unparsedSkipsToTracks(fetched.skipped, importSource)]
+    : (fetched.tracks || []);
 
   report({
     stage: 'cross_ref',
     message: 'Cross-referencing MusicBrainz…',
     current: 0,
-    total: fetched.tracks.length,
+    total: tracks.length,
   });
 
-  const enriched = await youtubeImportMatchService.enrichYouTubeTracksViaMusicBrainz(fetched.tracks, {
+  const enriched = await youtubeImportMatchService.enrichYouTubeTracksViaMusicBrainz(tracks, {
     onProgress: (update) => report({
       stage: 'cross_ref',
       current: update.current,
@@ -1238,7 +1229,9 @@ async function previewYouTubeFetchedTracks(userId, user, fetched, extraSummary, 
   return filterYouTubePreview(preview, {
     scanned: fetched.scanned,
     skippedJunk: fetched.skipped.filter((s) => s.reason === 'junk_channel').length,
-    skippedUnparsed: fetched.skipped.filter((s) => s.reason !== 'junk_channel' && s.reason !== 'unavailable').length,
+    skippedUnparsed: keepUnmatched
+      ? 0
+      : fetched.skipped.filter((s) => s.reason !== 'junk_channel' && s.reason !== 'unavailable').length,
     skippedUnavailable: fetched.skipped.filter((s) => s.reason === 'unavailable').length,
     skippedPlaylistItems: fetched.skipped.length,
     mbHigh: enriched.stats.high,
@@ -1247,12 +1240,71 @@ async function previewYouTubeFetchedTracks(userId, user, fetched, extraSummary, 
     playlistId: fetched.playlistId,
     playlistTitle: fetched.playlistTitle,
     ...extraSummary,
-  });
+  }, { keepUnmatched });
+}
+
+async function rematchYouTubeImportItem(userId, payload = {}) {
+  const user = await User.findById(userId).select('preferences balance role');
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+  if (!isAdmin(user)) {
+    const err = new Error('Admin access required');
+    err.status = 403;
+    throw err;
+  }
+
+  const title = String(payload.title || '').trim();
+  const artist = String(payload.artist || '').trim();
+  if (!title || !artist) {
+    const err = new Error('Artist and title are required to rematch');
+    err.status = 400;
+    throw err;
+  }
+
+  const ext = payload.externalMedia && typeof payload.externalMedia === 'object'
+    ? payload.externalMedia
+    : {};
+  const youtubeId = ext.externalIds?.youtube
+    || payload.key
+    || null;
+  const track = {
+    id: youtubeId,
+    title,
+    artist,
+    coverArt: payload.coverArt || ext.coverArt || null,
+    duration: payload.duration || ext.duration || 0,
+    album: payload.album || ext.album || null,
+    sourceLabel: ext.sourceLabel || 'YouTube Playlist',
+    category: ext.category || 'Music',
+    importSource: ext.importSource || 'youtube_playlist',
+    originalTitle: payload.originalTitle || ext.originalTitle || title,
+    originalArtist: payload.originalArtist || ext.originalArtist || artist,
+    externalIds: youtubeOnlyExternalIds(ext.externalIds || (youtubeId ? { youtube: youtubeId } : {})),
+    sources: ext.sources || {},
+    tags: ext.tags || [],
+    genres: ext.genres || [],
+  };
+
+  const youtubeImportMatchService = require('./youtubeImportMatchService');
+  const enriched = await youtubeImportMatchService.enrichYouTubeTracksViaMusicBrainz([track]);
+  const preview = await previewImportFromTracks(userId, 'youtube', enriched.tracks, user, {}, null);
+  const filtered = filterYouTubePreview(preview, {}, { keepUnmatched: true });
+  const item = filtered.items[0];
+  if (!item) {
+    const err = new Error('Rematch did not return a track');
+    err.status = 500;
+    throw err;
+  }
+  if (payload.key) item.key = payload.key;
+  return { item, stats: enriched.stats };
 }
 
 async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
   const youtubePlaylistService = require('./youtubePlaylistService');
-  const user = await User.findById(userId).select('preferences balance');
+  const user = await User.findById(userId).select('preferences balance role');
   if (!user) {
     const err = new Error('User not found');
     err.status = 404;
@@ -1270,7 +1322,7 @@ async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
 async function previewYouTubeLikesImport(userId, opts = {}) {
   const youtubePlaylistService = require('./youtubePlaylistService');
   const user = await User.findById(userId).select(
-    'preferences balance googleAccessToken googleRefreshToken oauthVerified'
+    'preferences balance role googleAccessToken googleRefreshToken oauthVerified'
   );
   if (!user) {
     const err = new Error('User not found');
@@ -1305,6 +1357,7 @@ module.exports = {
   executeSoundCloudImport,
   executeRekordboxImport,
   executeYouTubePlaylistImport,
+  rematchYouTubeImportItem,
   executeLibraryImport,
   convertRekordboxTrack,
   MIN_TIP,

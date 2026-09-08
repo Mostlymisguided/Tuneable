@@ -262,7 +262,8 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">YouTube Playlists</h3>
             <p className="text-gray-300">
               Paste a public YouTube playlist URL. Confident matches are ready to import; weaker matches need a 
-              quick confirm. Nothing from YouTube is streamed or played on Tuneable.
+              quick confirm. Admins can correct artist and title when MusicBrainz is unsure, rematch, or confirm a 
+              new catalogue identity. Nothing from YouTube is streamed or played on Tuneable.
             </p>
           </div>
           <div>

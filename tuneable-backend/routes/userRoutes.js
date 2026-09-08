@@ -1893,6 +1893,20 @@ router.post('/me/import/youtube/execute/start', authMiddleware, async (req, res)
   }
 });
 
+// @route   POST /api/users/me/import/youtube/rematch
+// @desc    Admin: re-run MusicBrainz after correcting artist/title
+// @access  Private (admin)
+router.post('/me/import/youtube/rematch', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const libraryImportService = require('../services/libraryImportService');
+    const result = await libraryImportService.rematchYouTubeImportItem(req.user._id, req.body || {});
+    res.json(result);
+  } catch (error) {
+    console.error('YouTube import rematch error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to rematch YouTube track' });
+  }
+});
+
 function parseRekordboxPlaylistsField(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
