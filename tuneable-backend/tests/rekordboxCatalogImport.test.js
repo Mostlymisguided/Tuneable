@@ -106,13 +106,11 @@ const {
   buildIngestItems,
   summarizeItems,
 } = require('../services/rekordboxPlaylistIngestService');
-const { buildMediaIndexes } = require('../scripts/lib/catalogMatch');
 
 describe('Rekordbox playlist MP3 ingest classification', () => {
   it('skips tracks whose files are missing on disk', async () => {
     const { tracks } = await getTracksFromPlaylistsFromContent(SAMPLE_XML, ['House Favorites']);
     const items = await buildIngestItems(tracks, {
-      indexes: buildMediaIndexes([]),
       createUnmatched: true,
     });
     expect(items).toHaveLength(2);

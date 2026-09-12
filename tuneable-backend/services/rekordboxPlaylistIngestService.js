@@ -11,6 +11,16 @@ const path = require('path');
 
 const { getTracksFromPlaylistsFromContent } = require('../scripts/lib/rekordboxXml');
 
+function emptyIndexes() {
+  return {
+    byTitleArtist: new Map(),
+    byTitle: new Map(),
+    byCoreTitleArtist: new Map(),
+    byCoreTitle: new Map(),
+    mediaList: [],
+  };
+}
+
 function catalogMatch() {
   return require('../scripts/lib/catalogMatch');
 }
@@ -184,7 +194,7 @@ async function buildIngestItems(tracks, {
     : tracks;
   const musicRoot = path.dirname(capped.find((t) => t.filePath)?.filePath || '/');
   const items = [];
-  const catalogIndexes = indexes || catalogMatch().buildMediaIndexes([]);
+  const catalogIndexes = indexes || emptyIndexes();
 
   for (let index = 0; index < capped.length; index += 1) {
     const track = capped[index];
