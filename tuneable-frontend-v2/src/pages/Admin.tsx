@@ -34,6 +34,7 @@ import RightsAdmin from '../components/RightsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
+import RekordboxPlaylistIngest from '../components/RekordboxPlaylistIngest';
 import MediaMergePanel from '../components/MediaMergePanel';
 import MetadataEnrichmentAdmin from '../components/MetadataEnrichmentAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
@@ -4408,6 +4409,8 @@ const Admin: React.FC = () => {
         {activeTab === 'settings' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">System Settings</h2>
+
+            <RekordboxPlaylistIngest />
 
             <LibraryXmlEnrich
               scope="all"

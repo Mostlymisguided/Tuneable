@@ -100,3 +100,48 @@ describe('convertRekordboxTrack', () => {
     expect(converted.externalIds.rekordbox).toBe('name:Untitled::Someone');
   });
 });
+
+const {
+  classifyLocalFile,
+  buildIngestItems,
+  summarizeItems,
+} = require('../services/rekordboxPlaylistIngestService');
+const { buildMediaIndexes } = require('../scripts/lib/catalogMatch');
+
+describe('Rekordbox playlist MP3 ingest classification', () => {
+  it('skips tracks whose files are missing on disk', async () => {
+    const { tracks } = await getTracksFromPlaylistsFromContent(SAMPLE_XML, ['House Favorites']);
+    const items = await buildIngestItems(tracks, {
+      indexes: buildMediaIndexes([]),
+      createUnmatched: true,
+    });
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => item.action === 'skip' && item.skipReason === 'missing_file')).toBe(true);
+    expect(items.every((item) => item.selected === false)).toBe(true);
+    expect(summarizeItems(items).missingFiles).toBe(2);
+  });
+
+  it('classifies non-mp3 files as skip', () => {
+    const result = classifyLocalFile({
+      filePath: '/tmp/track.wav',
+      fileExists: true,
+    });
+    expect(result).toEqual({ action: 'skip', skipReason: 'not_mp3' });
+  });
+
+  it('classifies low-bitrate mp3s as skip when a gate is set', () => {
+    const result = classifyLocalFile({
+      filePath: '/tmp/track.mp3',
+      fileExists: true,
+      bitrate: 192,
+    }, { minBitrate: 320 });
+    expect(result.action).toBe('skip');
+    expect(result.skipReason).toBe('low_bitrate');
+  });
+
+  it('requires a playlist name for ingest preview', async () => {
+    const { previewPlaylistIngest } = require('../services/rekordboxPlaylistIngestService');
+    await expect(previewPlaylistIngest(SAMPLE_XML, { playlists: [] }))
+      .rejects.toThrow(/playlist/i);
+  });
+});

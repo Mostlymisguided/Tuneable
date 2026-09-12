@@ -1203,7 +1203,16 @@ const LibraryImport: React.FC = () => {
           </h1>
           <p className="text-gray-400 mt-2 max-w-2xl">
             {isRekordbox
-              ? 'Admin: upload a Rekordbox XML export, pick playlists, then tip catalog entries into your library. Audio is not uploaded.'
+              ? (
+                <>
+                  Admin: upload a Rekordbox XML export, pick playlists, then tip catalog entries into your library. Audio is not uploaded.
+                  {' '}
+                  <Link to="/admin?tab=settings#rekordbox-ingest" className="text-purple-400 hover:underline">
+                    Ingest local MP3s from a playlist
+                  </Link>
+                  {' '}instead.
+                </>
+              )
               : isYouTube
                 ? 'Paste a public YouTube playlist URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm. Admins can correct artist and title when there is no confident match.'
                 : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
@@ -1408,6 +1417,11 @@ const LibraryImport: React.FC = () => {
                   ) : (
                     <p className="text-xs text-gray-500 text-center">
                       Export a playlist (or the library) from Rekordbox as XML. Cover art is read from files on this machine when Location paths are reachable.
+                      {' '}
+                      <Link to="/admin?tab=settings#rekordbox-ingest" className="text-purple-400 hover:underline">
+                        Upload the MP3s themselves from Admin → Settings
+                      </Link>
+                      .
                     </p>
                   )}
                 </div>

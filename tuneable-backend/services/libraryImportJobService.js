@@ -5,6 +5,7 @@
 
 const crypto = require('crypto');
 const libraryImportService = require('./libraryImportService');
+const rekordboxPlaylistIngestService = require('./rekordboxPlaylistIngestService');
 
 const JOB_TTL_MS = 15 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
@@ -114,7 +115,7 @@ function completeJob(jobId, result) {
   });
 }
 
-function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl, mode } = {}) {
+function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl, mode, minBitrate, createUnmatched } = {}) {
   const job = createJob({ userId, type: 'preview', source });
   const onProgress = progressReporter(job.id);
 
@@ -122,7 +123,15 @@ function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, play
     try {
       patchJob(job.id, { status: 'running', stage: 'starting', message: 'Starting scan…' });
       let preview;
-      if (source === 'rekordbox') {
+      if (source === 'rekordbox_ingest') {
+        preview = await rekordboxPlaylistIngestService.previewPlaylistIngest(xmlContent, {
+          playlists,
+          limit,
+          minBitrate,
+          createUnmatched,
+          onProgress,
+        });
+      } else if (source === 'rekordbox') {
         preview = await libraryImportService.previewRekordboxImport(userId, xmlContent, {
           playlists,
           limit,
@@ -168,7 +177,7 @@ function findActiveExecuteJob(userId) {
   return null;
 }
 
-function startExecuteJob(userId, source, { items, defaultTip } = {}) {
+function startExecuteJob(userId, source, { items, defaultTip, createParties, partyLocation } = {}) {
   const existing = findActiveExecuteJob(userId);
   if (existing) {
     return { jobId: existing.id, alreadyRunning: true };
@@ -181,7 +190,14 @@ function startExecuteJob(userId, source, { items, defaultTip } = {}) {
     try {
       patchJob(job.id, { status: 'running', stage: 'starting', message: 'Starting import…' });
       let results;
-      if (source === 'rekordbox') {
+      if (source === 'rekordbox_ingest') {
+        results = await rekordboxPlaylistIngestService.executePlaylistIngest(userId, {
+          items,
+          createParties,
+          partyLocation,
+          onProgress,
+        });
+      } else if (source === 'rekordbox') {
         results = await libraryImportService.executeRekordboxImport(userId, { items, defaultTip, onProgress });
       } else if (source === 'soundcloud') {
         results = await libraryImportService.executeSoundCloudImport(userId, { items, defaultTip, onProgress });
@@ -191,12 +207,14 @@ function startExecuteJob(userId, source, { items, defaultTip } = {}) {
         results = await libraryImportService.executeSpotifyImport(userId, { items, defaultTip, onProgress });
       }
 
-      completeJob(job.id, {
-        success: true,
-        ...results,
-        totalSpent: results.totalSpentPence / 100,
-        updatedBalance: results.updatedBalance / 100,
-      });
+      completeJob(job.id, source === 'rekordbox_ingest'
+        ? { success: true, ...results }
+        : {
+          success: true,
+          ...results,
+          totalSpent: results.totalSpentPence / 100,
+          updatedBalance: results.updatedBalance / 100,
+        });
     } catch (error) {
       console.error(`[libraryImportJob] execute ${source} failed:`, error.message);
       failJob(job.id, error);

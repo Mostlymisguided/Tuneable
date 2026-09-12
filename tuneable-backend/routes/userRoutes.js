@@ -246,7 +246,7 @@ const upload = createProfilePictureUpload();
 
 const rekordboxXmlUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     const mime = (file.mimetype || '').toLowerCase();
@@ -1984,6 +1984,64 @@ router.post('/me/import/rekordbox/execute/start', authMiddleware, adminMiddlewar
   } catch (error) {
     console.error('Rekordbox import execute start error:', error);
     res.status(500).json({ error: error.message || 'Failed to start Rekordbox import' });
+  }
+});
+
+// @route   POST /api/users/me/import/rekordbox/ingest/preview/start
+// @desc    Preview Rekordbox playlist MP3 ingest (local files → catalog attach/create)
+// @access  Private (admin)
+router.post(
+  '/me/import/rekordbox/ingest/preview/start',
+  authMiddleware,
+  adminMiddleware,
+  rekordboxXmlUpload.single('libraryXmlFile'),
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: 'libraryXmlFile is required' });
+      }
+      const playlists = parseRekordboxPlaylistsField(req.body?.playlists);
+      if (!playlists.length) {
+        return res.status(400).json({ error: 'Select at least one Rekordbox playlist' });
+      }
+      const minBitrate = req.body?.minBitrate ? parseInt(req.body.minBitrate, 10) : 0;
+      const createUnmatched = req.body?.createUnmatched !== 'false' && req.body?.createUnmatched !== false;
+      const limit = req.body?.limit ? parseInt(req.body.limit, 10) : null;
+      const libraryImportJobService = require('../services/libraryImportJobService');
+      const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'rekordbox_ingest', {
+        xmlContent: req.file.buffer.toString('utf8'),
+        playlists,
+        minBitrate: Number.isFinite(minBitrate) ? minBitrate : 0,
+        createUnmatched,
+        limit: Number.isFinite(limit) && limit > 0 ? limit : null,
+      });
+      res.status(202).json({ jobId, status: 'queued' });
+    } catch (error) {
+      console.error('Rekordbox ingest preview start error:', error);
+      res.status(error.status || 500).json({ error: error.message || 'Failed to start Rekordbox ingest preview' });
+    }
+  }
+);
+
+// @route   POST /api/users/me/import/rekordbox/ingest/execute/start
+// @desc    Execute Rekordbox playlist MP3 ingest (uploads local files to R2)
+// @access  Private (admin)
+router.post('/me/import/rekordbox/ingest/execute/start', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { items, createParties = true, partyLocation } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'No tracks selected to ingest' });
+    }
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const started = libraryImportJobService.startExecuteJob(req.user._id, 'rekordbox_ingest', {
+      items,
+      createParties: createParties !== false,
+      partyLocation: partyLocation || 'Library Import',
+    });
+    res.status(202).json({ jobId: started.jobId, status: started.alreadyRunning ? 'running' : 'queued' });
+  } catch (error) {
+    console.error('Rekordbox ingest execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start Rekordbox ingest' });
   }
 });
 

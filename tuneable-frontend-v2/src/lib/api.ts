@@ -1791,6 +1791,33 @@ export const userAPI = {
     return response.data as { jobId: string; status: string };
   },
 
+  startRekordboxIngestPreview: async (
+    libraryXmlFile: File,
+    playlists: string[],
+    options?: { minBitrate?: number; createUnmatched?: boolean; limit?: number }
+  ) => {
+    const formData = new FormData();
+    formData.append('libraryXmlFile', libraryXmlFile);
+    formData.append('playlists', JSON.stringify(playlists));
+    if (options?.minBitrate != null) formData.append('minBitrate', String(options.minBitrate));
+    if (options?.createUnmatched === false) formData.append('createUnmatched', 'false');
+    if (options?.limit) formData.append('limit', String(options.limit));
+    const response = await api.post('/users/me/import/rekordbox/ingest/preview/start', formData);
+    return response.data as { jobId: string; status: string };
+  },
+
+  startRekordboxIngestExecute: async (
+    items: Array<Record<string, unknown>>,
+    options?: { createParties?: boolean; partyLocation?: string }
+  ) => {
+    const response = await api.post('/users/me/import/rekordbox/ingest/execute/start', {
+      items,
+      createParties: options?.createParties !== false,
+      partyLocation: options?.partyLocation || 'Library Import',
+    });
+    return response.data as { jobId: string; status: string };
+  },
+
   requestSpotifyImport: async (spotifyAccount: string, note?: string) => {
     const response = await api.post('/users/me/import/spotify/request', { spotifyAccount, note });
     return response.data as {

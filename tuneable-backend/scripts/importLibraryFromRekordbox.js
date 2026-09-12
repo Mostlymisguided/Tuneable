@@ -2,9 +2,11 @@
 /**
  * Import MP3s from Rekordbox XML playlists into Tuneable.
  *
- * - Matches existing YouTube catalog entries and attaches MP3 (pending rights)
+ * Shared implementation: services/rekordboxPlaylistIngestService.js
+ * (same path the admin web UI uses).
+ *
+ * - Matches existing catalog entries and attaches MP3 (pending rights)
  * - Creates new Media records for unmatched tracks (--create-unmatched, default on)
- * - Tips on pending-rights tracks go to artist escrow until claimed
  * - Optionally mirrors Rekordbox playlists as private Tuneable parties
  *
  * List playlists:
@@ -32,13 +34,8 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 
-const { listPlaylists, getTracksFromPlaylists } = require('./lib/rekordboxXml');
-const { buildMediaIndexes, buildGuessFromFile, findBestCatalogMatch } = require('./lib/catalogMatch');
-const {
-  attachWithPendingRights,
-  createMediaWithPendingRights,
-  addMediaToPlaylistParty,
-} = require('./lib/libraryImport');
+const { listPlaylistsFromContent } = require('./lib/rekordboxXml');
+const { runPlaylistIngest } = require('../services/rekordboxPlaylistIngestService');
 
 const args = process.argv.slice(2);
 
@@ -97,195 +94,76 @@ if (!listOnly && !playlistsArg) {
   process.exit(1);
 }
 
+function formatItem(item) {
+  const fileLabel = item.filePath ? path.basename(item.filePath) : item.title;
+  const label = `"${item.title || fileLabel}" by ${item.artist || '?'}`;
+  if (item.action === 'attach') {
+    return `  MATCH [${item.matchType}] ${fileLabel} → catalog ${label}`;
+  }
+  if (item.action === 'create') {
+    return `  NEW  ${fileLabel} → ${label}`;
+  }
+  const reason = item.skipReason ? ` (${item.skipReason})` : '';
+  return `  SKIP${reason} ${fileLabel} — ${label}`;
+}
+
 async function main() {
+  const xmlContent = fs.readFileSync(xmlPath, 'utf8');
+
   if (listOnly) {
-    const playlists = await listPlaylists(xmlPath);
+    const playlists = await listPlaylistsFromContent(xmlContent);
     console.log(`\nRekordbox playlists (${playlists.length}):\n`);
     for (const p of playlists) {
       const missing = p.missingFiles > 0 ? ` (${p.missingFiles} missing files)` : '';
-      console.log(`  ${p.fullPath} — ${p.trackCount} tracks${missing}`);
+      const local = p.localFiles > 0 ? `, ${p.localFiles} local` : '';
+      console.log(`  ${p.fullPath} — ${p.trackCount} tracks${local}${missing}`);
     }
     return;
   }
 
   const playlistNames = playlistsArg.split(',').map((s) => s.trim()).filter(Boolean);
-  const { playlists, tracks, unmatchedPlaylists } = await getTracksFromPlaylists(xmlPath, playlistNames);
-
-  console.log(`XML: ${xmlPath}`);
-  console.log(`Playlists matched: ${playlists.map((p) => p.fullPath).join(', ') || '(none)'}`);
-  if (unmatchedPlaylists.length) {
-    console.warn(`Playlists not found: ${unmatchedPlaylists.join(', ')}`);
-  }
-  console.log(`Tracks to process: ${tracks.length}`);
-
-  const mp3Tracks = tracks.filter((t) => t.filePath?.toLowerCase().endsWith('.mp3'));
-  const missing = tracks.filter((t) => !t.fileExists);
-  if (missing.length) {
-    console.warn(`${missing.length} track(s) reference missing files on disk`);
-  }
-  if (tracks.length - mp3Tracks.length > 0) {
-    console.warn(`Skipping ${tracks.length - mp3Tracks.length} non-MP3 file(s)`);
-  }
-
-  const toProcess = limit ? mp3Tracks.slice(0, limit) : mp3Tracks;
 
   const mongoURI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/tuneable';
   await mongoose.connect(mongoURI);
   console.log('Connected to MongoDB\n');
 
-  const Media = require('../models/Media');
-
-  let user = null;
-  if (execute) {
-    user = await mongoose.connection.collection('users').findOne({
-      _id: new mongoose.Types.ObjectId(userIdArg),
-    });
-    if (!user) {
-      console.error('User not found:', userIdArg);
-      process.exit(1);
-    }
-    if (!process.env.R2_ENDPOINT || !process.env.R2_BUCKET_NAME) {
-      console.error('R2 env vars required for --execute');
-      process.exit(1);
-    }
-    console.log(`Executing as: ${user.username} (${user._id})\n`);
+  console.log(`XML: ${xmlPath}`);
+  console.log(`Playlists: ${playlistNames.join(', ')}`);
+  if (minBitrate > 0) {
+    console.log(`Bitrate gate: rejecting tracks below ${minBitrate}kbps`);
   }
+  console.log('');
 
-  const catalogCandidates = await Media.find({
-    contentForm: { $in: ['tune'] },
-    $or: [
-      { 'sources.youtube': { $exists: true, $ne: null } },
-      { 'sources.upload': { $exists: false } },
-      { 'sources.upload': null },
-      { 'sources.upload': '' },
-    ],
-  }).select('title artist sources uuid _id rightsStatus');
-
-  const youtubeOnly = catalogCandidates.filter((m) => {
-    const upload = m.sources?.get?.('upload') ?? m.sources?.upload;
-    return !upload;
+  const result = await runPlaylistIngest(xmlContent, {
+    playlists: playlistNames,
+    userId: execute ? userIdArg : null,
+    dryRun: !execute,
+    limit,
+    minBitrate,
+    createUnmatched,
+    createParties,
+    partyLocation,
+    onItem: (item) => console.log(formatItem(item)),
   });
 
-  const indexes = buildMediaIndexes(youtubeOnly);
-  console.log(`YouTube-only catalog entries: ${youtubeOnly.length}\n`);
-
-  const stats = {
-    attached: 0,
-    created: 0,
-    skipped: 0,
-    unmatched: 0,
-    partyAdds: 0,
-    lowBitrate: 0,
-    errors: 0,
-  };
-
-  if (minBitrate > 0) {
-    console.log(`Bitrate gate: rejecting tracks below ${minBitrate}kbps\n`);
-  }
-
-  const musicRoot = path.dirname(toProcess[0]?.filePath || '/');
-
-  for (const track of toProcess) {
-    const filePath = track.filePath;
-    const label = `"${track.name || path.basename(filePath)}" by ${track.artist || '?'}`;
-    const { candidates, id3 } = await buildGuessFromFile(filePath, musicRoot, track);
-
-    if (minBitrate > 0) {
-      const kbps = track.bitrate || (id3.bitrate ? Math.round(id3.bitrate) : null);
-      if (kbps != null && kbps < minBitrate) {
-        stats.lowBitrate++;
-        console.log(`  ✗ LOW BITRATE ${kbps}kbps < ${minBitrate}: ${path.basename(filePath)}`);
-        continue;
-      }
-      if (kbps == null) {
-        console.warn(`  ? bitrate unknown, allowing: ${path.basename(filePath)}`);
-      }
-    }
-
-    const match = findBestCatalogMatch(candidates, indexes);
-
-    if (match) {
-      console.log(`  MATCH [${match.matchType}] ${path.basename(filePath)} → catalog ${label}`);
-      if (execute) {
-        try {
-          const out = await attachWithPendingRights(match.media, filePath, user, {
-            rekordboxMeta: track,
-            importSource: 'rekordbox',
-          });
-          if (out.skipped) {
-            stats.skipped++;
-            console.log(`    ↷ Skipped: ${out.reason}`);
-          } else {
-            stats.attached++;
-            console.log(`    ↑ Attached (pending rights): ${out.uuid}`);
-            if (createParties && track.playlistName) {
-              const pr = await addMediaToPlaylistParty({
-                playlistName: track.playlistName,
-                mediaId: out.mediaId,
-                user,
-                location: partyLocation,
-              });
-              if (pr.added) stats.partyAdds++;
-            }
-          }
-        } catch (err) {
-          stats.errors++;
-          console.error(`    ✗ Error: ${err.message}`);
-        }
-      }
-    } else if (createUnmatched) {
-      console.log(`  NEW  ${path.basename(filePath)} → ${label}`);
-      if (execute) {
-        try {
-          const guess = candidates[0] || { title: track.name, artist: track.artist };
-          const out = await createMediaWithPendingRights(filePath, user, {
-            rekordboxMeta: track,
-            importSource: 'rekordbox',
-            guess,
-          });
-          if (out.skipped) {
-            stats.skipped++;
-            console.log(`    ↷ Skipped: ${out.reason}`);
-          } else {
-            stats.created++;
-            console.log(`    + Created (pending rights): ${out.uuid}`);
-            if (createParties && track.playlistName) {
-              const pr = await addMediaToPlaylistParty({
-                playlistName: track.playlistName,
-                mediaId: out.mediaId,
-                user,
-                location: partyLocation,
-              });
-              if (pr.added) stats.partyAdds++;
-            }
-          }
-        } catch (err) {
-          stats.errors++;
-          console.error(`    ✗ Error: ${err.message}`);
-        }
-      }
-    } else {
-      stats.unmatched++;
-      console.log(`  ???  No catalog match: ${path.basename(filePath)} — ${label}`);
-    }
-  }
-
+  console.log(`\nPlaylists matched: ${result.playlists.map((p) => p.fullPath).join(', ') || '(none)'}`);
   console.log('\n--- Summary ---');
-  console.log(`Tracks in playlists: ${tracks.length}`);
-  console.log(`MP3 processed:       ${toProcess.length}`);
-  if (minBitrate > 0) {
-    console.log(`Rejected < ${minBitrate}kbps:   ${stats.lowBitrate}`);
+  console.log(`Tracks in playlists: ${result.summary.total}`);
+  console.log(`Attach to catalog:   ${result.summary.attach}`);
+  console.log(`Create new media:    ${result.summary.create}`);
+  console.log(`Skipped:             ${result.summary.skip}`);
+  if (result.summary.lowBitrate > 0) {
+    console.log(`Rejected < ${minBitrate}kbps:   ${result.summary.lowBitrate}`);
   }
-  if (dryRun) {
+  if (result.dryRun) {
     console.log('(dry run — no changes made)');
   }
-  if (execute) {
-    console.log(`Attached to catalog: ${stats.attached}`);
-    console.log(`New media created:   ${stats.created}`);
-    console.log(`Skipped:             ${stats.skipped}`);
-    console.log(`Unmatched (no create): ${stats.unmatched}`);
-    console.log(`Party entries added: ${stats.partyAdds}`);
-    console.log(`Errors:              ${stats.errors}`);
+  if (result.results) {
+    console.log(`Attached to catalog: ${result.results.attached}`);
+    console.log(`New media created:   ${result.results.created}`);
+    console.log(`Skipped on execute:  ${result.results.skipped}`);
+    console.log(`Party entries added: ${result.results.partyAdds}`);
+    console.log(`Errors:              ${result.results.failed}`);
   }
 
   await mongoose.disconnect();
