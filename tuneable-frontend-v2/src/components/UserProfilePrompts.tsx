@@ -145,8 +145,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     hasHomeLocation &&
     !currentLocation &&
     !promptDismissed &&
-    currentLocationStatus !== 'denied' &&
-    currentLocationStatus !== 'unavailable';
+    currentLocationStatus !== 'denied';
 
   const prompts: Prompt[] = [];
 
@@ -209,7 +208,11 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       description: 'Tip once and influence charts at home and where you are now',
       icon: Navigation,
       action: handleEnableCurrentLocation,
-      actionLabel: isEnablingLocation ? 'Detecting...' : 'Enable',
+      actionLabel: isEnablingLocation
+        ? 'Detecting...'
+        : currentLocationStatus === 'unavailable' || currentLocationStatus === 'error'
+          ? 'Try again'
+          : 'Enable',
       priority: 5
     });
   }

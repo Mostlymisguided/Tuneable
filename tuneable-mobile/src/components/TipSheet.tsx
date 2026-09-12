@@ -167,8 +167,10 @@ export function TipSheet({
       currentLocation?.placeId &&
       homeLocation.placeId === currentLocation.placeId
   );
-  const canOfferCurrentLocation =
-    locationStatus !== 'denied' && locationStatus !== 'unavailable';
+  // Denied needs Settings. Timeouts / location-services-off are retryable.
+  const canOfferCurrentLocation = locationStatus !== 'denied';
+  const locationNeedsRetry =
+    locationStatus === 'unavailable' || locationStatus === 'error';
 
   useEffect(() => {
     return subscribeCurrentLocation(() => {
@@ -441,8 +443,8 @@ export function TipSheet({
     currentLabel ||
     (locationStatus === 'denied'
       ? 'Permission denied'
-      : locationStatus === 'unavailable'
-        ? 'Unavailable'
+      : locationStatus === 'unavailable' || locationStatus === 'error'
+        ? 'Couldn’t detect'
         : locationStatus === 'loading' || enablingLocation
           ? 'Detecting…'
           : 'Not enabled');
@@ -640,8 +642,9 @@ export function TipSheet({
                 {!currentLocation && canOfferCurrentLocation ? (
                   <View style={styles.enableRow}>
                     <Text style={styles.enableCopy}>
-                      Without location, this tip only counts on your home
-                      charts. Enable it to also influence charts where you are.
+                      {locationNeedsRetry
+                        ? 'We couldn’t detect your location. Try again, or tip with home only.'
+                        : 'Without location, this tip only counts on your home charts. Enable it to also influence charts where you are.'}
                     </Text>
                     <Pressable
                       style={styles.enableBtn}
@@ -657,7 +660,9 @@ export function TipSheet({
                         <>
                           <Ionicons name="navigate" size={16} color="#fff" />
                           <Text style={styles.enableBtnText}>
-                            Enable location
+                            {locationNeedsRetry
+                              ? 'Try again'
+                              : 'Enable location'}
                           </Text>
                         </>
                       )}

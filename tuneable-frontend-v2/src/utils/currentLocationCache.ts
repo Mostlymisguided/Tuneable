@@ -69,6 +69,10 @@ export function getCurrentLocationError(): string | null {
   return lastError;
 }
 
+export function isGeolocationSupported(): boolean {
+  return typeof navigator !== 'undefined' && Boolean(navigator.geolocation);
+}
+
 export function getTipCurrentLocation(): ResolvedLocation | null {
   if (memoryCache && Date.now() - memoryCache.resolvedAt <= TTL_MS) {
     return memoryCache.location;
