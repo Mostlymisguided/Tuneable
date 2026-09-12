@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from '../utils/toast';
-import { Mail, MessageSquare, CheckCircle, XCircle, Clock, Copy } from 'lucide-react';
+import { Mail, MessageSquare, CheckCircle, XCircle, Clock, Copy, ChevronDown, ChevronUp } from 'lucide-react';
 import { userAPI } from '../lib/api';
 
 interface InviteRequest {
@@ -24,6 +24,7 @@ const InviteRequestsAdmin: React.FC<InviteRequestsAdminProps> = ({ onPendingCoun
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     loadRequests();
@@ -120,29 +121,46 @@ const InviteRequestsAdmin: React.FC<InviteRequestsAdminProps> = ({ onPendingCoun
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Invite Requests</h2>
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          className="flex items-center text-left hover:opacity-90 transition-opacity"
+          aria-expanded={!isCollapsed}
+        >
+          <h2 className="text-2xl font-bold text-white">Invite Requests</h2>
+          <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+            {requests.length}
+          </span>
+          {isCollapsed ? (
+            <ChevronDown className="h-5 w-5 text-gray-400 ml-3" />
+          ) : (
+            <ChevronUp className="h-5 w-5 text-gray-400 ml-3" />
+          )}
+        </button>
         
         {/* Filter Tabs */}
-        <div className="flex space-x-2">
-          {['all', 'pending', 'approved', 'rejected'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setFilter(tab as any)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === tab
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
-        </div>
+        {!isCollapsed && (
+          <div className="flex space-x-2">
+            {['all', 'pending', 'approved', 'rejected'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab as any)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  filter === tab
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Requests List */}
-      {loading ? (
+      {isCollapsed ? null : loading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin h-8 w-8 border-2 border-purple-600 border-t-transparent rounded-full"></div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { authAPI } from '../lib/api';
 import { DEFAULT_PROFILE_PIC } from '../constants';
@@ -16,6 +16,9 @@ const InviteReferrals: React.FC = () => {
   const [newCodeLabel, setNewCodeLabel] = useState('');
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
+  const [isCodesCollapsed, setIsCodesCollapsed] = useState(false);
+  const [isReferralsCollapsed, setIsReferralsCollapsed] = useState(false);
+  const [isInactiveCollapsed, setIsInactiveCollapsed] = useState(true);
 
   useEffect(() => {
     loadReferrals();
@@ -127,162 +130,207 @@ const InviteReferrals: React.FC = () => {
     <div className="space-y-6">
       {/* Invite Codes Management */}
       <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Gift className="h-6 w-6 text-yellow-400 mr-2" />
-            <h3 className="text-xl font-bold text-white">Your Invite Codes</h3>
-          </div>
+        <div className="flex items-center justify-between gap-3">
           <button
+            type="button"
+            onClick={() => setIsCodesCollapsed((prev) => !prev)}
+            className="flex items-center justify-between flex-1 min-w-0 text-left hover:opacity-90 transition-opacity"
+            aria-expanded={!isCodesCollapsed}
+          >
+            <div className="flex items-center min-w-0">
+              <Gift className="h-6 w-6 text-yellow-400 mr-2 flex-shrink-0" />
+              <h3 className="text-xl font-bold text-white">Your Invite Codes</h3>
+              {activeCodes[0]?.code && (
+                <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full font-mono">
+                  {activeCodes[0].code}
+                </span>
+              )}
+              {activeCodes.length > 1 && (
+                <span className="ml-2 text-sm text-gray-400">
+                  +{activeCodes.length - 1}
+                </span>
+              )}
+            </div>
+            {isCodesCollapsed ? (
+              <ChevronDown className="h-5 w-5 text-gray-400 ml-3 flex-shrink-0" />
+            ) : (
+              <ChevronUp className="h-5 w-5 text-gray-400 ml-3 flex-shrink-0" />
+            )}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center space-x-2"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center space-x-2 flex-shrink-0"
           >
             <Plus className="h-5 w-5" />
             <span>New Code</span>
           </button>
         </div>
-        <p className="text-sm text-gray-300 mb-4">
-          Invite an artist with your code and you earn 10% of their paid tip revenue for their first year — taken from Tuneable&apos;s share, not theirs. It only applies to music they upload themselves.
-        </p>
-        
-        <p className="text-gray-300 mb-4">
-          Create multiple invite codes to track signups from different sources (Reddit, Twitter, etc.)
-        </p>
 
-        {/* Active Invite Codes */}
-        <div className="space-y-3 mb-4">
-          {activeCodes.length === 0 ? (
-            <div className="text-center py-4 text-gray-400">
-              No active invite codes. Create one to get started!
-            </div>
-          ) : (
-            activeCodes.map((inviteCode) => (
-              <div
-                key={inviteCode._id}
-                className="bg-black/40 rounded-lg p-4 border border-purple-500/30"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <p className="text-xs text-gray-400">
-                        {inviteCode.label || 'Primary'}
-                      </p>
-                      {inviteCode.usageCount > 0 && (
-                        <span className="text-xs text-purple-400">
-                          {inviteCode.usageCount} {inviteCode.usageCount === 1 ? 'signup' : 'signups'}
-                        </span>
-                      )}
+        {!isCodesCollapsed && (
+          <>
+            <p className="text-sm text-gray-300 mt-4 mb-4">
+              Invite an artist with your code and you earn 10% of their paid tip revenue for their first year — taken from Tuneable&apos;s share, not theirs. It only applies to music they upload themselves.
+            </p>
+            
+            <p className="text-gray-300 mb-4">
+              Create multiple invite codes to track signups from different sources (Reddit, Twitter, etc.)
+            </p>
+
+            {/* Active Invite Codes */}
+            <div className="space-y-3 mb-4">
+              {activeCodes.length === 0 ? (
+                <div className="text-center py-4 text-gray-400">
+                  No active invite codes. Create one to get started!
+                </div>
+              ) : (
+                activeCodes.map((inviteCode) => (
+                  <div
+                    key={inviteCode._id}
+                    className="bg-black/40 rounded-lg p-4 border border-purple-500/30"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <p className="text-xs text-gray-400">
+                            {inviteCode.label || 'Primary'}
+                          </p>
+                          {inviteCode.usageCount > 0 && (
+                            <span className="text-xs text-purple-400">
+                              {inviteCode.usageCount} {inviteCode.usageCount === 1 ? 'signup' : 'signups'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-2xl font-mono font-bold text-white tracking-wider">
+                          {inviteCode.code}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => copyInviteCode(inviteCode.code)}
+                          className="p-2 bg-purple-600/50 hover:bg-purple-600 text-white rounded transition-colors"
+                          title="Copy code"
+                        >
+                          {copiedCode === inviteCode.code ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => copyInviteLink(inviteCode.code)}
+                          className="p-2 bg-pink-600/50 hover:bg-pink-600 text-white rounded transition-colors"
+                          title="Copy link"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                        {editingCode === inviteCode._id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editLabel}
+                              onChange={(e) => setEditLabel(e.target.value)}
+                              placeholder="Label (e.g., Reddit)"
+                              className="px-2 py-1 bg-black/60 text-white rounded text-sm w-24"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleUpdateCode(inviteCode._id, undefined, editLabel)}
+                              className="p-2 bg-green-600/50 hover:bg-green-600 text-white rounded transition-colors"
+                              title="Save"
+                            >
+                              <Save className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingCode(null);
+                                setEditLabel('');
+                              }}
+                              className="p-2 bg-gray-600/50 hover:bg-gray-600 text-white rounded transition-colors"
+                              title="Cancel"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingCode(inviteCode._id);
+                                setEditLabel(inviteCode.label || '');
+                              }}
+                              className="p-2 bg-blue-600/50 hover:bg-blue-600 text-white rounded transition-colors"
+                              title="Edit label"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            {activeCodes.length > 1 && (
+                              <button
+                                onClick={() => handleDeleteCode(inviteCode._id)}
+                                className="p-2 bg-red-600/50 hover:bg-red-600 text-white rounded transition-colors"
+                                title="Deactivate"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-2xl font-mono font-bold text-white tracking-wider">
-                      {inviteCode.code}
+                    <p className="text-xs text-gray-400 mt-2">
+                      {window.location.origin}/register?invite={inviteCode.code}
                     </p>
                   </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => copyInviteCode(inviteCode.code)}
-                      className="p-2 bg-purple-600/50 hover:bg-purple-600 text-white rounded transition-colors"
-                      title="Copy code"
-                    >
-                      {copiedCode === inviteCode.code ? (
-                        <CheckCircle className="h-4 w-4" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => copyInviteLink(inviteCode.code)}
-                      className="p-2 bg-pink-600/50 hover:bg-pink-600 text-white rounded transition-colors"
-                      title="Copy link"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                    {editingCode === inviteCode._id ? (
-                      <>
-                        <input
-                          type="text"
-                          value={editLabel}
-                          onChange={(e) => setEditLabel(e.target.value)}
-                          placeholder="Label (e.g., Reddit)"
-                          className="px-2 py-1 bg-black/60 text-white rounded text-sm w-24"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => handleUpdateCode(inviteCode._id, undefined, editLabel)}
-                          className="p-2 bg-green-600/50 hover:bg-green-600 text-white rounded transition-colors"
-                          title="Save"
-                        >
-                          <Save className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingCode(null);
-                            setEditLabel('');
-                          }}
-                          className="p-2 bg-gray-600/50 hover:bg-gray-600 text-white rounded transition-colors"
-                          title="Cancel"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => {
-                            setEditingCode(inviteCode._id);
-                            setEditLabel(inviteCode.label || '');
-                          }}
-                          className="p-2 bg-blue-600/50 hover:bg-blue-600 text-white rounded transition-colors"
-                          title="Edit label"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        {activeCodes.length > 1 && (
-                          <button
-                            onClick={() => handleDeleteCode(inviteCode._id)}
-                            className="p-2 bg-red-600/50 hover:bg-red-600 text-white rounded transition-colors"
-                            title="Deactivate"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  {window.location.origin}/register?invite={inviteCode.code}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Inactive Invite Codes */}
-        {inactiveCodes.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-purple-500/20">
-            <p className="text-sm text-gray-400 mb-2">Inactive Codes</p>
-            <div className="space-y-2">
-              {inactiveCodes.map((inviteCode) => (
-                <div
-                  key={inviteCode._id}
-                  className="bg-black/20 rounded-lg p-3 border border-gray-600/30 opacity-60"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-500">{inviteCode.label || 'Unlabeled'}</p>
-                      <p className="text-lg font-mono text-gray-400">{inviteCode.code}</p>
-                    </div>
-                    <button
-                      onClick={() => handleUpdateCode(inviteCode._id, true)}
-                      className="px-3 py-1 bg-green-600/50 hover:bg-green-600 text-white rounded text-sm transition-colors"
-                    >
-                      Reactivate
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-          </div>
+
+            {/* Inactive Invite Codes */}
+            {inactiveCodes.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-purple-500/20">
+                <button
+                  type="button"
+                  onClick={() => setIsInactiveCollapsed((prev) => !prev)}
+                  className="w-full flex items-center justify-between text-left mb-2 hover:opacity-90 transition-opacity"
+                  aria-expanded={!isInactiveCollapsed}
+                >
+                  <p className="text-sm text-gray-400">
+                    Inactive Codes
+                    <span className="ml-2 text-gray-500">({inactiveCodes.length})</span>
+                  </p>
+                  {isInactiveCollapsed ? (
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4 text-gray-500" />
+                  )}
+                </button>
+                {!isInactiveCollapsed && (
+                  <div className="space-y-2">
+                    {inactiveCodes.map((inviteCode) => (
+                      <div
+                        key={inviteCode._id}
+                        className="bg-black/20 rounded-lg p-3 border border-gray-600/30 opacity-60"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500">{inviteCode.label || 'Unlabeled'}</p>
+                            <p className="text-lg font-mono text-gray-400">{inviteCode.code}</p>
+                          </div>
+                          <button
+                            onClick={() => handleUpdateCode(inviteCode._id, true)}
+                            className="px-3 py-1 bg-green-600/50 hover:bg-green-600 text-white rounded text-sm transition-colors"
+                          >
+                            Reactivate
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -340,95 +388,110 @@ const InviteReferrals: React.FC = () => {
 
       {/* Referrals List */}
       <div className="card bg-black/20 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+        <button
+          type="button"
+          onClick={() => setIsReferralsCollapsed((prev) => !prev)}
+          className="w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity"
+          aria-expanded={!isReferralsCollapsed}
+        >
           <div className="flex items-center">
             <Users className="h-6 w-6 text-purple-400 mr-2" />
             <h3 className="text-xl font-bold text-white">
               People You've Invited
             </h3>
-          </div>
-          <div className="flex items-center space-x-3">
-            {activeCodes.length > 1 && (
-              <select
-                value={selectedCodeFilter}
-                onChange={(e) => setSelectedCodeFilter(e.target.value)}
-                className="px-3 py-1 bg-black/60 text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                <option value="">All Codes</option>
-                {activeCodes.map((code) => (
-                  <option key={code._id} value={code.code}>
-                    {code.label || code.code} ({code.usageCount})
-                  </option>
-                ))}
-              </select>
-            )}
-            <span className="text-purple-400 font-bold">
+            <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
               {referrals.length}
             </span>
           </div>
-        </div>
+          {isReferralsCollapsed ? (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
 
-        {referrals.length === 0 ? (
-          <div className="text-center py-12">
-            <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400 mb-2">No referrals yet</p>
-            <p className="text-sm text-gray-500">
-              Share your invite codes to grow the Tuneable community!
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {referrals.map((referral) => (
-              <Link
-                key={referral.uuid}
-                to={`/user/${referral.uuid}`}
-                className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
-              >
-                <div className="flex items-center space-x-4 flex-1 min-w-0">
-                  {/* Profile Picture */}
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
-                    <img
-                      src={referral.profilePic || DEFAULT_PROFILE_PIC}
-                      alt={referral.username}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                      }}
-                    />
-                  </div>
-                  
-                  {/* User Info */}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-white font-semibold text-lg truncate">
-                      {referral.username}
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
-                      {referral.location?.city && (
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">
-                            {referral.location.city}
-                            {referral.location.country && `, ${referral.location.country}`}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="h-3 w-3" />
-                        <span>Joined {formatDate(referral.joinedAt)}</span>
+        {!isReferralsCollapsed && (
+          <>
+            {activeCodes.length > 1 && (
+              <div className="flex justify-end mt-4 mb-2">
+                <select
+                  value={selectedCodeFilter}
+                  onChange={(e) => setSelectedCodeFilter(e.target.value)}
+                  className="px-3 py-1 bg-black/60 text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">All Codes</option>
+                  {activeCodes.map((code) => (
+                    <option key={code._id} value={code.code}>
+                      {code.label || code.code} ({code.usageCount})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {referrals.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400 mb-2">No referrals yet</p>
+                <p className="text-sm text-gray-500">
+                  Share your invite codes to grow the Tuneable community!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 mt-4">
+                {referrals.map((referral) => (
+                  <Link
+                    key={referral.uuid}
+                    to={`/user/${referral.uuid}`}
+                    className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-4 flex-1 min-w-0">
+                      {/* Profile Picture */}
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
+                        <img
+                          src={referral.profilePic || DEFAULT_PROFILE_PIC}
+                          alt={referral.username}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                          }}
+                        />
                       </div>
-                      {referral.usedCode && activeCodes.length > 1 && (
-                        <div className="flex items-center space-x-1">
-                          <span className="text-purple-400 font-mono text-xs">
-                            {referral.usedCode}
-                          </span>
+                      
+                      {/* User Info */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-white font-semibold text-lg truncate">
+                          {referral.username}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+                          {referral.location?.city && (
+                            <div className="flex items-center space-x-1">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">
+                                {referral.location.city}
+                                {referral.location.country && `, ${referral.location.country}`}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center space-x-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>Joined {formatDate(referral.joinedAt)}</span>
+                          </div>
+                          {referral.usedCode && activeCodes.length > 1 && (
+                            <div className="flex items-center space-x-1">
+                              <span className="text-purple-400 font-mono text-xs">
+                                {referral.usedCode}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

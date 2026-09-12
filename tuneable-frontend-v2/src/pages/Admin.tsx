@@ -23,7 +23,9 @@ import {
   Gift,
   Sparkles,
   Undo2,
-  Scale
+  Scale,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import SpotifyImportRequestsAdmin from '../components/SpotifyImportRequestsAdmin';
@@ -170,6 +172,8 @@ const Admin: React.FC = () => {
   // Warning modal state
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [selectedUserForWarning, setSelectedUserForWarning] = useState<{ id: string; username: string } | null>(null);
+
+  const [isInviteManagementCollapsed, setIsInviteManagementCollapsed] = useState(true);
 
   // Top-up modal state
   const [topUpModalOpen, setTopUpModalOpen] = useState(false);
@@ -1444,11 +1448,27 @@ const Admin: React.FC = () => {
 
             {/* Invite Codes Management - Admin Only */}
             <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                <Gift className="h-5 w-5 mr-2" />
-                Invite Codes Management
-              </h3>
-              <InviteReferrals />
+              <button
+                type="button"
+                onClick={() => setIsInviteManagementCollapsed((prev) => !prev)}
+                className="w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity"
+                aria-expanded={!isInviteManagementCollapsed}
+              >
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Gift className="h-5 w-5 mr-2" />
+                  Invite Codes Management
+                </h3>
+                {isInviteManagementCollapsed ? (
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <ChevronUp className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+              {!isInviteManagementCollapsed && (
+                <div className="mt-4">
+                  <InviteReferrals />
+                </div>
+              )}
             </div>
 
             <div className="bg-gray-800 rounded-lg p-6">
