@@ -108,14 +108,15 @@ const {
 } = require('../services/rekordboxPlaylistIngestService');
 
 describe('Rekordbox playlist MP3 ingest classification', () => {
-  it('skips tracks whose files are missing on disk', async () => {
+  it('treats missing disk files as upload-needed catalog creates', async () => {
     const { tracks } = await getTracksFromPlaylistsFromContent(SAMPLE_XML, ['House Favorites']);
     const items = await buildIngestItems(tracks, {
       createUnmatched: true,
     });
     expect(items).toHaveLength(2);
-    expect(items.every((item) => item.action === 'skip' && item.skipReason === 'missing_file')).toBe(true);
-    expect(items.every((item) => item.selected === false)).toBe(true);
+    expect(items.every((item) => item.action === 'create' && item.needsUpload)).toBe(true);
+    expect(items.every((item) => item.fileExists === false)).toBe(true);
+    expect(summarizeItems(items).needsUpload).toBe(2);
     expect(summarizeItems(items).missingFiles).toBe(2);
   });
 
@@ -141,5 +142,24 @@ describe('Rekordbox playlist MP3 ingest classification', () => {
     const { previewPlaylistIngest } = require('../services/rekordboxPlaylistIngestService');
     await expect(previewPlaylistIngest(SAMPLE_XML, { playlists: [] }))
       .rejects.toThrow(/playlist/i);
+  });
+});
+
+const { decodeRekordboxLocation } = require('../utils/libraryXml');
+
+describe('decodeRekordboxLocation', () => {
+  it('strips file://localhost to a POSIX path', () => {
+    expect(decodeRekordboxLocation('file://localhost/Users/admin/Music/Track.mp3'))
+      .toBe('/Users/admin/Music/Track.mp3');
+  });
+
+  it('strips file:/// when localhost is omitted', () => {
+    expect(decodeRekordboxLocation('file:///Users/admin/Music/Track.mp3'))
+      .toBe('/Users/admin/Music/Track.mp3');
+  });
+
+  it('URL-decodes spaces in Location', () => {
+    expect(decodeRekordboxLocation('file://localhost/Users/admin/Music/K%20Tea.mp3'))
+      .toBe('/Users/admin/Music/K Tea.mp3');
   });
 });

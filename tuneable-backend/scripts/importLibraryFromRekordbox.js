@@ -55,6 +55,7 @@ const partyLocation = argValue('--party-location') || 'Library Import';
 const createUnmatched = !args.includes('--no-create-unmatched');
 const createParties = !args.includes('--no-create-parties');
 const minBitrate = argValue('--min-bitrate') ? parseInt(argValue('--min-bitrate'), 10) : 0;
+const musicRootArg = argValue('--music-root') || process.env.REKORDBOX_MUSIC_ROOT || null;
 
 if (!xmlPath) {
   console.error(`Usage: node importLibraryFromRekordbox.js --xml /path/to/export.xml [options]
@@ -68,6 +69,7 @@ Options:
   --limit N                     Max tracks to process
   --party-location "City"       Location for created parties
   --min-bitrate N               Reject tracks below N kbps (e.g. 320)
+  --music-root /path            If XML Location paths are missing, match MP3s by filename under this folder
   --no-create-unmatched         Skip creating new Media for unmatched files
   --no-create-parties           Skip creating Tuneable parties from playlists
 `);
@@ -143,6 +145,7 @@ async function main() {
     createUnmatched,
     createParties,
     partyLocation,
+    musicRoot: musicRootArg,
     onItem: (item) => console.log(formatItem(item)),
   });
 

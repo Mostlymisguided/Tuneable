@@ -7,6 +7,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { getTracksFromPlaylistsFromContent } = require('../scripts/lib/rekordboxXml');
@@ -51,6 +52,30 @@ function artistLabel(media) {
 
 function isMp3Path(filePath) {
   return Boolean(filePath && String(filePath).toLowerCase().endsWith('.mp3'));
+}
+
+function buildBasenameIndex(musicRoot) {
+  if (!musicRoot || typeof musicRoot !== 'string') return null;
+  const root = path.resolve(musicRoot.trim());
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return null;
+  const { walkMp3Files } = require('../scripts/lib/matchUtils');
+  const index = new Map();
+  for (const full of walkMp3Files(root)) {
+    const key = path.basename(full).toLowerCase();
+    if (!index.has(key)) index.set(key, full);
+  }
+  return index;
+}
+
+function remapTrackPath(track, basenameIndex) {
+  if (!track?.filePath) return track;
+  if (track.fileExists || fs.existsSync(track.filePath)) {
+    return { ...track, fileExists: true };
+  }
+  if (!basenameIndex) return track;
+  const hit = basenameIndex.get(path.basename(track.filePath).toLowerCase());
+  if (!hit) return track;
+  return { ...track, filePath: hit, fileExists: true, pathRemapped: true };
 }
 
 function isSafeLocalMp3Path(filePath) {
@@ -111,6 +136,7 @@ function serializeItem(base) {
     bitrate: base.bitrate || null,
     filePath: base.filePath || null,
     fileExists: Boolean(base.fileExists),
+    needsUpload: Boolean(base.needsUpload),
     playlistName: base.playlistName || null,
     playlistPath: base.playlistPath || null,
     action: base.action,
@@ -164,6 +190,66 @@ function rekordboxMetaFromItem(item) {
   };
 }
 
+function itemFromCatalogMatch(track, index, match, {
+  createUnmatched = true,
+  bitrate = null,
+  needsUpload = false,
+} = {}) {
+  if (match?.media) {
+    if (mediaHasUpload(match.media)) {
+      return itemFromTrack(track, index, {
+        action: 'skip',
+        skipReason: 'already_has_upload',
+        matchType: match.matchType,
+        mediaId: match.media._id,
+        mediaUuid: match.media.uuid || null,
+        catalogTitle: match.media.title,
+        catalogArtist: artistLabel(match.media),
+        bitrate,
+        selected: false,
+        needsUpload: false,
+      });
+    }
+    return itemFromTrack(track, index, {
+      action: 'attach',
+      matchType: match.matchType,
+      mediaId: match.media._id,
+      mediaUuid: match.media.uuid || null,
+      catalogTitle: match.media.title,
+      catalogArtist: artistLabel(match.media),
+      bitrate,
+      selected: true,
+      needsUpload,
+    });
+  }
+  if (createUnmatched) {
+    return itemFromTrack(track, index, {
+      action: 'create',
+      bitrate,
+      selected: true,
+      needsUpload,
+    });
+  }
+  return itemFromTrack(track, index, {
+    action: 'skip',
+    skipReason: 'no_match',
+    bitrate,
+    selected: false,
+    needsUpload: false,
+  });
+}
+
+function matchFromRekordboxFields(track, catalogIndexes) {
+  if (!catalogIndexes?.mediaList?.length) return null;
+  const title = (track.title || track.name || '').trim();
+  const artist = (track.artist || '').trim();
+  if (!title || !artist) return null;
+  return catalogMatch().findBestCatalogMatch(
+    [{ artist, title, source: 'rekordbox' }],
+    catalogIndexes,
+  );
+}
+
 async function loadCatalogIndexes() {
   const Media = require('../models/Media');
   const mediaList = await Media.find({
@@ -186,13 +272,16 @@ async function buildIngestItems(tracks, {
   limit = null,
   minBitrate = 0,
   createUnmatched = true,
+  musicRoot = null,
   onProgress,
 } = {}) {
   const report = typeof onProgress === 'function' ? onProgress : () => {};
+  const basenameIndex = buildBasenameIndex(musicRoot || process.env.REKORDBOX_MUSIC_ROOT);
+  const remapped = (tracks || []).map((track) => remapTrackPath(track, basenameIndex));
   const capped = Number.isFinite(Number(limit)) && Number(limit) > 0
-    ? tracks.slice(0, Number(limit))
-    : tracks;
-  const musicRoot = path.dirname(capped.find((t) => t.filePath)?.filePath || '/');
+    ? remapped.slice(0, Number(limit))
+    : remapped;
+  const guessRoot = path.dirname(capped.find((t) => t.filePath)?.filePath || '/');
   const items = [];
   const catalogIndexes = indexes || emptyIndexes();
 
@@ -206,6 +295,27 @@ async function buildIngestItems(tracks, {
     });
 
     const local = classifyLocalFile(track, { minBitrate });
+    if (local.action === 'skip' && local.skipReason === 'not_mp3') {
+      items.push(itemFromTrack(track, index, {
+        action: 'skip',
+        skipReason: 'not_mp3',
+        bitrate: local.bitrate || bitrateKbps(track),
+        selected: false,
+      }));
+      continue;
+    }
+
+    const fileMissing = local.action === 'skip' && local.skipReason === 'missing_file';
+    if (fileMissing) {
+      const match = matchFromRekordboxFields(track, catalogIndexes);
+      items.push(itemFromCatalogMatch(track, index, match, {
+        createUnmatched,
+        bitrate: local.bitrate || bitrateKbps(track),
+        needsUpload: true,
+      }));
+      continue;
+    }
+
     if (local.action === 'skip') {
       items.push(itemFromTrack(track, index, {
         action: 'skip',
@@ -219,7 +329,7 @@ async function buildIngestItems(tracks, {
     let id3 = null;
     let match = null;
     try {
-      const guessed = await catalogMatch().buildGuessFromFile(track.filePath, musicRoot, track);
+      const guessed = await catalogMatch().buildGuessFromFile(track.filePath, guessRoot, track);
       id3 = guessed.id3;
       const kbps = bitrateKbps(track, id3);
       if (minBitrate > 0 && kbps != null && kbps < minBitrate) {
@@ -233,57 +343,14 @@ async function buildIngestItems(tracks, {
       }
       match = catalogMatch().findBestCatalogMatch(guessed.candidates, catalogIndexes);
     } catch {
-      items.push(itemFromTrack(track, index, {
-        action: 'skip',
-        skipReason: 'read_error',
-        selected: false,
-        bitrate: local.bitrate,
-      }));
-      continue;
+      match = matchFromRekordboxFields(track, catalogIndexes);
     }
 
-    if (match?.media) {
-      if (mediaHasUpload(match.media)) {
-        items.push(itemFromTrack(track, index, {
-          action: 'skip',
-          skipReason: 'already_has_upload',
-          matchType: match.matchType,
-          mediaId: match.media._id,
-          mediaUuid: match.media.uuid || null,
-          catalogTitle: match.media.title,
-          catalogArtist: artistLabel(match.media),
-          bitrate: bitrateKbps(track, id3),
-          selected: false,
-        }));
-        continue;
-      }
-      items.push(itemFromTrack(track, index, {
-        action: 'attach',
-        matchType: match.matchType,
-        mediaId: match.media._id,
-        mediaUuid: match.media.uuid || null,
-        catalogTitle: match.media.title,
-        catalogArtist: artistLabel(match.media),
-        bitrate: bitrateKbps(track, id3),
-        selected: true,
-      }));
-      continue;
-    }
-
-    if (createUnmatched) {
-      items.push(itemFromTrack(track, index, {
-        action: 'create',
-        bitrate: bitrateKbps(track, id3),
-        selected: true,
-      }));
-    } else {
-      items.push(itemFromTrack(track, index, {
-        action: 'skip',
-        skipReason: 'no_match',
-        bitrate: bitrateKbps(track, id3),
-        selected: false,
-      }));
-    }
+    items.push(itemFromCatalogMatch(track, index, match, {
+      createUnmatched,
+      bitrate: bitrateKbps(track, id3),
+      needsUpload: false,
+    }));
   }
 
   return items;
@@ -296,7 +363,8 @@ function summarizeItems(items) {
     create: items.filter((i) => i.action === 'create').length,
     skip: items.filter((i) => i.action === 'skip').length,
     selected: items.filter((i) => i.selected).length,
-    missingFiles: items.filter((i) => i.skipReason === 'missing_file').length,
+    missingFiles: items.filter((i) => i.needsUpload || i.skipReason === 'missing_file').length,
+    needsUpload: items.filter((i) => i.needsUpload).length,
     nonMp3: items.filter((i) => i.skipReason === 'not_mp3').length,
     lowBitrate: items.filter((i) => i.skipReason === 'low_bitrate').length,
     alreadyHasUpload: items.filter((i) => i.skipReason === 'already_has_upload').length,
@@ -308,6 +376,7 @@ async function previewPlaylistIngest(xmlContent, {
   limit = null,
   minBitrate = 0,
   createUnmatched = true,
+  musicRoot = null,
   onProgress,
 } = {}) {
   const report = typeof onProgress === 'function' ? onProgress : () => {};
@@ -337,8 +406,17 @@ async function previewPlaylistIngest(xmlContent, {
     limit,
     minBitrate,
     createUnmatched,
+    musicRoot,
     onProgress,
   });
+
+  const summary = summarizeItems(items);
+  const missingAll = summary.total > 0 && summary.missingFiles === summary.total;
+  const message = missingAll
+    ? `The XML listed ${summary.total} tracks but the audio is not on this API host (${os.hostname()}). Location in Rekordbox XML is a path, not the MP3. Choose the music folder on this computer (below) and we will upload matching files.`
+    : summary.needsUpload
+      ? `${summary.needsUpload} track(s) need MP3s from your computer. Choose the music folder below, then ingest.`
+      : 'Local MP3s will be uploaded to the catalog with pending rights. Existing uploads are never overwritten.';
 
   return {
     source: 'rekordbox_ingest',
@@ -348,9 +426,14 @@ async function previewPlaylistIngest(xmlContent, {
       trackCount: p.trackCount || p.tracks?.length || 0,
     })),
     catalogSize,
+    checkedOn: {
+      hostname: os.hostname(),
+      platform: process.platform,
+    },
+    musicRoot: musicRoot || process.env.REKORDBOX_MUSIC_ROOT || null,
     items,
-    summary: summarizeItems(items),
-    message: 'Local MP3s will be uploaded to the catalog with pending rights. Existing uploads are never overwritten.',
+    summary,
+    message,
   };
 }
 
@@ -513,6 +596,39 @@ async function executePlaylistIngest(userId, {
   return results;
 }
 
+async function ingestUploadedAudio(userId, {
+  item,
+  buffer,
+  originalname,
+  createParties = true,
+  partyLocation = 'Library Import',
+} = {}) {
+  if (!item || !item.action || (item.action !== 'attach' && item.action !== 'create')) {
+    throw ingestError('Nothing to ingest for this track');
+  }
+  if (!buffer?.length) {
+    throw ingestError('MP3 file is required');
+  }
+  const ext = path.extname(originalname || item.filePath || '.mp3').toLowerCase() || '.mp3';
+  if (ext !== '.mp3') {
+    throw ingestError('Only MP3 files are allowed');
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rb-ingest-'));
+  const tmpFile = path.join(tmpDir, path.basename(originalname || 'track.mp3'));
+  fs.writeFileSync(tmpFile, buffer);
+  try {
+    const results = await executePlaylistIngest(userId, {
+      items: [{ ...item, selected: true, filePath: tmpFile, needsUpload: false }],
+      createParties,
+      partyLocation,
+    });
+    return results.items?.[0] || results;
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
 async function runPlaylistIngest(xmlContent, {
   playlists,
   userId = null,
@@ -522,6 +638,7 @@ async function runPlaylistIngest(xmlContent, {
   createUnmatched = true,
   createParties = true,
   partyLocation = 'Library Import',
+  musicRoot = null,
   onProgress,
   onItem,
 } = {}) {
@@ -530,6 +647,7 @@ async function runPlaylistIngest(xmlContent, {
     limit,
     minBitrate,
     createUnmatched,
+    musicRoot,
     onProgress,
   });
 
@@ -562,5 +680,6 @@ module.exports = {
   summarizeItems,
   previewPlaylistIngest,
   executePlaylistIngest,
+  ingestUploadedAudio,
   runPlaylistIngest,
 };

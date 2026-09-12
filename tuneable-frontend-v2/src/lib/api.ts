@@ -1794,7 +1794,7 @@ export const userAPI = {
   startRekordboxIngestPreview: async (
     libraryXmlFile: File,
     playlists: string[],
-    options?: { minBitrate?: number; createUnmatched?: boolean; limit?: number }
+    options?: { minBitrate?: number; createUnmatched?: boolean; limit?: number; musicRoot?: string }
   ) => {
     const formData = new FormData();
     formData.append('libraryXmlFile', libraryXmlFile);
@@ -1802,6 +1802,7 @@ export const userAPI = {
     if (options?.minBitrate != null) formData.append('minBitrate', String(options.minBitrate));
     if (options?.createUnmatched === false) formData.append('createUnmatched', 'false');
     if (options?.limit) formData.append('limit', String(options.limit));
+    if (options?.musicRoot) formData.append('musicRoot', options.musicRoot);
     const response = await api.post('/users/me/import/rekordbox/ingest/preview/start', formData);
     return response.data as { jobId: string; status: string };
   },
@@ -1825,6 +1826,28 @@ export const userAPI = {
       partyLocation: options?.partyLocation || 'Library Import',
     });
     return response.data as { jobId: string; status: string };
+  },
+
+  ingestRekordboxFile: async (
+    item: Record<string, unknown>,
+    audioFile: File,
+    options?: { createParties?: boolean; partyLocation?: string }
+  ) => {
+    const formData = new FormData();
+    formData.append('audioFile', audioFile);
+    formData.append('item', JSON.stringify(item));
+    formData.append('createParties', options?.createParties === false ? 'false' : 'true');
+    if (options?.partyLocation) formData.append('partyLocation', options.partyLocation);
+    const response = await api.post('/users/me/import/rekordbox/ingest/file', formData);
+    return response.data as {
+      key?: string;
+      title?: string;
+      status: string;
+      mediaId?: string | null;
+      uuid?: string | null;
+      reason?: string;
+      error?: string;
+    };
   },
 
   requestSpotifyImport: async (spotifyAccount: string, note?: string) => {

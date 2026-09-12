@@ -23,15 +23,23 @@ function escapeRegex(str) {
 
 /**
  * Decode Rekordbox Location URI to local filesystem path.
+ * Handles file://localhost/…, file:///…, Windows drive letters, and stray %.
  */
 function decodeRekordboxLocation(location) {
   if (!location || typeof location !== 'string') return null;
-  let decoded = decodeURIComponent(location.trim());
+  let decoded = location.trim();
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    // Pioneer sometimes leaves a literal % that is not a URI escape
+  }
   decoded = decoded.replace(/^file:\/\/localhost/i, '');
+  decoded = decoded.replace(/^file:\/\//i, '');
   if (/^\/[A-Za-z]:/.test(decoded)) {
     decoded = decoded.slice(1);
   }
-  return path.normalize(decoded);
+  decoded = decoded.replace(/^\/Macintosh HD(?=\/)/i, '');
+  return decoded ? path.normalize(decoded) : null;
 }
 
 function decodeItunesLocation(location) {

@@ -115,7 +115,7 @@ function completeJob(jobId, result) {
   });
 }
 
-function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl, mode, minBitrate, createUnmatched } = {}) {
+function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, playlists, playlistUrl, mode, minBitrate, createUnmatched, musicRoot } = {}) {
   const job = createJob({ userId, type: 'preview', source });
   const onProgress = progressReporter(job.id);
 
@@ -129,6 +129,7 @@ function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, play
           limit,
           minBitrate,
           createUnmatched,
+          musicRoot,
           onProgress,
         });
       } else if (source === 'rekordbox') {

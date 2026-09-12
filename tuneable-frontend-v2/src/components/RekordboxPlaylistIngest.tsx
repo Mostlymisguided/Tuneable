@@ -42,11 +42,14 @@ export interface IngestPreviewItem {
   catalogTitle?: string | null;
   catalogArtist?: string | null;
   selected: boolean;
+  needsUpload?: boolean;
 }
 
 interface IngestPreview {
   playlists: Array<{ name: string; fullPath: string; trackCount: number }>;
   catalogSize: number;
+  checkedOn?: { hostname?: string; platform?: string };
+  musicRoot?: string | null;
   items: IngestPreviewItem[];
   summary: {
     total: number;
@@ -58,6 +61,7 @@ interface IngestPreview {
     nonMp3: number;
     lowBitrate: number;
     alreadyHasUpload: number;
+    needsUpload?: number;
   };
   message?: string;
 }
@@ -71,7 +75,7 @@ interface IngestResult {
 }
 
 const SKIP_LABELS: Record<string, string> = {
-  missing_file: 'File not on this machine',
+  missing_file: 'MP3 not on the API host — pick a folder below',
   not_mp3: 'Not an MP3',
   low_bitrate: 'Below bitrate gate',
   already_has_upload: 'Catalog already has audio',
@@ -79,6 +83,13 @@ const SKIP_LABELS: Record<string, string> = {
   read_error: 'Could not read file',
   missing_or_unsafe_file: 'File missing or not a local MP3',
 };
+
+function trackBasename(item: IngestPreviewItem) {
+  const fromPath = item.filePath?.split(/[\\/]/).pop();
+  if (fromPath) return fromPath.toLowerCase();
+  if (item.title) return `${item.title}.mp3`.toLowerCase();
+  return '';
+}
 
 function actionLabel(action: IngestAction) {
   if (action === 'attach') return 'Attach MP3';
@@ -96,6 +107,7 @@ const INGEST_TIMEOUT_MS = 60 * 60 * 1000;
 
 const RekordboxPlaylistIngest: React.FC = () => {
   const xmlInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [isParsingXml, setIsParsingXml] = useState(false);
   const [playlists, setPlaylists] = useState<IngestPlaylist[]>([]);
@@ -104,6 +116,7 @@ const RekordboxPlaylistIngest: React.FC = () => {
   const [createUnmatched, setCreateUnmatched] = useState(true);
   const [createParties, setCreateParties] = useState(true);
   const [minBitrate, setMinBitrate] = useState('');
+  const [musicRoot, setMusicRoot] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [progressMessage, setProgressMessage] = useState('');
@@ -112,6 +125,8 @@ const RekordboxPlaylistIngest: React.FC = () => {
   const [preview, setPreview] = useState<IngestPreview | null>(null);
   const [items, setItems] = useState<IngestPreviewItem[]>([]);
   const [executeResult, setExecuteResult] = useState<IngestResult | null>(null);
+  const [browserFiles, setBrowserFiles] = useState<Record<string, File>>({});
+  const [folderLabel, setFolderLabel] = useState('');
 
   useEffect(() => {
     if (window.location.hash === '#rekordbox-ingest') {
@@ -130,10 +145,17 @@ const RekordboxPlaylistIngest: React.FC = () => {
     [items],
   );
 
+  const matchedUploadCount = useMemo(
+    () => selectedItems.filter((item) => Boolean(browserFiles[item.key])).length,
+    [selectedItems, browserFiles],
+  );
+
   const resetPreview = () => {
     setPreview(null);
     setItems([]);
     setExecuteResult(null);
+    setBrowserFiles({});
+    setFolderLabel('');
     setProgressMessage('');
     setProgressCurrent(0);
     setProgressTotal(0);
@@ -192,6 +214,7 @@ const RekordboxPlaylistIngest: React.FC = () => {
       const started = await userAPI.startRekordboxIngestPreview(xmlFile, [selectedPlaylist], {
         createUnmatched,
         minBitrate: minBitrate ? Number(minBitrate) : 0,
+        musicRoot: musicRoot.trim() || undefined,
       });
       const data = await userAPI.waitForImportJob<IngestPreview>(
         started.jobId,
@@ -200,6 +223,8 @@ const RekordboxPlaylistIngest: React.FC = () => {
       );
       setPreview(data);
       setItems(data.items || []);
+      setBrowserFiles({});
+      setFolderLabel('');
       toast.success(
         `Ready: ${data.summary.attach} attach, ${data.summary.create} create, ${data.summary.skip} skip`,
       );
@@ -211,41 +236,86 @@ const RekordboxPlaylistIngest: React.FC = () => {
     }
   };
 
+  const matchFolderFiles = (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const byName = new Map<string, File>();
+    Array.from(fileList).forEach((file) => {
+      if (!file.name.toLowerCase().endsWith('.mp3')) return;
+      const key = file.name.toLowerCase();
+      if (!byName.has(key)) byName.set(key, file);
+    });
+    const next: Record<string, File> = {};
+    items.forEach((item) => {
+      const name = trackBasename(item);
+      const file = name ? byName.get(name) : undefined;
+      if (file) next[item.key] = file;
+    });
+    setBrowserFiles(next);
+    setFolderLabel(`${fileList.length} file(s) in folder · ${Object.keys(next).length} matched this playlist`);
+    toast.success(`Matched ${Object.keys(next).length} MP3(s) from the folder`);
+  };
+
   const runExecute = async () => {
     if (selectedItems.length === 0) {
       toast.error('Select at least one track to ingest');
       return;
     }
+    const uploadItems = selectedItems.filter((item) => browserFiles[item.key]);
+    const serverItems = selectedItems.filter((item) => item.fileExists && !item.needsUpload && !browserFiles[item.key]);
+    if (uploadItems.length === 0 && serverItems.length === 0) {
+      toast.error('Choose the folder that contains these MP3s, then ingest');
+      return;
+    }
+
     setIsExecuting(true);
     setExecuteResult(null);
-    setProgressMessage('Starting ingest…');
+    const tallies = { attached: 0, created: 0, skipped: 0, failed: 0, partyAdds: 0 };
+
     try {
-      const started = await userAPI.startRekordboxIngestExecute(selectedItems, {
-        createParties,
-        partyLocation: 'Library Import',
-      });
-      const result = await userAPI.waitForImportJob<IngestResult>(
-        started.jobId,
-        applyJobProgress,
-        { timeoutMs: INGEST_TIMEOUT_MS },
-      );
-      setExecuteResult({
-        attached: result.attached || 0,
-        created: result.created || 0,
-        skipped: result.skipped || 0,
-        failed: result.failed || 0,
-        partyAdds: result.partyAdds || 0,
-      });
-      toast.success(`Ingested ${result.attached || 0} attached, ${result.created || 0} created`);
-      setItems((prev) => prev.map((item) => {
-        const outcome = (result as IngestResult & {
-          items?: Array<{ key: string; status: string }>;
-        }).items?.find((row) => row.key === item.key);
-        if (outcome?.status === 'attached' || outcome?.status === 'created') {
-          return { ...item, selected: false, action: 'skip' as const, skipReason: 'already_has_upload' };
+      for (let index = 0; index < uploadItems.length; index += 1) {
+        const item = uploadItems[index];
+        const file = browserFiles[item.key];
+        setProgressMessage(`Uploading ${index + 1} of ${uploadItems.length}: ${item.title}`);
+        setProgressCurrent(index + 1);
+        setProgressTotal(uploadItems.length);
+        const outcome = await userAPI.ingestRekordboxFile(
+          { ...item, selected: true } as unknown as Record<string, unknown>,
+          file,
+          { createParties, partyLocation: 'Library Import' },
+        );
+        if (outcome.status === 'attached') tallies.attached += 1;
+        else if (outcome.status === 'created') tallies.created += 1;
+        else if (outcome.status === 'skipped') tallies.skipped += 1;
+        else tallies.failed += 1;
+        if (outcome.status === 'attached' || outcome.status === 'created') {
+          setItems((prev) => prev.map((row) => (
+            row.key === item.key
+              ? { ...row, selected: false, action: 'skip', skipReason: 'already_has_upload', needsUpload: false }
+              : row
+          )));
         }
-        return item;
-      }));
+      }
+
+      if (serverItems.length > 0) {
+        setProgressMessage('Ingesting files already on the API host…');
+        const started = await userAPI.startRekordboxIngestExecute(serverItems, {
+          createParties,
+          partyLocation: 'Library Import',
+        });
+        const result = await userAPI.waitForImportJob<IngestResult>(
+          started.jobId,
+          applyJobProgress,
+          { timeoutMs: INGEST_TIMEOUT_MS },
+        );
+        tallies.attached += result.attached || 0;
+        tallies.created += result.created || 0;
+        tallies.skipped += result.skipped || 0;
+        tallies.failed += result.failed || 0;
+        tallies.partyAdds += result.partyAdds || 0;
+      }
+
+      setExecuteResult(tallies);
+      toast.success(`Ingested ${tallies.attached} attached, ${tallies.created} created`);
     } catch (error: any) {
       toast.error(error?.response?.data?.error || error?.message || 'Ingest failed');
     } finally {
@@ -262,6 +332,13 @@ const RekordboxPlaylistIngest: React.FC = () => {
     )));
   };
 
+  const selectedPlaylistMeta = playlists.find(
+    (p) => (p.fullPath || p.name) === selectedPlaylist,
+  );
+  const selectedHasNoLocal = Boolean(
+    selectedPlaylistMeta && selectedPlaylistMeta.trackCount > 0 && selectedPlaylistMeta.localFiles === 0,
+  );
+
   const busy = isParsingXml || isPreviewing || isExecuting;
 
   return (
@@ -272,10 +349,9 @@ const RekordboxPlaylistIngest: React.FC = () => {
           Rekordbox playlist ingest
         </h2>
         <p className="text-gray-400 mt-2 max-w-3xl">
-          Upload a Rekordbox XML export, pick one playlist, and ingest its local MP3s into the catalog.
-          Matching YouTube-only (or otherwise upload-less) tunes get the file attached; unmatched tracks
-          are created with pending rights. Files are read from Rekordbox Location paths on this server —
-          the same machine-local behaviour as the CLI.
+          The Rekordbox XML is a playlist manifest: titles, artists, and file <em>paths</em> — not the audio.
+          Upload the XML, pick a playlist, then choose the folder on this computer that contains the MP3s.
+          Matching files are uploaded to the catalog.
         </p>
       </div>
 
@@ -367,8 +443,29 @@ const RekordboxPlaylistIngest: React.FC = () => {
                 <p className="text-sm text-gray-500 px-2 py-3">No playlists match that filter.</p>
               )}
             </div>
+            {selectedHasNoLocal && (
+              <p className="text-amber-200 text-sm flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                The API host cannot see these files. After preview, choose the music folder on this computer
+                (for example iTunes Media or Downloaded by MediaHuman).
+              </p>
+            )}
           </div>
         )}
+
+        <label className="block text-sm text-gray-300">
+          Music folder on this API host (optional)
+          <input
+            type="text"
+            value={musicRoot}
+            onChange={(e) => setMusicRoot(e.target.value)}
+            placeholder="/Users/you/Music"
+            className="mt-1 w-full bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-white"
+          />
+          <span className="text-xs text-gray-500 mt-1 block">
+            If Rekordbox Location paths are stale, we match missing tracks by filename under this folder.
+          </span>
+        </label>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="flex items-center gap-2 text-sm text-gray-300">
@@ -463,6 +560,7 @@ const RekordboxPlaylistIngest: React.FC = () => {
               <p className="text-sm text-gray-400 mt-1">
                 {preview.summary.attach} attach · {preview.summary.create} create · {preview.summary.skip} skip
                 {preview.summary.missingFiles > 0 ? ` · ${preview.summary.missingFiles} missing on disk` : ''}
+                {preview.checkedOn?.hostname ? ` · checked on ${preview.checkedOn.hostname}` : ''}
               </p>
             </div>
             <button
@@ -480,6 +578,40 @@ const RekordboxPlaylistIngest: React.FC = () => {
               {preview.message}
             </p>
           )}
+
+          <div className="rounded-lg border border-dashed border-purple-500/40 bg-purple-900/10 p-4 space-y-2">
+            <p className="text-sm text-gray-200 font-medium">MP3s from this computer</p>
+            <p className="text-xs text-gray-400">
+              Pick the folder that contains these files. We match by filename (e.g. K Tea.mp3).
+            </p>
+            <input
+              ref={folderInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              // @ts-expect-error webkitdirectory is valid in Chromium
+              webkitdirectory=""
+              directory=""
+              accept=".mp3,audio/mpeg"
+              onChange={(e) => {
+                matchFolderFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => folderInputRef.current?.click()}
+              disabled={busy}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium"
+            >
+              Choose music folder
+            </button>
+            {folderLabel ? (
+              <p className="text-sm text-green-300">{folderLabel}</p>
+            ) : (
+              <p className="text-xs text-gray-500">{matchedUploadCount} of {selectedItems.length} selected tracks have an MP3 ready to upload</p>
+            )}
+          </div>
 
           <div className="max-h-[28rem] overflow-auto rounded-lg border border-gray-700">
             <table className="min-w-full text-sm">
@@ -536,8 +668,12 @@ const RekordboxPlaylistIngest: React.FC = () => {
                           <span className="text-gray-500">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-500 truncate max-w-[14rem]" title={item.filePath || ''}>
-                        {item.filePath ? item.filePath.split('/').pop() : '—'}
+                      <td className="px-3 py-2 text-xs text-gray-500 break-all max-w-[18rem]" title={item.filePath || ''}>
+                        {browserFiles[item.key]
+                          ? `Ready: ${browserFiles[item.key].name}`
+                          : item.needsUpload
+                            ? `Needs upload · ${item.filePath || item.title}`
+                            : (item.filePath || '—')}
                       </td>
                     </tr>
                   );
@@ -549,11 +685,15 @@ const RekordboxPlaylistIngest: React.FC = () => {
           <button
             type="button"
             onClick={() => void runExecute()}
-            disabled={selectedItems.length === 0 || busy}
+            disabled={
+              selectedItems.length === 0
+              || busy
+              || (matchedUploadCount === 0 && !selectedItems.some((item) => item.fileExists && !item.needsUpload))
+            }
             className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 rounded-lg font-medium flex items-center gap-2"
           >
             {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Ingest {selectedItems.length} track{selectedItems.length === 1 ? '' : 's'}
+            Ingest {matchedUploadCount || selectedItems.length} track{(matchedUploadCount || selectedItems.length) === 1 ? '' : 's'}
           </button>
         </div>
       )}

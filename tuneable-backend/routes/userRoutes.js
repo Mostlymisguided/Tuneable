@@ -244,6 +244,19 @@ const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 // Configure upload using R2 or local fallback
 const upload = createProfilePictureUpload();
 
+const rekordboxMp3Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    if (ext === '.mp3' || mime === 'audio/mpeg' || mime === 'audio/mp3') {
+      return cb(null, true);
+    }
+    return cb(new Error('Only MP3 files are allowed'));
+  },
+});
+
 const rekordboxXmlUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 },
@@ -2007,6 +2020,7 @@ router.post(
       const minBitrate = req.body?.minBitrate ? parseInt(req.body.minBitrate, 10) : 0;
       const createUnmatched = req.body?.createUnmatched !== 'false' && req.body?.createUnmatched !== false;
       const limit = req.body?.limit ? parseInt(req.body.limit, 10) : null;
+      const musicRoot = typeof req.body?.musicRoot === 'string' ? req.body.musicRoot.trim() : '';
       const libraryImportJobService = require('../services/libraryImportJobService');
       const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'rekordbox_ingest', {
         xmlContent: req.file.buffer.toString('utf8'),
@@ -2014,6 +2028,7 @@ router.post(
         minBitrate: Number.isFinite(minBitrate) ? minBitrate : 0,
         createUnmatched,
         limit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        musicRoot: musicRoot || null,
       });
       res.status(202).json({ jobId, status: 'queued' });
     } catch (error) {
@@ -2044,6 +2059,45 @@ router.post('/me/import/rekordbox/ingest/execute/start', authMiddleware, adminMi
     res.status(500).json({ error: error.message || 'Failed to start Rekordbox ingest' });
   }
 });
+
+// @route   POST /api/users/me/import/rekordbox/ingest/file
+// @desc    Ingest one Rekordbox playlist track from an uploaded MP3
+// @access  Private (admin)
+router.post(
+  '/me/import/rekordbox/ingest/file',
+  authMiddleware,
+  adminMiddleware,
+  rekordboxMp3Upload.single('audioFile'),
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: 'audioFile is required' });
+      }
+      let item = req.body?.item;
+      if (typeof item === 'string') {
+        try {
+          item = JSON.parse(item);
+        } catch {
+          return res.status(400).json({ error: 'item must be JSON' });
+        }
+      }
+      const createParties = req.body?.createParties !== 'false' && req.body?.createParties !== false;
+      const partyLocation = req.body?.partyLocation || 'Library Import';
+      const rekordboxPlaylistIngestService = require('../services/rekordboxPlaylistIngestService');
+      const result = await rekordboxPlaylistIngestService.ingestUploadedAudio(req.user._id, {
+        item,
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        createParties,
+        partyLocation,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('Rekordbox ingest file error:', error);
+      res.status(error.status || 500).json({ error: error.message || 'Failed to ingest MP3' });
+    }
+  }
+);
 
 // @route   GET /api/users/me/import/jobs/:jobId
 // @desc    Poll library import preview/execute job progress
