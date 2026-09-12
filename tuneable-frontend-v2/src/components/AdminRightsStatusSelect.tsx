@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   RIGHTS_STATUS_HELP,
   RIGHTS_STATUS_LABELS,
