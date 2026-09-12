@@ -573,7 +573,7 @@ router.post(
       const user = await User.findByLoginIdentifier(identifier);
       if (!user) {
         console.log(`Login attempt failed: User not found for identifier: ${identifier}`);
-        return res.status(401).json({ error: 'Invalid email or password' });
+        return res.status(401).json({ error: 'Invalid email, password or username' });
       }
 
       // Check if user is active
@@ -634,7 +634,7 @@ router.post(
         // Return error with remaining attempts
         const remainingAttempts = 6 - user.failedLoginAttempts;
         return res.status(401).json({ 
-          error: 'Invalid email or password',
+          error: 'Invalid email, password or username',
           failedAttempts: user.failedLoginAttempts,
           remainingAttempts: remainingAttempts
         });

@@ -346,7 +346,7 @@ const AuthPage: React.FC = () => {
         const failedAttemptsCount = error.response?.data?.failedAttempts || 0;
         setFailedAttempts(failedAttemptsCount);
         // Display the error message from server
-        const serverErrorMessage = error.response?.data?.error || 'Invalid email or password';
+        const serverErrorMessage = error.response?.data?.error || 'Invalid email, password or username';
         setLoginError(serverErrorMessage);
       } else if (error.response.status === 400) {
         // Validation error
