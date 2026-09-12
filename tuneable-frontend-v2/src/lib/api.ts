@@ -1807,7 +1807,16 @@ export const userAPI = {
   },
 
   startRekordboxIngestExecute: async (
-    items: Array<Record<string, unknown>>,
+    items: Array<{
+      key: string;
+      action: 'attach' | 'create' | 'skip';
+      selected?: boolean;
+      title?: string;
+      artist?: string;
+      filePath?: string | null;
+      mediaId?: string | null;
+      playlistName?: string | null;
+    }>,
     options?: { createParties?: boolean; partyLocation?: string }
   ) => {
     const response = await api.post('/users/me/import/rekordbox/ingest/execute/start', {
