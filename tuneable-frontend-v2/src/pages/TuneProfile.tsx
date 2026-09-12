@@ -18,6 +18,7 @@ import {
   Headphones,
   Volume2,
   Award,
+  ShieldCheck,
   X,
   Save,
   Coins,
@@ -69,7 +70,8 @@ import {
   enrichMediaWithPlayability,
   isYouTubeOnly,
   normalizeSources,
-  getPlayabilityBlockReason,
+  getCoverOverlayKind,
+  getBlockedCoverCopy,
 } from '../utils/mediaPlayability';
 import {
   getListenElsewhereTarget,
@@ -91,7 +93,7 @@ import { getTagProfilePath } from '../utils/tagNormalizer';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
-import { RIGHTS_STATUS_HELP, type RightsStatus } from '../utils/rightsStatus';
+import { type RightsStatus } from '../utils/rightsStatus';
 
 interface Media {
   _id: string;
@@ -1623,6 +1625,9 @@ const TuneProfile: React.FC = () => {
   };
 
   const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
+  const coverOverlayKind = getCoverOverlayKind(media);
+  const blockedCover = getBlockedCoverCopy(coverOverlayKind);
+  const coverPlayable = coverOverlayKind === 'play' || coverOverlayKind === 'play_permitted';
 
   const handleListenElsewhere = () => {
     if (!openListenElsewhere(media)) return;
@@ -2311,7 +2316,9 @@ const TuneProfile: React.FC = () => {
               <p className="text-gray-300 text-sm mt-1">
                 {!isMediaPlayable(media)
                   ? 'Tip to help get this track fully added once audio is uploaded.'
-                  : 'Boost global ranking and support the artist'}
+                  : coverOverlayKind === 'play_permitted'
+                    ? 'Playable now. Tips are held until the artist joins and claims.'
+                    : 'Boost global ranking and support the artist'}
               </p>
             </div>
             {user && (
@@ -2484,69 +2491,73 @@ const TuneProfile: React.FC = () => {
                 alt={`${media.title} cover`}
                 className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
-              {/* Play / awaiting rights overlay (matches mobile claim flow) */}
+              {coverOverlayKind === 'play_permitted' && (
+                <div className="absolute top-2 left-2 z-10 pointer-events-none">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-teal-950/90 border border-teal-400/60 text-teal-100 text-[11px] font-semibold shadow-lg">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Permitted
+                  </span>
+                </div>
+              )}
+              {/* Play / blocked-rights overlay */}
               <div 
                 className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
-                  isMediaPlayable(media)
-                    ? 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
+                  coverPlayable
+                    ? coverOverlayKind === 'play_permitted'
+                      ? 'bg-teal-950/40 opacity-0 group-hover:opacity-100 cursor-pointer'
+                      : 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
                     : 'bg-black/50 opacity-100 cursor-default'
                 }`}
-                onClick={isMediaPlayable(media) ? handlePlaySong : undefined}
+                onClick={coverPlayable ? handlePlaySong : undefined}
               >
-                {isMediaPlayable(media) ? (
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                {coverPlayable ? (
+                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-2xl ${
+                    coverOverlayKind === 'play_permitted'
+                      ? 'bg-teal-600 hover:bg-teal-500'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  }`}>
                     <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
                   </div>
-                ) : (
-                  (() => {
-                    const blockReason = getPlayabilityBlockReason(media);
-                    const rightsBlocked = blockReason === 'rights';
-                    const disputed = blockReason === 'disputed';
-
-                    return (
-                      <div className="text-center px-4">
-                        <Award className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                        <p className="text-white text-sm font-semibold">
-                          {disputed ? 'Rights disputed' : 'Awaiting Rights'}
-                        </p>
-                        <p className="text-gray-300 text-xs mt-1 mb-3">
-                          {disputed
-                            ? 'Playback is paused while ownership is resolved'
-                            : rightsBlocked
-                              ? 'Claim ownership to receive tips held in escrow'
-                              : 'Claim this media and upload audio if you are the rights holder'}
-                        </p>
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          {!disputed && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowClaimModal(true);
-                              }}
-                              className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
-                            >
-                              Claim media
-                            </button>
-                          )}
-                          {listenElsewhere && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleListenElsewhere();
-                              }}
-                              className="px-4 py-2 bg-black/50 hover:bg-black/70 border border-white/20 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              {listenElsewhere.label}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()
-                )}
+                ) : blockedCover ? (
+                  <div className="text-center px-4">
+                    <Award className={`h-8 w-8 mx-auto mb-2 ${
+                      coverOverlayKind === 'disputed' ? 'text-red-400' : 'text-amber-400'
+                    }`} />
+                    <p className="text-white text-sm font-semibold">
+                      {blockedCover.title}
+                    </p>
+                    <p className="text-gray-300 text-xs mt-1 mb-3">
+                      {blockedCover.hint}
+                    </p>
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      {blockedCover.showClaim && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowClaimModal(true);
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
+                        >
+                          Claim media
+                        </button>
+                      )}
+                      {listenElsewhere && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleListenElsewhere();
+                          }}
+                          className="px-4 py-2 bg-black/50 hover:bg-black/70 border border-white/20 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          {listenElsewhere.label}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
             
@@ -2566,9 +2577,9 @@ const TuneProfile: React.FC = () => {
                 </p>
               )}
 
-              {media.rightsStatus === 'permitted' && (
+              {coverOverlayKind === 'play_permitted' && (
                 <p className="text-xs text-teal-300/90 text-center md:text-left px-2 mb-2">
-                  {RIGHTS_STATUS_HELP.permitted}
+                  Playable now · tips held until the artist claims
                 </p>
               )}
 

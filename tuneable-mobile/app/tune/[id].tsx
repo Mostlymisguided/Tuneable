@@ -32,8 +32,9 @@ import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
 import {
+  getBlockedCoverCopy,
+  getCoverOverlayKind,
   getCreatorDisplay,
-  getPlayabilityBlockReason,
   isRightsPendingClaimable,
   isUploadPlayable,
   mediaId,
@@ -148,9 +149,8 @@ export default function TuneProfileScreen() {
   );
 
   const playable = isUploadPlayable(media);
-  const blockReason = getPlayabilityBlockReason(media);
-  const rightsBlocked = blockReason === 'rights';
-  const disputed = blockReason === 'disputed';
+  const coverOverlayKind = getCoverOverlayKind(media);
+  const blockedCover = getBlockedCoverCopy(coverOverlayKind);
   const showClaimCta = Boolean(media && isRightsPendingClaimable(media));
   const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
   const artist = media ? getCreatorDisplay(media) : 'Unknown artist';
@@ -388,30 +388,30 @@ export default function TuneProfileScreen() {
                 source={{ uri: media.coverArt || DEFAULT_COVER_ART }}
                 style={styles.cover}
               />
-              <View style={styles.coverOverlay}>
+              <View
+                style={[
+                  styles.coverOverlay,
+                  coverOverlayKind === 'play_permitted' && styles.coverOverlayPermitted,
+                ]}>
                 {playable ? (
-                  <View style={styles.coverPlay}>
+                  <View
+                    style={[
+                      styles.coverPlay,
+                      coverOverlayKind === 'play_permitted' && styles.coverPlayPermitted,
+                    ]}>
                     <Ionicons name="play" size={28} color="#fff" />
                   </View>
-                ) : (
+                ) : blockedCover ? (
                   <View style={styles.awaitingBox}>
                     <Ionicons
                       name="ribbon-outline"
                       size={28}
-                      color="#fbbf24"
+                      color={coverOverlayKind === 'disputed' ? '#f87171' : '#fbbf24'}
                     />
-                    <Text style={styles.awaitingTitle}>
-                      {disputed ? 'Rights disputed' : 'Awaiting Rights'}
-                    </Text>
-                    <Text style={styles.awaitingHint}>
-                      {disputed
-                        ? 'Playback is paused while ownership is resolved'
-                        : rightsBlocked
-                          ? 'Claim ownership to receive tips held in escrow'
-                          : 'Claim this media and upload audio if you are the rights holder'}
-                    </Text>
+                    <Text style={styles.awaitingTitle}>{blockedCover.title}</Text>
+                    <Text style={styles.awaitingHint}>{blockedCover.hint}</Text>
                     <View style={styles.awaitingActions}>
-                      {!disputed ? (
+                      {blockedCover.showClaim ? (
                         <Pressable
                           style={styles.claimOverlayBtn}
                           onPress={() => setClaimOpen(true)}>
@@ -434,12 +434,23 @@ export default function TuneProfileScreen() {
                       ) : null}
                     </View>
                   </View>
-                )}
+                ) : null}
               </View>
+              {coverOverlayKind === 'play_permitted' ? (
+                <View style={styles.permittedBadge} pointerEvents="none">
+                  <Ionicons name="shield-checkmark" size={12} color="#99f6e4" />
+                  <Text style={styles.permittedBadgeText}>Permitted</Text>
+                </View>
+              ) : null}
             </Pressable>
 
             <Text style={styles.title}>{media.title || 'Untitled'}</Text>
             <Text style={styles.artist}>{artist}</Text>
+            {coverOverlayKind === 'play_permitted' ? (
+              <Text style={styles.permittedHint}>
+                Playable now · tips held until the artist claims
+              </Text>
+            ) : null}
 
             {heroMetadata.length > 0 ? (
               <Text style={styles.metaLine}>{heroMetadata.join(' · ')}</Text>
@@ -829,6 +840,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
+  coverOverlayPermitted: {
+    backgroundColor: 'rgba(19, 78, 74, 0.35)',
+  },
   coverPlay: {
     width: 64,
     height: 64,
@@ -837,6 +851,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingLeft: 3,
+  },
+  coverPlayPermitted: {
+    backgroundColor: '#0d9488',
+  },
+  permittedBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4, 47, 46, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(45, 212, 191, 0.6)',
+  },
+  permittedBadgeText: {
+    color: '#ccfbf1',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  permittedHint: {
+    color: '#5eead4',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 4,
+    paddingHorizontal: 16,
   },
   awaitingBox: {
     alignItems: 'center',

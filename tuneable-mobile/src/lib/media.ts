@@ -76,6 +76,51 @@ export function getPlayabilityBlockReason(
   return 'audio';
 }
 
+export type CoverOverlayKind =
+  | 'play'
+  | 'play_permitted'
+  | 'pending'
+  | 'disputed'
+  | 'audio';
+
+export function getCoverOverlayKind(
+  media: ChartMediaItem | null | undefined
+): CoverOverlayKind {
+  if (isUploadPlayable(media)) {
+    return media?.rightsStatus === 'permitted' ? 'play_permitted' : 'play';
+  }
+  if (media?.rightsStatus === 'disputed') return 'disputed';
+  if (media?.rightsStatus === 'pending') return 'pending';
+  return 'audio';
+}
+
+export function getBlockedCoverCopy(kind: CoverOverlayKind): {
+  title: string;
+  hint: string;
+  showClaim: boolean;
+} | null {
+  if (kind === 'play' || kind === 'play_permitted') return null;
+  if (kind === 'disputed') {
+    return {
+      title: 'Rights disputed',
+      hint: 'Playback is paused while ownership is resolved',
+      showClaim: false,
+    };
+  }
+  if (kind === 'pending') {
+    return {
+      title: 'Awaiting Rights',
+      hint: 'Claim ownership to receive tips held in escrow',
+      showClaim: true,
+    };
+  }
+  return {
+    title: 'Awaiting audio',
+    hint: 'Claim this media and upload audio if you are the rights holder',
+    showClaim: true,
+  };
+}
+
 export function mediaId(media: ChartMediaItem): string {
   return media.id || media._id || media.uuid || '';
 }
