@@ -2355,10 +2355,14 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   if (isLoading) {
     return (
       <EntertainingLoader
-        flavor="party"
+        flavor={isGlobalParty ? 'generic' : 'party'}
         size="page"
-        headline="Loading this party…"
-        detail="Pulling the queue, tips, and who’s in the room."
+        headline={isGlobalParty ? 'Loading Global media…' : 'Loading this party…'}
+        detail={
+          isGlobalParty
+            ? 'Pulling the chart, tips, and what’s playing.'
+            : 'Pulling the queue, tips, and who’s in the room.'
+        }
       />
     );
   }
