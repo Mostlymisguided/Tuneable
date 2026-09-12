@@ -123,7 +123,7 @@ export default function NowPlayingScreen() {
           <Text style={styles.emptyText}>Nothing is playing yet.</Text>
           <Pressable
             style={styles.emptyBtn}
-            onPress={() => router.replace('/(tabs)/music')}>
+            onPress={() => router.replace('/(tabs)/charts')}>
             <Text style={styles.emptyBtnText}>Browse music</Text>
           </Pressable>
         </View>

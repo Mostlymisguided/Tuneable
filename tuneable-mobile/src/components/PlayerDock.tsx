@@ -22,9 +22,9 @@ export function PlayerDock() {
       ) : (
         <Pressable
           style={styles.idle}
-          onPress={() => router.push('/(tabs)/music')}>
+          onPress={() => router.push('/(tabs)/charts')}>
           <Text style={styles.idleLabel}>Nothing playing</Text>
-          <Text style={styles.idleCta}>Browse music →</Text>
+          <Text style={styles.idleCta}>Browse charts →</Text>
         </Pressable>
       )}
     </View>

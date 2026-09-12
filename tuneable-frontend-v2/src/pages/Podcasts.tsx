@@ -1485,7 +1485,11 @@ const Podcasts: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 text-white">
       <GlobalChartLocationHero
-        chartLabel="The World's Best Podcasts"
+        chartKind="podcasts"
+        onChartKindChange={(kind) => {
+          if (kind === 'podcasts') return;
+          navigate(kind === 'books' ? '/books' : '/party/global?period=all-time');
+        }}
         contentNoun="Podcasts"
         selectedLocation={selectedLocation}
         locationScope={locationScope}

@@ -1211,6 +1211,29 @@ export const locationAPI = {
     return response.data as { location: Record<string, unknown> };
   },
 
+  getChart: async (params?: {
+    parentPlaceId?: string;
+    scope?: string;
+    limit?: number;
+  }) => {
+    const response = await api.get('/locations/chart', { params });
+    return response.data as {
+      places: Array<{
+        placeId: string;
+        name: string;
+        featureType?: string | null;
+        country?: string | null;
+        countryCode?: string | null;
+        supportPence: number;
+        mediaCount?: number;
+        bidCount?: number;
+      }>;
+      count: number;
+      parentPlaceId: string | null;
+      scope: string;
+    };
+  },
+
   getProfile: async (placeId: string, params?: { page?: number; limit?: number; timePeriod?: string; sortBy?: string }) => {
     const response = await api.get(`/locations/${encodeURIComponent(placeId)}/profile`, { params });
     return response.data;

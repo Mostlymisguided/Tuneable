@@ -159,7 +159,7 @@ export default function UploadScreen() {
             </Text>
             <Pressable
               style={styles.secondaryBtn}
-              onPress={() => router.push('/(tabs)/music')}>
+              onPress={() => router.push('/(tabs)/charts')}>
               <Text style={styles.secondaryBtnText}>Browse music</Text>
             </Pressable>
           </View>

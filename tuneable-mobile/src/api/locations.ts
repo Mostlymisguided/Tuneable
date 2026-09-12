@@ -39,6 +39,24 @@ export type LocationProfileResponse = {
   pagination?: { page: number; limit: number; total: number; pages: number };
 };
 
+export type PlaceChartItem = {
+  placeId: string;
+  name: string;
+  featureType?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  supportPence: number;
+  mediaCount?: number;
+  bidCount?: number;
+};
+
+export type PlaceChartResponse = {
+  places: PlaceChartItem[];
+  count: number;
+  parentPlaceId: string | null;
+  scope: string;
+};
+
 export const locationAPI = {
   suggest: async (
     q: string,
@@ -69,6 +87,17 @@ export const locationAPI = {
       '/locations/reverse',
       { longitude, latitude }
     );
+    return response.data;
+  },
+
+  getChart: async (params?: {
+    parentPlaceId?: string;
+    scope?: string;
+    limit?: number;
+  }): Promise<PlaceChartResponse> => {
+    const response = await api.get<PlaceChartResponse>('/locations/chart', {
+      params,
+    });
     return response.data;
   },
 

@@ -10,7 +10,9 @@ import {
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { penceToPounds } from '../utils/currency';
+import ChartKindToggle from './ChartKindToggle';
 import ChartLocationScopeToggle from './ChartLocationScopeToggle';
+import { chartKindLabel, type ChartMediaKind } from '../utils/chartKind';
 
 export interface LocationQuickPick extends CountryLocationPick {
   total: number;
@@ -18,7 +20,8 @@ export interface LocationQuickPick extends CountryLocationPick {
 }
 
 interface GlobalChartLocationHeroProps {
-  chartLabel: string;
+  chartKind?: ChartMediaKind;
+  onChartKindChange?: (kind: ChartMediaKind) => void;
   contentNoun?: string;
   selectedLocation: ResolvedLocation | null;
   locationScope?: LocationScope;
@@ -28,6 +31,7 @@ interface GlobalChartLocationHeroProps {
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
   popularLocationsLabel?: string;
+  showRankedBySupport?: boolean;
 }
 
 function chipLabel(loc: LocationQuickPick): string {
@@ -92,8 +96,9 @@ function LocationQuickPickButtons({
 }
 
 const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
-  chartLabel,
-  contentNoun = 'Music',
+  chartKind = 'music',
+  onChartKindChange,
+  contentNoun,
   selectedLocation,
   locationScope = 'in',
   onLocationScopeChange,
@@ -102,6 +107,7 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
   onLocationChange,
   locationQuickPicks,
   popularLocationsLabel,
+  showRankedBySupport = true,
 }) => {
   const locationLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
@@ -131,16 +137,37 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
     closeSearch();
   };
 
+  const noun = contentNoun || chartKindLabel(chartKind);
+  const [kindOpen, setKindOpen] = React.useState(false);
+  const [scopeOpen, setScopeOpen] = React.useState(false);
+
   return (
     <div className="text-center px-3 sm:px-6 pt-6 sm:pt-10 pb-3">
-      <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
-        {chartLabel}
-      </p>
+      {onChartKindChange ? (
+        <ChartKindToggle
+          value={chartKind}
+          onChange={onChartKindChange}
+          open={kindOpen}
+          onOpenChange={(open) => {
+            setKindOpen(open);
+            if (open) setScopeOpen(false);
+          }}
+        />
+      ) : (
+        <p className="text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-2">
+          {chartKindLabel(chartKind)}
+        </p>
+      )}
       <div className="flex w-full flex-col items-center">
         {onLocationScopeChange ? (
           <ChartLocationScopeToggle
             value={locationScope}
             onChange={onLocationScopeChange}
+            open={scopeOpen}
+            onOpenChange={(open) => {
+              setScopeOpen(open);
+              if (open) setKindOpen(false);
+            }}
           />
         ) : (
           <p className="w-full text-center text-[10px] sm:text-xs font-semibold tracking-[0.3em] uppercase text-purple-300/80 mb-3">
@@ -200,9 +227,15 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
         </div>
       )}
 
+      {showRankedBySupport && (
+        <p className="mt-3 text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-purple-300/50">
+          Ranked by support
+        </p>
+      )}
+
       {selectedLocation?.placeId && (
         <p className="text-xs text-purple-300 mt-3">
-          {locationScopeFilterNote(contentNoun, formatLocation(selectedLocation), locationScope)}
+          {locationScopeFilterNote(noun, formatLocation(selectedLocation), locationScope)}
         </p>
       )}
     </div>

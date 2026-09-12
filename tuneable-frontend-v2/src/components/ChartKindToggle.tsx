@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
-  LOCATION_SCOPE_OPTIONS,
-  locationScopeLabel,
-  type LocationScope,
-} from '../utils/locationHelpers';
+  CHART_KIND_OPTIONS,
+  chartKindLabel,
+  type ChartMediaKind,
+} from '../utils/chartKind';
 
-interface ChartLocationScopeToggleProps {
-  value: LocationScope;
-  onChange: (scope: LocationScope) => void;
+interface ChartKindToggleProps {
+  value: ChartMediaKind;
+  onChange: (kind: ChartMediaKind) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-const ChartLocationScopeToggle: React.FC<ChartLocationScopeToggleProps> = ({
+const ChartKindToggle: React.FC<ChartKindToggleProps> = ({
   value,
   onChange,
   open: openProp,
@@ -40,11 +40,11 @@ const ChartLocationScopeToggle: React.FC<ChartLocationScopeToggleProps> = ({
   if (open) {
     return (
       <div
-        className="flex w-full flex-wrap justify-center gap-x-3 gap-y-1 mb-3"
+        className="flex w-full flex-wrap justify-center gap-x-3 gap-y-1 mb-2"
         role="radiogroup"
-        aria-label="Location chart scope"
+        aria-label="Chart type"
       >
-        {LOCATION_SCOPE_OPTIONS.map((option) => {
+        {CHART_KIND_OPTIONS.map((option) => {
           const selected = option.id === value;
           return (
             <button
@@ -74,15 +74,15 @@ const ChartLocationScopeToggle: React.FC<ChartLocationScopeToggleProps> = ({
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="group flex w-full items-center justify-center gap-1 mb-3 text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-purple-300/80 hover:text-purple-200 transition-colors"
+      className="group flex w-full items-center justify-center gap-1 mb-2 text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase text-purple-300/80 hover:text-purple-200 transition-colors"
       aria-haspopup="true"
       aria-expanded={false}
-      aria-label={`Chart scope ${locationScopeLabel(value)}. Change to In, From, or Supported by.`}
+      aria-label={`${chartKindLabel(value)}. Change to Music, Podcasts, or Books.`}
     >
-      {locationScopeLabel(value)}
+      {chartKindLabel(value)}
       <ChevronDown className="h-3 w-3 opacity-50 group-hover:opacity-90 transition-opacity" />
     </button>
   );
 };
 
-export default ChartLocationScopeToggle;
+export default ChartKindToggle;

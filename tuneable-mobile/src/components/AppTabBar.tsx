@@ -17,14 +17,15 @@ type TabItem = {
 
 const TABS: TabItem[] = [
   { href: '/(tabs)', label: 'Home', icon: 'home' },
-  { href: '/(tabs)/music', label: 'Music', icon: 'musical-notes', segment: 'music' },
-  { href: '/(tabs)/podcasts', label: 'Podcasts', icon: 'mic', segment: 'podcasts' },
+  { href: '/(tabs)/charts', label: 'Charts', icon: 'stats-chart', segment: 'charts' },
+  { href: '/(tabs)/places', label: 'Places', icon: 'earth', segment: 'places' },
   { href: '/(tabs)/profile', label: 'Profile', icon: 'person', segment: 'profile' },
 ];
 
 function tabHrefFromSegments(segments: string[]): Href | null {
   if (segments[0] !== '(tabs)') return null;
   const child = segments[1];
+  if (child === 'music' || child === 'podcasts') return '/(tabs)/charts';
   const match = TABS.find((tab) => tab.segment && tab.segment === child);
   return match?.href ?? '/(tabs)';
 }

@@ -2420,7 +2420,11 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       {/* Party Header — Variant 2: editorial, quick-picks always visible */}
       {isGlobalParty && headerVariant === 2 && (
       <GlobalChartLocationHero
-        chartLabel="The World's Best Music"
+        chartKind="music"
+        onChartKindChange={(kind) => {
+          if (kind === 'music') return;
+          navigate(kind === 'podcasts' ? '/podcasts' : '/books');
+        }}
         contentNoun="Music"
         selectedLocation={selectedLocation}
         locationScope={locationScope}

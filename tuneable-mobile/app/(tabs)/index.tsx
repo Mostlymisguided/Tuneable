@@ -326,7 +326,9 @@ export default function HomeScreen() {
           <View style={styles.catalogLinks}>
             <Pressable
               style={styles.catalogChip}
-              onPress={() => router.push('/(tabs)/podcasts')}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/charts', params: { kind: 'podcasts' } })
+              }
               accessibilityRole="button"
               accessibilityLabel="Open podcasts"
             >
@@ -407,7 +409,9 @@ export default function HomeScreen() {
         <CoverRail
           title="Rising today"
           actionLabel="Full chart"
-          onAction={() => router.push('/(tabs)/music')}
+          onAction={() =>
+            router.push({ pathname: '/(tabs)/charts', params: { kind: 'music' } })
+          }
           items={risingRail}
           emptyTitle="Nothing rising yet"
           emptyBody="Be the first to tip the global chart today."

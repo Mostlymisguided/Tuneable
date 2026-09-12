@@ -3,6 +3,7 @@ const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const mapboxGeocoding = require('../services/mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getLocationProfile } = require('../services/locationProfileService');
+const { getPlaceChart } = require('../services/placeChartService');
 
 const router = express.Router();
 
@@ -63,6 +64,29 @@ router.post('/resolve', async (req, res) => {
       error: status === 503 ? 'Location search is not configured' : 'Failed to resolve location',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+});
+
+/**
+ * GET /api/locations/chart
+ * Ranked places (countries, or children under parentPlaceId) by support.
+ */
+router.get('/chart', optionalAuthMiddleware, async (req, res) => {
+  try {
+    const parentPlaceId =
+      typeof req.query.parentPlaceId === 'string' ? req.query.parentPlaceId.trim() : '';
+    const scope = typeof req.query.scope === 'string' ? req.query.scope : 'from';
+    const limit = req.query.limit;
+
+    const chart = await getPlaceChart({
+      parentPlaceId: parentPlaceId || null,
+      scope,
+      limit,
+    });
+    res.json(chart);
+  } catch (error) {
+    console.error('Error fetching place chart:', error);
+    res.status(500).json({ error: 'Failed to fetch place chart' });
   }
 });
 
