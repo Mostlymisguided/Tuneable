@@ -43,7 +43,7 @@ export interface LibraryItem {
   tags?: string[];
   contentForm?: string[];
   sources?: Record<string, string>;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   rightsCleared?: boolean;
   isPlayable?: boolean;
   hasHostedAudio?: boolean;

@@ -28,7 +28,7 @@ export function normalizeSources(sources: MediaSources): Record<string, string> 
 export function getUploadUrl(media: ChartMediaItem | null | undefined): string | null {
   if (!media) return null;
   if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') return null;
-  if (media.rightsCleared === false) return null;
+  if (media.rightsStatus !== 'permitted' && media.rightsCleared === false) return null;
   const sources = normalizeSources(media.sources);
   const url = sources.upload || sources.audio_direct || sources.audio || null;
   return url || null;
@@ -52,6 +52,7 @@ export function isUploadPlayable(media: ChartMediaItem | null | undefined): bool
   const url = getUploadUrl(media);
   if (!url) return false;
   if (media.isPlayable === true) return true;
+  if (media.rightsStatus === 'permitted') return true;
   return media.rightsCleared === true;
 }
 
@@ -59,7 +60,9 @@ export function isRightsPendingClaimable(
   media: ChartMediaItem | null | undefined
 ): boolean {
   if (!media) return false;
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
+  return media.rightsStatus === 'pending' || media.rightsStatus === 'permitted'
+    ? !media.rightsCleared
+    : false;
 }
 
 /** Why a track cannot play on mobile (null when playable). */
@@ -68,12 +71,7 @@ export function getPlayabilityBlockReason(
 ): 'rights' | 'audio' | 'disputed' | null {
   if (!media || isUploadPlayable(media)) return null;
   if (media.rightsStatus === 'disputed') return 'disputed';
-  if (
-    isRightsPendingClaimable(media) ||
-    media.rightsStatus === 'pending'
-  ) {
-    return 'rights';
-  }
+  if (media.rightsStatus === 'pending') return 'rights';
   if (media.hasHostedAudio && media.rightsCleared === false) return 'rights';
   return 'audio';
 }

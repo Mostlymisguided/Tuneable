@@ -118,7 +118,7 @@ interface Media {
   sources?: { [key: string]: string };
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   tipCount?: number;
   bids?: Bid[];
   comments?: Comment[];

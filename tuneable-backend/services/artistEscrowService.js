@@ -78,7 +78,8 @@ class ArtistEscrowService {
       // Calculate artist share (70% of bid amount)
       const artistSharePence = bidSplit.artistSharePence;
 
-      const rightsPending = media.rightsStatus === 'pending' && !media.rightsCleared;
+      const { isEscrowUntilClaim } = require('../utils/mediaRights');
+      const rightsPending = isEscrowUntilClaim(media);
 
       // Pending library imports: full artist share goes to escrow until rights holder claims
       if (rightsPending) {

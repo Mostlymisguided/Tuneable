@@ -460,10 +460,14 @@ const mediaSchema = new mongoose.Schema({
   creatorDisplay: { type: String, default: null }, // Optional display string for UI
   
   // Rights confirmation fields
+  // pending: hosted without permission — not playable, escrow until claim
+  // permitted: admin has off-platform permission; playable, escrow until the artist claims
+  // cleared: rights holder is on the platform (self-upload or approved claim)
+  // disputed: ownership contested — not playable
   rightsCleared: { type: Boolean, default: false },
   rightsStatus: {
     type: String,
-    enum: ['cleared', 'pending', 'disputed'],
+    enum: ['cleared', 'pending', 'permitted', 'disputed'],
     default: 'pending',
     index: true,
   },

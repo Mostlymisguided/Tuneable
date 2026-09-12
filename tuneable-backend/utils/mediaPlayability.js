@@ -1,7 +1,8 @@
 /**
  * Media playability helpers for the metadata/import → upload transition.
  *
- * Playable music requires an uploaded file (sources.upload) AND cleared rights.
+ * Playable music requires an uploaded file (sources.upload) plus a playable
+ * rights status (cleared, or permitted with off-platform permission).
  * Pending library-import audio stays hosted for a later claim, but is not
  * streamed and direct audio URLs are stripped from public API responses.
  * Stream URLs for playable tracks are also omitted unless the requester is
@@ -85,6 +86,10 @@ function isMediaPlayable(media) {
     return false;
   }
 
+  if (media.rightsStatus === 'permitted') {
+    return !!sources.upload;
+  }
+
   return !!(sources.upload && media.rightsCleared === true);
 }
 
@@ -102,6 +107,7 @@ function getPlayabilityBlockReason(media) {
 
   if (media.rightsStatus === 'disputed') return 'disputed';
   if (media.rightsStatus === 'pending') return 'rights';
+  // permitted is playable when a file exists; missing audio falls through below
 
   const sources = normalizeSources(media.sources);
   if (!hasDirectAudioSource(sources)) return 'audio';
@@ -112,7 +118,8 @@ function getPlayabilityBlockReason(media) {
 
 function isRightsPendingClaimable(media) {
   if (!media) return false;
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
+  return (media.rightsStatus === 'pending' || media.rightsStatus === 'permitted')
+    && !media.rightsCleared;
 }
 
 /**

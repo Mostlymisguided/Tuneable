@@ -51,7 +51,7 @@ import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMe
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { canEditMedia, canDeleteMedia, isCreator, isAdminOrCreator } from '../utils/permissionHelpers';
+import { canEditMedia, canDeleteMedia, isCreator, isAdmin, isAdminOrCreator } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
@@ -90,6 +90,8 @@ import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
+import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
+import { RIGHTS_STATUS_HELP, type RightsStatus } from '../utils/rightsStatus';
 
 interface Media {
   _id: string;
@@ -132,7 +134,7 @@ interface Media {
   sources?: { [key: string]: string };
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   hasHostedAudio?: boolean;
   tipCount?: number;
   bids?: Bid[];
@@ -276,6 +278,7 @@ const TuneProfile: React.FC = () => {
   
   // Claim tune modal (rights-pending limbo only)
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [savingRightsStatus, setSavingRightsStatus] = useState(false);
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -1542,6 +1545,35 @@ const TuneProfile: React.FC = () => {
     setShowClaimModal(true);
   };
 
+  const handleRightsStatusChange = async (status: RightsStatus) => {
+    if (!media?._id || savingRightsStatus) return;
+    const previous = media.rightsStatus;
+    setSavingRightsStatus(true);
+    setMedia((current) => current
+      ? enrichMediaWithPlayability({
+          ...current,
+          rightsStatus: status,
+          rightsCleared: status === 'cleared',
+        })
+      : current);
+    try {
+      await mediaAPI.updateMedia(media._id, { rightsStatus: status });
+      toast.success(
+        status === 'permitted'
+          ? 'Marked permitted — playable, tips held until the artist claims'
+          : `Rights status set to ${status}`
+      );
+      await fetchMediaProfile();
+    } catch (err: any) {
+      setMedia((current) => current
+        ? enrichMediaWithPlayability({ ...current, rightsStatus: previous })
+        : current);
+      toast.error(err.response?.data?.error || 'Failed to update rights status');
+    } finally {
+      setSavingRightsStatus(false);
+    }
+  };
+
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
     if (!media && !mediaId) {
@@ -2391,7 +2423,16 @@ const TuneProfile: React.FC = () => {
             {/* Edit Tune & Report Buttons */}
             <div className="flex flex-wrap justify-end gap-2 md:flex-nowrap md:items-center">
             
-              {/* Report Button - Always visible */}
+              {isAdmin(user) && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-black/30 border border-white/10 rounded-lg">
+                  <span className="text-xs text-gray-400 hidden sm:inline">Rights</span>
+                  <AdminRightsStatusSelect
+                    value={media.rightsStatus}
+                    disabled={savingRightsStatus}
+                    onChange={handleRightsStatusChange}
+                  />
+                </div>
+              )}
               <button
                 onClick={() => setShowReportModal(true)}
                 className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
@@ -2400,7 +2441,7 @@ const TuneProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
-              {/* Claim media — rights-pending limbo only */}
+              {/* Claim media — pending or permitted until the artist is onboarded */}
               {!canEditTune() && isRightsPendingClaimable(media) && (
                 <button
                   onClick={handleClaimTune}
@@ -2522,6 +2563,12 @@ const TuneProfile: React.FC = () => {
               {heroMetadata.length > 0 && (
                 <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-2">
                   {heroMetadata.join(' · ')}
+                </p>
+              )}
+
+              {media.rightsStatus === 'permitted' && (
+                <p className="text-xs text-teal-300/90 text-center md:text-left px-2 mb-2">
+                  {RIGHTS_STATUS_HELP.permitted}
                 </p>
               )}
 

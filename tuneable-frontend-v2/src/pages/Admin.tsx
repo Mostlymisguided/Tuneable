@@ -46,6 +46,8 @@ import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import TagList from '../components/TagList';
+import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
+import { RIGHTS_STATUS_LABELS } from '../utils/rightsStatus';
 
 interface MediaEditDraft {
   title: string;
@@ -846,7 +848,7 @@ const Admin: React.FC = () => {
         params.search = mediaSearchQuery;
       }
       if (mediaRightsFilter !== '') {
-        params.rightsCleared = mediaRightsFilter === 'true';
+        params.rightsStatus = mediaRightsFilter;
       }
       const data = await mediaAPI.getAllMedia(params);
       setMediaList(data.media || []);
@@ -2834,7 +2836,7 @@ const Admin: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Rights Cleared
+                        Rights
                       </label>
                       <select
                         value={mediaRightsFilter}
@@ -2846,8 +2848,10 @@ const Admin: React.FC = () => {
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                       >
                         <option value="">All</option>
-                        <option value="true">Cleared</option>
-                        <option value="false">Not Cleared</option>
+                        <option value="cleared">Cleared</option>
+                        <option value="permitted">Permitted</option>
+                        <option value="pending">Pending</option>
+                        <option value="disputed">Disputed</option>
                       </select>
                     </div>
                   </div>
@@ -3097,10 +3101,27 @@ const Admin: React.FC = () => {
                                 <div className="flex flex-col gap-1">
                                   {item.status === 'vetoed' ? (
                                     <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
-                                  ) : item.rightsCleared ? (
-                                    <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Rights Cleared</span>
                                   ) : (
-                                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>
+                                    <AdminRightsStatusSelect
+                                      value={item.rightsStatus || (item.rightsCleared ? 'cleared' : 'pending')}
+                                      onChange={async (status) => {
+                                        try {
+                                          await mediaAPI.updateMedia(item._id, { rightsStatus: status });
+                                          setMediaList((current) => current.map((row) => (
+                                            row._id === item._id
+                                              ? {
+                                                  ...row,
+                                                  rightsStatus: status,
+                                                  rightsCleared: status === 'cleared',
+                                                }
+                                              : row
+                                          )));
+                                          toast.success(`Rights set to ${RIGHTS_STATUS_LABELS[status]}`);
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to update rights');
+                                        }
+                                      }}
+                                    />
                                   )}
                                   {item.label && item.label.length > 0 && (
                                     <div className="text-xs text-gray-400">

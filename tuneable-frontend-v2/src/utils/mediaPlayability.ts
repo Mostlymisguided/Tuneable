@@ -1,9 +1,9 @@
 /**
  * Client-side playability checks (mirrors tuneable-backend/utils/mediaPlayability.js).
  *
- * Pending-rights uploads are not playable. The API strips stream URLs for guests
- * while still setting isPlayable; trust that flag for UI. Direct audio URLs
- * should already be stripped for unplayable tracks.
+ * Pending-rights uploads are not playable. Permitted admin uploads (off-platform
+ * permission, artist not yet on Tuneable) are playable. The API strips stream
+ * URLs for guests while still setting isPlayable; trust that flag for UI.
  */
 
 export type SupportMode = 'tip';
@@ -25,7 +25,7 @@ const DIRECT_AUDIO_SOURCE_KEYS = ['upload', 'audio_direct', 'audio', 'enclosure'
 type MediaLike = PlayabilityFields & {
   sources?: Record<string, string> | Array<{ platform?: string; url?: string; youtube?: string }> | null;
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   contentForm?: string | string[];
   contentType?: string | string[];
 };
@@ -112,6 +112,10 @@ export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
     return false;
   }
 
+  if (media.rightsStatus === 'permitted') {
+    return !!sources.upload;
+  }
+
   return !!(sources.upload && media.rightsCleared === true);
 }
 
@@ -143,7 +147,8 @@ export function isRightsPendingClaimable(
   media: { rightsStatus?: string; rightsCleared?: boolean } | null | undefined
 ): boolean {
   if (!media) return false;
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
+  return (media.rightsStatus === 'pending' || media.rightsStatus === 'permitted')
+    && !media.rightsCleared;
 }
 
 export function enrichMediaWithPlayability<T extends MediaLike>(media: T): T & PlayabilityFields {

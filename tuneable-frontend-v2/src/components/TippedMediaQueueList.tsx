@@ -73,7 +73,7 @@ export interface TippedQueueItem {
   sources?: Record<string, string>;
   contentType?: string[] | string;
   contentForm?: string[] | string;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   rightsCleared?: boolean;
   isPlayable?: boolean;
   hasHostedAudio?: boolean;

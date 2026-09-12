@@ -21,7 +21,7 @@ interface PlayerMedia {
   minimumBid?: number;
   isPlayable?: boolean;
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   contentForm?: string | string[];
 }
 

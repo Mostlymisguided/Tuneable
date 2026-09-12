@@ -8,6 +8,7 @@ const {
   getPlayabilityBlockReason,
   enrichMediaWithPlayability,
   stripDirectAudioSources,
+  isRightsPendingClaimable,
 } = require('../utils/mediaPlayability');
 
 const UPLOAD = 'https://uploads.tuneable.stream/media-uploads/daft-punk-around-the-world-a1b2c3d4.mp3';
@@ -21,6 +22,24 @@ describe('isMediaPlayable', () => {
       rightsCleared: true,
       contentForm: ['tune'],
     })).toBe(true);
+  });
+
+  it('plays permitted admin uploads without rightsCleared', () => {
+    expect(isMediaPlayable({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    })).toBe(true);
+  });
+
+  it('does not play permitted tracks with no hosted file', () => {
+    expect(isMediaPlayable({
+      sources: { youtube: YT },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    })).toBe(false);
   });
 
   it('does not play pending library-import uploads', () => {
@@ -80,6 +99,15 @@ describe('getPlayabilityBlockReason', () => {
     })).toBe('rights');
   });
 
+  it('returns audio for permitted tracks with no file', () => {
+    expect(getPlayabilityBlockReason({
+      sources: { youtube: YT },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    })).toBe('audio');
+  });
+
   it('returns audio for YouTube catalog with uncleared rights and no file', () => {
     expect(getPlayabilityBlockReason({
       sources: { youtube: YT },
@@ -126,6 +154,18 @@ describe('enrichMediaWithPlayability', () => {
     expect(presented.isPlayable).toBe(true);
     expect(presented.sources.upload).toBeUndefined();
     expect(presented.hasHostedAudio).toBe(true);
+  });
+
+  it('keeps upload URLs for permitted tracks when authenticated', () => {
+    const presented = enrichMediaWithPlayability({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    }, { authenticated: true });
+    expect(presented.isPlayable).toBe(true);
+    expect(presented.sources.upload).toBe(UPLOAD);
+    expect(presented.playabilityBlockReason).toBeNull();
   });
 
   it('keeps upload URLs for authenticated listeners', () => {
@@ -197,5 +237,25 @@ describe('stripDirectAudioSources', () => {
       youtube: YT,
       spotify: 'https://open.spotify.com/track/1',
     });
+  });
+});
+
+describe('isRightsPendingClaimable', () => {
+  it('allows claims on pending and permitted listings', () => {
+    expect(isRightsPendingClaimable({
+      rightsStatus: 'pending',
+      rightsCleared: false,
+    })).toBe(true);
+    expect(isRightsPendingClaimable({
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+    })).toBe(true);
+  });
+
+  it('does not allow claims on cleared listings', () => {
+    expect(isRightsPendingClaimable({
+      rightsStatus: 'cleared',
+      rightsCleared: true,
+    })).toBe(false);
   });
 });

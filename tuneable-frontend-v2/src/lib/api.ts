@@ -580,6 +580,7 @@ export const mediaAPI = {
     addedBy?: string;
     labelId?: string;
     rightsCleared?: boolean;
+    rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
     dateFrom?: string;
     dateTo?: string;
   }) => {
@@ -647,6 +648,7 @@ export const mediaAPI = {
       bpm?: string | number;
       key?: string;
       libraryXmlFile?: File;
+      rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
     }
   ) => {
     const formData = new FormData();
@@ -669,6 +671,9 @@ export const mediaAPI = {
     }
     if (options?.libraryXmlFile) {
       formData.append('libraryXmlFile', options.libraryXmlFile);
+    }
+    if (options?.rightsStatus) {
+      formData.append('rightsStatus', options.rightsStatus);
     }
     const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -757,6 +762,7 @@ export const mediaAPI = {
     rightsHolderEmail?: string;
     description?: string;
     sources?: { [key: string]: string };
+    rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   }) => {
     // Use regular endpoint which supports all field updates (tags, genres, elements, etc.)
     // This endpoint checks permissions: admin OR media owner OR verified creator

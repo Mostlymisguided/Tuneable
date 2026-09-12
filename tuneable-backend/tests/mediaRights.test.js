@@ -6,6 +6,9 @@ const {
   isVerifiedOriginalUpload,
   shouldClearRightsOnAttach,
   shouldGateHostedMusic,
+  applyRightsStatus,
+  isEscrowUntilClaim,
+  permittedRightsFields,
 } = require('../utils/mediaRights');
 
 const UPLOAD = 'https://uploads.tuneable.stream/media-uploads/example.mp3';
@@ -136,6 +139,16 @@ describe('shouldGateHostedMusic', () => {
     })).toBe(false);
   });
 
+  it('does not gate permitted admin uploads', () => {
+    expect(shouldGateHostedMusic({
+      sources: { upload: UPLOAD },
+      contentForm: ['tune'],
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      mediaOwners: [],
+    })).toBe(false);
+  });
+
   it('ignores podcasts', () => {
     expect(shouldGateHostedMusic({
       sources: { upload: UPLOAD, enclosure: 'https://cdn.example/ep.mp3' },
@@ -180,5 +193,47 @@ describe('shouldClearRightsOnAttach', () => {
         verificationSource: 'upload',
       },
     })).toBe(true);
+  });
+});
+
+describe('applyRightsStatus', () => {
+  it('stamps permitted without clearing rights', () => {
+    const media = { rightsStatus: 'pending', rightsCleared: false };
+    const result = applyRightsStatus(media, 'permitted', 'admin1');
+    expect(result.changed).toBe(true);
+    expect(media.rightsStatus).toBe('permitted');
+    expect(media.rightsCleared).toBe(false);
+    expect(isEscrowUntilClaim(media)).toBe(true);
+  });
+
+  it('demotes self-upload owners when marking permitted', () => {
+    const media = {
+      rightsStatus: 'cleared',
+      rightsCleared: true,
+      mediaOwners: [{
+        userId: 'admin1',
+        percentage: 100,
+        role: 'creator',
+        verified: true,
+        verificationMethod: 'Self-upload',
+        verificationSource: 'upload',
+      }],
+    };
+    applyRightsStatus(media, 'permitted', 'admin1');
+    expect(media.mediaOwners[0].percentage).toBe(0);
+    expect(media.mediaOwners[0].role).toBe('aux');
+    expect(media.mediaOwners[0].verified).toBe(false);
+  });
+
+  it('clears permitted when moving to cleared', () => {
+    const media = { ...permittedRightsFields('admin1') };
+    applyRightsStatus(media, 'cleared', 'artist1');
+    expect(media.rightsStatus).toBe('cleared');
+    expect(media.rightsCleared).toBe(true);
+    expect(isEscrowUntilClaim(media)).toBe(false);
+  });
+
+  it('rejects unknown statuses', () => {
+    expect(applyRightsStatus({}, 'licensed', 'admin1').error).toMatch(/Invalid/);
   });
 });

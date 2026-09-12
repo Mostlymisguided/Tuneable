@@ -94,6 +94,7 @@ const CreatorUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [adminRightsMode, setAdminRightsMode] = useState<'cleared' | 'permitted'>('cleared');
   const [labelSuggestions, setLabelSuggestions] = useState<any[]>([]);
   const [isSearchingLabels, setIsSearchingLabels] = useState(false);
   const [showLabelSuggestions, setShowLabelSuggestions] = useState(false);
@@ -580,6 +581,9 @@ const CreatorUpload: React.FC = () => {
       if (formData.label) uploadData.append('label', formData.label);
       if (formData.language) uploadData.append('language', formData.language);
       if (libraryXmlFile) uploadData.append('libraryXmlFile', libraryXmlFile);
+      if (isAdmin && adminRightsMode === 'permitted') {
+        uploadData.append('rightsStatus', 'permitted');
+      }
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const token = localStorage.getItem('token');
@@ -1487,6 +1491,36 @@ const CreatorUpload: React.FC = () => {
 
           {/* Rights Confirmation */}
           <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-lg p-6">
+            {isAdmin && (
+              <fieldset className="mb-5 space-y-3">
+                <legend className="text-sm font-semibold text-white mb-2">Rights category</legend>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="admin-rights-mode"
+                    checked={adminRightsMode === 'cleared'}
+                    onChange={() => setAdminRightsMode('cleared')}
+                    className="mt-1 h-4 w-4 text-purple-600"
+                  />
+                  <span className="text-sm text-gray-300">
+                    <strong className="text-white">I am the rights holder.</strong> Playable, tips go to this account.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="admin-rights-mode"
+                    checked={adminRightsMode === 'permitted'}
+                    onChange={() => setAdminRightsMode('permitted')}
+                    className="mt-1 h-4 w-4 text-purple-600"
+                  />
+                  <span className="text-sm text-gray-300">
+                    <strong className="text-white">Artist gave permission but isn&apos;t on Tuneable yet.</strong>{' '}
+                    Playable now. Tips are held until they join and claim the listing.
+                  </span>
+                </label>
+              </fieldset>
+            )}
             <div className="flex items-start space-x-3">
               <input
                 type="checkbox"

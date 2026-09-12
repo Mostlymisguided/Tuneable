@@ -36,6 +36,9 @@ const {
   shouldClearRightsOnAttach,
   pendingRightsFields,
   clearedRightsFields,
+  permittedRightsFields,
+  applyRightsStatus,
+  isValidRightsStatus,
 } = require('../utils/mediaRights');
 const {
   attachGearIdsToProductionStack,
@@ -597,6 +600,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       composer,
       producer,
       label,
+      rightsStatus: requestedRightsStatus,
     } = req.body;
 
     // Resolve display metadata before upload so R2 keys are human-readable
@@ -803,28 +807,36 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       // Production equipment / gear (structured)
       productionStack: stackWithGear,
 
-      // Rights confirmation (assumed true when uploaded via checkbox)
-      rightsCleared: true,
-      rightsStatus: 'cleared',
-      rightsConfirmedBy: userId,
-      rightsConfirmedAt: new Date(),
+      // Rights: creator self-upload is cleared. Admins can mark permitted
+      // (off-platform permission, artist not on Tuneable yet) — playable,
+      // but not stamped as the admin's own work.
+      ...(isAdmin(user) && requestedRightsStatus === 'permitted'
+        ? permittedRightsFields(userId)
+        : {
+            rightsCleared: true,
+            rightsStatus: 'cleared',
+            rightsConfirmedBy: userId,
+            rightsConfirmedAt: new Date(),
+          }),
       
-      // Auto-assign ownership to uploader
-      mediaOwners: [{
-        userId: userId,
-        percentage: 100,
-        role: 'creator',
-        verified: true,
-        verifiedAt: new Date(),
-        verifiedBy: userId,
-        verificationMethod: 'Self-upload',
-        verificationNotes: null,
-        verificationSource: 'upload',
-        addedBy: userId,
-        addedAt: new Date(),
-        lastUpdatedAt: new Date(),
-        lastUpdatedBy: userId
-      }]
+      // Auto-assign ownership to uploader unless this is an admin permitted upload
+      mediaOwners: (isAdmin(user) && requestedRightsStatus === 'permitted')
+        ? []
+        : [{
+            userId: userId,
+            percentage: 100,
+            role: 'creator',
+            verified: true,
+            verifiedAt: new Date(),
+            verifiedBy: userId,
+            verificationMethod: 'Self-upload',
+            verificationNotes: null,
+            verificationSource: 'upload',
+            addedBy: userId,
+            addedAt: new Date(),
+            lastUpdatedAt: new Date(),
+            lastUpdatedBy: userId
+          }]
     });
     
     await media.save();
@@ -937,6 +949,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       replaceExisting,
       bpm,
       key,
+      rightsStatus: requestedRightsStatus,
     } = req.body;
 
     if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
@@ -1014,19 +1027,24 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
 
     const isThirdParty = uploaderRole === 'third_party';
-    const clearRights = shouldClearRightsOnAttach({
-      uploaderRole,
-      isAdminUser: isAdmin(user),
-      existingOwner: media.mediaOwners?.find(
-        (o) => o.userId && o.userId.toString() === userId.toString()
-      ) || null,
-    });
+    const adminPermitted = isAdmin(user) && requestedRightsStatus === 'permitted';
+    const clearRights = adminPermitted
+      ? false
+      : shouldClearRightsOnAttach({
+          uploaderRole,
+          isAdminUser: isAdmin(user),
+          existingOwner: media.mediaOwners?.find(
+            (o) => o.userId && o.userId.toString() === userId.toString()
+          ) || null,
+        });
     const verificationMethod = isThirdParty ? 'third_party_claim' : 'attach_upload';
     const verificationNotes = isThirdParty
       ? (rightsDisclaimer || 'Third-party upload with rights disclaimer')
-      : (clearRights
-        ? 'Audio attached to existing catalog entry'
-        : 'Operator attach — rights pending artist claim');
+      : (adminPermitted
+        ? 'Admin attach with off-platform permission — awaiting artist claim'
+        : (clearRights
+          ? 'Audio attached to existing catalog entry'
+          : 'Operator attach — rights pending artist claim'));
 
     if (!media.sources || typeof media.sources.set !== 'function') {
       media.sources = new Map(Object.entries(media.sources || {}));
@@ -1034,7 +1052,9 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     media.sources.set('upload', fileUrl);
     Object.assign(
       media,
-      clearRights ? clearedRightsFields(userId) : pendingRightsFields(userId, isAdmin(user) ? 'operator_attach' : null)
+      adminPermitted
+        ? permittedRightsFields(userId)
+        : (clearRights ? clearedRightsFields(userId) : pendingRightsFields(userId, isAdmin(user) ? 'operator_attach' : null))
     );
     if (!media.mediaType?.includes('mp3')) {
       media.mediaType = [...(media.mediaType || []), 'mp3'];
@@ -2516,6 +2536,29 @@ router.put('/:id', authMiddleware, async (req, res) => {
       if (JSON.stringify(oldStack) !== JSON.stringify(newStack)) {
         changes.push({ field: 'productionStack', oldValue: oldStack, newValue: newStack });
         media.productionStack = newStack;
+      }
+    }
+
+    if (req.body.rightsStatus !== undefined && isAdmin(req.user)) {
+      const previousStatus = media.rightsStatus;
+      const previousCleared = media.rightsCleared;
+      const applied = applyRightsStatus(media, req.body.rightsStatus, userId);
+      if (applied.error) {
+        return res.status(400).json({ error: applied.error });
+      }
+      if (applied.changed) {
+        changes.push({
+          field: 'rightsStatus',
+          oldValue: previousStatus,
+          newValue: req.body.rightsStatus,
+        });
+        if (previousCleared !== media.rightsCleared) {
+          changes.push({
+            field: 'rightsCleared',
+            oldValue: previousCleared,
+            newValue: media.rightsCleared,
+          });
+        }
       }
     }
 
@@ -4034,6 +4077,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       addedBy,
       labelId,
       rightsCleared,
+      rightsStatus,
       dateFrom,
       dateTo
     } = req.query;
@@ -4069,8 +4113,10 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       query['label.labelId'] = labelId;
     }
 
-    // Rights cleared filter
-    if (rightsCleared !== undefined) {
+    // Rights filter
+    if (rightsStatus && isValidRightsStatus(rightsStatus)) {
+      query.rightsStatus = rightsStatus;
+    } else if (rightsCleared !== undefined) {
       query.rightsCleared = rightsCleared === 'true';
     }
 
@@ -4164,6 +4210,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
         genres: item.genres || [],
         explicit: item.explicit || false,
         rightsCleared: item.rightsCleared || false,
+        rightsStatus: item.rightsStatus || 'pending',
         uploadedAt: item.uploadedAt || item.createdAt,
         createdAt: item.createdAt,
         addedBy: item.addedBy ? {

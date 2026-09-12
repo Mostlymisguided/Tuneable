@@ -1,10 +1,19 @@
 /**
  * Rights / playability policy for hosted music.
  *
- * Playback requires a verified original upload (artist self-upload or
- * rights-holder attach). Operator library imports stay pending.
- * Playability itself still lives on Media.rightsStatus in mediaPlayability.js.
+ * Playback requires a hosted file plus a playable rights status:
+ *   cleared   — rights holder is on Tuneable (self-upload or approved claim)
+ *   permitted — admin attested off-platform permission; artist not onboarded yet
+ *   pending   — no permission (library import); not playable
+ *   disputed  — ownership contested; not playable
+ *
+ * Operator library imports stay pending. Playability lives in mediaPlayability.js.
  */
+
+const RIGHTS_STATUSES = ['cleared', 'pending', 'permitted', 'disputed'];
+const PLAYABLE_RIGHTS_STATUSES = ['cleared', 'permitted'];
+const BLOCKED_RIGHTS_STATUSES = ['pending', 'disputed'];
+const ESCROW_UNTIL_CLAIM_STATUSES = ['pending', 'permitted'];
 
 const { isPodcastLike, isWrittenMedia, normalizeSources } = require('./mediaPlayability');
 
@@ -116,15 +125,89 @@ function clearedRightsFields(userId) {
   };
 }
 
+function permittedRightsFields(userId) {
+  return {
+    rightsCleared: false,
+    rightsStatus: 'permitted',
+    rightsConfirmedBy: userId || undefined,
+    rightsConfirmedAt: new Date(),
+  };
+}
+
+function disputedRightsFields(userId) {
+  return {
+    rightsCleared: false,
+    rightsStatus: 'disputed',
+    rightsConfirmedBy: userId || undefined,
+    rightsConfirmedAt: new Date(),
+  };
+}
+
+function isValidRightsStatus(status) {
+  return RIGHTS_STATUSES.includes(status);
+}
+
+function isBlockedRightsStatus(status) {
+  return BLOCKED_RIGHTS_STATUSES.includes(status);
+}
+
+function isPlayableRightsStatus(status) {
+  return PLAYABLE_RIGHTS_STATUSES.includes(status);
+}
+
+function isEscrowUntilClaim(media) {
+  if (!media) return false;
+  return ESCROW_UNTIL_CLAIM_STATUSES.includes(media.rightsStatus) && media.rightsCleared !== true;
+}
+
+function rightsFieldsForStatus(status, userId, importSource = null) {
+  if (status === 'cleared') return clearedRightsFields(userId);
+  if (status === 'permitted') return permittedRightsFields(userId);
+  if (status === 'disputed') return disputedRightsFields(userId);
+  return pendingRightsFields(userId, importSource);
+}
+
+function applyRightsStatus(media, status, userId, importSource = null) {
+  if (!isValidRightsStatus(status)) {
+    return { error: `Invalid rights status: ${status}` };
+  }
+  const fields = rightsFieldsForStatus(status, userId, importSource);
+  const unchanged =
+    media.rightsStatus === fields.rightsStatus &&
+    media.rightsCleared === fields.rightsCleared;
+  if (unchanged) return { changed: false, fields };
+  Object.assign(media, fields);
+  if (status === 'permitted') {
+    demoteUnclaimedOwners(media);
+  }
+  return { changed: true, fields };
+}
+
+/**
+ * Permitted means the rights holder is not on Tuneable yet, so nobody should
+ * currently receive payouts. Zero out non-claim owners so a later claim can
+ * take 100% without exceeding the ownership cap.
+ */
+function demoteUnclaimedOwners(media) {
+  for (const owner of media.mediaOwners || []) {
+    if (isClaimApprovedOwner(owner)) continue;
+    owner.percentage = 0;
+    if (owner.role === 'creator' || owner.role === 'primary') owner.role = 'aux';
+    owner.verified = false;
+  }
+}
+
 /**
  * Hosted non-podcast music that is currently streamable (or marked cleared)
  * without a verified original-upload owner.
+ * Do not gate permitted tracks — admin attested off-platform permission.
  */
 function shouldGateHostedMusic(media) {
   if (!media || !hasHostedUpload(media)) return false;
   if (isPodcastLike(media) || isWrittenMedia(media)) return false;
   if (hasVerifiedRightsHolder(media)) return false;
   if (media.rightsStatus === 'pending' && media.rightsCleared !== true) return false;
+  if (media.rightsStatus === 'permitted') return false;
   if (media.rightsStatus === 'disputed') return false;
   return true;
 }
@@ -135,6 +218,10 @@ function applyPendingGate(doc, { importSource } = {}) {
 }
 
 module.exports = {
+  RIGHTS_STATUSES,
+  PLAYABLE_RIGHTS_STATUSES,
+  BLOCKED_RIGHTS_STATUSES,
+  ESCROW_UNTIL_CLAIM_STATUSES,
   LIBRARY_IMPORT_SOURCES,
   LIBRARY_VERIFICATION_METHODS,
   hasHostedUpload,
@@ -147,5 +234,14 @@ module.exports = {
   shouldGateHostedMusic,
   pendingRightsFields,
   clearedRightsFields,
+  permittedRightsFields,
+  disputedRightsFields,
+  isValidRightsStatus,
+  isBlockedRightsStatus,
+  isPlayableRightsStatus,
+  isEscrowUntilClaim,
+  rightsFieldsForStatus,
+  applyRightsStatus,
   applyPendingGate,
+  demoteUnclaimedOwners,
 };
