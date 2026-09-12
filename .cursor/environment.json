@@ -1,0 +1,23 @@
+{
+  "name": "Tuneable",
+  "user": "ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "install": "./.cursor/install.sh",
+  "start": "./.cursor/start.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "cd tuneable-backend && until mongosh --quiet --host 127.0.0.1 --port 27017 --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; do sleep 1; done && npm start"
+    },
+    {
+      "name": "frontend",
+      "command": "cd tuneable-frontend-v2 && npm run dev"
+    }
+  ],
+  "ports": [
+    { "name": "backend", "port": 8000 },
+    { "name": "frontend", "port": 5173 }
+  ]
+}
