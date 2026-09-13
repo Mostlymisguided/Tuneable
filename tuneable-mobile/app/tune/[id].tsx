@@ -388,17 +388,9 @@ export default function TuneProfileScreen() {
                 source={{ uri: media.coverArt || DEFAULT_COVER_ART }}
                 style={styles.cover}
               />
-              <View
-                style={[
-                  styles.coverOverlay,
-                  coverOverlayKind === 'play_permitted' && styles.coverOverlayPermitted,
-                ]}>
+              <View style={styles.coverOverlay}>
                 {playable ? (
-                  <View
-                    style={[
-                      styles.coverPlay,
-                      coverOverlayKind === 'play_permitted' && styles.coverPlayPermitted,
-                    ]}>
+                  <View style={styles.coverPlay}>
                     <Ionicons name="play" size={28} color="#fff" />
                   </View>
                 ) : blockedCover ? (
@@ -437,20 +429,17 @@ export default function TuneProfileScreen() {
                 ) : null}
               </View>
               {coverOverlayKind === 'play_permitted' ? (
-                <View style={styles.permittedBadge} pointerEvents="none">
-                  <Ionicons name="shield-checkmark" size={12} color="#99f6e4" />
-                  <Text style={styles.permittedBadgeText}>Permitted</Text>
-                </View>
+                <Pressable
+                  style={styles.coverClaimBtn}
+                  onPress={() => setClaimOpen(true)}>
+                  <Ionicons name="ribbon-outline" size={12} color="#fff" />
+                  <Text style={styles.coverClaimText}>Claim</Text>
+                </Pressable>
               ) : null}
             </Pressable>
 
             <Text style={styles.title}>{media.title || 'Untitled'}</Text>
             <Text style={styles.artist}>{artist}</Text>
-            {coverOverlayKind === 'play_permitted' ? (
-              <Text style={styles.permittedHint}>
-                Playable now · tips held until the artist claims
-              </Text>
-            ) : null}
 
             {heroMetadata.length > 0 ? (
               <Text style={styles.metaLine}>{heroMetadata.join(' · ')}</Text>
@@ -840,9 +829,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  coverOverlayPermitted: {
-    backgroundColor: 'rgba(19, 78, 74, 0.35)',
-  },
   coverPlay: {
     width: 64,
     height: 64,
@@ -852,10 +838,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 3,
   },
-  coverPlayPermitted: {
-    backgroundColor: '#0d9488',
-  },
-  permittedBadge: {
+  coverClaimBtn: {
     position: 'absolute',
     top: 8,
     left: 8,
@@ -865,22 +848,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(4, 47, 46, 0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(45, 212, 191, 0.6)',
+    backgroundColor: '#f59e0b',
   },
-  permittedBadgeText: {
-    color: '#ccfbf1',
+  coverClaimText: {
+    color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-  },
-  permittedHint: {
-    color: '#5eead4',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 4,
-    paddingHorizontal: 16,
   },
   awaitingBox: {
     alignItems: 'center',

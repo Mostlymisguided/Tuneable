@@ -18,7 +18,6 @@ import {
   Headphones,
   Volume2,
   Award,
-  ShieldCheck,
   X,
   Save,
   Coins,
@@ -2316,9 +2315,7 @@ const TuneProfile: React.FC = () => {
               <p className="text-gray-300 text-sm mt-1">
                 {!isMediaPlayable(media)
                   ? 'Tip to help get this track fully added once audio is uploaded.'
-                  : coverOverlayKind === 'play_permitted'
-                    ? 'Playable now. Tips are held until the artist joins and claims.'
-                    : 'Boost global ranking and support the artist'}
+                  : 'Boost global ranking and support the artist'}
               </p>
             </div>
             {user && (
@@ -2492,30 +2489,29 @@ const TuneProfile: React.FC = () => {
                 className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
               {coverOverlayKind === 'play_permitted' && (
-                <div className="absolute top-2 left-2 z-10 pointer-events-none">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-teal-950/90 border border-teal-400/60 text-teal-100 text-[11px] font-semibold shadow-lg">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    Permitted
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowClaimModal(true);
+                  }}
+                  className="absolute top-2 left-2 z-20 px-2 py-1 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-[11px] font-semibold shadow-lg inline-flex items-center gap-1"
+                >
+                  <Award className="h-3 w-3" />
+                  Claim
+                </button>
               )}
               {/* Play / blocked-rights overlay */}
               <div 
-                className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
+                className={`absolute inset-0 z-10 flex items-center justify-center rounded-lg transition-opacity ${
                   coverPlayable
-                    ? coverOverlayKind === 'play_permitted'
-                      ? 'bg-teal-950/40 opacity-0 group-hover:opacity-100 cursor-pointer'
-                      : 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
+                    ? 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
                     : 'bg-black/50 opacity-100 cursor-default'
                 }`}
                 onClick={coverPlayable ? handlePlaySong : undefined}
               >
                 {coverPlayable ? (
-                  <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-2xl ${
-                    coverOverlayKind === 'play_permitted'
-                      ? 'bg-teal-600 hover:bg-teal-500'
-                      : 'bg-purple-600 hover:bg-purple-700'
-                  }`}>
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-2xl bg-purple-600 hover:bg-purple-700">
                     <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
                   </div>
                 ) : blockedCover ? (
@@ -2574,12 +2570,6 @@ const TuneProfile: React.FC = () => {
               {heroMetadata.length > 0 && (
                 <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-2">
                   {heroMetadata.join(' · ')}
-                </p>
-              )}
-
-              {coverOverlayKind === 'play_permitted' && (
-                <p className="text-xs text-teal-300/90 text-center md:text-left px-2 mb-2">
-                  Playable now · tips held until the artist claims
                 </p>
               )}
 
