@@ -259,7 +259,7 @@ const rekordboxMp3Upload = multer({
 
 const rekordboxXmlUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
     const mime = (file.mimetype || '').toLowerCase();
@@ -690,15 +690,14 @@ router.get('/profile', authMiddleware, async (req, res) => {
     
     // Calculate user statistics
     const Bid = require('../models/Bid');
-    const userBids = await Bid.find({ userId: user._id });
+    const userBids = await Bid.find({ userId: user._id }).select('amount').lean();
     
     const globalUserBids = userBids.length;
     const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
     const globalUserBidAvg = globalUserBids > 0 ? totalAmountBid / globalUserBids : 0;
     
     // Calculate global user aggregate rank (simplified)
-    const allUsers = await User.find({}).select('_id');
-    const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
+    const userAggregateRank = await User.countDocuments();
     
     // Add statistics to user object
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
@@ -3547,8 +3546,7 @@ router.get('/:userId/profile', async (req, res) => {
     
     // Calculate global user aggregate rank
     // This is a simplified calculation - in production, this would be more complex
-    const allUsers = await User.find({}).select('_id');
-    const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
+    const userAggregateRank = await User.countDocuments();
     
     // Get unique media items bid on - from ACTIVE bids only (matches tune library which only shows active bids)
     const activeBidsForStats = allUserBidsForStats.filter(bid => bid.status === 'active');
@@ -5567,7 +5565,7 @@ router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
     const Media = require('../models/Media');
     const Party = require('../models/Party');
     const media = await Media.findById(bid.mediaId);
-    const party = bid.partyId ? await Party.findById(bid.partyId) : null;
+    const party = bid.partyId ? await Party.findById(bid.partyId).select('name type') : null;
 
     if (!media) {
       return res.status(404).json({ error: 'Media associated with bid not found' });

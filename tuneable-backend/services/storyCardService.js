@@ -7,6 +7,10 @@ const fs = require('fs');
 const axios = require('axios');
 const NodeCache = require('node-cache');
 const sharp = require('sharp');
+// libvips caches decoded images off-heap; on a 512MB Render box that RSS
+// is enough to get the process cgroup-killed with no JS stack.
+sharp.cache(false);
+sharp.concurrency(1);
 const Media = require('../models/Media');
 const { isValidObjectId } = require('../utils/validators');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');

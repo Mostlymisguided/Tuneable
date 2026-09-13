@@ -4,7 +4,7 @@
   "description": "Backend API for Tuneable",
   "main": "index.js",
   "scripts": {
-    "start": "node --max-old-space-size=384 index.js",
+    "start": "node --max-old-space-size=320 index.js",
     "dev": "nodemon index.js",
     "test": "jest",
     "migrate-tunebytes": "node scripts/migrateTuneBytes.js",
