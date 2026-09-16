@@ -113,10 +113,27 @@ export function isMediaPlayable(media: MediaLike | null | undefined): boolean {
   }
 
   if (media.rightsStatus === 'permitted') {
-    return !!sources.upload;
+    return hasDirectAudioSource(sources);
   }
 
-  return !!(sources.upload && media.rightsCleared === true);
+  // Slim player mappers often omit rightsCleared/isPlayable. Public APIs already
+  // strip hosted URLs for unplayable tracks, so a remaining audio source is enough
+  // unless rights were explicitly denied.
+  return hasDirectAudioSource(sources) && media.rightsCleared !== false;
+}
+
+/** Fields ensureCurrentPlayable checks — omit these and audio play resets to null. */
+export function playerPlayabilityFields(media: MediaLike | null | undefined): Pick<
+  MediaLike,
+  'rightsCleared' | 'rightsStatus' | 'isPlayable' | 'contentForm' | 'contentType'
+> {
+  return {
+    rightsCleared: media?.rightsCleared,
+    rightsStatus: media?.rightsStatus,
+    isPlayable: media?.isPlayable,
+    contentForm: media?.contentForm,
+    contentType: media?.contentType,
+  };
 }
 
 export function getSupportMode(media: MediaLike | null | undefined): SupportMode {

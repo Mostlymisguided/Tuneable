@@ -69,6 +69,7 @@ import {
   enrichMediaWithPlayability,
   isYouTubeOnly,
   normalizeSources,
+  playerPlayabilityFields,
   getCoverOverlayKind,
   getBlockedCoverCopy,
 } from '../utils/mediaPlayability';
@@ -1664,8 +1665,12 @@ const TuneProfile: React.FC = () => {
             break;
         } else if (source && source.platform === 'youtube' && source.url) {
           (sources as any).youtube = source.url;
+        } else if (source && source.platform === 'upload' && source.url) {
+          (sources as any).upload = source.url;
         } else if (source?.youtube) {
           (sources as any).youtube = source.youtube;
+        } else if (source?.upload) {
+          (sources as any).upload = source.upload;
         }
         }
       } else if (typeof media.sources === 'object') {
@@ -1677,6 +1682,7 @@ const TuneProfile: React.FC = () => {
     // Format media for webplayer
     const formattedSong = {
       id: media._id || media.uuid,
+      _id: media._id || media.uuid,
       title: media.title,
       artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
       duration: media.duration,
@@ -1685,7 +1691,8 @@ const TuneProfile: React.FC = () => {
       globalMediaAggregate: media.globalMediaAggregate || 0,
       bids: media.bids || [],
       addedBy: media.addedBy?.username || 'Unknown',
-      totalBidValue: media.globalMediaAggregate || 0
+      totalBidValue: media.globalMediaAggregate || 0,
+      ...playerPlayabilityFields(media),
     } as any;
 
     console.log('🎵 Playing from TuneProfile:', formattedSong);
@@ -1715,6 +1722,7 @@ const TuneProfile: React.FC = () => {
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    ...playerPlayabilityFields(item as any),
   });
 
   const recommendedToQueueShape = (item: RecommendedMediaItem) => ({

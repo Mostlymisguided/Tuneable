@@ -45,7 +45,7 @@ import {
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
-import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { hasAuthToken, requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
@@ -193,10 +193,7 @@ function toPlayerQueueItem(item: any) {
     addedBy: typeof mediaData?.addedBy === 'object'
       ? mediaData.addedBy?.username || 'Unknown'
       : mediaData?.addedBy,
-    rightsCleared: mediaData?.rightsCleared,
-    rightsStatus: mediaData?.rightsStatus,
-    isPlayable: mediaData?.isPlayable,
-    contentForm: mediaData?.contentForm,
+    ...playerPlayabilityFields(mediaData),
   };
 }
 
@@ -1645,11 +1642,11 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       media = media.filter((item: any) => mediaMatchesBpmFilter(item, bpmFilterRange));
     }
 
-    return sortChartItems(media, chartSort, {
+    const sorted = sortChartItems(media, chartSort, {
       getDate: (item: any) => {
         const mediaItem = item.mediaId || item;
         return isGlobalParty
-          ? mediaItem.createdAt || item.createdAt || item.queuedAt
+          ? mediaItem.createdAt || mediaItem.uploadedAt || item.createdAt || item.queuedAt
           : item.queuedAt || mediaItem.createdAt || item.createdAt;
       },
       getTip: (item: any) => {
@@ -1660,7 +1657,49 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         return mediaItem.globalMediaAggregate || 0;
       },
     });
-  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty]);
+
+    // Most-tipped Global is capped at the top 250, so a just-tipped upload
+    // disappears from the chart. Keep the viewer's own recent adds visible.
+    if (!isGlobalParty || chartSort !== 'most-tipped' || !user) return sorted;
+
+    const viewerIds = new Set(
+      [user._id, (user as any).id, user.uuid].filter(Boolean).map((id) => String(id))
+    );
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const mine: any[] = [];
+    const rest: any[] = [];
+    for (const item of sorted) {
+      const mediaItem = item.mediaId || item;
+      const addedBy = mediaItem.addedBy;
+      const addedByIds = [
+        addedBy?._id,
+        addedBy?.id,
+        addedBy?.uuid,
+        typeof addedBy === 'string' ? addedBy : null,
+      ]
+        .filter(Boolean)
+        .map((id) => String(id));
+      const created = new Date(
+        mediaItem.createdAt || mediaItem.uploadedAt || item.createdAt || 0
+      ).getTime();
+      const isMine = addedByIds.some((id) => viewerIds.has(id));
+      if (isMine && Number.isFinite(created) && created >= cutoff) {
+        mine.push(item);
+      } else {
+        rest.push(item);
+      }
+    }
+    if (mine.length === 0) return sorted;
+    mine.sort((a, b) => {
+      const aItem = a.mediaId || a;
+      const bItem = b.mediaId || b;
+      return (
+        new Date(bItem.createdAt || bItem.uploadedAt || 0).getTime() -
+        new Date(aItem.createdAt || aItem.uploadedAt || 0).getTime()
+      );
+    });
+    return [...mine, ...rest];
+  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty, user]);
 
   const chartRanks = useMemo(
     () => buildChartRankMap(displayMedia, partyMediaKey),
@@ -2997,7 +3036,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                       )}
                       {searchQuery.trim() && displayMedia.length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
                         <p className="text-xs text-gray-400 mt-2 text-center">
-                          No matches in this chart — add it from MusicBrainz
+                          No matches in this chart — sort by Newest, or add it from MusicBrainz
                         </p>
                       )}
                       {queueSearchTerms.length > 0 && (

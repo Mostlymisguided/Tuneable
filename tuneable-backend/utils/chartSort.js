@@ -62,8 +62,8 @@ function sortChartItems(items, sortBy, accessors = {}) {
 
 function mediaChartMongoSort(sortBy) {
   const key = normalizeChartSort(sortBy);
-  if (key === 'newest') return { createdAt: -1, globalMediaAggregate: -1 };
-  if (key === 'oldest') return { createdAt: 1, globalMediaAggregate: -1 };
+  if (key === 'newest') return { createdAt: -1, uploadedAt: -1, globalMediaAggregate: -1 };
+  if (key === 'oldest') return { createdAt: 1, uploadedAt: 1, globalMediaAggregate: -1 };
   return { globalMediaAggregate: -1 };
 }
 

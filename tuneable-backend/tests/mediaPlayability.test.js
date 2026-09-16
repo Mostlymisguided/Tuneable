@@ -42,6 +42,13 @@ describe('isMediaPlayable', () => {
     })).toBe(false);
   });
 
+  it('does not play hosted audio without a playable rights status', () => {
+    expect(isMediaPlayable({
+      sources: { upload: UPLOAD },
+      contentForm: ['tune'],
+    })).toBe(false);
+  });
+
   it('does not play pending library-import uploads', () => {
     expect(isMediaPlayable({
       sources: { upload: UPLOAD, youtube: YT },

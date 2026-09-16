@@ -7,7 +7,7 @@ import { mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlayability';
+import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
@@ -202,6 +202,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    ...playerPlayabilityFields(item),
   });
 
   const startQueue = (startItem?: TippedQueueItem) => {

@@ -119,7 +119,7 @@ import {
   getPlaceProfilePath,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
-import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
+import { normalizeSources, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import {
   championBadgeKey,
@@ -1316,6 +1316,7 @@ const UserProfile: React.FC = () => {
           addedBy: null,
           totalBidValue: libItem.globalMediaAggregate,
           sourceType: 'library',
+          ...playerPlayabilityFields(libItem),
         }))
         .filter((media) => isMediaPlayable(media)) as any[];
 
@@ -1536,6 +1537,7 @@ const UserProfile: React.FC = () => {
             addedBy: null,
             totalBidValue: 0,
             sourceType: 'user_queue' as const,
+            ...playerPlayabilityFields(queueItem),
           }))
           .filter((media) => isMediaPlayable(media)) as any[];
 

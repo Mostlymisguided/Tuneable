@@ -21,7 +21,7 @@ import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTab
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 import TipCtaLabel from '../components/TipCtaLabel';
-import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
+import { normalizeSources, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
 import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
 
@@ -568,6 +568,7 @@ Join here: ${inviteLink}`.trim();
           bids: [],
           addedBy: null,
           totalBidValue: libItem.globalMediaAggregate,
+          ...playerPlayabilityFields(libItem),
         }))
         .filter((media) => isMediaPlayable(media)) as any[];
 

@@ -9,7 +9,7 @@ import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
-import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
 
 interface TopTunesSong {
@@ -137,6 +137,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       bids: song.bids || [],
       addedBy: null,
       totalBidValue: song.globalMediaAggregate,
+      ...playerPlayabilityFields(song as any),
     };
     
     // Clear podcast player so PlayerRenderer switches to web player

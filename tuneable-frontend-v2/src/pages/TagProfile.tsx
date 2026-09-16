@@ -6,7 +6,7 @@ import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_COVER_ART } from '../constants';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlayability';
+import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaChampions from '../components/MediaChampions';
@@ -130,6 +130,7 @@ function formatTagItemForPlayer(item: TagMediaItem) {
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    ...playerPlayabilityFields(item as any),
   };
 }
 

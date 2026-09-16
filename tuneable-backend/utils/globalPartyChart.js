@@ -46,6 +46,7 @@ const MEDIA_CHART_SELECT = [
   'addedBy',
   'status',
   'createdAt',
+  'uploadedAt',
   'creatorDisplay',
   'contentType',
   'contentForm',
@@ -54,10 +55,12 @@ const MEDIA_CHART_SELECT = [
   'rightsCleared',
 ].join(' ');
 
-const USER_PUBLIC_SELECT = 'username profilePic uuid';
+const USER_PUBLIC_SELECT = '_id username profilePic uuid';
 const DEFAULT_SUPPORTERS_LIMIT = 5;
 const DEFAULT_CHART_LIMIT = 250;
 const MAX_CHART_LIMIT = 500;
+// Most-tipped charts otherwise drop brand-new tips that have not reached the top N.
+const RECENT_TIPPED_RESERVE = 25;
 
 function effectiveChartLimit(limit) {
   if (typeof limit === 'number' && limit > 0) {
@@ -517,26 +520,46 @@ async function fetchAllTimeGlobalChart({
 } = {}) {
   const startTime = Date.now();
   const chartSort = normalizeChartSort(sortBy);
-
-  const query = Media.find({
+  const chartLimit = effectiveChartLimit(limit);
+  const startOffset = typeof offset === 'number' && offset > 0 ? offset : 0;
+  const baseFilter = {
     ...GLOBAL_PARTY_TUNES_FILTER,
     bids: { $exists: true, $ne: [] },
     status: { $ne: 'vetoed' },
-  })
+  };
+
+  const withChartPopulate = (findQuery) => findQuery
     .select(MEDIA_CHART_SELECT)
-    .sort(mediaChartMongoSort(chartSort))
     .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
     .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
     .populate('addedBy', 'username profilePic uuid')
     .lean();
 
-  const chartLimit = effectiveChartLimit(limit);
-  if (typeof offset === 'number' && offset > 0) {
-    query.skip(offset);
-  }
-  query.limit(chartLimit);
+  // Keep newest tipped tracks in the all-time payload so a just-tipped upload
+  // is searchable / show-more-reachable instead of falling off the top-250 cut.
+  const reserveRecent = chartSort === 'most-tipped' && startOffset === 0;
+  const recentLimit = reserveRecent ? Math.min(RECENT_TIPPED_RESERVE, chartLimit) : 0;
+  const primaryLimit = chartLimit - recentLimit;
 
-  const mediaList = await query;
+  const mediaList = await withChartPopulate(
+    Media.find(baseFilter)
+      .sort(mediaChartMongoSort(chartSort))
+      .skip(startOffset)
+      .limit(primaryLimit)
+  );
+
+  if (recentLimit > 0) {
+    const existingIds = mediaList.map((m) => m._id);
+    const recent = await withChartPopulate(
+      Media.find({
+        ...baseFilter,
+        ...(existingIds.length ? { _id: { $nin: existingIds } } : {}),
+      })
+        .sort({ createdAt: -1, globalMediaAggregate: -1 })
+        .limit(recentLimit)
+    );
+    mediaList.push(...recent);
+  }
   const mediaIds = mediaList.map((m) => m._id);
   const supportersByMedia = await loadTopSupportersByMedia(mediaIds, {
     supportersLimit,
@@ -786,9 +809,26 @@ async function fetchPeriodGlobalChart({
         : mediaBidValues[media._id.toString()] || 0,
     }));
   } else {
-    const rankedIds = candidateIds
+    const recentReserve = startOffset === 0 ? Math.min(RECENT_TIPPED_RESERVE, chartLimit) : 0;
+    let reservedRecentIds = [];
+    if (recentReserve > 0) {
+      const recentDocs = await Media.find({
+        ...GLOBAL_PARTY_TUNES_FILTER,
+        _id: { $in: candidateIds },
+        status: { $ne: 'vetoed' },
+      })
+        .select('_id')
+        .sort({ createdAt: -1, globalMediaAggregate: -1 })
+        .limit(recentReserve)
+        .lean();
+      reservedRecentIds = recentDocs.map((doc) => doc._id.toString());
+    }
+    const recentIdSet = new Set(reservedRecentIds);
+    const topByTips = candidateIds
+      .filter((id) => !recentIdSet.has(id))
       .sort((a, b) => (mediaBidValues[b] || 0) - (mediaBidValues[a] || 0))
-      .slice(startOffset, startOffset + chartLimit);
+      .slice(startOffset, startOffset + Math.max(chartLimit - reservedRecentIds.length, 0));
+    const rankedIds = [...topByTips, ...reservedRecentIds];
 
     const fetched = await Media.find({
       ...GLOBAL_PARTY_TUNES_FILTER,
