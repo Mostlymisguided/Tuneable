@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { GitMerge, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { GitMerge, Loader2, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
 
@@ -59,9 +59,13 @@ const MediaMergePanel: React.FC<MediaMergePanelProps> = ({ initialSourceId = '',
     byTitleArtist: DuplicateCluster[];
   } | null>(null);
   const [loadingDupes, setLoadingDupes] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(!initialSourceId);
 
   useEffect(() => {
-    if (initialSourceId) setSourceId(initialSourceId);
+    if (initialSourceId) {
+      setSourceId(initialSourceId);
+      setIsCollapsed(false);
+    }
   }, [initialSourceId]);
 
   const loadDuplicates = useCallback(async () => {
@@ -77,8 +81,10 @@ const MediaMergePanel: React.FC<MediaMergePanelProps> = ({ initialSourceId = '',
   }, []);
 
   useEffect(() => {
-    void loadDuplicates();
-  }, [loadDuplicates]);
+    if (!isCollapsed && !duplicates) {
+      void loadDuplicates();
+    }
+  }, [isCollapsed, duplicates, loadDuplicates]);
 
   const handlePreview = async () => {
     if (!sourceId.trim() || !keepId.trim()) {
@@ -188,123 +194,144 @@ const MediaMergePanel: React.FC<MediaMergePanelProps> = ({ initialSourceId = '',
   );
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 space-y-4">
+    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <GitMerge className="h-5 w-5 text-purple-400" />
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          className="flex items-center gap-2 min-w-0 text-left hover:opacity-90 transition-opacity"
+          aria-expanded={!isCollapsed}
+        >
+          <GitMerge className="h-5 w-5 text-purple-400 flex-shrink-0" />
           <h3 className="text-lg font-semibold text-white">Merge duplicate media</h3>
-        </div>
-        <button
-          type="button"
-          onClick={() => void loadDuplicates()}
-          disabled={loadingDupes}
-          className="text-sm px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-1.5"
-        >
-          {loadingDupes ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Refresh duplicates
         </button>
-      </div>
-
-      <p className="text-sm text-gray-400">
-        Fold a duplicate (source) into the canonical track (keep). Tips and IDs move to keep;
-        source is soft-deleted. Fuzzy import suggestions reduce new dupes — use this for leftovers.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Source (duplicate to remove)</label>
-          <input
-            type="text"
-            value={sourceId}
-            onChange={(e) => {
-              setSourceId(e.target.value);
-              setPreview(null);
-            }}
-            placeholder="ObjectId or uuid"
-            className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-400 mb-1">Keep (canonical)</label>
-          <input
-            type="text"
-            value={keepId}
-            onChange={(e) => {
-              setKeepId(e.target.value);
-              setPreview(null);
-            }}
-            placeholder="ObjectId or uuid"
-            className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm"
-          />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!isCollapsed && (
+            <button
+              type="button"
+              onClick={() => void loadDuplicates()}
+              disabled={loadingDupes}
+              className="text-sm px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-1.5"
+            >
+              {loadingDupes ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Refresh duplicates
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            className="p-1 text-gray-400 hover:text-white transition-colors"
+            aria-label={isCollapsed ? 'Expand merge duplicates' : 'Collapse merge duplicates'}
+          >
+            {isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+          </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void handlePreview()}
-          disabled={isPreviewing}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm flex items-center gap-2"
-        >
-          {isPreviewing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Preview merge
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleMerge()}
-          disabled={!preview || isMerging}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
-        >
-          {isMerging ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitMerge className="h-4 w-4" />}
-          Confirm merge
-        </button>
-      </div>
+      {!isCollapsed && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-gray-400">
+            Fold a duplicate (source) into the canonical track (keep). Tips and IDs move to keep;
+            source is soft-deleted. Fuzzy import suggestions reduce new dupes — use this for leftovers.
+          </p>
 
-      {preview && (
-        <div className="bg-amber-950/30 border border-amber-800/60 rounded-lg p-3 space-y-3">
-          <div className="flex items-start gap-2 text-amber-200 text-sm">
-            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span>
-              Will reassign {preview.willReassign.bids} bids, {preview.willReassign.parties} parties,
-              {' '}{preview.willReassign.comments} comments, {preview.willReassign.claims} claims,
-              {' '}{preview.willReassign.reports} reports.
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-900/70 rounded p-3">
-              <div className="text-xs text-red-300 mb-1">Source (removed)</div>
-              <div className="font-medium text-white">{preview.source.title}</div>
-              <div className="text-gray-400">{preview.source.artist}</div>
-              <Link
-                to={`/tune/${preview.source.uuid}`}
-                className="text-xs text-purple-300 hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open
-              </Link>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Source (duplicate to remove)</label>
+              <input
+                type="text"
+                value={sourceId}
+                onChange={(e) => {
+                  setSourceId(e.target.value);
+                  setPreview(null);
+                }}
+                placeholder="ObjectId or uuid"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm"
+              />
             </div>
-            <div className="bg-gray-900/70 rounded p-3">
-              <div className="text-xs text-green-300 mb-1">Keep</div>
-              <div className="font-medium text-white">{preview.keep.title}</div>
-              <div className="text-gray-400">{preview.keep.artist}</div>
-              <Link
-                to={`/tune/${preview.keep.uuid}`}
-                className="text-xs text-purple-300 hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open
-              </Link>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Keep (canonical)</label>
+              <input
+                type="text"
+                value={keepId}
+                onChange={(e) => {
+                  setKeepId(e.target.value);
+                  setPreview(null);
+                }}
+                placeholder="ObjectId or uuid"
+                className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white text-sm"
+              />
             </div>
           </div>
-        </div>
-      )}
 
-      {duplicates && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-gray-700">
-          {renderClusterList(duplicates.byIsrc, 'Same ISRC')}
-          {renderClusterList(duplicates.byTitleArtist, 'Exact title + artist')}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handlePreview()}
+              disabled={isPreviewing}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm flex items-center gap-2"
+            >
+              {isPreviewing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Preview merge
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleMerge()}
+              disabled={!preview || isMerging}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
+            >
+              {isMerging ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitMerge className="h-4 w-4" />}
+              Confirm merge
+            </button>
+          </div>
+
+          {preview && (
+            <div className="bg-amber-950/30 border border-amber-800/60 rounded-lg p-3 space-y-3">
+              <div className="flex items-start gap-2 text-amber-200 text-sm">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  Will reassign {preview.willReassign.bids} bids, {preview.willReassign.parties} parties,
+                  {' '}{preview.willReassign.comments} comments, {preview.willReassign.claims} claims,
+                  {' '}{preview.willReassign.reports} reports.
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-gray-900/70 rounded p-3">
+                  <div className="text-xs text-red-300 mb-1">Source (removed)</div>
+                  <div className="font-medium text-white">{preview.source.title}</div>
+                  <div className="text-gray-400">{preview.source.artist}</div>
+                  <Link
+                    to={`/tune/${preview.source.uuid}`}
+                    className="text-xs text-purple-300 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open
+                  </Link>
+                </div>
+                <div className="bg-gray-900/70 rounded p-3">
+                  <div className="text-xs text-green-300 mb-1">Keep</div>
+                  <div className="font-medium text-white">{preview.keep.title}</div>
+                  <div className="text-gray-400">{preview.keep.artist}</div>
+                  <Link
+                    to={`/tune/${preview.keep.uuid}`}
+                    className="text-xs text-purple-300 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {duplicates && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-gray-700">
+              {renderClusterList(duplicates.byIsrc, 'Same ISRC')}
+              {renderClusterList(duplicates.byTitleArtist, 'Exact title + artist')}
+            </div>
+          )}
         </div>
       )}
     </div>
