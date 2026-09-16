@@ -6,7 +6,7 @@
  * - Unused welcome credit expires 12 months after grant
  * - Welcome-funded tips capped at £1.11 per tip
  * - Max £3.33 welcome + max 3 distinct media per artist (owner or name key)
- * - Cannot use welcome credit on media you own / control
+ * - Own / controlled media: welcome credit allowed, but max £1.11 per media (artist caps skipped)
  * - Refunds do not restore welcome credit (see welcomeCreditHelper)
  * - Welcome-funded artist share is provisional until a real top-up (90 days)
  */
@@ -20,6 +20,7 @@ const {
 } = require('./welcomeCreditHelper');
 
 const MAX_WELCOME_PER_TIP_PENCE = 111; // £1.11
+const MAX_WELCOME_SELF_PER_MEDIA_PENCE = MAX_WELCOME_PER_TIP_PENCE; // £1.11 total welcome per owned media
 const MAX_WELCOME_PER_ARTIST_PENCE = 333; // £3.33
 const MAX_WELCOME_MEDIA_PER_ARTIST = 3;
 const WELCOME_CREDIT_EXPIRY_MONTHS = 12;
@@ -33,6 +34,7 @@ const CODES = {
   WALLET_FROZEN: 'WELCOME_WALLET_FROZEN',
   TIP_TOO_LARGE: 'WELCOME_TIP_TOO_LARGE',
   SELF_DEAL: 'WELCOME_SELF_DEAL',
+  SELF_MEDIA_CAP: 'WELCOME_SELF_MEDIA_CAP',
   ARTIST_CAP_AMOUNT: 'WELCOME_ARTIST_CAP_AMOUNT',
   ARTIST_CAP_MEDIA: 'WELCOME_ARTIST_CAP_MEDIA',
   PAYOUT_HELD: 'PAYOUT_HELD',
@@ -83,6 +85,24 @@ function getMediaControllerUserIds(media) {
   }
 
   return ids;
+}
+
+/**
+ * True when the tipper owns or is linked as artist/host on this media.
+ */
+function userControlsMedia(user, media) {
+  const tipperId = idStr(user?._id);
+  if (!tipperId) return false;
+  return getMediaControllerUserIds(media).has(tipperId);
+}
+
+/** @deprecated Use userControlsMedia — own-media welcome tips are capped, not blocked. */
+function isWelcomeSelfDeal(user, media) {
+  return userControlsMedia(user, media);
+}
+
+function remainingSelfMediaWelcomePence(usedPence) {
+  return Math.max(0, MAX_WELCOME_SELF_PER_MEDIA_PENCE - Math.max(0, Math.round(Number(usedPence) || 0)));
 }
 
 /**
@@ -251,6 +271,27 @@ async function getWelcomeUsageTowardArtist(tipperUserId, artistKey) {
 }
 
 /**
+ * Historical welcome spend by this tipper on a single media item.
+ */
+async function getWelcomeUsageOnMedia(tipperUserId, mediaId) {
+  const Bid = require('../models/Bid');
+  const mediaIdStr = idStr(mediaId);
+  if (!tipperUserId || !mediaIdStr || !mongoose.Types.ObjectId.isValid(mediaIdStr)) {
+    return 0;
+  }
+
+  const bids = await Bid.find({
+    userId: tipperUserId,
+    mediaId: mediaIdStr,
+    welcomeCreditAppliedPence: { $gt: 0 },
+  })
+    .select('welcomeCreditAppliedPence')
+    .lean();
+
+  return bids.reduce((sum, b) => sum + (b.welcomeCreditAppliedPence || 0), 0);
+}
+
+/**
  * Enforce welcome-credit rules for a media tip (party / global / podcast).
  * Call after media is resolved and before creating the Bid.
  * @returns {{ welcomeAppliedPence: number }}
@@ -290,14 +331,26 @@ async function assertWelcomeMediaSpend({ user, amountPence, media }) {
     );
   }
 
-  const controllers = getMediaControllerUserIds(media);
-  const tipperId = idStr(user._id);
-  if (tipperId && controllers.has(tipperId)) {
-    throw policyError(
-      CODES.SELF_DEAL,
-      'Welcome credit cannot be used to tip media you own or control. Top up your wallet to tip your own releases.',
-      400
-    );
+  if (userControlsMedia(user, media)) {
+    const usedPence = await getWelcomeUsageOnMedia(user._id, media?._id);
+    const remaining = remainingSelfMediaWelcomePence(usedPence);
+    if (welcomeAppliedPence > remaining) {
+      const maxLabel = `£${(MAX_WELCOME_SELF_PER_MEDIA_PENCE / 100).toFixed(2)}`;
+      throw policyError(
+        CODES.SELF_MEDIA_CAP,
+        remaining <= 0
+          ? `Welcome credit on your own media is limited to ${maxLabel} per track.`
+          : `Welcome credit on your own media is limited to ${maxLabel} per track. You have £${(remaining / 100).toFixed(2)} remaining on this track.`,
+        400,
+        {
+          maxSelfMediaPence: MAX_WELCOME_SELF_PER_MEDIA_PENCE,
+          usedPence,
+          remainingPence: remaining,
+        }
+      );
+    }
+    // Per-media cap replaces per-artist welcome caps on catalogue you control.
+    return { welcomeAppliedPence };
   }
 
   const targets = getArtistCapTargets(media);
@@ -491,6 +544,7 @@ function sendPolicyError(res, err) {
 module.exports = {
   CODES,
   MAX_WELCOME_PER_TIP_PENCE,
+  MAX_WELCOME_SELF_PER_MEDIA_PENCE,
   MAX_WELCOME_PER_ARTIST_PENCE,
   MAX_WELCOME_MEDIA_PER_ARTIST,
   WELCOME_CREDIT_EXPIRY_MONTHS,
@@ -499,6 +553,9 @@ module.exports = {
   PAYOUT_WELCOME_RISK_SHARE,
   policyError,
   getMediaControllerUserIds,
+  userControlsMedia,
+  isWelcomeSelfDeal,
+  remainingSelfMediaWelcomePence,
   getArtistCapTargets,
   computeWelcomeExpiryDate,
   stampWelcomeCreditGrant,
@@ -507,6 +564,7 @@ module.exports = {
   assertWelcomeMediaSpend,
   assertWelcomeGenericSpend,
   getWelcomeUsageTowardArtist,
+  getWelcomeUsageOnMedia,
   getArtistWelcomeOriginStats,
   assertPayoutAllowed,
   sendPolicyError,
