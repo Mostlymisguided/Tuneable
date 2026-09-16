@@ -737,6 +737,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 updatedAt: party.updatedAt,
                 media: party.media,
                 topLocations: globalTopLocations || [],
+                hiddenCount: chart.meta.hiddenCount || 0,
             };
 
             return res.status(200).json({
@@ -3733,6 +3734,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 sortBy: chartSort,
                 media: chart.media,
                 count: chart.media.length,
+                hiddenCount: chart.meta.hiddenCount || 0,
                 periodStartDate: getPeriodStartDate(timePeriod),
                 periodEndDate: new Date(),
                 locationFilter: locationPlaceId ? { placeId: locationPlaceId } : null,

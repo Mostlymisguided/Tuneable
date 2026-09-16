@@ -11,6 +11,7 @@ const {
   enrichMediaWithPlayability,
   availablePlatformsFromSources,
   playableHostedMusicMongoFilter,
+  normalizeSources,
 } = require('./mediaPlayability');
 const { normalizeChartSort, mediaChartMongoSort } = require('./chartSort');
 const {
@@ -71,7 +72,7 @@ function withChartPopulate(findQuery) {
     .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
     .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
     .populate('addedBy', USER_PUBLIC_SELECT)
-    .lean();
+    .lean({ flattenMaps: true });
 }
 
 function andChartFilters(...filters) {
@@ -87,6 +88,28 @@ function chartTunesFilter({ playableOnly = true, extra = {} } = {}) {
     extra,
     playableOnly ? playableHostedMusicMongoFilter() : null
   );
+}
+
+const ALL_TIME_CHART_EXTRA = {
+  bids: { $exists: true, $ne: [] },
+  status: { $ne: 'vetoed' },
+};
+
+/** Catalog rows excluded by Playable — 0 when the All chart is requested. */
+function hiddenCatalogCount(playableOnly, totalCount, playableCount) {
+  if (!playableOnly) return 0;
+  return Math.max(0, Number(totalCount || 0) - Number(playableCount || 0));
+}
+
+async function countHiddenCatalogTunes({ extra = {}, playableOnly = true } = {}) {
+  if (!playableOnly) return 0;
+  const inIds = extra?._id?.$in;
+  if (Array.isArray(inIds) && inIds.length === 0) return 0;
+  const [totalCount, playableCount] = await Promise.all([
+    Media.countDocuments(chartTunesFilter({ playableOnly: false, extra })),
+    Media.countDocuments(chartTunesFilter({ playableOnly: true, extra })),
+  ]);
+  return hiddenCatalogCount(true, totalCount, playableCount);
 }
 
 /**
@@ -147,18 +170,7 @@ function effectiveChartLimit(limit) {
 }
 
 function sourcesToObject(sources) {
-  const sourcesObj = {};
-  if (!sources) return sourcesObj;
-  if (sources instanceof Map) {
-    sources.forEach((value, key) => {
-      if (value) sourcesObj[key] = value;
-    });
-  } else if (typeof sources === 'object') {
-    Object.entries(sources).forEach(([key, value]) => {
-      if (value) sourcesObj[key] = value;
-    });
-  }
-  return sourcesObj;
+  return normalizeSources(sources);
 }
 
 function artistNameFromMedia(media) {
@@ -602,10 +614,11 @@ async function fetchAllTimeGlobalChart({
   const startOffset = typeof offset === 'number' && offset > 0 ? offset : 0;
   const baseFilter = chartTunesFilter({
     playableOnly,
-    extra: {
-      bids: { $exists: true, $ne: [] },
-      status: { $ne: 'vetoed' },
-    },
+    extra: ALL_TIME_CHART_EXTRA,
+  });
+  const hiddenCountPromise = countHiddenCatalogTunes({
+    extra: ALL_TIME_CHART_EXTRA,
+    playableOnly,
   });
 
   // Keep newest tipped tracks in the all-time payload so a just-tipped upload
@@ -628,8 +641,7 @@ async function fetchAllTimeGlobalChart({
         chartTunesFilter({
           playableOnly,
           extra: {
-            bids: { $exists: true, $ne: [] },
-            status: { $ne: 'vetoed' },
+            ...ALL_TIME_CHART_EXTRA,
             ...(existingIds.length ? { _id: { $nin: existingIds } } : {}),
           },
         })
@@ -714,13 +726,17 @@ async function fetchAllTimeGlobalChart({
     };
   });
 
-  const topLocations = await computeTopLocations({ startDate: null });
+  const [topLocations, hiddenCount] = await Promise.all([
+    computeTopLocations({ startDate: null }),
+    hiddenCountPromise,
+  ]);
 
   return {
     media: chartMedia,
     topLocations,
     meta: {
       count: chartMedia.length,
+      hiddenCount,
       processingTimeMs: Date.now() - startTime,
       supportersLimit,
       limited: true,
@@ -804,7 +820,7 @@ async function fetchPeriodGlobalChart({
 
     if (includeOrigin) {
       const originMatchedIds = await Media.distinct('_id', chartTunesFilter({
-        playableOnly,
+        playableOnly: false,
         extra: {
           status: { $ne: 'vetoed' },
           ...mediaOriginPlaceMatch(placeId),
@@ -825,6 +841,14 @@ async function fetchPeriodGlobalChart({
     matchingMediaIds = periodMediaIds.filter(Boolean).map((id) => id.toString());
   }
 
+  const hiddenCount = await countHiddenCatalogTunes({
+    extra: {
+      _id: { $in: matchingMediaIds },
+      status: { $ne: 'vetoed' },
+    },
+    playableOnly,
+  });
+
   matchingMediaIds = await filterPlayableMediaIds(matchingMediaIds, playableOnly);
 
   if (matchingMediaIds.length === 0) {
@@ -833,6 +857,7 @@ async function fetchPeriodGlobalChart({
       topLocations: await computeTopLocations({ startDate }),
       meta: {
         count: 0,
+        hiddenCount,
         processingTimeMs: Date.now() - startTime,
         supportersLimit,
         limited: true,
@@ -1046,6 +1071,7 @@ async function fetchPeriodGlobalChart({
     topLocations: await computeTopLocations({ startDate }),
     meta: {
       count: chartMedia.length,
+      hiddenCount,
       processingTimeMs: Date.now() - startTime,
       supportersLimit,
       limited: true,
@@ -1067,4 +1093,6 @@ module.exports = {
   loadTopSupportersByMedia,
   chartTunesFilter,
   andChartFilters,
+  hiddenCatalogCount,
+  countHiddenCatalogTunes,
 };

@@ -290,6 +290,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [selectedTimePeriod, setSelectedTimePeriod] = useState(initialPeriod);
   const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
+  const [sortedHiddenCount, setSortedHiddenCount] = useState<number | null>(null);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
@@ -752,6 +753,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         }
       );
       setSortedMedia(response.media || []);
+      setSortedHiddenCount(
+        typeof (response as any).hiddenCount === 'number' ? (response as any).hiddenCount : null
+      );
       if (Array.isArray((response as any).topLocations)) {
         setParty((prev: any) => prev ? { ...prev, topLocations: (response as any).topLocations } : prev);
       }
@@ -1707,12 +1711,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     [displayMedia]
   );
 
-  const chartMedia = useMemo(
-    () => (playableOnly ? displayMedia.filter(isPartyItemPlayable) : displayMedia),
-    [displayMedia, playableOnly]
-  );
+  const serverHiddenCount = useSortedQueue
+    ? sortedHiddenCount
+    : (typeof (party as any)?.hiddenCount === 'number' ? (party as any).hiddenCount : null);
 
-  const hiddenPlayableCount = displayMedia.length - chartMedia.length;
+  const chartMedia = useMemo(() => {
+    if (!playableOnly) return displayMedia;
+    if (serverHiddenCount !== null) return displayMedia;
+    return displayMedia.filter(isPartyItemPlayable);
+  }, [displayMedia, playableOnly, serverHiddenCount]);
+
+  const hiddenPlayableCount = playableOnly
+    ? (serverHiddenCount ?? (displayMedia.length - displayMedia.filter(isPartyItemPlayable).length))
+    : 0;
 
   const getDisplayMedia = () => chartMedia;
 
@@ -3489,7 +3500,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                     <p className="text-gray-600 text-sm mt-2">Can't find it? Add New Media above to search MusicBrainz and tip it in</p>
                   </div>
                 )}
-                {!showVetoed && getPartyMedia().length > 0 && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
+                {!showVetoed && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
                   <PlayableEmptyState
                     hiddenCount={hiddenPlayableCount}
                     onShowAll={() => setPlayableOnly(false)}

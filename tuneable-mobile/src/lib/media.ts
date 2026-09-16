@@ -48,10 +48,11 @@ export function isUploadPlayable(media: ChartMediaItem | null | undefined): bool
   if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
     return false;
   }
+  // API may strip stream URLs for guests while still marking the track playable.
+  if (media.isPlayable === true) return true;
   if (media.isPlayable === false) return false;
   const url = getUploadUrl(media);
   if (!url) return false;
-  if (media.isPlayable === true) return true;
   if (media.rightsStatus === 'permitted') return true;
   return media.rightsCleared === true;
 }

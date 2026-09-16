@@ -55,4 +55,11 @@ describe('books vs music chart isolation', () => {
   it('omits the playable clause when All is requested', () => {
     expect(chartTunesFilter({ playableOnly: false })).toEqual(GLOBAL_PARTY_TUNES_FILTER);
   });
+
+  it('counts excluded catalog only while Playable is on', () => {
+    const { hiddenCatalogCount } = require('../utils/globalPartyChart');
+    expect(hiddenCatalogCount(true, 250, 22)).toBe(228);
+    expect(hiddenCatalogCount(true, 22, 22)).toBe(0);
+    expect(hiddenCatalogCount(false, 250, 22)).toBe(0);
+  });
 });

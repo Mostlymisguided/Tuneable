@@ -161,6 +161,7 @@ export interface SortedMediaResponse {
   timePeriod: string;
   media: ChartMediaItem[];
   count: number;
+  hiddenCount?: number;
   locationFilter?: { placeId: string } | null;
 }
 

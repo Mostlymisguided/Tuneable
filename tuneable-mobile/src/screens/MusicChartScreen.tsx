@@ -77,6 +77,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmPanel, setShowBpmPanel] = useState(false);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
+  const [serverHiddenCount, setServerHiddenCount] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -108,6 +109,9 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         playableOnly,
       });
       setMedia(res.media ?? []);
+      setServerHiddenCount(
+        typeof res.hiddenCount === 'number' ? res.hiddenCount : null
+      );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to load chart';
@@ -147,13 +151,16 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
     [matchingMedia]
   );
 
-  const filteredMedia = useMemo(
-    () =>
-      playableOnly ? matchingMedia.filter(isUploadPlayable) : matchingMedia,
-    [matchingMedia, playableOnly]
-  );
+  const filteredMedia = useMemo(() => {
+    if (!playableOnly) return matchingMedia;
+    // New chart API already ranked among playable and reports excluded catalog.
+    if (serverHiddenCount !== null) return matchingMedia;
+    return matchingMedia.filter(isUploadPlayable);
+  }, [matchingMedia, playableOnly, serverHiddenCount]);
 
-  const hiddenPlayableCount = matchingMedia.length - filteredMedia.length;
+  const hiddenPlayableCount = playableOnly
+    ? (serverHiddenCount ?? (matchingMedia.length - matchingMedia.filter(isUploadPlayable).length))
+    : 0;
 
   const visibleMedia = useMemo(
     () => filteredMedia.slice(0, visibleCount),
@@ -209,8 +216,10 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   };
 
   const hasMore = visibleCount < filteredMedia.length;
+  const noPlayableWithCatalog =
+    playableOnly && filteredMedia.length === 0 && hiddenPlayableCount > 0;
   const emptyMessage =
-    playableOnly && matchingMedia.length > 0 && filteredMedia.length === 0
+    noPlayableWithCatalog
       ? 'No playable audio here yet.'
       : filtersActive
         ? 'No tunes match these filters.'
@@ -309,7 +318,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         }
         ListEmptyComponent={
           !loading ? (
-            playableOnly && matchingMedia.length > 0 && filteredMedia.length === 0 ? (
+            playableOnly && noPlayableWithCatalog ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.empty}>{emptyMessage}</Text>
                 <Pressable
