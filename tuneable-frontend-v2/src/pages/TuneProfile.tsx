@@ -53,6 +53,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { canEditMedia, canDeleteMedia, isCreator, isAdmin, isAdminOrCreator } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { formatBpmLabel, roundBpm } from '../utils/bpm';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -916,7 +917,7 @@ const TuneProfile: React.FC = () => {
         explicit: media.explicit || false,
         isrc: media.isrc || '',
         upc: media.upc || '',
-        bpm: media.bpm || 0,
+        bpm: roundBpm(media.bpm) || 0,
         key: media.key || '',
         tags: media.tags || [],
         lyrics: media.lyrics || '',
@@ -2175,7 +2176,7 @@ const TuneProfile: React.FC = () => {
     { label: 'Title', value: media.title, icon: Music },
     { label: 'Artist', value: media.artist, icon: Mic },
     { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
-    { label: 'BPM', value: media.bpm, icon: Headphones },
+    { label: 'BPM', value: roundBpm(media.bpm), icon: Headphones },
     {
       label: 'Release Date',
       value: media.releaseDate
@@ -2217,7 +2218,7 @@ const TuneProfile: React.FC = () => {
         : null,
     media.duration ? formatDuration(media.duration) : null,
     media.key,
-    media.bpm ? `${media.bpm} BPM` : null,
+    formatBpmLabel(media.bpm),
   ].filter((part): part is string => Boolean(part));
 
   const topTagRankings = tagRankings.slice(0, 3);
@@ -3812,6 +3813,7 @@ const TuneProfile: React.FC = () => {
                   <label className="block text-white font-medium mb-2">BPM</label>
                   <input
                     type="number"
+                    step="1"
                     value={editForm.bpm}
                     onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
                     className="input"

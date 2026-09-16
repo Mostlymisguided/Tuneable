@@ -3,6 +3,7 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { roundBpm } = require('../utils/bpm');
 
 const DEFAULT_OPTIONS = {
   candidatePoolSize: 120,
@@ -180,7 +181,7 @@ const formatMediaEntry = (record, playabilityOptions = {}) => {
     artist: getPrimaryArtistName(media) || 'Unknown Artist',
     coverArt: media.coverArt || null,
     duration: media.duration || 0,
-    bpm: typeof media.bpm === 'number' && media.bpm > 0 ? media.bpm : null,
+    bpm: roundBpm(media.bpm),
     releaseDate: media.releaseDate || null,
     releaseYear: typeof media.releaseYear === 'number' ? media.releaseYear : null,
     primaryLocation: media.primaryLocation || null,

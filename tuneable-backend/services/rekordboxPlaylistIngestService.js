@@ -11,6 +11,7 @@ const os = require('os');
 const path = require('path');
 
 const { getTracksFromPlaylistsFromContent } = require('../scripts/lib/rekordboxXml');
+const { roundBpm } = require('../utils/bpm');
 
 function emptyIndexes() {
   return {
@@ -129,7 +130,7 @@ function serializeItem(base) {
     artist: base.artist || '',
     album: base.album || null,
     genre: base.genre || null,
-    bpm: base.bpm || null,
+    bpm: roundBpm(base.bpm),
     keySignature: base.keySignature || null,
     duration: base.duration || null,
     year: base.year || null,
@@ -158,7 +159,7 @@ function itemFromTrack(track, index, extras = {}) {
     artist: (track.artist || '').trim(),
     album: track.album || null,
     genre: track.genre || null,
-    bpm: track.bpm || null,
+    bpm: roundBpm(track.bpm),
     keySignature: track.key || null,
     duration: track.duration || track.totalTime || null,
     year: track.year || null,
@@ -179,7 +180,7 @@ function rekordboxMetaFromItem(item) {
     artist: item.artist,
     album: item.album,
     genre: item.genre,
-    bpm: item.bpm,
+    bpm: roundBpm(item.bpm),
     key: item.keySignature || null,
     year: item.year,
     bitrate: item.bitrate,

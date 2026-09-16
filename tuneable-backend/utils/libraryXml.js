@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const xml2js = require('xml2js');
+const { roundBpm } = require('./bpm');
 
 function asArray(value) {
   if (!value) return [];
@@ -85,7 +86,7 @@ async function parseRekordboxXmlContent(xmlContent) {
       artist: track.Artist || '',
       album: track.Album || '',
       genre: track.Genre || '',
-      bpm: track.AverageBpm ? parseFloat(track.AverageBpm) : null,
+      bpm: roundBpm(track.AverageBpm),
       key: track.Tonality || track.Key || null,
       rating: track.Rating ? parseInt(track.Rating, 10) : 0,
       playCount: track.PlayCount ? parseInt(track.PlayCount, 10) : 0,
@@ -152,7 +153,7 @@ function parseItunesLibraryXmlContent(xmlContent) {
     const location = extractPlistString(block, 'Location');
     const filePath = decodeItunesLocation(location);
     const totalTimeMs = extractPlistNumber(block, 'Total Time');
-    const bpm = extractPlistNumber(block, 'BPM');
+    const bpm = roundBpm(extractPlistNumber(block, 'BPM'));
     const genre = extractPlistString(block, 'Genre');
     const year = extractPlistNumber(block, 'Year');
 
@@ -266,9 +267,7 @@ function pickLibraryMetadata(match) {
 }
 
 function parseOptionalBpm(value) {
-  if (value === undefined || value === null || value === '') return null;
-  const num = parseFloat(String(value));
-  return Number.isFinite(num) && num > 0 ? num : null;
+  return roundBpm(value);
 }
 
 function parseOptionalKey(value) {
@@ -283,8 +282,8 @@ function parseOptionalKey(value) {
 function resolveBpmKey({ bodyBpm, bodyKey, libraryMatch, extracted } = {}) {
   const lib = pickLibraryMetadata(libraryMatch);
   const bpm = parseOptionalBpm(bodyBpm)
-    ?? (lib?.bpm != null ? lib.bpm : null)
-    ?? (extracted?.bpm != null ? extracted.bpm : null);
+    ?? parseOptionalBpm(lib?.bpm)
+    ?? parseOptionalBpm(extracted?.bpm);
   const key = parseOptionalKey(bodyKey)
     || lib?.key
     || extracted?.key

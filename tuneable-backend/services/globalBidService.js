@@ -14,6 +14,7 @@ const { applyTipChipsToMedia } = require('../utils/elementNormalizer');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { collectIdentity, buildIdentityOrQuery } = require('../utils/mediaIdentity');
+const { roundBpm } = require('../utils/bpm');
 
 /**
  * @param {string} userId
@@ -140,9 +141,7 @@ async function placeGlobalBid(userId, {
       const storedExternalIds = externalIdEntries
         .filter(([key, value]) => key && value && key !== 'isrc')
         .concat(resolvedIsrc ? [['isrc', resolvedIsrc]] : []);
-      const resolvedBpm = Number.isFinite(Number(externalBpm)) && Number(externalBpm) > 0
-        ? Number(externalBpm)
-        : undefined;
+      const resolvedBpm = roundBpm(externalBpm) ?? undefined;
       const resolvedKey = externalKey && String(externalKey).trim()
         ? String(externalKey).trim()
         : undefined;

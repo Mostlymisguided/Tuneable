@@ -32,6 +32,7 @@ const {
   normalizeElementList,
 } = require('../utils/elementNormalizer');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
+const { roundBpm } = require('../utils/bpm');
 const {
   shouldClearRightsOnAttach,
   pendingRightsFields,
@@ -2020,6 +2021,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
         if (field === 'elements') {
           value = normalizeElementList(value);
+        }
+
+        if (field === 'bpm') {
+          value = roundBpm(value);
         }
         
         // Check if value actually changed

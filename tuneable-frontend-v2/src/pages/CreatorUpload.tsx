@@ -13,6 +13,7 @@ import AiToolsEditor from '../components/AiToolsEditor';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
+import { roundBpm } from '../utils/bpm';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -225,6 +226,7 @@ const CreatorUpload: React.FC = () => {
       return null;
     }
 
+    const matchBpm = roundBpm(match.bpm);
     setFormData((prev) => ({
       ...prev,
       title: prev.title || match.title || prev.title,
@@ -232,10 +234,10 @@ const CreatorUpload: React.FC = () => {
       album: prev.album || match.album || prev.album,
       genre: prev.genre || match.genre || prev.genre,
       duration: prev.duration || (match.duration ? secondsToMMSS(match.duration) : prev.duration),
-      bpm: prev.bpm || (match.bpm != null ? String(match.bpm) : prev.bpm),
+      bpm: prev.bpm || (matchBpm != null ? String(matchBpm) : prev.bpm),
       key: prev.key || match.key || prev.key,
     }));
-    setLibraryMatchLabel(`${match.title || selectedFile.name}${match.bpm ? ` · ${match.bpm} BPM` : ''}${match.key ? ` · ${match.key}` : ''}`);
+    setLibraryMatchLabel(`${match.title || selectedFile.name}${matchBpm ? ` · ${matchBpm} BPM` : ''}${match.key ? ` · ${match.key}` : ''}`);
     return match;
   }, [libraryTracks]);
 
@@ -297,7 +299,7 @@ const CreatorUpload: React.FC = () => {
         genre: extractedMetadata.genre?.[0] || prev.genre,
         duration: extractedMetadata.duration ? secondsToMMSS(extractedMetadata.duration) : prev.duration,
         explicit: extractedMetadata.explicit || prev.explicit,
-        bpm: extractedMetadata.bpm?.toString() || prev.bpm,
+        bpm: roundBpm(extractedMetadata.bpm)?.toString() || prev.bpm,
         key: extractedMetadata.key || prev.key,
         isrc: extractedMetadata.isrc || prev.isrc,
         upc: extractedMetadata.upc || prev.upc,
@@ -805,7 +807,7 @@ const CreatorUpload: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-gray-400">BPM:</span>
-                      <span className="text-white ml-2">{extractedMetadata.bpm || 'N/A'}</span>
+                      <span className="text-white ml-2">{roundBpm(extractedMetadata.bpm) ?? 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Artwork:</span>
@@ -1205,6 +1207,7 @@ const CreatorUpload: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="1"
                     name="bpm"
                     value={formData.bpm}
                     onChange={handleChange}

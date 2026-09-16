@@ -27,7 +27,7 @@ import { TagClaimSheet } from '@/src/components/TagClaimSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
-import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence, formatBpmLabel, roundBpm } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
@@ -189,7 +189,7 @@ export default function TuneProfileScreen() {
     return [
       media.album || null,
       year,
-      media.bpm != null ? `${media.bpm} BPM` : null,
+      formatBpmLabel(media.bpm),
       media.key || null,
       durationLabel || null,
     ].filter((part): part is string => Boolean(part));
@@ -231,7 +231,8 @@ export default function TuneProfileScreen() {
           : String(new Date(media.releaseDate!).getFullYear()),
       });
     }
-    if (media.bpm != null) fields.push({ label: 'BPM', value: String(media.bpm) });
+    const bpm = roundBpm(media.bpm);
+    if (bpm != null) fields.push({ label: 'BPM', value: String(bpm) });
     if (media.key) fields.push({ label: 'Key', value: media.key });
     if (durationLabel) fields.push({ label: 'Duration', value: durationLabel });
     if (media.addedBy?.username) {

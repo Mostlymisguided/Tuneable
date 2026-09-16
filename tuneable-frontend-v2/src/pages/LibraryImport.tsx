@@ -21,6 +21,7 @@ import { DEFAULT_PROFILE_PIC } from '../constants';
 import { buildOAuthStartUrl } from '../utils/platform';
 import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../utils/oauthErrorMessage';
 import { isAdmin } from '../utils/permissionHelpers';
+import { formatBpmLabel } from '../utils/bpm';
 
 type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox' | 'youtube';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
@@ -2176,9 +2177,9 @@ const LibraryImport: React.FC = () => {
                         <div className="font-medium truncate">{item.title}</div>
                         <div className="text-sm text-gray-400 truncate">
                           {item.artist}
-                          {item.bpm || item.musicalKey ? (
+                          {formatBpmLabel(item.bpm) || item.musicalKey ? (
                             <span className="text-gray-500">
-                              {item.bpm ? ` · ${Math.round(Number(item.bpm))} BPM` : ''}
+                              {formatBpmLabel(item.bpm) ? ` · ${formatBpmLabel(item.bpm)}` : ''}
                               {item.musicalKey ? ` · ${item.musicalKey}` : ''}
                             </span>
                           ) : null}

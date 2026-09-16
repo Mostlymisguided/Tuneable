@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const MetadataExtractor = require('../../utils/metadataExtractor');
+const { roundBpm } = require('../../utils/bpm');
 const { uploadToR2 } = require('./attachUpload');
 
 const PENDING_RIGHTS_NOTES =
@@ -56,7 +57,7 @@ function mergeMetadata(doc, { id3, rekordbox, extracted }) {
     doc.duration = ex.duration || rb.totalTime || tags.duration || doc.duration;
   }
   if (!doc.bpm) {
-    doc.bpm = rb.bpm || ex.bpm || tags.bpm || null;
+    doc.bpm = roundBpm(rb.bpm || ex.bpm || tags.bpm);
   }
   if (!doc.key) {
     doc.key = rb.key || ex.key || tags.key || null;

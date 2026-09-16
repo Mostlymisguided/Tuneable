@@ -10,6 +10,7 @@ import {
   Play,
 } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
+import { roundBpm } from '../utils/bpm';
 
 export type EnrichScope = 'mine' | 'all';
 
@@ -345,7 +346,7 @@ const LibraryXmlEnrich: React.FC<LibraryXmlEnrichProps> = ({
                     </div>
                     <div className="text-sm text-right flex-shrink-0">
                       <div className="text-gray-400">
-                        BPM: {item.currentBpm ?? '—'} → {item.newBpm ?? '—'}
+                        BPM: {roundBpm(item.currentBpm) ?? '—'} → {roundBpm(item.newBpm) ?? '—'}
                       </div>
                       <div className="text-gray-400">
                         Key: {item.currentKey || '—'} → {item.newKey || '—'}

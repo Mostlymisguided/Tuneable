@@ -13,6 +13,20 @@ export function formatTuneBytes(value: number | undefined | null): string {
   });
 }
 
+/** Canonical BPM for display: nearest whole number. Empty / non-positive → null. */
+export function roundBpm(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const num = typeof value === 'number' ? value : Number.parseFloat(String(value).trim());
+  if (!Number.isFinite(num) || num <= 0) return null;
+  const rounded = Math.round(num);
+  return rounded > 0 ? rounded : null;
+}
+
+export function formatBpmLabel(value: unknown): string | null {
+  const bpm = roundBpm(value);
+  return bpm == null ? null : `${bpm} BPM`;
+}
+
 /** Format duration in seconds as m:ss or h:mm:ss */
 export function formatDuration(seconds: number | undefined | null): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '';

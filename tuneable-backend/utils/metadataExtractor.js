@@ -1,5 +1,6 @@
 const { createMediaUpload, getPublicUrl } = require('./r2Upload');
 const { normalizeIsrc } = require('./mediaMatchUtils');
+const { roundBpm } = require('./bpm');
 const crypto = require('crypto');
 
 let musicMetadataPromise;
@@ -52,7 +53,7 @@ class MetadataExtractor {
         lossless: metadata.format.lossless || false,
         
         // Advanced metadata
-        bpm: metadata.common.bpm || null,
+        bpm: roundBpm(metadata.common.bpm),
         key: metadata.common.key || null,
         isrc: normalizeIsrc(metadata.common.isrc),
         upc: metadata.common.barcode || null,
@@ -250,7 +251,7 @@ class MetadataExtractor {
       explicit: extractedData.explicit || false,
       
       // Advanced metadata
-      bpm: extractedData.bpm || null,
+      bpm: roundBpm(extractedData.bpm),
       key: extractedData.key || null,
       isrc: normalizeIsrc(extractedData.isrc),
       upc: extractedData.upc || null,

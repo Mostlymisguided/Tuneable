@@ -12,6 +12,7 @@ const soundcloudService = require('./soundcloudService');
 const importCrossRefService = require('./importCrossRefService');
 const { placeGlobalBid } = require('./globalBidService');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { roundBpm } = require('../utils/bpm');
 const {
   buildMediaIndexes,
   findFuzzyCatalogMatch,
@@ -95,9 +96,7 @@ function buildExternalMediaFromTrack(track, {
     : (track.genre ? [String(track.genre).trim()].filter(Boolean) : []);
 
   const isrc = normalizeIsrc(track.externalIds?.isrc || track.isrc);
-  const bpm = Number.isFinite(Number(track.bpm)) && Number(track.bpm) > 0
-    ? Number(track.bpm)
-    : null;
+  const bpm = roundBpm(track.bpm);
   const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
   const externalIds = { ...(track.externalIds || {}) };
   if (isrc) externalIds.isrc = isrc;
@@ -269,8 +268,8 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
     changed = true;
   }
 
-  const incomingBpm = Number(externalMedia.bpm);
-  if ((!media.bpm || media.bpm === 0) && Number.isFinite(incomingBpm) && incomingBpm > 0) {
+  const incomingBpm = roundBpm(externalMedia.bpm);
+  if ((!media.bpm || media.bpm === 0) && incomingBpm != null) {
     media.bpm = incomingBpm;
     changed = true;
   }
@@ -1005,9 +1004,7 @@ function convertRekordboxTrack(track) {
   const artist = (track.artist || '').trim();
   const trackId = track.trackId ? String(track.trackId) : '';
   const catalogId = trackId || `name:${title}::${artist}`;
-  const bpm = Number.isFinite(Number(track.bpm)) && Number(track.bpm) > 0
-    ? Number(track.bpm)
-    : null;
+  const bpm = roundBpm(track.bpm);
   const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
   const genre = track.genre && String(track.genre).trim() ? String(track.genre).trim() : null;
 

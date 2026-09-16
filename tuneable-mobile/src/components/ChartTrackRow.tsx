@@ -9,7 +9,7 @@ import {
 import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
-import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence, roundBpm } from '@/src/lib/format';
 import {
   getCountryLabelFromLocation,
   getCountryPlaceProfileHref,
@@ -33,9 +33,7 @@ function getReleaseYear(item: ChartMediaItem): number | null {
 }
 
 function getBpm(item: ChartMediaItem): number | null {
-  const bpm = item.bpm;
-  if (typeof bpm !== 'number' || !Number.isFinite(bpm) || bpm <= 0) return null;
-  return Math.round(bpm);
+  return roundBpm(item.bpm);
 }
 
 type Props = {

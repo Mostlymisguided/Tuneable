@@ -3,6 +3,7 @@ const { uuidv7 } = require('uuidv7');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeLanguageInput } = require('../utils/language');
 const { normalizeIsbn } = require('../utils/isbn');
+const { roundBpm } = require('../utils/bpm');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -226,7 +227,13 @@ const mediaSchema = new mongoose.Schema({
   upc: { type: String, default: null }, // Universal Product Code
   lyrics: { type: String }, // lyrics
   transcript: { type: String }, // Podcast/video transcript
-  bpm: { type: Number },
+  bpm: {
+    type: Number,
+    set(value) {
+      if (value === undefined) return undefined;
+      return roundBpm(value);
+    },
+  },
   key: { type: String },
   pitch: { type: Number, default: 440 },
   timeSignature: { type: String, default: '4/4' },
@@ -593,6 +600,11 @@ mediaSchema.pre('save', function (next) {
   } else if (this.isbn) {
     const normalizedIsbn = normalizeIsbn(this.isbn);
     if (normalizedIsbn) this.isbn = normalizedIsbn;
+  }
+
+  if (this.bpm != null) {
+    const roundedBpm = roundBpm(this.bpm);
+    if (roundedBpm !== this.bpm) this.bpm = roundedBpm;
   }
 
   // MongoDB text indexes treat `language` as a stemming override (`en`, not `eng`).

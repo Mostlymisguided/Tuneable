@@ -54,6 +54,7 @@ import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlay
 import { requireAuthToPlay } from '../utils/playAuth';
 import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { roundBpm } from '../utils/bpm';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -868,7 +869,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         explicit: media.explicit || false,
         isrc: media.isrc || '',
         upc: media.upc || '',
-        bpm: (media as any).bpm || 0,
+        bpm: roundBpm((media as any).bpm) || 0,
         key: (media as any).key || '',
         tags: media.tags || [],
         lyrics: (media as any).lyrics || '',
@@ -3601,6 +3602,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                   <label className="block text-white font-medium mb-2">BPM</label>
                   <input
                     type="number"
+                    step="1"
                     value={editForm.bpm}
                     onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
                     className="input"
