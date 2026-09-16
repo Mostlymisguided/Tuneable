@@ -325,7 +325,6 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
           <PlayableFilterTrigger
             playableOnly={playableOnly}
             onToggle={togglePlayableOnly}
-            hiddenCount={hiddenPlayableCount}
           />
         </div>
         <PlayableFilterHint

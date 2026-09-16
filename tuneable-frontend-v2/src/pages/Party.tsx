@@ -2777,7 +2777,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                       <PlayableFilterTrigger
                         playableOnly={playableOnly}
                         onToggle={togglePlayableOnly}
-                        hiddenCount={hiddenPlayableCount}
                       />
                     </div>
                     <PlayableFilterHint

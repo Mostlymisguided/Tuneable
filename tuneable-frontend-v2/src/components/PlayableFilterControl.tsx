@@ -4,20 +4,12 @@ import { catalogHiddenLabel } from '../utils/playableFilterPref';
 type TriggerProps = {
   playableOnly: boolean;
   onToggle: () => void;
-  hiddenCount?: number;
 };
 
 export function PlayableFilterTrigger({
   playableOnly,
   onToggle,
-  hiddenCount = 0,
 }: TriggerProps) {
-  const detail = playableOnly
-    ? hiddenCount > 0
-      ? `−${hiddenCount}`
-      : undefined
-    : 'All';
-
   return (
     <button
       type="button"
@@ -28,16 +20,13 @@ export function PlayableFilterTrigger({
           : 'Showing all tunes, including catalog tracks awaiting rights.'
       }
       aria-pressed={playableOnly}
-      aria-label={playableOnly ? 'Playable only, on' : 'Playable only, off'}
+      aria-label={playableOnly ? 'Showing playable. Click to show all.' : 'Showing all. Click to show playable only.'}
       className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
         playableOnly ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
       }`}
     >
       <Headphones className="h-4 w-4 text-purple-400 flex-shrink-0" />
-      Playable
-      {detail ? (
-        <span className="text-xs text-purple-300 font-normal">{detail}</span>
-      ) : null}
+      {playableOnly ? 'Playable' : 'All'}
     </button>
   );
 }

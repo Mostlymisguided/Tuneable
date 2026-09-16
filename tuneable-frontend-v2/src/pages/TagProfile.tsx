@@ -607,7 +607,6 @@ const TagProfile: React.FC = () => {
                 <PlayableFilterTrigger
                   playableOnly={playableOnly}
                   onToggle={togglePlayableOnly}
-                  hiddenCount={hiddenPlayableCount}
                 />
               ) : null}
             </div>

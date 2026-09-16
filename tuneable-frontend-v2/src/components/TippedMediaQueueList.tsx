@@ -297,7 +297,6 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
             <PlayableFilterTrigger
               playableOnly={playableOnly}
               onToggle={() => setPlayableOnly(!playableOnly)}
-              hiddenCount={hiddenPlayableCount}
             />
           ) : null}
           {showPlayAll && hasPlayable ? (
