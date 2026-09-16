@@ -105,6 +105,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         locationPlaceId: locationPlaceId ?? undefined,
         locationScope: locationPlaceId ? locationScope : undefined,
         sortBy: chartSort,
+        playableOnly,
       });
       setMedia(res.media ?? []);
     } catch (err) {
@@ -115,7 +116,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, locationPlaceId, chartSort, locationScope]);
+  }, [period, locationPlaceId, chartSort, locationScope, playableOnly]);
 
   useFocusEffect(
     useCallback(() => {

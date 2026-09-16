@@ -10,6 +10,7 @@ const { DEFAULT_COVER_ART } = require('./coverArtUtils');
 const {
   enrichMediaWithPlayability,
   availablePlatformsFromSources,
+  playableHostedMusicMongoFilter,
 } = require('./mediaPlayability');
 const { normalizeChartSort, mediaChartMongoSort } = require('./chartSort');
 const {
@@ -61,6 +62,82 @@ const DEFAULT_CHART_LIMIT = 250;
 const MAX_CHART_LIMIT = 500;
 // Most-tipped charts otherwise drop brand-new tips that have not reached the top N.
 const RECENT_TIPPED_RESERVE = 25;
+const VIEWER_RECENT_TIP_DAYS = 7;
+const VIEWER_RECENT_TIP_LIMIT = 25;
+
+function withChartPopulate(findQuery) {
+  return findQuery
+    .select(MEDIA_CHART_SELECT)
+    .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
+    .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
+    .populate('addedBy', USER_PUBLIC_SELECT)
+    .lean();
+}
+
+function andChartFilters(...filters) {
+  const clauses = filters.filter((filter) => filter && Object.keys(filter).length > 0);
+  if (clauses.length === 0) return {};
+  if (clauses.length === 1) return clauses[0];
+  return { $and: clauses };
+}
+
+function chartTunesFilter({ playableOnly = true, extra = {} } = {}) {
+  return andChartFilters(
+    GLOBAL_PARTY_TUNES_FILTER,
+    extra,
+    playableOnly ? playableHostedMusicMongoFilter() : null
+  );
+}
+
+/**
+ * Drop unplayable IDs before ranking so the top-N cut is among playable tracks.
+ */
+async function filterPlayableMediaIds(ids, playableOnly) {
+  if (!playableOnly || !ids.length) return ids;
+  const docs = await Media.find(
+    chartTunesFilter({
+      playableOnly: true,
+      extra: { _id: { $in: ids }, status: { $ne: 'vetoed' } },
+    })
+  )
+    .select('_id')
+    .lean();
+  const playable = new Set(docs.map((doc) => doc._id.toString()));
+  return ids.filter((id) => playable.has(id.toString()));
+}
+
+/**
+ * Media the viewer tipped in the last week, even if it missed the top-N cut.
+ * Uses Bid docs (not media.bids) so a successful tip still surfaces.
+ */
+async function fetchViewerRecentTippedMedia({
+  userId,
+  existingIds = [],
+  startDate = null,
+  playableOnly = true,
+} = {}) {
+  if (!userId) return [];
+  const since = startDate || new Date(Date.now() - VIEWER_RECENT_TIP_DAYS * 24 * 60 * 60 * 1000);
+  const mediaIds = await Bid.distinct('mediaId', {
+    userId,
+    status: 'active',
+    createdAt: { $gte: since },
+  });
+  const existing = new Set((existingIds || []).map((id) => id.toString()));
+  const missing = mediaIds.filter((id) => id && !existing.has(id.toString()));
+  if (missing.length === 0) return [];
+  return withChartPopulate(
+    Media.find(
+      chartTunesFilter({
+        playableOnly,
+        extra: {
+          _id: { $in: missing.slice(0, VIEWER_RECENT_TIP_LIMIT) },
+          status: { $ne: 'vetoed' },
+        },
+      })
+    ).sort({ createdAt: -1 })
+  );
+}
 
 function effectiveChartLimit(limit) {
   if (typeof limit === 'number' && limit > 0) {
@@ -517,23 +594,19 @@ async function fetchAllTimeGlobalChart({
   limit = null,
   offset = 0,
   sortBy = 'most-tipped',
+  playableOnly = true,
 } = {}) {
   const startTime = Date.now();
   const chartSort = normalizeChartSort(sortBy);
   const chartLimit = effectiveChartLimit(limit);
   const startOffset = typeof offset === 'number' && offset > 0 ? offset : 0;
-  const baseFilter = {
-    ...GLOBAL_PARTY_TUNES_FILTER,
-    bids: { $exists: true, $ne: [] },
-    status: { $ne: 'vetoed' },
-  };
-
-  const withChartPopulate = (findQuery) => findQuery
-    .select(MEDIA_CHART_SELECT)
-    .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
-    .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
-    .populate('addedBy', 'username profilePic uuid')
-    .lean();
+  const baseFilter = chartTunesFilter({
+    playableOnly,
+    extra: {
+      bids: { $exists: true, $ne: [] },
+      status: { $ne: 'vetoed' },
+    },
+  });
 
   // Keep newest tipped tracks in the all-time payload so a just-tipped upload
   // is searchable / show-more-reachable instead of falling off the top-250 cut.
@@ -551,15 +624,31 @@ async function fetchAllTimeGlobalChart({
   if (recentLimit > 0) {
     const existingIds = mediaList.map((m) => m._id);
     const recent = await withChartPopulate(
-      Media.find({
-        ...baseFilter,
-        ...(existingIds.length ? { _id: { $nin: existingIds } } : {}),
-      })
+      Media.find(
+        chartTunesFilter({
+          playableOnly,
+          extra: {
+            bids: { $exists: true, $ne: [] },
+            status: { $ne: 'vetoed' },
+            ...(existingIds.length ? { _id: { $nin: existingIds } } : {}),
+          },
+        })
+      )
         .sort({ createdAt: -1, globalMediaAggregate: -1 })
         .limit(recentLimit)
     );
     mediaList.push(...recent);
   }
+
+  const viewerRecent = await fetchViewerRecentTippedMedia({
+    userId,
+    existingIds: mediaList.map((m) => m._id),
+    playableOnly,
+  });
+  if (viewerRecent.length) {
+    mediaList.unshift(...viewerRecent);
+  }
+
   const mediaIds = mediaList.map((m) => m._id);
   const supportersByMedia = await loadTopSupportersByMedia(mediaIds, {
     supportersLimit,
@@ -672,6 +761,7 @@ async function fetchPeriodGlobalChart({
   limit = null,
   offset = 0,
   sortBy = 'most-tipped',
+  playableOnly = true,
 } = {}) {
   const startTime = Date.now();
   const chartSort = normalizeChartSort(sortBy);
@@ -684,7 +774,14 @@ async function fetchPeriodGlobalChart({
   // All-time with no location filter must use the slim chart path — loading every
   // active bid into memory for ranking OOMs / 500s on production-sized datasets.
   if (!startDate && !placeId) {
-    return fetchAllTimeGlobalChart({ userId, supportersLimit, limit, offset, sortBy: chartSort });
+    return fetchAllTimeGlobalChart({
+      userId,
+      supportersLimit,
+      limit,
+      offset,
+      sortBy: chartSort,
+      playableOnly,
+    });
   }
 
   let matchingMediaIds;
@@ -706,11 +803,13 @@ async function fetchPeriodGlobalChart({
     }
 
     if (includeOrigin) {
-      const originMatchedIds = await Media.distinct('_id', {
-        ...GLOBAL_PARTY_TUNES_FILTER,
-        status: { $ne: 'vetoed' },
-        ...mediaOriginPlaceMatch(placeId),
-      });
+      const originMatchedIds = await Media.distinct('_id', chartTunesFilter({
+        playableOnly,
+        extra: {
+          status: { $ne: 'vetoed' },
+          ...mediaOriginPlaceMatch(placeId),
+        },
+      }));
       for (const id of originMatchedIds) {
         if (id) idSet.add(id.toString());
       }
@@ -725,6 +824,8 @@ async function fetchPeriodGlobalChart({
     const periodMediaIds = await Bid.distinct('mediaId', bidQuery);
     matchingMediaIds = periodMediaIds.filter(Boolean).map((id) => id.toString());
   }
+
+  matchingMediaIds = await filterPlayableMediaIds(matchingMediaIds, playableOnly);
 
   if (matchingMediaIds.length === 0) {
     return {
@@ -789,11 +890,13 @@ async function fetchPeriodGlobalChart({
     const mongoSort = dateSort
       ? mediaChartMongoSort(chartSort)
       : { globalMediaAggregate: -1 };
-    const fetched = await Media.find({
-      ...GLOBAL_PARTY_TUNES_FILTER,
-      _id: { $in: candidateIds },
-      status: { $ne: 'vetoed' },
-    })
+    const fetched = await Media.find(chartTunesFilter({
+      playableOnly,
+      extra: {
+        _id: { $in: candidateIds },
+        status: { $ne: 'vetoed' },
+      },
+    }))
       .select(MEDIA_CHART_SELECT)
       .sort(mongoSort)
       .skip(startOffset)
@@ -812,11 +915,13 @@ async function fetchPeriodGlobalChart({
     const recentReserve = startOffset === 0 ? Math.min(RECENT_TIPPED_RESERVE, chartLimit) : 0;
     let reservedRecentIds = [];
     if (recentReserve > 0) {
-      const recentDocs = await Media.find({
-        ...GLOBAL_PARTY_TUNES_FILTER,
-        _id: { $in: candidateIds },
-        status: { $ne: 'vetoed' },
-      })
+      const recentDocs = await Media.find(chartTunesFilter({
+        playableOnly,
+        extra: {
+          _id: { $in: candidateIds },
+          status: { $ne: 'vetoed' },
+        },
+      }))
         .select('_id')
         .sort({ createdAt: -1, globalMediaAggregate: -1 })
         .limit(recentReserve)
@@ -830,11 +935,13 @@ async function fetchPeriodGlobalChart({
       .slice(startOffset, startOffset + Math.max(chartLimit - reservedRecentIds.length, 0));
     const rankedIds = [...topByTips, ...reservedRecentIds];
 
-    const fetched = await Media.find({
-      ...GLOBAL_PARTY_TUNES_FILTER,
-      _id: { $in: rankedIds },
-      status: { $ne: 'vetoed' },
-    })
+    const fetched = await Media.find(chartTunesFilter({
+      playableOnly,
+      extra: {
+        _id: { $in: rankedIds },
+        status: { $ne: 'vetoed' },
+      },
+    }))
       .select(MEDIA_CHART_SELECT)
       .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
       .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
@@ -851,6 +958,21 @@ async function fetchPeriodGlobalChart({
         if (diff !== 0) return diff;
         return (b.media.globalMediaAggregate || 0) - (a.media.globalMediaAggregate || 0);
       });
+  }
+
+  if (startOffset === 0) {
+    const viewerRecent = await fetchViewerRecentTippedMedia({
+      userId,
+      existingIds: mediaList.map((row) => row.media._id),
+      startDate: startDate || undefined,
+      playableOnly,
+    });
+    if (viewerRecent.length) {
+      mediaList.unshift(...viewerRecent.map((media) => ({
+        media,
+        timePeriodBidValue: mediaBidValues[media._id.toString()] || media.globalMediaAggregate || 0,
+      })));
+    }
   }
 
   const pageMediaIds = mediaList.map((row) => row.media._id);
@@ -943,4 +1065,6 @@ module.exports = {
   fetchPeriodGlobalChart,
   computeTopLocations,
   loadTopSupportersByMedia,
+  chartTunesFilter,
+  andChartFilters,
 };

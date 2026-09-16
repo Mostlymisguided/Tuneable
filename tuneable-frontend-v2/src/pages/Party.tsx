@@ -526,7 +526,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     if (partyId) {
       fetchPartyDetails();
     }
-  }, [partyId]);
+  }, [partyId, playableOnly]);
 
   useEffect(() => {
     if (!partyId) return;
@@ -535,7 +535,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     } else {
       setSortedMedia([]);
     }
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope, playableOnly]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
@@ -701,7 +701,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       }
       
       // Then fetch the updated party details
-      const response = await partyAPI.getPartyDetails(partyId!);
+      const response = await partyAPI.getPartyDetails(partyId!, { playableOnly });
       setParty(response.party);
       
       // Check if current user is the host (use UUID)
@@ -748,6 +748,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         {
           ...(locationPlaceId ? { locationPlaceId, locationScope } : {}),
           sortBy: chartSort,
+          playableOnly,
         }
       );
       setSortedMedia(response.media || []);

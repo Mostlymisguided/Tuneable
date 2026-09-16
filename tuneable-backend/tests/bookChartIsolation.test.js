@@ -4,7 +4,7 @@
  */
 
 const { BOOK_CATALOG_QUERY, isWrittenMedia } = require('../utils/mediaKinds');
-const { GLOBAL_PARTY_TUNES_FILTER } = require('../utils/globalPartyChart');
+const { GLOBAL_PARTY_TUNES_FILTER, chartTunesFilter } = require('../utils/globalPartyChart');
 const { isMediaPlayable } = require('../utils/mediaPlayability');
 
 describe('books vs music chart isolation', () => {
@@ -35,5 +35,24 @@ describe('books vs music chart isolation', () => {
     };
     expect(isWrittenMedia(book)).toBe(true);
     expect(isMediaPlayable(book)).toBe(false);
+  });
+
+  it('nests the playable $or under $and so a location $or is preserved', () => {
+    const filter = chartTunesFilter({
+      playableOnly: true,
+      extra: { $or: [{ 'primaryLocation.placeId': 'x' }] },
+    });
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      GLOBAL_PARTY_TUNES_FILTER,
+      { $or: [{ 'primaryLocation.placeId': 'x' }] },
+    ]));
+    const playableClause = filter.$and.find((clause) => clause['sources.upload']);
+    expect(playableClause.$or).toEqual(expect.arrayContaining([
+      { rightsStatus: 'permitted' },
+    ]));
+  });
+
+  it('omits the playable clause when All is requested', () => {
+    expect(chartTunesFilter({ playableOnly: false })).toEqual(GLOBAL_PARTY_TUNES_FILTER);
   });
 });

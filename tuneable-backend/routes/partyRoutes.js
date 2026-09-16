@@ -19,6 +19,7 @@ const {
   availablePlatformsFromSources,
   normalizeSources,
   playabilityOptionsFromRequest,
+  parsePlayableOnlyQuery,
 } = require('../utils/mediaPlayability');
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
@@ -677,7 +678,8 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
         
         if (isRequestingGlobalParty) {
             console.log('🌍 Fetching Global Party chart (slim supporters)...');
-            const chart = await fetchAllTimeGlobalChart({ userId });
+            const playableOnly = parsePlayableOnlyQuery(req.query.playableOnly);
+            const chart = await fetchAllTimeGlobalChart({ userId, playableOnly });
             console.log(`🌍 Global Party Performance Metrics:`);
             console.log(`   - Processing time: ${chart.meta.processingTimeMs}ms`);
             console.log(`   - Media count: ${chart.meta.count}`);
@@ -3722,6 +3724,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 locationScope,
                 userId: req.user?._id,
                 sortBy: chartSort,
+                playableOnly: parsePlayableOnlyQuery(req.query.playableOnly),
             });
             console.log(`🌍 Global Party time sorting: ${chart.meta.count} media in ${chart.meta.processingTimeMs}ms${locationPlaceId ? ` (location: ${locationPlaceId}, scope: ${locationScope})` : ''}`);
 

@@ -375,8 +375,12 @@ export const partyAPI = {
     return response.data;
   },
   
-  getPartyDetails: async (partyId: string): Promise<{ party: Party }> => {
-    const response = await api.get(`/parties/${partyId}/details`);
+  getPartyDetails: async (partyId: string, options?: { playableOnly?: boolean }): Promise<{ party: Party }> => {
+    const params: Record<string, string> = {};
+    if (typeof options?.playableOnly === 'boolean') {
+      params.playableOnly = String(options.playableOnly);
+    }
+    const response = await api.get(`/parties/${partyId}/details`, { params });
     return response.data;
   },
   
@@ -515,7 +519,7 @@ export const partyAPI = {
     return response.data;
   },
   
-  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string }) => {
+  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string; playableOnly?: boolean }) => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
@@ -525,6 +529,9 @@ export const partyAPI = {
     }
     if (options?.sortBy) {
       params.sortBy = options.sortBy;
+    }
+    if (typeof options?.playableOnly === 'boolean') {
+      params.playableOnly = String(options.playableOnly);
     }
     const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`, { params });
     return response.data;

@@ -93,6 +93,37 @@ function isMediaPlayable(media) {
   return !!(sources.upload && media.rightsCleared === true);
 }
 
+/**
+ * Mongo filter matching isMediaPlayable() for hosted music/tunes.
+ * Combine with $and when the parent query already uses $or.
+ */
+function playableHostedMusicMongoFilter() {
+  return {
+    'sources.upload': { $exists: true, $nin: [null, ''] },
+    $or: [
+      { rightsStatus: 'permitted' },
+      { rightsStatus: 'cleared', rightsCleared: true },
+      {
+        rightsStatus: { $nin: ['pending', 'disputed', 'permitted'] },
+        rightsCleared: true,
+      },
+    ],
+  };
+}
+
+/**
+ * Chart query param. Default true so Global ranks among playable tracks.
+ * `all` / `false` / `0` keeps the unfiltered (All) chart.
+ */
+function parsePlayableOnlyQuery(value, defaultValue = true) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  const s = String(value).trim().toLowerCase();
+  if (['0', 'false', 'all', 'no', 'off'].includes(s)) return false;
+  if (['1', 'true', 'playable', 'yes', 'on'].includes(s)) return true;
+  return defaultValue;
+}
+
 function getSupportMode(media) {
   return 'tip';
 }
@@ -187,6 +218,8 @@ module.exports = {
   stripDirectAudioSources,
   isYouTubeOnly,
   isMediaPlayable,
+  playableHostedMusicMongoFilter,
+  parsePlayableOnlyQuery,
   getSupportMode,
   getPlayabilityBlockReason,
   isRightsPendingClaimable,

@@ -9,6 +9,8 @@ const {
   enrichMediaWithPlayability,
   stripDirectAudioSources,
   isRightsPendingClaimable,
+  parsePlayableOnlyQuery,
+  playableHostedMusicMongoFilter,
 } = require('../utils/mediaPlayability');
 
 const UPLOAD = 'https://uploads.tuneable.stream/media-uploads/daft-punk-around-the-world-a1b2c3d4.mp3';
@@ -264,5 +266,88 @@ describe('isRightsPendingClaimable', () => {
       rightsStatus: 'cleared',
       rightsCleared: true,
     })).toBe(false);
+  });
+});
+
+describe('parsePlayableOnlyQuery', () => {
+  it('defaults to true so Global ranks among playable tracks', () => {
+    expect(parsePlayableOnlyQuery(undefined)).toBe(true);
+    expect(parsePlayableOnlyQuery(null)).toBe(true);
+    expect(parsePlayableOnlyQuery('')).toBe(true);
+  });
+
+  it('treats all/false/0 as the unfiltered chart', () => {
+    expect(parsePlayableOnlyQuery('all')).toBe(false);
+    expect(parsePlayableOnlyQuery('false')).toBe(false);
+    expect(parsePlayableOnlyQuery('0')).toBe(false);
+    expect(parsePlayableOnlyQuery(false)).toBe(false);
+  });
+
+  it('treats playable/true/1 as playable-only', () => {
+    expect(parsePlayableOnlyQuery('playable')).toBe(true);
+    expect(parsePlayableOnlyQuery('true')).toBe(true);
+    expect(parsePlayableOnlyQuery('1')).toBe(true);
+    expect(parsePlayableOnlyQuery(true)).toBe(true);
+  });
+});
+
+describe('playableHostedMusicMongoFilter', () => {
+  function matchesPlayableHostedMusicFilter(media) {
+    const upload = media?.sources?.upload;
+    if (upload == null || upload === '') return false;
+    const status = media.rightsStatus;
+    if (status === 'permitted') return true;
+    if (status === 'cleared' && media.rightsCleared === true) return true;
+    return status !== 'pending'
+      && status !== 'disputed'
+      && status !== 'permitted'
+      && media.rightsCleared === true;
+  }
+
+  const cases = [
+    {
+      name: 'permitted hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'permitted', rightsCleared: false },
+    },
+    {
+      name: 'cleared hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'cleared', rightsCleared: true },
+    },
+    {
+      name: 'legacy cleared without status',
+      media: { sources: { upload: UPLOAD }, rightsCleared: true },
+    },
+    {
+      name: 'pending hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'pending', rightsCleared: false },
+    },
+    {
+      name: 'permitted youtube-only',
+      media: { sources: { youtube: YT }, rightsStatus: 'permitted', rightsCleared: false },
+    },
+    {
+      name: 'cleared youtube-only',
+      media: { sources: { youtube: YT }, rightsStatus: 'cleared', rightsCleared: true },
+    },
+    {
+      name: 'disputed hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'disputed', rightsCleared: false },
+    },
+  ];
+
+  it('mirrors isMediaPlayable for hosted music', () => {
+    const filter = playableHostedMusicMongoFilter();
+    expect(filter['sources.upload']).toEqual({ $exists: true, $nin: [null, ''] });
+    expect(filter.$or).toEqual(expect.arrayContaining([
+      { rightsStatus: 'permitted' },
+      { rightsStatus: 'cleared', rightsCleared: true },
+    ]));
+
+    for (const { media } of cases) {
+      expect(matchesPlayableHostedMusicFilter(media)).toBe(isMediaPlayable({
+        ...media,
+        contentForm: ['tune'],
+      }));
+    }
   });
 });
