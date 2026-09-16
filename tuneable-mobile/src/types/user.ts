@@ -62,7 +62,9 @@ export interface LocationAncestor {
   placeId?: string;
   placetype?: string;
   label?: string;
+  regionCode?: string;
   countryCode?: string;
+  wikidataId?: string;
 }
 
 export interface ResolvedLocation {
@@ -74,6 +76,11 @@ export interface ResolvedLocation {
   placeId?: string;
   featureType?: string;
   label?: string;
+  namePreferred?: string;
+  placeFormatted?: string;
+  fullAddress?: string;
+  postcode?: string;
+  ancestorIds?: string[];
   ancestors?: LocationAncestor[];
   detectedFromIP?: boolean;
   coordinates?: {

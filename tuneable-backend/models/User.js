@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const { uuidv7 } = require('uuidv7');
+const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 const userSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -122,58 +123,8 @@ const userSchema = new mongoose.Schema({
   stripeConnectAccountId: { 
     type: String 
   }, // For future Stripe Connect migration (Phase 2)
-  homeLocation: {
-    city: { type: String },
-    region: { type: String }, // State, province, or region
-    country: { type: String },
-    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    detectedFromIP: { type: Boolean, default: false }, // Track if auto-detected from IP
-    // Mapbox-resolved hierarchy (permanent geocoding)
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
-  secondaryLocation: {
-    city: { type: String },
-    region: { type: String },
-    country: { type: String },
-    countryCode: { type: String },
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
+  homeLocation: mapboxLocationFields(),
+  secondaryLocation: mapboxLocationFields(),
   preferences: {
     theme: { type: String, default: 'light' },
     anonymousMode: { type: Boolean, default: false },

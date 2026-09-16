@@ -199,9 +199,10 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActiveIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
-      void handleSelect(suggestions[activeIndex]);
+      const index = activeIndex >= 0 ? activeIndex : 0;
+      void handleSelect(suggestions[index]);
     } else if (e.key === 'Escape') {
       setIsOpen(false);
       setActiveIndex(-1);

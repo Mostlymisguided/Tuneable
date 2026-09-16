@@ -219,7 +219,7 @@ export function formatLocationFilter(filter: { city?: string; country?: string; 
   return 'Unknown Location';
 }
 
-/** Place types allowed as Champion scopes (excludes street / postcode). */
+/** Place types allowed as Champion scopes. Postcode/street/address are stored but not offered yet. */
 const CHAMPION_SCOPE_PLACETYPES = new Set([
   'country',
   'region',
@@ -255,7 +255,7 @@ export function getChampionScopePicksFromLocation(
   };
 
   const ancestors = Array.isArray(location.ancestors) ? [...location.ancestors] : [];
-  const order = ['country', 'region', 'district', 'place', 'locality', 'neighborhood'];
+  const order = ['country', 'region', 'postcode', 'district', 'place', 'locality', 'neighborhood', 'street', 'address'];
   ancestors.sort((a, b) => {
     const ai = order.indexOf(a.placetype || '');
     const bi = order.indexOf(b.placetype || '');

@@ -4,6 +4,7 @@ const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeLanguageInput } = require('../utils/language');
 const { normalizeIsbn } = require('../utils/isbn');
 const { roundBpm } = require('../utils/bpm');
+const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -312,57 +313,8 @@ const mediaSchema = new mongoose.Schema({
   category: { type: String, default: null }, // YouTube category name (mapped from categoryId)
   
   // Location fields (aligned with User homeLocation / Mapbox resolve)
-  primaryLocation: {
-    city: { type: String },
-    region: { type: String }, // State, province, or region
-    country: { type: String },
-    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    detectedFromIP: { type: Boolean, default: false }, // Track if auto-detected from IP
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
-  secondaryLocation: {
-    city: { type: String },
-    region: { type: String },
-    country: { type: String },
-    countryCode: { type: String },
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
+  primaryLocation: mapboxLocationFields(),
+  secondaryLocation: mapboxLocationFields(),
   /** Where primaryLocation came from: artist_home | musicbrainz | uploader | manual | … */
   locationSource: { type: String, default: null },
   

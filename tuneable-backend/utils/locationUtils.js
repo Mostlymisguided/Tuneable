@@ -322,7 +322,11 @@ const MAPBOX_LOCATION_FIELDS = [
   'ancestorIds',
   'ancestors',
   'label',
+  'namePreferred',
   'display',
+  'placeFormatted',
+  'fullAddress',
+  'postcode',
   'resolvedAt',
 ];
 
@@ -340,10 +344,11 @@ function applyResolvedLocation(locationData, existingLocation = null) {
   const base = processLocation(locationData, existingLocation) || {};
   const merged = { ...base };
 
+  const replacingPlace = Boolean(locationData.placeId);
   for (const field of MAPBOX_LOCATION_FIELDS) {
     if (locationData[field] !== undefined && locationData[field] !== null) {
       merged[field] = locationData[field];
-    } else if (existingLocation?.[field] !== undefined && merged[field] === undefined) {
+    } else if (!replacingPlace && existingLocation?.[field] !== undefined && merged[field] === undefined) {
       merged[field] = existingLocation[field];
     }
   }

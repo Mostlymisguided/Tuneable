@@ -24,9 +24,14 @@ export interface MapboxLocationFields {
     placetype: string;
     regionCode?: string;
     countryCode?: string;
+    wikidataId?: string;
   }[];
   label?: string;
+  namePreferred?: string;
   display?: string;
+  placeFormatted?: string;
+  fullAddress?: string;
+  postcode?: string;
   resolvedAt?: string;
 }
 
