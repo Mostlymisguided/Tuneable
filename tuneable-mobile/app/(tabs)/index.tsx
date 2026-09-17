@@ -327,6 +327,17 @@ export default function HomeScreen() {
             <Pressable
               style={styles.catalogChip}
               onPress={() =>
+                router.push({ pathname: '/(tabs)/charts', params: { kind: 'music' } })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Open music"
+            >
+              <Ionicons name="musical-notes-outline" size={16} color={colors.accentLight} />
+              <Text style={styles.catalogChipText}>Music</Text>
+            </Pressable>
+            <Pressable
+              style={styles.catalogChip}
+              onPress={() =>
                 router.push({ pathname: '/(tabs)/charts', params: { kind: 'podcasts' } })
               }
               accessibilityRole="button"
@@ -334,6 +345,17 @@ export default function HomeScreen() {
             >
               <Ionicons name="mic-outline" size={16} color={colors.accentLight} />
               <Text style={styles.catalogChipText}>Podcasts</Text>
+            </Pressable>
+            <Pressable
+              style={styles.catalogChip}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/charts', params: { kind: 'books' } })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Open books"
+            >
+              <Ionicons name="book-outline" size={16} color={colors.accentLight} />
+              <Text style={styles.catalogChipText}>Books</Text>
             </Pressable>
           </View>
 
@@ -606,10 +628,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   catalogChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: colors.card,
