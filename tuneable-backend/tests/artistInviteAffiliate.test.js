@@ -4,7 +4,9 @@
 
 const {
   AFFILIATE_SHARE_OF_ARTIST,
+  AFFILIATE_SHARE_PERCENT,
   computeAffiliateSharePence,
+  affiliateWindowInfo,
   isAffiliateEligible,
   ownerPaidSharePence,
 } = require('../utils/artistInviteAffiliate');
@@ -26,9 +28,9 @@ const originalMedia = {
 };
 
 describe('computeAffiliateSharePence', () => {
-  it('is 10% of paid artist share', () => {
-    expect(AFFILIATE_SHARE_OF_ARTIST).toBe(0.1);
-    expect(computeAffiliateSharePence(140)).toBe(14);
+  it('is 3% of paid artist share', () => {
+    expect(AFFILIATE_SHARE_OF_ARTIST).toBe(0.03);
+    expect(computeAffiliateSharePence(140)).toBe(4);
   });
 
   it('is zero when the tip is promo-only', () => {
@@ -80,6 +82,25 @@ describe('isAffiliateEligible', () => {
       artistUser,
       inviterUser: artistUser,
     })).toBe(false);
+  });
+});
+
+describe('affiliateWindowInfo', () => {
+  it('reports remaining days inside the first year', () => {
+    const now = new Date('2026-06-01T00:00:00.000Z');
+    const info = affiliateWindowInfo(new Date('2026-01-01T00:00:00.000Z'), now);
+    expect(info.active).toBe(true);
+    expect(info.daysRemaining).toBeGreaterThan(100);
+    expect(AFFILIATE_SHARE_PERCENT).toBe(3);
+  });
+
+  it('is inactive after the first year', () => {
+    const info = affiliateWindowInfo(
+      new Date('2020-01-01T00:00:00.000Z'),
+      new Date('2022-01-01T00:00:00.000Z')
+    );
+    expect(info.active).toBe(false);
+    expect(info.daysRemaining).toBe(0);
   });
 });
 

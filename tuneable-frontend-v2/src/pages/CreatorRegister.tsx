@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { creatorAPI } from '../lib/api';
+import { creatorAPI, authAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
   User,
@@ -20,7 +20,8 @@ import {
   EyeOff,
   Shield,
   Facebook,
-  Instagram
+  Instagram,
+  Gift
 } from 'lucide-react';
 
 const CreatorRegister: React.FC = () => {
@@ -82,12 +83,49 @@ const CreatorRegister: React.FC = () => {
     username: ''
   });
 
+  const [parentInviteCode, setParentInviteCode] = useState('');
+  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
+  const [inviterUsername, setInviterUsername] = useState('');
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+
   // Refs for error fields
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   const [genreInput, setGenreInput] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
+
+  useEffect(() => {
+    const inviteParam = searchParams.get('invite');
+    if (!inviteParam) return;
+    const code = inviteParam.toUpperCase().slice(0, 5);
+    setParentInviteCode(code);
+    if (code.length !== 5) {
+      setInviteCodeValid(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsValidatingCode(true);
+    authAPI.validateInvite(code)
+      .then((data) => {
+        if (cancelled) return;
+        setInviteCodeValid(Boolean(data.valid));
+        setInviterUsername(data.inviterUsername || '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setInviteCodeValid(false);
+        setInviterUsername('');
+      })
+      .finally(() => {
+        if (!cancelled) setIsValidatingCode(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   // Check existing OAuth connections and update verification status
   useEffect(() => {
@@ -301,6 +339,9 @@ const CreatorRegister: React.FC = () => {
           email: accountData.email,
           password: accountData.password,
           username: accountData.username,
+          ...(parentInviteCode.length === 5 && inviteCodeValid !== false
+            ? { parentInviteCode }
+            : {}),
         });
         
         toast.success('Account created successfully!');
@@ -506,6 +547,13 @@ const CreatorRegister: React.FC = () => {
           <User className="h-6 w-6 mr-2 text-purple-400" />
           Create Your Account
         </h3>
+
+        {inviterUsername && inviteCodeValid && (
+          <div className="flex items-center text-sm text-green-300 bg-green-900/20 border border-green-500/30 rounded-lg px-3 py-2">
+            <Gift className="h-4 w-4 mr-2 flex-shrink-0" />
+            Invited by <strong className="ml-1">@{inviterUsername}</strong>
+          </div>
+        )}
 
         <div className="space-y-4">
           {/* Email */}
@@ -986,6 +1034,20 @@ const CreatorRegister: React.FC = () => {
           <p className="text-gray-300">
             Join Tuneable as a verified creator and claim your music
           </p>
+          {(parentInviteCode || inviterUsername) && !isAuthenticated && (
+            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-800/50 border border-purple-400/30 text-sm text-purple-100">
+              <Gift className="h-4 w-4 flex-shrink-0" />
+              {isValidatingCode ? (
+                <span>Checking invite…</span>
+              ) : inviteCodeValid && inviterUsername ? (
+                <span>Invited by <strong>@{inviterUsername}</strong></span>
+              ) : inviteCodeValid === false ? (
+                <span>That invite code is invalid. You can still sign up.</span>
+              ) : (
+                <span>Invite code {parentInviteCode}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Progress Steps */}

@@ -256,6 +256,11 @@ export const authAPI = {
     return response.data;
   },
 
+  validateInvite: async (code: string) => {
+    const response = await api.get(`/users/validate-invite/${encodeURIComponent(code.trim())}`);
+    return response.data as { valid: boolean; inviterUsername?: string };
+  },
+
   // Invite code management
   createInviteCode: async (label?: string) => {
     const response = await api.post('/users/invite-codes', { label });

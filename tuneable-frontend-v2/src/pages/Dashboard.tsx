@@ -6,7 +6,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from '../utils/toast';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -150,15 +150,14 @@ const Dashboard: React.FC = () => {
     if (!inviteCode) {
       return window.location.origin;
     }
-    return `${window.location.origin}/register?invite=${inviteCode}`;
+    return `${window.location.origin}/creator/register?invite=${inviteCode}`;
   }, [user?.primaryInviteCode, user?.personalInviteCode]);
 
   const inviteMessage = useMemo(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
-    const codeLine = inviteCode ? `Use my invite code ${inviteCode} when you sign up.` : '';
-    return `Hey! I'm inviting you to try Tuneable, the social music app for supporting your favourite artists by tipping on tunes.
+    return `Hey! I'm inviting you to join Tuneable as a creator. Upload your own music and you keep 70% of paid tips.
 
-${codeLine}
+If you sign up with my invite code ${inviteCode || ''}, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.
 
 Join here: ${inviteLink}`.trim();
   }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
@@ -216,7 +215,7 @@ Join here: ${inviteLink}`.trim();
   const handleFacebookShare = useCallback(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
     const quote = inviteCode 
-      ? `Support your favourite Creators on Tuneable! Join with this invite code: ${inviteCode}`
+      ? `Invite artists to Tuneable — they keep 70% of paid tips, and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
       : 'Support your favourite Creators on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
@@ -232,7 +231,7 @@ Join here: ${inviteLink}`.trim();
     }
 
     // Create Instagram-friendly invite message
-    const instagramMessage = `Support your favourite Creators on Tuneable! 🎵\n\nJoin with this invite code: ${inviteCode}\n\n${inviteLink}`;
+    const instagramMessage = `Invite artists to Tuneable 🎵\n\nThey keep 70% of paid tips. You earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`;
 
     try {
       // Copy message to clipboard first
@@ -2701,7 +2700,10 @@ Join here: ${inviteLink}`.trim();
           <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
               <div>
-                <p className="text-sm text-gray-300">Share your invite link</p>
+                <p className="text-sm text-gray-300">Invite an artist — earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Taken from Tuneable&apos;s share, not theirs, and only on music they upload themselves.
+                </p>
                 <p className="text-xs text-gray-500 mt-1 break-all">
                   {inviteLink}
                 </p>
@@ -2804,11 +2806,25 @@ Join here: ${inviteLink}`.trim();
                         <div className="text-gray-400 text-sm">
                           {userName}
                         </div>
-                        {(invitedUser.givenName || invitedUser.familyName) && (
-                          <div className="text-gray-500 text-xs mt-1">
-                            Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
-                          </div>
-                        )}
+                        <div className="text-gray-500 text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                          {(invitedUser.givenName || invitedUser.familyName) && (
+                            <span>Joined {new Date(invitedUser.createdAt).toLocaleDateString()}</span>
+                          )}
+                          <span>
+                            {invitedUser.isCreator ? 'Creator' : 'Listener'}
+                            {invitedUser.hasOriginalUpload
+                              ? ` · ${invitedUser.originalUploadCount} upload${invitedUser.originalUploadCount === 1 ? '' : 's'}`
+                              : ''}
+                          </span>
+                          {invitedUser.affiliateWindowActive ? (
+                            <span>{invitedUser.affiliateDaysRemaining}d left</span>
+                          ) : (
+                            <span>Window ended</span>
+                          )}
+                          <span>
+                            {penceToPounds(invitedUser.commissionPence || 0)} earned
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );

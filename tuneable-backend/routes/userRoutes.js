@@ -779,17 +779,29 @@ router.get('/invited', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
-    // Find all users who used this user's personalInviteCode
-    const invitedUsers = await User.find({ 
-      parentInviteCode: user.personalInviteCode 
-    })
+    const codes = user.getActiveInviteCodes().map((ic) => ic.code);
+    if (user.personalInviteCode && !codes.includes(user.personalInviteCode)) {
+      codes.push(user.personalInviteCode);
+    }
+
+    const invitedQuery = {
+      $or: [
+        { invitedByUserId: user._id },
+        ...(codes.length ? [{ parentInviteCode: { $in: codes } }] : []),
+      ],
+    };
+
+    const invitedUsers = await User.find(invitedQuery)
     .select('-password -passwordResetToken -passwordResetExpires -emailVerificationToken -emailVerificationExpires')
     .sort({ createdAt: -1 })
     .lean();
+
+    const { attachAffiliateInviteStats } = require('../utils/artistInviteAffiliate');
+    const enriched = await attachAffiliateInviteStats(user, invitedUsers);
     
     res.json({ 
-      invitedUsers,
-      count: invitedUsers.length 
+      invitedUsers: enriched,
+      count: enriched.length 
     });
   } catch (error) {
     console.error('Error fetching invited users:', error);
@@ -3819,10 +3831,13 @@ router.get('/referrals', authMiddleware, async (req, res) => {
     }
     
     const referrals = await User.find(query)
-      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId')
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId creatorProfile.verificationStatus')
       .sort({ createdAt: -1 })
       .lean();
-    
+
+    const { attachAffiliateInviteStats } = require('../utils/artistInviteAffiliate');
+    const enrichedReferrals = await attachAffiliateInviteStats(user, referrals);
+
     // Get invite codes with stats
     const inviteCodes = user.getActiveInviteCodes().map(ic => ({
       code: ic.code,
@@ -3850,13 +3865,21 @@ router.get('/referrals', authMiddleware, async (req, res) => {
       personalInviteCodes: inviteCodes,
       primaryInviteCode: user.getPrimaryInviteCode(),
       referralCount: referrals.length,
-      referrals: referrals.map(r => ({
+      referrals: enrichedReferrals.map(r => ({
         username: r.username,
         profilePic: r.profilePic,
         joinedAt: r.createdAt,
         location: r.homeLocation || null,
         uuid: r.uuid,
-        usedCode: r.parentInviteCode
+        usedCode: r.parentInviteCode,
+        isCreator: r.isCreator,
+        creatorVerificationStatus: r.creatorVerificationStatus,
+        hasOriginalUpload: r.hasOriginalUpload,
+        originalUploadCount: r.originalUploadCount,
+        affiliateWindowEndsAt: r.affiliateWindowEndsAt,
+        affiliateWindowActive: r.affiliateWindowActive,
+        affiliateDaysRemaining: r.affiliateDaysRemaining,
+        commissionPence: r.commissionPence,
       }))
     });
   } catch (error) {

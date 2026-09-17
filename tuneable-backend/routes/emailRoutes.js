@@ -277,11 +277,18 @@ router.post('/invite', authMiddleware, [
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!inviter.personalInviteCode) {
+    if (!inviter.personalInviteCode && typeof inviter.getPrimaryInviteCode !== 'function') {
       return res.status(400).json({ error: 'You do not have an invite code' });
     }
 
-    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?invite=${inviter.personalInviteCode}`;
+    const inviteCode = (typeof inviter.getPrimaryInviteCode === 'function'
+      ? inviter.getPrimaryInviteCode()
+      : null) || inviter.personalInviteCode;
+    if (!inviteCode) {
+      return res.status(400).json({ error: 'You do not have an invite code' });
+    }
+
+    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/creator/register?invite=${inviteCode}`;
     const results = [];
     const errors_occurred = [];
 
@@ -291,7 +298,7 @@ router.post('/invite', authMiddleware, [
         const emailSent = await sendInviteEmail(
           email,
           inviter.username,
-          inviter.personalInviteCode,
+          inviteCode,
           inviteLink
         );
         

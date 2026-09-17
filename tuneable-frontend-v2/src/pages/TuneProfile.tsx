@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
@@ -18,6 +18,7 @@ import {
   Headphones,
   Volume2,
   Award,
+  Gift,
   X,
   Save,
   Coins,
@@ -1548,6 +1549,41 @@ const TuneProfile: React.FC = () => {
     setShowClaimModal(true);
   };
 
+  const handleInviteArtist = useCallback(async () => {
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    if (!user) {
+      toast.error('Sign in to invite this artist');
+      navigate('/login');
+      return;
+    }
+    if (!inviteCode) {
+      toast.error('Your account does not have an invite code yet');
+      return;
+    }
+    const artistName = media?.artist || 'this artist';
+    const title = media?.title || 'this track';
+    const link = `${window.location.origin}/creator/register?invite=${inviteCode}`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator with my invite code ${inviteCode}, then upload or claim it so tips can reach you.\n\n${link}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(message);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = message;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success('Invite message copied — send it to the artist');
+    } catch {
+      toast.error('Could not copy invite');
+    }
+  }, [media?.artist, media?.title, navigate, user]);
+
   const handleRightsStatusChange = async (status: RightsStatus) => {
     if (!media?._id || savingRightsStatus) return;
     const previous = media.rightsStatus;
@@ -2456,14 +2492,24 @@ const TuneProfile: React.FC = () => {
               
               {/* Claim media — pending or permitted until the artist is onboarded */}
               {!canEditTune() && isRightsPendingClaimable(media) && (
-                <button
-                  onClick={handleClaimTune}
-                  className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
-                >
-                  <Award className="h-4 w-4" />
-                  <span className="hidden sm:inline">Claim media</span>
-                  <span className="sm:hidden">Claim</span>
-                </button>
+                <>
+                  <button
+                    onClick={handleClaimTune}
+                    className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
+                  >
+                    <Award className="h-4 w-4" />
+                    <span className="hidden sm:inline">Claim media</span>
+                    <span className="sm:hidden">Claim</span>
+                  </button>
+                  <button
+                    onClick={handleInviteArtist}
+                    className="px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
+                  >
+                    <Gift className="h-4 w-4" />
+                    <span className="hidden sm:inline">Invite this artist</span>
+                    <span className="sm:hidden">Invite</span>
+                  </button>
+                </>
               )}
               
               {/* Edit Tune Button - Only show if user can edit and not in edit mode */}
@@ -2545,6 +2591,19 @@ const TuneProfile: React.FC = () => {
                           className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
                         >
                           Claim media
+                        </button>
+                      )}
+                      {blockedCover.showClaim && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleInviteArtist();
+                          }}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
+                        >
+                          <Gift className="h-3.5 w-3.5" />
+                          Invite this artist
                         </button>
                       )}
                       {listenElsewhere && (

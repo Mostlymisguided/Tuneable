@@ -20,7 +20,7 @@ type Props = {
 };
 
 function getInviteShareUrl(code: string): string {
-  return `https://tuneable.stream/register?invite=${encodeURIComponent(code)}`;
+  return `https://tuneable.stream/creator/register?invite=${encodeURIComponent(code)}`;
 }
 
 export function InviteShareCard({
@@ -36,8 +36,8 @@ export function InviteShareCard({
   if (!code) return null;
 
   const shareMessage = username
-    ? `Join me on Tuneable — use my invite code ${code}\n${getInviteShareUrl(code)}`
-    : `Join Tuneable with invite code ${code}\n${getInviteShareUrl(code)}`;
+    ? `Join Tuneable as a creator — use my invite code ${code}. Upload your music and keep 70% of paid tips; I earn 3% from Tuneable's share for your first year.\n${getInviteShareUrl(code)}`
+    : `Join Tuneable as a creator with invite code ${code}. Upload your music and keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
 
   const onCopy = async () => {
     try {
@@ -64,7 +64,7 @@ export function InviteShareCard({
       ) : null}
       {!collapsible ? <Text style={styles.code}>{code}</Text> : null}
       <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
-        Friends need this 5-character code to create an account.
+        Invite an artist with this code and earn 3% of their paid tips for year one (from Tuneable's share, on music they upload).
       </Text>
       <View style={styles.actions}>
         <Pressable style={styles.actionBtn} onPress={() => void onCopy()}>

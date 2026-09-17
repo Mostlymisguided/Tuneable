@@ -511,4 +511,12 @@ export interface Referral {
   } | null;
   uuid: string;
   usedCode?: string;
+  isCreator?: boolean;
+  creatorVerificationStatus?: string;
+  hasOriginalUpload?: boolean;
+  originalUploadCount?: number;
+  affiliateWindowEndsAt?: string | null;
+  affiliateWindowActive?: boolean;
+  affiliateDaysRemaining?: number;
+  commissionPence?: number;
 }

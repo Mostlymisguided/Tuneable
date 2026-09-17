@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Library, Wallet, MessagesSquare } from 'lucide-react';
-import { SUPPORT_EMAIL, HOW_MONEY_WORKS_PATH } from '../constants';
+import { SUPPORT_EMAIL, HOW_MONEY_WORKS_PATH, ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
 import GeneralReportModal from '../components/GeneralReportModal';
 
 const Help: React.FC = () => {
@@ -175,7 +175,7 @@ const Help: React.FC = () => {
             <p className="text-gray-300">
               Verified creators receive 70% of each tip on their media via escrow. Tuneable keeps 30% today
               and is committed to reducing that to 10% at scale. Invite an artist with your code and you
-              earn 10% of their paid tips for a year, taken from Tuneable&apos;s share, on music they upload
+              earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for a year, taken from Tuneable&apos;s share, on music they upload
               themselves. If the company reaches a £1 billion valuation, we commit to community governance
               (a DAO for artists and users).{' '}
               <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">

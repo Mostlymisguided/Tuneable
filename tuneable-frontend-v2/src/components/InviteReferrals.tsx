@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { authAPI } from '../lib/api';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
 import type { InviteCode, Referral, ReferralsResponse } from '../types';
 
 const InviteReferrals: React.FC = () => {
@@ -92,7 +92,7 @@ const InviteReferrals: React.FC = () => {
   };
 
   const copyInviteLink = (code: string) => {
-    const inviteLink = `${window.location.origin}/register?invite=${code}`;
+    const inviteLink = `${window.location.origin}/creator/register?invite=${code}`;
     navigator.clipboard.writeText(inviteLink);
     setCopiedCode(code);
     toast.success('Invite link copied to clipboard!');
@@ -170,7 +170,7 @@ const InviteReferrals: React.FC = () => {
         {!isCodesCollapsed && (
           <>
             <p className="text-sm text-gray-300 mt-4 mb-4">
-              Invite an artist with your code and you earn 10% of their paid tip revenue for their first year — taken from Tuneable&apos;s share, not theirs. It only applies to music they upload themselves.
+              Invite an artist with your code and you earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tip revenue for their first year — taken from Tuneable&apos;s share, not theirs. It only applies to music they upload themselves.
             </p>
             
             <p className="text-gray-300 mb-4">
@@ -279,7 +279,7 @@ const InviteReferrals: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-2">
-                      {window.location.origin}/register?invite={inviteCode.code}
+                      {window.location.origin}/creator/register?invite={inviteCode.code}
                     </p>
                   </div>
                 ))
@@ -464,6 +464,24 @@ const InviteReferrals: React.FC = () => {
                           {referral.username}
                         </h4>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+                          {referral.isCreator && (
+                            <span className="text-purple-300">
+                              Creator{referral.hasOriginalUpload ? ` · ${referral.originalUploadCount} upload${referral.originalUploadCount === 1 ? '' : 's'}` : ''}
+                            </span>
+                          )}
+                          {!referral.isCreator && referral.hasOriginalUpload && (
+                            <span className="text-purple-300">
+                              {referral.originalUploadCount} upload{referral.originalUploadCount === 1 ? '' : 's'}
+                            </span>
+                          )}
+                          {referral.affiliateWindowActive ? (
+                            <span>{referral.affiliateDaysRemaining}d left</span>
+                          ) : (
+                            <span>Window ended</span>
+                          )}
+                          <span className="text-indigo-300">
+                            {((referral.commissionPence || 0) / 100).toLocaleString('en-GB', { style: 'currency', currency: 'GBP' })}
+                          </span>
                           {referral.location?.city && (
                             <div className="flex items-center space-x-1">
                               <MapPin className="h-3 w-3" />

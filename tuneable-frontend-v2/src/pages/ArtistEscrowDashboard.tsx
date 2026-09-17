@@ -18,9 +18,9 @@ import {
   Globe
 } from 'lucide-react';
 import { artistEscrowAPI } from '../lib/api';
+import { ARTIST_INVITE_AFFILIATE_PERCENT, HOW_MONEY_WORKS_PATH } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
-import { HOW_MONEY_WORKS_PATH } from '../constants';
 
 const ESCROW_TAKE_RATE_NOTE_KEY = 'tuneable.escrowTakeRateNote.dismissed';
 
@@ -431,12 +431,14 @@ const ArtistEscrowDashboard: React.FC = () => {
               <p className="text-sm text-gray-300 mt-2">
                 {escrowInfo.history.length} allocation{escrowInfo.history.length !== 1 ? 's' : ''} in history
               </p>
-              {(escrowInfo.affiliateEarned || 0) > 0 && (
-                <p className="text-sm text-indigo-200 mt-2">
-                  Includes {penceToPounds(escrowInfo.affiliateEarned || 0)} from inviting artists
-                  (10% of their paid tips for year one).
-                </p>
-              )}
+              <p className="text-sm text-indigo-200 mt-2">
+                Invite an artist with your code and you earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of
+                their paid tips for year one, taken from Tuneable&apos;s share on music they upload
+                themselves.
+                {(escrowInfo.affiliateEarned || 0) > 0
+                  ? ` You've earned ${penceToPounds(escrowInfo.affiliateEarned)} so far.`
+                  : ' Nothing earned yet — share your invite from the dashboard.'}
+              </p>
               {escrowInfo.totalEscrowEarned !== undefined && (
                 <p className="text-sm text-gray-400 mt-1">
                   Total earned: {penceToPounds(escrowInfo.totalEscrowEarned)}

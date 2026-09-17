@@ -27,6 +27,7 @@ const {
   originalUploaderOwner,
   isAffiliateEligible,
   ownerPaidSharePence,
+  AFFILIATE_SHARE_PERCENT,
 } = require('../utils/artistInviteAffiliate');
 
 // Revenue split constants
@@ -386,7 +387,7 @@ class ArtistEscrowService {
   }
   
   /**
-   * 10% of an invited artist's paid tip share, taken from the platform cut.
+   * 3% of an invited artist's paid tip share, taken from the platform cut.
    * Original uploads only; first year after the artist signed up.
    * @private
    */
@@ -450,7 +451,7 @@ class ArtistEscrowService {
         userId: inviter._id,
         type: 'escrow_allocated',
         title: 'Artist invite commission',
-        message: `£${(affiliatePence / 100).toFixed(2)} from a tip on "${mediaTitle}" (10% of that artist's paid share).`,
+        message: `£${(affiliatePence / 100).toFixed(2)} from a tip on "${mediaTitle}" (${AFFILIATE_SHARE_PERCENT}% of that artist's paid share).`,
         link: `/tune/${media._id}`,
         linkText: 'View Media',
         relatedMediaId: media._id,
@@ -466,7 +467,7 @@ class ArtistEscrowService {
       amount: affiliatePence,
       paidPence: affiliatePence,
       promoPence: 0,
-      percentage: 10,
+      percentage: AFFILIATE_SHARE_PERCENT,
       reason: 'artist_invite',
     };
   }
