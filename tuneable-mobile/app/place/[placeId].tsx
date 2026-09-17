@@ -278,20 +278,17 @@ export default function PlaceProfileScreen() {
             onPress={() => setPlayableOnly(!playableOnly)}
             accessibilityRole="button"
             accessibilityLabel={
-              playableOnly ? 'Playable only, on' : 'Playable only, off'
+              playableOnly
+                ? 'Showing playable. Tap to show all.'
+                : 'Showing all. Tap to show playable only.'
             }
             style={[
               styles.timeTrigger,
               playableOnly && styles.timeTriggerActive,
             ]}>
             <Ionicons name="headset-outline" size={14} color={colors.accentLight} />
-            <Text style={styles.timeTriggerLabel}>Playable</Text>
-            <Text style={styles.timeTriggerDetail} numberOfLines={1}>
-              {playableOnly
-                ? hiddenPlayableCount > 0
-                  ? `(−${hiddenPlayableCount})`
-                  : ''
-                : '(All)'}
+            <Text style={styles.timeTriggerLabel}>
+              {playableOnly ? 'Playable' : 'All'}
             </Text>
           </Pressable>
         </View>
@@ -300,7 +297,10 @@ export default function PlaceProfileScreen() {
       {playableOnly && hiddenPlayableCount > 0 ? (
         <Pressable onPress={() => setPlayableOnly(false)} style={styles.hiddenHintBtn}>
           <Text style={styles.hiddenHint}>
-            Showing playable only · {catalogHiddenLabel(hiddenPlayableCount)}
+            Showing playable only ·{' '}
+            <Text style={styles.hiddenHintLink}>
+              {catalogHiddenLabel(hiddenPlayableCount)}
+            </Text>
           </Text>
         </Pressable>
       ) : null}
@@ -725,6 +725,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
+  },
+  hiddenHintLink: {
+    color: '#d8b4fe',
+    textDecorationLine: 'underline',
   },
   showCatalogBtn: {
     marginTop: 12,

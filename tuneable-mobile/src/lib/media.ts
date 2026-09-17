@@ -45,16 +45,19 @@ export function isWrittenMedia(
 export function isUploadPlayable(media: ChartMediaItem | null | undefined): boolean {
   if (!media) return false;
   if (isWrittenMedia(media)) return false;
-  if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
-    return false;
-  }
   // API may strip stream URLs for guests while still marking the track playable.
   if (media.isPlayable === true) return true;
   if (media.isPlayable === false) return false;
-  const url = getUploadUrl(media);
-  if (!url) return false;
-  if (media.rightsStatus === 'permitted') return true;
-  return media.rightsCleared === true;
+  if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
+    return false;
+  }
+  const sources = normalizeSources(media.sources);
+  const hasAudio = Boolean(
+    sources.upload || sources.audio_direct || sources.audio || sources.enclosure
+  );
+  if (media.rightsStatus === 'permitted') return hasAudio;
+  // Match web: a remaining hosted URL is enough unless rights were explicitly denied.
+  return hasAudio && media.rightsCleared !== false;
 }
 
 export function isRightsPendingClaimable(
