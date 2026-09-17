@@ -58,6 +58,9 @@ export default function PlaceProfileScreen() {
   const [relatedTags, setRelatedTags] = useState<Array<{ name: string; slug: string }>>(
     []
   );
+  const [venues, setVenues] = useState<
+    Array<{ _id: string; name: string; slug: string; venueKind?: string | null }>
+  >([]);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,6 +95,7 @@ export default function PlaceProfileScreen() {
         setTotal(data.pagination?.total ?? data.media?.length ?? 0);
         setRelatedPlaces(data.relatedPlaces || []);
         setRelatedTags(data.relatedTags || []);
+        setVenues(data.venues || []);
         setMedia(data.media || []);
       } catch (err) {
         setError(
@@ -101,6 +105,7 @@ export default function PlaceProfileScreen() {
           setMedia([]);
           setRelatedPlaces([]);
           setRelatedTags([]);
+          setVenues([]);
         }
       } finally {
         setLoading(false);
@@ -238,6 +243,17 @@ export default function PlaceProfileScreen() {
               <Ionicons name="pricetag" size={12} color="#c084fc" />
               <Text style={styles.tagChipText}>{related.name}</Text>
             </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {!loading && venues.length > 0 ? (
+        <View style={styles.chipRow}>
+          {venues.map((venue) => (
+            <View key={venue._id || venue.slug} style={styles.venueChip}>
+              <Ionicons name="business-outline" size={12} color="#fbbf24" />
+              <Text style={styles.venueChipText}>{venue.name}</Text>
+            </View>
           ))}
         </View>
       ) : null}
@@ -582,6 +598,22 @@ const styles = StyleSheet.create({
   },
   placeChipText: {
     color: '#bae6fd',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  venueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  venueChipText: {
+    color: '#fde68a',
     fontSize: 12,
     fontWeight: '600',
   },

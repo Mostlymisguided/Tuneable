@@ -1205,7 +1205,7 @@ export const topTunesAPI = {
 
 // Location API (Mapbox geocoding via backend + place profiles)
 export const locationAPI = {
-  suggest: async (q: string, options?: { country?: string; worldview?: string; limit?: number }) => {
+  suggest: async (q: string, options?: { country?: string; worldview?: string; limit?: number; mode?: 'venue' | 'place'; sessionToken?: string }) => {
     const response = await api.get('/locations/suggest', {
       params: { q, ...options },
     });
@@ -1219,8 +1219,8 @@ export const locationAPI = {
     };
   },
 
-  resolve: async (mapboxId: string) => {
-    const response = await api.post('/locations/resolve', { mapboxId });
+  resolve: async (mapboxId: string, options?: { sessionToken?: string }) => {
+    const response = await api.post('/locations/resolve', { mapboxId, ...options });
     return response.data as { location: Record<string, unknown> };
   },
 
@@ -2296,7 +2296,8 @@ export const collectiveAPI = {
     page?: number;
     limit?: number;
     genre?: string;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    placeId?: string;
     sortBy?: 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'name';
     sortOrder?: 'asc' | 'desc';
     search?: string;
@@ -2367,7 +2368,8 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    venueKind?: string;
   }) => {
     // Handle both FormData (with file upload) and plain object
     const response = collectiveData instanceof FormData
@@ -2388,17 +2390,11 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    venueKind?: string;
+    location?: Record<string, unknown> | null;
     profilePicture?: string;
     coverImage?: string;
-    location?: {
-      city?: string;
-      country?: string;
-      coordinates?: {
-        lat: number;
-        lng: number;
-      };
-    };
     socialMedia?: {
       instagram?: string;
       facebook?: string;
@@ -2425,7 +2421,7 @@ export const collectiveAPI = {
   getAllCollectives: async (params?: {
     verificationStatus?: string;
     genre?: string;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
     search?: string;
     sortBy?: 'name' | 'verificationStatus' | 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
     sortOrder?: 'asc' | 'desc';

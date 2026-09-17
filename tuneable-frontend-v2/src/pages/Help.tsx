@@ -193,8 +193,10 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Collectives</h3>
             <p className="text-gray-300">
-              Collectives are for bands, production companies, and creative groups. Founders can invite 
-              members and admins, manage the collective's presence, and collaborate on releases.
+              Collectives are for bands, production companies, creative groups, and claimed venues
+              (bars, hostels, clubs, cafes). Founders can invite members and admins and manage the
+              public profile. Venues must be bound to a Mapbox place so they appear on that city&apos;s
+              place page.
             </p>
           </div>
           <div>

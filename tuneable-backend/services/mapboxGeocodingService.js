@@ -20,6 +20,8 @@ const CONTEXT_TYPE_ORDER = [
   'address',
 ];
 const SEARCH_PLACE_TYPES = 'country,region,postcode,district,place,locality,neighborhood';
+const VENUE_SEARCH_PLACE_TYPES = `${SEARCH_PLACE_TYPES},street,address`;
+const SEARCH_BOX_URL = 'https://api.mapbox.com/search/searchbox/v1';
 const COARSE_FEATURE_TYPES = new Set(['country', 'region', 'district']);
 const PLACE_LIKE_FEATURE_TYPES = new Set(['place', 'locality', 'neighborhood']);
 
@@ -45,17 +47,74 @@ async function forwardGeocode(params) {
 /**
  * Autocomplete suggestions (temporary geocoding — do not persist results).
  */
+async function suggestSearchBox(query, options = {}) {
+  const params = {
+    q: query,
+    access_token: getAccessToken(),
+    session_token: options.sessionToken,
+    language: options.language || 'en',
+    limit: Math.min(Math.max(options.limit || 8, 1), 10),
+    types: 'poi,address',
+  };
+  if (options.country) {
+    params.country = options.country;
+  }
+  if (options.proximity) {
+    params.proximity = options.proximity;
+  }
+
+  const response = await axios.get(`${SEARCH_BOX_URL}/suggest`, {
+    params,
+    timeout: 10000,
+  });
+
+  return (response.data?.suggestions || [])
+    .filter((item) => item && item.mapbox_id)
+    .map((item) => ({
+      mapboxId: item.mapbox_id,
+      label: item.name || item.feature_name || item.mapbox_id,
+      placeFormatted: item.place_formatted || item.full_address || null,
+      featureType: item.feature_type || null,
+    }));
+}
+
+async function retrieveSearchBox(mapboxId, sessionToken) {
+  if (!sessionToken) return null;
+  const response = await axios.get(
+    `${SEARCH_BOX_URL}/retrieve/${encodeURIComponent(mapboxId)}`,
+    {
+      params: {
+        access_token: getAccessToken(),
+        session_token: sessionToken,
+      },
+      timeout: 10000,
+    }
+  );
+  const feature = response.data?.features?.[0];
+  if (!feature) return null;
+  return parseFeatureToLocation(feature);
+}
+
 async function suggest(query, options = {}) {
   const trimmed = typeof query === 'string' ? query.trim() : '';
   if (!trimmed) {
     return [];
   }
 
+  if (options.mode === 'venue' && options.sessionToken) {
+    try {
+      const poiSuggestions = await suggestSearchBox(trimmed, options);
+      if (poiSuggestions.length > 0) return poiSuggestions;
+    } catch (err) {
+      console.warn('Search Box suggest failed, falling back to geocoding:', err.message);
+    }
+  }
+
   const params = {
     q: trimmed,
     autocomplete: true,
     permanent: false,
-    types: SEARCH_PLACE_TYPES,
+    types: options.mode === 'venue' ? VENUE_SEARCH_PLACE_TYPES : (options.types || SEARCH_PLACE_TYPES),
     limit: Math.min(Math.max(options.limit || 8, 1), 10),
     language: options.language || 'en',
   };
@@ -77,10 +136,19 @@ async function suggest(query, options = {}) {
 /**
  * Resolve a place by mapbox_id for storage (permanent geocoding).
  */
-async function resolveByMapboxId(mapboxId) {
+async function resolveByMapboxId(mapboxId, options = {}) {
   const id = typeof mapboxId === 'string' ? mapboxId.trim() : '';
   if (!id) {
     return null;
+  }
+
+  if (options.sessionToken) {
+    try {
+      const retrieved = await retrieveSearchBox(id, options.sessionToken);
+      if (retrieved) return retrieved;
+    } catch (err) {
+      console.warn('Search Box retrieve failed, falling back to geocoding:', err.message);
+    }
   }
 
   const data = await forwardGeocode({
@@ -377,4 +445,5 @@ module.exports = {
   featureToSuggestion,
   CONTEXT_TYPE_ORDER,
   SEARCH_PLACE_TYPES,
+  VENUE_SEARCH_PLACE_TYPES,
 };

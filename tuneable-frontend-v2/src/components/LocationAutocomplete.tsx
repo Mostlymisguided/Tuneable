@@ -25,6 +25,8 @@ export interface LocationAutocompleteProps {
   id?: string;
   autoFocus?: boolean;
   showIcon?: boolean;
+  searchMode?: 'place' | 'venue';
+  sessionToken?: string;
 }
 
 const MIN_QUERY_LENGTH = 2;
@@ -60,10 +62,18 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
   id,
   autoFocus = false,
   showIcon = true,
+  searchMode = 'place',
+  sessionToken,
 }) => {
   const generatedId = useId();
   const inputId = id || generatedId;
   const listboxId = `${inputId}-listbox`;
+  const generatedSessionTokenRef = useRef(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `venue-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+  const venueSessionToken = sessionToken || generatedSessionTokenRef.current;
 
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -114,6 +124,9 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
           country,
           worldview,
           limit: 6,
+          ...(searchMode === 'venue'
+            ? { mode: 'venue', sessionToken: venueSessionToken }
+            : {}),
         });
         const next = response.suggestions || [];
         setSuggestions(next);
@@ -146,7 +159,10 @@ const LocationAutocomplete: React.FC<LocationAutocompleteProps> = ({
     setIsResolving(true);
 
     try {
-      const response = await locationAPI.resolve(suggestion.mapboxId);
+      const response = await locationAPI.resolve(
+        suggestion.mapboxId,
+        searchMode === 'venue' ? { sessionToken: venueSessionToken } : undefined
+      );
       const location = response.location as ResolvedLocation;
       onChange(location);
       setQuery(getDisplayText(location));

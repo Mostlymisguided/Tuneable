@@ -8,7 +8,12 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
-const { processLocation, mergeLocation } = require('../utils/locationUtils');
+const {
+  normalizeCollectiveType,
+  normalizeVenueKind,
+  normalizeCollectiveLocation,
+  venueLocationError,
+} = require('../utils/collectiveVenue');
 
 // Configure upload for collective profile pictures (reuse label upload config)
 const profilePictureUpload = createLabelProfilePictureUpload();
@@ -25,6 +30,7 @@ router.get('/', async (req, res) => {
       limit = 20, 
       genre, 
       type,
+      placeId,
       sortBy = 'totalBidAmount',
       sortOrder = 'desc',
       search 
@@ -40,6 +46,10 @@ router.get('/', async (req, res) => {
     // Filter by type
     if (type) {
       query.type = type;
+    }
+
+    if (placeId && typeof placeId === 'string' && placeId.trim()) {
+      query['location.ancestorIds'] = placeId.trim();
     }
     
     // Search by name or slug
@@ -61,7 +71,7 @@ router.get('/', async (req, res) => {
     }
 
     const collectives = await Collective.find(query)
-      .select('name slug profilePicture description genres type stats.globalCollectiveAggregate stats.memberCount stats.releaseCount')
+      .select('name slug profilePicture description genres type venueKind location stats.globalCollectiveAggregate stats.memberCount stats.releaseCount')
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -514,11 +524,18 @@ router.get('/:slug/media', async (req, res) => {
 // Create collective (with optional profile picture upload)
 router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
-    const { name, description, email, website, genres, foundedYear, type, location } = req.body;
+    const { name, description, email, website, genres, foundedYear, type, venueKind, location } = req.body;
 
     // Validate required fields
     if (!name || !email) {
       return res.status(400).json({ error: 'Collective name and email are required' });
+    }
+
+    const collectiveType = normalizeCollectiveType(type);
+    const processedLocation = normalizeCollectiveLocation(location);
+    const locationError = venueLocationError(collectiveType, processedLocation);
+    if (locationError) {
+      return res.status(400).json({ error: locationError });
     }
 
     // Check if collective name already exists
@@ -546,9 +563,6 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       console.log(`📸 Saving collective profile picture: ${profilePictureUrl} for collective ${name}`);
     }
 
-    // Process location data
-    const processedLocation = processLocation(location);
-
     const collective = new Collective({
       name,
       slug, // Explicitly set slug
@@ -557,7 +571,8 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       website,
       genres: genres || [],
       foundedYear,
-      type: type || 'collective',
+      type: collectiveType,
+      venueKind: collectiveType === 'venue' ? normalizeVenueKind(venueKind) : undefined,
       profilePicture: profilePictureUrl,
       location: processedLocation,
       members: [{
@@ -594,19 +609,40 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     const updates = { ...req.body };
     
-    // Handle location separately to safely merge
-    let locationUpdate = null;
+    // Handle location separately to safely merge Mapbox fields
+    let locationUpdate = undefined;
     if (updates.location !== undefined) {
-      locationUpdate = mergeLocation(updates.location, collective.location);
-      delete updates.location; // Remove from updates to handle separately
+      locationUpdate = updates.location === null
+        ? null
+        : normalizeCollectiveLocation(updates.location);
+      delete updates.location;
+    }
+
+    if (updates.type !== undefined) {
+      updates.type = normalizeCollectiveType(updates.type);
+    }
+    if (updates.venueKind !== undefined) {
+      updates.venueKind = updates.type === 'venue' || collective.type === 'venue'
+        ? normalizeVenueKind(updates.venueKind)
+        : undefined;
     }
     
     // Apply all other updates
     Object.assign(collective, updates);
     
     // Apply location update separately if provided
-    if (locationUpdate !== null) {
+    if (locationUpdate !== undefined) {
       collective.location = locationUpdate;
+    }
+
+    const nextType = collective.type;
+    if (nextType !== 'venue') {
+      collective.venueKind = undefined;
+    }
+
+    const locationError = venueLocationError(nextType, collective.location);
+    if (locationError) {
+      return res.status(400).json({ error: locationError });
     }
     
     await collective.save();

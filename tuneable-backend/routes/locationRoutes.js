@@ -13,7 +13,7 @@ const router = express.Router();
  */
 router.get('/suggest', async (req, res) => {
   try {
-    const { q, country, worldview, language, limit, proximity } = req.query;
+    const { q, country, worldview, language, limit, proximity, mode, sessionToken, types } = req.query;
 
     if (!q || typeof q !== 'string' || !q.trim()) {
       return res.status(400).json({ error: 'Query parameter q is required' });
@@ -25,6 +25,9 @@ router.get('/suggest', async (req, res) => {
       language: typeof language === 'string' ? language : 'en',
       limit: limit ? parseInt(limit, 10) : 8,
       proximity: typeof proximity === 'string' ? proximity : undefined,
+      mode: mode === 'venue' ? 'venue' : undefined,
+      sessionToken: typeof sessionToken === 'string' ? sessionToken : undefined,
+      types: typeof types === 'string' ? types : undefined,
     });
 
     res.json({ suggestions });
@@ -45,13 +48,15 @@ router.get('/suggest', async (req, res) => {
  */
 router.post('/resolve', async (req, res) => {
   try {
-    const { mapboxId } = req.body || {};
+    const { mapboxId, sessionToken } = req.body || {};
 
     if (!mapboxId || typeof mapboxId !== 'string' || !mapboxId.trim()) {
       return res.status(400).json({ error: 'mapboxId is required' });
     }
 
-    const resolved = await mapboxGeocoding.resolveByMapboxId(mapboxId.trim());
+    const resolved = await mapboxGeocoding.resolveByMapboxId(mapboxId.trim(), {
+      sessionToken: typeof sessionToken === 'string' ? sessionToken : undefined,
+    });
     if (!resolved) {
       return res.status(404).json({ error: 'Place not found' });
     }

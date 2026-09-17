@@ -35,6 +35,14 @@ export type LocationProfileResponse = {
   stats?: { mediaCount?: number; globalPlaceAggregate?: number };
   relatedPlaces?: LocationPlaceChip[];
   relatedTags?: LocationRelatedTag[];
+  venues?: Array<{
+    _id: string;
+    name: string;
+    slug: string;
+    profilePicture?: string | null;
+    venueKind?: string | null;
+    display?: string;
+  }>;
   media?: ChartMediaItem[];
   pagination?: { page: number; limit: number; total: number; pages: number };
 };

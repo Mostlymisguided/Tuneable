@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { MapPin, Tag, Music, Coins } from 'lucide-react';
+import { MapPin, Tag, Music, Coins, Plus } from 'lucide-react';
 import { locationAPI } from '../lib/api';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -9,6 +9,10 @@ import { penceToPounds } from '../utils/currency';
 import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import EntertainingLoader from '../components/EntertainingLoader';
+import CollectiveCreateModal from '../components/CollectiveCreateModal';
+import { useAuth } from '../contexts/AuthContext';
+import { venueKindLabel } from '../utils/collectiveTypes';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface PlaceEntity {
   placeId: string;
@@ -37,11 +41,23 @@ interface RelatedTag {
   slug: string;
 }
 
+interface PlaceVenue {
+  _id: string;
+  name: string;
+  slug: string;
+  profilePicture?: string | null;
+  type?: string;
+  venueKind?: string | null;
+  display?: string;
+  verificationStatus?: string;
+}
+
 type PlaceMediaItem = TippedQueueItem;
 
 const LocationProfile: React.FC = () => {
   const { placeId: placeIdParam } = useParams<{ placeId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const placeId = placeIdParam ? decodeURIComponent(placeIdParam) : '';
 
@@ -49,10 +65,12 @@ const LocationProfile: React.FC = () => {
   const [stats, setStats] = useState<PlaceStats | null>(null);
   const [relatedPlaces, setRelatedPlaces] = useState<RelatedPlace[]>([]);
   const [relatedTags, setRelatedTags] = useState<RelatedTag[]>([]);
+  const [venues, setVenues] = useState<PlaceVenue[]>([]);
   const [media, setMedia] = useState<PlaceMediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showVenueModal, setShowVenueModal] = useState(false);
 
   const loadProfile = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -67,6 +85,7 @@ const LocationProfile: React.FC = () => {
         setStats(data.stats || null);
         setRelatedPlaces(data.relatedPlaces || []);
         setRelatedTags(data.relatedTags || []);
+        setVenues(data.venues || []);
         setMedia(data.media || []);
         setTotal(data.pagination?.total ?? (data.media?.length || 0));
       } catch (err: unknown) {
@@ -203,6 +222,49 @@ const LocationProfile: React.FC = () => {
                 </div>
               )}
 
+              {!loading && (venues.length > 0 || user) && (
+                <div className="w-full max-w-lg mb-3">
+                  <div className="flex items-center justify-center md:justify-between gap-2 mb-2">
+                    <p className="text-xs uppercase tracking-wide text-gray-400">Venues</p>
+                    {user && (
+                      <button
+                        type="button"
+                        onClick={() => setShowVenueModal(true)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-100 text-xs font-medium hover:bg-amber-500/25 transition-colors"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add a venue here
+                      </button>
+                    )}
+                  </div>
+                  {venues.length > 0 ? (
+                    <div className="flex flex-wrap justify-center md:justify-start gap-1.5">
+                      {venues.map((venue) => (
+                        <Link
+                          key={venue._id || venue.slug}
+                          to={`/collective/${venue.slug}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-100 text-xs font-medium hover:bg-amber-500/25 hover:border-amber-400/50 transition-colors no-underline"
+                        >
+                          <img
+                            src={venue.profilePicture || DEFAULT_PROFILE_PIC}
+                            alt=""
+                            className="h-4 w-4 rounded-full object-cover"
+                          />
+                          {venue.name}
+                          {venueKindLabel(venue.venueKind) ? (
+                            <span className="text-amber-200/70">· {venueKindLabel(venue.venueKind)}</span>
+                          ) : null}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center md:text-left">
+                      No claimed venues yet in {displayName}.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Champions strip — top tippers; tap expands ranked chip list */}
               {!loading && !error && placeId && (
                 <div className="w-full max-w-lg flex justify-center md:justify-start">
@@ -262,6 +324,15 @@ const LocationProfile: React.FC = () => {
           })()}
         </div>
       </div>
+      <CollectiveCreateModal
+        isOpen={showVenueModal}
+        onClose={() => setShowVenueModal(false)}
+        initialType="venue"
+        onSuccess={() => {
+          setShowVenueModal(false);
+          void loadProfile({ silent: true });
+        }}
+      />
     </div>
   );
 };

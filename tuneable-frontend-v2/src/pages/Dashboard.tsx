@@ -1907,7 +1907,7 @@ Join here: ${inviteLink}`.trim();
                               className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                             >
                               <Plus className="h-4 w-4 mr-2" />
-                              Create Collective
+                              Create Collective / Venue
                             </button>
                           )}
                         </div>
@@ -2323,7 +2323,7 @@ Join here: ${inviteLink}`.trim();
                                 onClick={() => setIsCollectiveModalOpen(true)}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                               >
-                                Create Collective
+                                Create Collective / Venue
                               </button>
                             )}
                           </div>
