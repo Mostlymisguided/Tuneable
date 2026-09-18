@@ -40,6 +40,7 @@ import TuneProfile from './pages/TuneProfile';
 import GearProfile from './pages/GearProfile';
 import TagProfile from './pages/TagProfile';
 import LocationProfile from './pages/LocationProfile';
+import Places from './pages/Places';
 import PodcastEpisodeProfile from './pages/PodcastEpisodeProfile';
 import PodcastSeriesProfile from './pages/PodcastSeriesProfile';
 import UserProfile from './pages/UserProfile';
@@ -277,6 +278,14 @@ const AppContent = () => {
             <Route
               path="/place/:placeId"
               element={<LocationProfile />}
+            />
+            <Route
+              path="/places"
+              element={<Places />}
+            />
+            <Route
+              path="/charts"
+              element={<Navigate to="/party/global?period=all-time" replace />}
             />
             <Route 
               path="/podcasts" 

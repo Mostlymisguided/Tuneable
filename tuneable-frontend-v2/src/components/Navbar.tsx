@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { User as UserIcon, Mic, Music, Home, LogOut, Compass, Plus, BookOpen } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { User as UserIcon, Home, LogOut, Plus, BarChart3, Globe } from 'lucide-react';
 import AddMediaModal from './AddMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
+import { chartKindPath, isChartsPath, isPlacesPath } from '../utils/chartKind';
+
+function ghostNavClass(active: boolean, loggedOut = false) {
+  const idle = loggedOut ? 'text-gray-300' : 'text-white';
+  return `px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center ${
+    active ? 'bg-gray-700 text-white' : `${idle} hover:bg-gray-600 hover:text-white`
+  }`;
+}
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [showAddMediaModal, setShowAddMediaModal] = useState(false);
+  const chartsActive = isChartsPath(pathname);
+  const placesActive = isPlacesPath(pathname);
 
   const handleLogout = () => {
     logout();
@@ -62,45 +73,21 @@ const Navbar: React.FC = () => {
                   </button>
                 )}
                 <Link
-                  to="/podcasts"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
+                  to={chartKindPath('music')}
+                  className={ghostNavClass(chartsActive)}
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  <Mic className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Podcasts</span>
+                  <BarChart3 className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Charts</span>
                 </Link>
                 <Link
-                  to="/books"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
+                  to="/places"
+                  className={ghostNavClass(placesActive)}
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 >
-                  <BookOpen className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Books</span>
+                  <Globe className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Places</span>
                 </Link>
-                {/* Talks nav hidden for now; /conversations still reachable by URL */}
-                <Link
-                  to="/party/global?period=all-time"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  <Music className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Music</span>
-                </Link>
-                {/* <Link
-                  to="/podcasts"
-                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
-                  style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
-                >
-                  Podcasts
-                </Link> */}
                 <div className="flex items-center space-x-2 sm:space-x-3 ml-2 sm:ml-4">
                   <Link
                     to="/wallet"
@@ -112,10 +99,8 @@ const Navbar: React.FC = () => {
                   </Link>
                   <Link
                     to={`/user/${user._id || user.uuid}`}
-                    className="px-2 sm:px-4 py-1 sm:py-2 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
+                    className="px-2 sm:px-4 py-1 sm:py-2 text-white rounded-lg font-medium transition-colors text-sm sm:text-base hover:bg-gray-600"
                     style={{ textDecoration: 'none' }}
-                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#4B5563'}
-                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                   >
                     <span className="hidden sm:inline">{user.username}</span>
                     <UserIcon className="h-5 w-5 sm:hidden" />
@@ -123,16 +108,8 @@ const Navbar: React.FC = () => {
                   <NotificationBell />
                   <button
                     onClick={handleLogout}
-                    className="px-2 sm:px-3 py-1 sm:py-2 text-gray-300 rounded-lg font-medium transition-colors text-sm sm:text-base flex items-center justify-center"
+                    className="px-2 sm:px-3 py-1 sm:py-2 text-gray-300 rounded-lg font-medium transition-colors text-sm sm:text-base flex items-center justify-center hover:bg-gray-600 hover:text-white"
                     style={{ textDecoration: 'none' }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.backgroundColor = '#4B5563';
-                      (e.target as HTMLElement).style.color = 'white';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                      (e.target as HTMLElement).style.color = '#D1D5DB';
-                    }}
                   >
                     <LogOut className="h-5 w-5 sm:hidden" />
                     <span className="hidden sm:inline">Logout</span>
@@ -143,74 +120,38 @@ const Navbar: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <Link
                   to="/about"
-                  className="hidden sm:flex px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors items-center justify-center"
+                  className={`hidden sm:flex ${ghostNavClass(pathname === '/about', true)}`}
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
-                    (e.target as HTMLElement).style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                    (e.target as HTMLElement).style.color = '#D1D5DB';
-                  }}
                 >
                   About
                 </Link>
                 <Link
-                  to="/explore"
-                  className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center"
+                  to={chartKindPath('music')}
+                  className={ghostNavClass(chartsActive, true)}
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
-                    (e.target as HTMLElement).style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                    (e.target as HTMLElement).style.color = '#D1D5DB';
-                  }}
                 >
-                  <Compass className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Explore Music</span>
+                  <BarChart3 className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Charts</span>
                 </Link>
-                <a
-                  href="https://tuneable.stream/podcasts/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center"
+                <Link
+                  to="/places"
+                  className={ghostNavClass(placesActive, true)}
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
-                    (e.target as HTMLElement).style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                    (e.target as HTMLElement).style.color = '#D1D5DB';
-                  }}
                 >
-                  <Mic className="h-5 w-5 sm:hidden" />
-                  <span className="hidden sm:inline">Explore Podcasts</span>
-                </a>
+                  <Globe className="h-5 w-5 sm:hidden" />
+                  <span className="hidden sm:inline">Places</span>
+                </Link>
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-gray-300 rounded-lg font-medium transition-colors"
+                  className={ghostNavClass(pathname === '/login', true)}
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = '#4B5563';
-                    (e.target as HTMLElement).style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.target as HTMLElement).style.backgroundColor = 'transparent';
-                    (e.target as HTMLElement).style.color = '#D1D5DB';
-                  }}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium transition-colors hover:bg-purple-700"
                   style={{ textDecoration: 'none' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = '#7C3AED'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = '#9333EA'}
                 >
                   Sign Up
                 </Link>

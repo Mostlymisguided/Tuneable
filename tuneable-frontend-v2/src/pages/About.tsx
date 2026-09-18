@@ -87,16 +87,16 @@ const About: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4 m-6">
               <Link
-                to="/explore"
+                to="/party/global?period=all-time"
                 className="text-white rounded-lg p-4 border-2 border-white font-semibold hover:bg-gray-100 hover:text-gray-900 transition-colors text-lg text-center"
               >
-                Explore Music
+                Charts
               </Link>
               <Link
-                to="/podcasts"
+                to="/places"
                 className="text-white rounded-lg p-4 border-2 border-white font-semibold hover:bg-gray-100 hover:text-gray-900 transition-colors text-lg text-center"
               >
-                Explore Podcasts
+                Places
               </Link>
             </div>
           </div>
@@ -291,8 +291,11 @@ const About: React.FC = () => {
               <p className="text-gray-400">&copy; 2025 Tuneable. All rights reserved.</p>
             </div>
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-              <Link to="/explore" className="text-gray-400 hover:text-white transition-colors">
-                Explore Music
+              <Link to="/party/global?period=all-time" className="text-gray-400 hover:text-white transition-colors">
+                Charts
+              </Link>
+              <Link to="/places" className="text-gray-400 hover:text-white transition-colors">
+                Places
               </Link>
               <Link to="/join-us" className="text-gray-400 hover:text-white transition-colors">
                 Join Us

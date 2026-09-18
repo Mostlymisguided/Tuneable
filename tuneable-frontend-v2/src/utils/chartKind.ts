@@ -1,5 +1,6 @@
 export const CHART_MEDIA_KINDS = ['music', 'podcasts', 'books'] as const;
 export type ChartMediaKind = (typeof CHART_MEDIA_KINDS)[number];
+export type ChartHeroKind = ChartMediaKind | 'places';
 
 export const CHART_KIND_OPTIONS: { id: ChartMediaKind; label: string }[] = [
   { id: 'music', label: 'Music' },
@@ -14,7 +15,8 @@ export function normalizeChartKind(value: unknown): ChartMediaKind {
   return 'music';
 }
 
-export function chartKindLabel(kind: ChartMediaKind): string {
+export function chartKindLabel(kind: ChartHeroKind): string {
+  if (kind === 'places') return 'Places';
   return CHART_KIND_OPTIONS.find((option) => option.id === kind)?.label || 'Music';
 }
 
@@ -22,4 +24,20 @@ export function chartKindPath(kind: ChartMediaKind): string {
   if (kind === 'podcasts') return '/podcasts';
   if (kind === 'books') return '/books';
   return '/party/global?period=all-time';
+}
+
+export function isChartsPath(pathname: string): boolean {
+  return (
+    pathname === '/charts' ||
+    pathname.startsWith('/charts/') ||
+    pathname.startsWith('/party/') ||
+    pathname === '/podcasts' ||
+    pathname.startsWith('/podcasts/') ||
+    pathname === '/books' ||
+    pathname.startsWith('/books/')
+  );
+}
+
+export function isPlacesPath(pathname: string): boolean {
+  return pathname === '/places' || pathname.startsWith('/places/') || pathname.startsWith('/place/');
 }
