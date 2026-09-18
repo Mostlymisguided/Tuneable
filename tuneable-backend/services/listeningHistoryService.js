@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { uuidv7 } = require('uuidv7');
 const Media = require('../models/Media');
 const ListeningHistory = require('../models/ListeningHistory');
 const {
@@ -20,16 +21,44 @@ class ListeningHistoryError extends Error {
 }
 
 function formatMediaArtist(media) {
-  return resolveCreatorDisplay(media);
+  try {
+    return asPlainString(resolveCreatorDisplay(media), 'Unknown Artist');
+  } catch (error) {
+    console.error('Failed to format media artist for listening history:', error);
+    return 'Unknown Artist';
+  }
+}
+
+function asPlainString(value, fallback = '') {
+  if (value == null || value === '') return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) {
+    const names = value
+      .map((entry) => {
+        if (typeof entry === 'string') return entry.trim();
+        if (entry && typeof entry === 'object' && entry.name) return String(entry.name).trim();
+        return '';
+      })
+      .filter(Boolean);
+    return names.join(' & ') || fallback;
+  }
+  if (typeof value === 'object' && value.name) return String(value.name);
+  return fallback;
 }
 
 async function resolveMediaByIdentifier(identifier) {
   if (!identifier) return null;
-  if (mongoose.Types.ObjectId.isValid(identifier)) {
-    const byId = await Media.findById(identifier);
-    if (byId) return byId;
+  try {
+    if (mongoose.Types.ObjectId.isValid(identifier) && String(identifier).length === 24) {
+      const byId = await Media.findById(identifier);
+      if (byId) return byId;
+    }
+    return Media.findOne({ uuid: identifier });
+  } catch (error) {
+    console.error('Failed to resolve media for listening history:', error);
+    return null;
   }
-  return Media.findOne({ uuid: identifier });
 }
 
 /**
@@ -85,38 +114,58 @@ async function trackListeningSession({
     existing?.listenDurationSeconds || 0
   );
 
-  const history = await ListeningHistory.findOneAndUpdate(
-    { userId, sessionId },
-    {
-      $setOnInsert: {
-        userId,
-        mediaId: media._id,
-        sessionId,
-        startedAt: startedAt ? new Date(startedAt) : now,
-        countedAsPlay: false,
+  const setFields = {
+    mediaId: media._id,
+    sourceType: normalizedSourceType,
+    client: normalizedClient,
+    mediaTitle: asPlainString(mediaTitle, media.title || ''),
+    mediaArtist: asPlainString(mediaArtist, formatMediaArtist(media)),
+    mediaCoverArt: asPlainString(mediaCoverArt, media.coverArt || ''),
+    mediaDuration: numericDuration,
+    lastPlayedAt: now,
+    lastPositionSeconds: numericPosition,
+    listenDurationSeconds,
+    completionPercent,
+    status: derivedCompleted ? 'completed' : (listenDurationSeconds > 0 ? 'partial' : 'in_progress'),
+    completedAt: derivedCompleted ? (existing?.completedAt || now) : existing?.completedAt || null,
+  };
+
+  let history;
+  try {
+    history = await ListeningHistory.findOneAndUpdate(
+      { userId, sessionId },
+      {
+        $setOnInsert: {
+          userId,
+          mediaId: media._id,
+          sessionId,
+          uuid: uuidv7(),
+          startedAt: startedAt ? new Date(startedAt) : now,
+          countedAsPlay: false,
+        },
+        $set: setFields,
       },
-      $set: {
-        mediaId: media._id,
-        sourceType: normalizedSourceType,
-        client: normalizedClient,
-        mediaTitle: mediaTitle || media.title || '',
-        mediaArtist: mediaArtist || formatMediaArtist(media),
-        mediaCoverArt: mediaCoverArt || media.coverArt || '',
-        mediaDuration: numericDuration,
-        lastPlayedAt: now,
-        lastPositionSeconds: numericPosition,
-        listenDurationSeconds,
-        completionPercent,
-        status: derivedCompleted ? 'completed' : (listenDurationSeconds > 0 ? 'partial' : 'in_progress'),
-        completedAt: derivedCompleted ? (existing?.completedAt || now) : existing?.completedAt || null,
-      },
-    },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true,
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      history = await ListeningHistory.findOneAndUpdate(
+        { userId, sessionId },
+        { $set: setFields },
+        { new: true }
+      );
     }
-  );
+    if (!history) {
+      if (error?.name === 'ValidationError' || error?.name === 'CastError') {
+        throw new ListeningHistoryError(400, error.message);
+      }
+      throw error;
+    }
+  }
 
   let playCounted = false;
   if (qualified && !history.countedAsPlay) {

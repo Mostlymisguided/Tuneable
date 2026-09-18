@@ -39,11 +39,26 @@ interface Session {
   lastDuration: number;
 }
 
-const HEARTBEAT_MS = 15_000;
+function artistLabel(artist: unknown): string {
+  if (!artist) return '';
+  if (typeof artist === 'string') return artist;
+  if (Array.isArray(artist)) {
+    return artist
+      .map((entry) => (typeof entry === 'string' ? entry : (entry as { name?: string })?.name))
+      .filter(Boolean)
+      .join(' & ');
+  }
+  if (typeof artist === 'object' && artist && 'name' in artist) {
+    return String((artist as { name?: string }).name || '');
+  }
+  return '';
+}
 
 function createSessionId(mediaId: string) {
   return `${mediaId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 }
+
+const HEARTBEAT_MS = 15_000;
 
 export function useListeningHistoryTracker({
   mediaId,
@@ -59,8 +74,8 @@ export function useListeningHistoryTracker({
   const snapshotRef = useRef<Snapshot>({
     mediaId: mediaId || null,
     title,
-    artist,
-    coverArt,
+    artist: artistLabel(artist),
+    coverArt: typeof coverArt === 'string' ? coverArt : '',
     currentTime,
     duration,
     sourceType,
@@ -75,8 +90,8 @@ export function useListeningHistoryTracker({
     snapshotRef.current = {
       mediaId: mediaId || null,
       title,
-      artist,
-      coverArt,
+      artist: artistLabel(artist),
+      coverArt: typeof coverArt === 'string' ? coverArt : '',
       currentTime,
       duration,
       sourceType,
@@ -87,8 +102,8 @@ export function useListeningHistoryTracker({
       sessionRef.current.lastPosition = currentTime;
       sessionRef.current.lastDuration = duration;
       sessionRef.current.title = title;
-      sessionRef.current.artist = artist;
-      sessionRef.current.coverArt = coverArt;
+      sessionRef.current.artist = artistLabel(artist);
+      sessionRef.current.coverArt = typeof coverArt === 'string' ? coverArt : '';
       sessionRef.current.sourceType = sourceType;
     }
   }, [artist, coverArt, currentTime, duration, enabled, isPlaying, mediaId, sourceType, title]);
