@@ -48,7 +48,7 @@ describe('Rekordbox XML playlist parse', () => {
     expect(tracks[0].title).toBe('Track One');
     expect(tracks[0].artist).toBe('Artist A');
     expect(tracks[0].bpm).toBe(122);
-    expect(tracks[0].key).toBe('8A');
+    expect(tracks[0].key).toBe('A Minor');
     expect(tracks[0].duration).toBe(180);
     expect(tracks[0].playlistName).toBe('House Favorites');
   });
@@ -85,7 +85,7 @@ describe('convertRekordboxTrack', () => {
     expect(converted.title).toBe('Track One');
     expect(converted.artist).toBe('Artist A');
     expect(converted.bpm).toBe(122);
-    expect(converted.key).toBe('8A');
+    expect(converted.key).toBe('A Minor');
     expect(converted.externalIds.rekordbox).toBe('101');
     expect(converted.sources).toEqual({});
     expect(converted.importSource).toBe('rekordbox');

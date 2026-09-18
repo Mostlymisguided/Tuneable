@@ -13,6 +13,7 @@ const importCrossRefService = require('./importCrossRefService');
 const { placeGlobalBid } = require('./globalBidService');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { roundBpm } = require('../utils/bpm');
+const { normalizeKey } = require('../utils/keyNormalizer');
 const {
   buildMediaIndexes,
   findFuzzyCatalogMatch,
@@ -97,7 +98,7 @@ function buildExternalMediaFromTrack(track, {
 
   const isrc = normalizeIsrc(track.externalIds?.isrc || track.isrc);
   const bpm = roundBpm(track.bpm);
-  const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
+  const key = normalizeKey(track.key);
   const externalIds = { ...(track.externalIds || {}) };
   if (isrc) externalIds.isrc = isrc;
   else delete externalIds.isrc;
@@ -273,7 +274,7 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
     media.bpm = incomingBpm;
     changed = true;
   }
-  const incomingKey = externalMedia.key && String(externalMedia.key).trim();
+  const incomingKey = normalizeKey(externalMedia.key);
   if ((!media.key || !String(media.key).trim()) && incomingKey) {
     media.key = incomingKey;
     changed = true;
@@ -1005,7 +1006,7 @@ function convertRekordboxTrack(track) {
   const trackId = track.trackId ? String(track.trackId) : '';
   const catalogId = trackId || `name:${title}::${artist}`;
   const bpm = roundBpm(track.bpm);
-  const key = track.key && String(track.key).trim() ? String(track.key).trim() : null;
+  const key = normalizeKey(track.key);
   const genre = track.genre && String(track.genre).trim() ? String(track.genre).trim() : null;
 
   return {

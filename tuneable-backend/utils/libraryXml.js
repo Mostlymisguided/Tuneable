@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const xml2js = require('xml2js');
 const { roundBpm } = require('./bpm');
+const { normalizeKey } = require('./keyNormalizer');
 
 function asArray(value) {
   if (!value) return [];
@@ -87,7 +88,7 @@ async function parseRekordboxXmlContent(xmlContent) {
       album: track.Album || '',
       genre: track.Genre || '',
       bpm: roundBpm(track.AverageBpm),
-      key: track.Tonality || track.Key || null,
+      key: normalizeKey(track.Tonality || track.Key || null),
       rating: track.Rating ? parseInt(track.Rating, 10) : 0,
       playCount: track.PlayCount ? parseInt(track.PlayCount, 10) : 0,
       comments: track.Comments || '',
@@ -256,7 +257,7 @@ function pickLibraryMetadata(match) {
   return {
     source: match.source,
     bpm: match.bpm ?? null,
-    key: match.key ?? null,
+    key: parseOptionalKey(match.key),
     title: match.title || null,
     artist: match.artist || null,
     album: match.album || null,
@@ -271,9 +272,7 @@ function parseOptionalBpm(value) {
 }
 
 function parseOptionalKey(value) {
-  if (value === undefined || value === null) return null;
-  const str = String(value).trim();
-  return str || null;
+  return normalizeKey(value);
 }
 
 /**
@@ -285,8 +284,8 @@ function resolveBpmKey({ bodyBpm, bodyKey, libraryMatch, extracted } = {}) {
     ?? parseOptionalBpm(lib?.bpm)
     ?? parseOptionalBpm(extracted?.bpm);
   const key = parseOptionalKey(bodyKey)
-    || lib?.key
-    || extracted?.key
+    || parseOptionalKey(lib?.key)
+    || parseOptionalKey(extracted?.key)
     || null;
   return { bpm, key, libraryMeta: lib };
 }

@@ -4,6 +4,7 @@ const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeLanguageInput } = require('../utils/language');
 const { normalizeIsbn } = require('../utils/isbn');
 const { roundBpm } = require('../utils/bpm');
+const { normalizeKey } = require('../utils/keyNormalizer');
 const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 const mediaSchema = new mongoose.Schema({
@@ -235,7 +236,13 @@ const mediaSchema = new mongoose.Schema({
       return roundBpm(value);
     },
   },
-  key: { type: String },
+  key: {
+    type: String,
+    set(value) {
+      if (value === undefined) return undefined;
+      return normalizeKey(value);
+    },
+  },
   pitch: { type: Number, default: 440 },
   timeSignature: { type: String, default: '4/4' },
   bitrate: { type: Number },
@@ -557,6 +564,11 @@ mediaSchema.pre('save', function (next) {
   if (this.bpm != null) {
     const roundedBpm = roundBpm(this.bpm);
     if (roundedBpm !== this.bpm) this.bpm = roundedBpm;
+  }
+
+  if (this.key != null) {
+    const normalizedKey = normalizeKey(this.key);
+    if (normalizedKey !== this.key) this.key = normalizedKey;
   }
 
   // MongoDB text indexes treat `language` as a stemming override (`en`, not `eng`).

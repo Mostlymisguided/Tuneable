@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 
 const MetadataExtractor = require('../../utils/metadataExtractor');
 const { roundBpm } = require('../../utils/bpm');
+const { normalizeKey } = require('../../utils/keyNormalizer');
 const { uploadToR2 } = require('./attachUpload');
 
 const PENDING_RIGHTS_NOTES =
@@ -60,7 +61,7 @@ function mergeMetadata(doc, { id3, rekordbox, extracted }) {
     doc.bpm = roundBpm(rb.bpm || ex.bpm || tags.bpm);
   }
   if (!doc.key) {
-    doc.key = rb.key || ex.key || tags.key || null;
+    doc.key = normalizeKey(rb.key || ex.key || tags.key);
   }
   if (!doc.album && (ex.album || rb.album)) {
     doc.album = ex.album || rb.album;
@@ -177,7 +178,7 @@ async function createMediaWithPendingRights(filePath, user, options = {}) {
     album: extracted.album || rb.album || null,
     duration: extracted.duration || rb.totalTime || id3.duration || null,
     bpm: rb.bpm || extracted.bpm || id3.bpm || null,
-    key: rb.key || extracted.key || id3.key || null,
+    key: normalizeKey(rb.key || extracted.key || id3.key),
     isrc: extracted.isrc || null,
     genres: rb.genre ? [rb.genre] : (extracted.genre ? (Array.isArray(extracted.genre) ? extracted.genre : [extracted.genre]) : []),
     explicit: extracted.explicit || false,

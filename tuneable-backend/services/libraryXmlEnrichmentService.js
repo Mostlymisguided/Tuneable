@@ -7,6 +7,7 @@ const {
 const { buildMediaIndexes, findCatalogMatch } = require('../scripts/lib/catalogMatch');
 const { isAdmin, canEditMedia } = require('../utils/permissionHelpers');
 const { roundBpm } = require('../utils/bpm');
+const { normalizeKey } = require('../utils/keyNormalizer');
 
 function getExternalId(media, key) {
   if (!media?.externalIds) return null;
@@ -128,7 +129,7 @@ function buildEnrichmentPatch(media, track) {
       patch.bpm = nextBpm;
     }
   if (isMissingKey(media.key) && track.key && String(track.key).trim()) {
-    patch.key = String(track.key).trim();
+    patch.key = normalizeKey(track.key);
   }
   return patch;
 }
@@ -288,7 +289,7 @@ async function executeLibraryXmlEnrichment(updates, { user } = {}) {
         changed = true;
       }
       if (item.key && String(item.key).trim() && isMissingKey(media.key)) {
-        media.key = String(item.key).trim();
+        media.key = normalizeKey(item.key);
         changed = true;
       }
       if (item.rekordboxTrackId && !getExternalId(media, 'rekordbox')) {
