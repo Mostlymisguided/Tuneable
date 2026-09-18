@@ -140,14 +140,13 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
   const noun = contentNoun || chartKindLabel(chartKind);
   const [kindOpen, setKindOpen] = React.useState(false);
   const [scopeOpen, setScopeOpen] = React.useState(false);
-  const kindToggleable = Boolean(onChartKindChange) && chartKind !== 'places';
 
   return (
     <div className="text-center px-3 sm:px-6 pt-6 sm:pt-10 pb-3">
-      {kindToggleable ? (
+      {onChartKindChange && chartKind !== 'places' ? (
         <ChartKindToggle
-          value={chartKind === 'places' ? 'music' : chartKind}
-          onChange={onChartKindChange!}
+          value={chartKind}
+          onChange={onChartKindChange}
           open={kindOpen}
           onOpenChange={(open) => {
             setKindOpen(open);
