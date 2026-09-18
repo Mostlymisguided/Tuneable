@@ -141,6 +141,11 @@ export default function PlaceProfileScreen() {
 
   const hiddenPlayableCount = sortedMedia.length - displayedMedia.length;
 
+  const playableCount = useMemo(
+    () => displayedMedia.filter(isUploadPlayable).length,
+    [displayedMedia]
+  );
+
   const mosaicCovers = useMemo(
     () =>
       media.slice(0, 4).map((item, index) => ({
@@ -159,6 +164,10 @@ export default function PlaceProfileScreen() {
       return;
     }
     void setQueueAndPlay(playable, index);
+  };
+
+  const onPlayQueue = () => {
+    void setQueueAndPlay(displayedMedia, 0);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
@@ -374,6 +383,16 @@ export default function PlaceProfileScreen() {
           </View>
           <Text style={styles.sortHint}>{CHART_ADDED_SORT_HINT}</Text>
         </View>
+      ) : null}
+
+      {playableCount > 0 ? (
+        <Pressable
+          style={styles.playBtn}
+          onPress={onPlayQueue}
+          accessibilityRole="button"
+          accessibilityLabel={`Play ${playableCount} upload${playableCount !== 1 ? 's' : ''}`}>
+          <Ionicons name="play" size={22} color="#fff" />
+        </Pressable>
       ) : null}
     </View>
   );
@@ -714,6 +733,16 @@ const styles = StyleSheet.create({
   },
   timeChipTextActive: {
     color: '#fff',
+  },
+  playBtn: {
+    alignSelf: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   centered: {
     alignItems: 'center',
