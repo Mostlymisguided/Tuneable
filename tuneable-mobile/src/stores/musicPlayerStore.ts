@@ -1,4 +1,4 @@
-import type { AudioStatus } from 'expo-audio';
+import { Audio, type AVPlaybackStatus } from 'expo-av';
 import { create } from 'zustand';
 import type { ChartMediaItem } from '@/src/types/media';
 import {
@@ -6,12 +6,6 @@ import {
   MUSIC_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
 import { getUploadUrl, isUploadPlayable, mediaId, getCreatorDisplay } from '@/src/lib/media';
-import {
-  isPlaybackFailed,
-  lockScreenArtworkUrl,
-  ManagedAudioPlayer,
-  statusMillis,
-} from '@/src/lib/managedAudioPlayer';
 import { showToast } from '@/src/stores/toastStore';
 import {
   completeListeningHistory,
@@ -37,13 +31,25 @@ type MusicPlayerState = {
   clear: () => Promise<void>;
 };
 
-const audio = new ManagedAudioPlayer();
+let sound: Audio.Sound | null = null;
+let audioModeReady = false;
 /** Guard against skip loops when many consecutive tracks fail to load. */
 let consecutiveLoadFailures = 0;
 let skipAfterFailureInFlight = false;
 /** Only toast once per unbroken skip streak (user-selected or load failure). */
 let skipNoticeShown = false;
-let finishingTrack = false;
+
+async function ensureAudioMode() {
+  if (audioModeReady) return;
+  await Audio.setAudioModeAsync({
+    allowsRecordingIOS: false,
+    playsInSilentModeIOS: true,
+    staysActiveInBackground: true,
+    shouldDuckAndroid: true,
+    playThroughEarpieceAndroid: false,
+  });
+  audioModeReady = true;
+}
 
 function getStore(): MusicPlayerState {
   return useMusicPlayerStore.getState();
@@ -53,15 +59,6 @@ function noticeSkipOnce(message: string) {
   if (skipNoticeShown) return;
   skipNoticeShown = true;
   showToast(message);
-}
-
-function lockScreenMeta(item: ChartMediaItem) {
-  return {
-    title: item.title?.trim() || 'Tuneable',
-    artist: getCreatorDisplay(item),
-    albumTitle: 'Tuneable',
-    artworkUrl: lockScreenArtworkUrl(item.coverArt),
-  };
 }
 
 /** Next playable item after `fromIndex` in list order (wraps). */
@@ -112,20 +109,21 @@ async function skipAfterFailure(reason: string) {
   }
 }
 
-function onStatus(status: AudioStatus) {
-  if (isPlaybackFailed(status)) {
-    void skipAfterFailure(status.playbackState || 'Failed to load audio');
+function onStatus(status: AVPlaybackStatus) {
+  if (!status.isLoaded) {
+    if (status.error) {
+      void skipAfterFailure(status.error);
+    }
     return;
   }
 
   consecutiveLoadFailures = 0;
   skipNoticeShown = false;
-  const { positionMs, durationMs } = statusMillis(status);
   useMusicPlayerStore.setState({
-    isPlaying: status.playing,
-    isLoading: status.isBuffering || !status.isLoaded,
-    positionMs,
-    durationMs: durationMs || getStore().durationMs,
+    isPlaying: status.isPlaying,
+    isLoading: status.isBuffering,
+    positionMs: status.positionMillis ?? 0,
+    durationMs: status.durationMillis ?? 0,
     error: null,
   });
 
@@ -136,23 +134,28 @@ function onStatus(status: AudioStatus) {
       title: item.title,
       artist: getCreatorDisplay(item),
       coverArt: item.coverArt,
-      currentTime: positionMs / 1000,
-      duration: (durationMs || (item.duration ?? 0) * 1000) / 1000,
+      currentTime: (status.positionMillis ?? 0) / 1000,
+      duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
       sourceType: 'direct',
-      isPlaying: status.playing,
+      isPlaying: status.isPlaying,
     });
   }
 
-  if (status.didJustFinish) {
-    if (finishingTrack) return;
-    finishingTrack = true;
+  if (status.didJustFinish && !status.isLooping) {
     completeListeningHistory();
-    void getStore()
-      .next()
-      .finally(() => {
-        finishingTrack = false;
-      });
+    void getStore().next();
   }
+}
+
+async function unloadSound() {
+  if (!sound) return;
+  try {
+    sound.setOnPlaybackStatusUpdate(null);
+    await sound.unloadAsync();
+  } catch {
+    // ignore unload races
+  }
+  sound = null;
 }
 
 async function loadAndPlay(item: ChartMediaItem) {
@@ -163,7 +166,8 @@ async function loadAndPlay(item: ChartMediaItem) {
   }
 
   endListeningHistorySession();
-  finishingTrack = false;
+  await ensureAudioMode();
+  await unloadSound();
 
   useMusicPlayerStore.setState({
     isLoading: true,
@@ -173,12 +177,12 @@ async function loadAndPlay(item: ChartMediaItem) {
   });
 
   try {
-    await audio.loadAndPlay({
-      uri,
-      metadata: lockScreenMeta(item),
-      lockScreen: { showSeekBackward: true, showSeekForward: true },
-      onStatus,
-    });
+    const created = await Audio.Sound.createAsync(
+      { uri },
+      { shouldPlay: true, progressUpdateIntervalMillis: 500 },
+      onStatus
+    );
+    sound = created.sound;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
@@ -255,17 +259,18 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   },
 
   play: async () => {
-    if (!audio.isReady) {
+    if (!sound) {
       const { queue, currentIndex } = get();
       const item = queue[currentIndex];
       if (item) await loadAndPlay(item);
       return;
     }
-    audio.play();
+    await sound.playAsync();
   },
 
   pause: async () => {
-    audio.pause();
+    if (!sound) return;
+    await sound.pauseAsync();
   },
 
   togglePlayPause: async () => {
@@ -305,15 +310,15 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   },
 
   seek: async (positionMs) => {
-    await audio.seekToSeconds(Math.max(0, positionMs) / 1000);
+    if (!sound) return;
+    await sound.setPositionAsync(Math.max(0, positionMs));
   },
 
   clear: async () => {
     endListeningHistorySession();
-    audio.release();
+    await unloadSound();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
-    finishingTrack = false;
     set({
       queue: [],
       currentIndex: 0,

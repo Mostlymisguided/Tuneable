@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -26,28 +26,26 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      SplashScreen.hideAsync();
-    }, 4000);
-    return () => clearTimeout(t);
+  const hideSplash = useCallback(() => {
+    void SplashScreen.hideAsync();
   }, []);
 
-  if (!loaded && !error) {
-    return null;
-  }
+  useEffect(() => {
+    if (loaded || error) hideSplash();
+  }, [loaded, error, hideSplash]);
+
+  useEffect(() => {
+    const t = setTimeout(hideSplash, 2500);
+    return () => clearTimeout(t);
+  }, [hideSplash]);
 
   return (
-    <AuthProvider>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </AuthProvider>
+    <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={hideSplash}>
+      <AuthProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </AuthProvider>
+    </View>
   );
 }
 
