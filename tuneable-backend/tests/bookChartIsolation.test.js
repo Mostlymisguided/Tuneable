@@ -62,4 +62,15 @@ describe('books vs music chart isolation', () => {
     expect(hiddenCatalogCount(true, 22, 22)).toBe(0);
     expect(hiddenCatalogCount(false, 250, 22)).toBe(0);
   });
+
+  it('casts hex strings back to ObjectIds for Bid.aggregate $in', () => {
+    const mongoose = require('mongoose');
+    const { toObjectIds } = require('../utils/globalPartyChart');
+    const id = new mongoose.Types.ObjectId();
+    const [cast] = toObjectIds([id.toString(), id.toString(), 'not-an-id']);
+    expect(cast).toBeInstanceOf(mongoose.Types.ObjectId);
+    expect(cast.toString()).toBe(id.toString());
+    expect(toObjectIds([id, id.toString()])).toHaveLength(1);
+    expect(toObjectIds([])).toEqual([]);
+  });
 });

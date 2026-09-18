@@ -82,6 +82,32 @@ function andChartFilters(...filters) {
   return { $and: clauses };
 }
 
+/**
+ * Bid.aggregate $in does not cast hex strings to ObjectId (unlike Media.find on _id).
+ * Period charts stringify IDs for Set de-dupe — convert back before querying Bid.
+ */
+function toObjectIds(ids) {
+  const objectIds = [];
+  const seen = new Set();
+  for (const id of ids || []) {
+    if (id == null || id === '') continue;
+    if (id instanceof mongoose.Types.ObjectId) {
+      const hex = id.toString();
+      if (seen.has(hex)) continue;
+      seen.add(hex);
+      objectIds.push(id);
+      continue;
+    }
+    const hex = String(id);
+    if (seen.has(hex) || !mongoose.Types.ObjectId.isValid(hex)) continue;
+    const objectId = new mongoose.Types.ObjectId(hex);
+    if (objectId.toString() !== hex) continue;
+    seen.add(hex);
+    objectIds.push(objectId);
+  }
+  return objectIds;
+}
+
 function chartTunesFilter({ playableOnly = true, extra = {} } = {}) {
   return andChartFilters(
     GLOBAL_PARTY_TUNES_FILTER,
@@ -231,7 +257,7 @@ async function loadTopSupportersByMedia(mediaIds, {
   }
 
   const match = {
-    mediaId: { $in: mediaIds },
+    mediaId: { $in: toObjectIds(mediaIds) },
     status: 'active',
   };
   if (startDate) {
@@ -285,7 +311,7 @@ async function loadTopSupportersByMedia(mediaIds, {
 
   if (userId) {
     const viewerMatch = {
-      mediaId: { $in: mediaIds },
+      mediaId: { $in: toObjectIds(mediaIds) },
       userId: new mongoose.Types.ObjectId(userId),
       status: 'active',
     };
@@ -841,6 +867,8 @@ async function fetchPeriodGlobalChart({
     matchingMediaIds = periodMediaIds.filter(Boolean).map((id) => id.toString());
   }
 
+  matchingMediaIds = toObjectIds(matchingMediaIds);
+
   const hiddenCount = await countHiddenCatalogTunes({
     extra: {
       _id: { $in: matchingMediaIds },
@@ -875,7 +903,7 @@ async function fetchPeriodGlobalChart({
   if (!useStoredGlobalAggregate) {
     const rankBidQuery = {
       status: 'active',
-      mediaId: { $in: matchingMediaIds },
+      mediaId: { $in: toObjectIds(matchingMediaIds) },
     };
     if (startDate) {
       rankBidQuery.createdAt = { $gte: startDate };
@@ -1093,6 +1121,7 @@ module.exports = {
   loadTopSupportersByMedia,
   chartTunesFilter,
   andChartFilters,
+  toObjectIds,
   hiddenCatalogCount,
   countHiddenCatalogTunes,
 };
