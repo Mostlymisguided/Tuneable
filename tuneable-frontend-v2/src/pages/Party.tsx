@@ -44,7 +44,7 @@ import {
   type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
-import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
+import { getCanonicalTag, generateTagSlug, tagsMatch } from '../utils/tagNormalizer';
 import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { hasAuthToken, requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
@@ -231,6 +231,65 @@ function getPeriodStartDate(period: string): Date | null {
     default:
       return null;
   }
+}
+
+function collectItemTags(item: any): string[] {
+  const nested = item?.mediaId && typeof item.mediaId === 'object' ? item.mediaId.tags : null;
+  const lists = [item?.tags, nested];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const raw of list) {
+      if (typeof raw !== 'string') continue;
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+  }
+  return out;
+}
+
+/** Live chart search: title/artist/category, plus tags (with or without a # prefix). */
+function chartItemMatchesSearch(item: any, allTerms: string[]): boolean {
+  if (allTerms.length === 0) return true;
+  const mediaItem = item?.mediaId && typeof item.mediaId === 'object' ? item.mediaId : item;
+  const tags = collectItemTags(item);
+
+  const regularTerms = allTerms.filter((term) => !term.startsWith('#'));
+  const tagTerms = allTerms
+    .filter((term) => term.startsWith('#'))
+    .map((term) => term.slice(1).trim())
+    .filter(Boolean);
+
+  const matchesRegularSearch =
+    regularTerms.length === 0 ||
+    regularTerms.some((term) => {
+      const lowerTerm = term.toLowerCase();
+      const title = (mediaItem.title || '').toLowerCase();
+      const artist = Array.isArray(mediaItem.artist)
+        ? mediaItem.artist.map((a: any) => (a && typeof a === 'object' ? a.name : a) || '').join(' ').toLowerCase()
+        : (mediaItem.artist || '').toLowerCase();
+      const category = (mediaItem.category || '').toLowerCase();
+      const tagHaystack = tags.join(' ').toLowerCase();
+
+      return (
+        title.includes(lowerTerm) ||
+        artist.includes(lowerTerm) ||
+        category.includes(lowerTerm) ||
+        tagHaystack.includes(lowerTerm) ||
+        tags.some((tag) => tagsMatch(tag, term))
+      );
+    });
+
+  const matchesTagSearch =
+    tagTerms.length === 0 ||
+    tagTerms.some((tagTerm) => tags.some((tag) => tagsMatch(tag, tagTerm)));
+
+  return matchesRegularSearch && matchesTagSearch;
 }
 
 /** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
@@ -1611,36 +1670,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     const allTerms = liveTerm ? [...queueSearchTerms, liveTerm] : queueSearchTerms;
 
     if (allTerms.length > 0) {
-      media = media.filter((item: any) => {
-        const mediaItem = item.mediaId || item;
-
-        const regularTerms = allTerms.filter(term => !term.startsWith('#'));
-        const tagTerms = allTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
-
-        const matchesRegularSearch = regularTerms.length === 0 || regularTerms.some(term => {
-          const lowerTerm = term.toLowerCase();
-          const title = (mediaItem.title || '').toLowerCase();
-          const artist = Array.isArray(mediaItem.artist)
-            ? mediaItem.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
-            : (mediaItem.artist || '').toLowerCase();
-          const category = (mediaItem.category || '').toLowerCase();
-
-          return title.includes(lowerTerm) ||
-                 artist.includes(lowerTerm) ||
-                 category.includes(lowerTerm);
-        });
-
-        const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
-          const canonicalSearchTag = getCanonicalTag(tagTerm);
-          const tags = Array.isArray(mediaItem.tags)
-            ? mediaItem.tags.map((tag: any) => tag && typeof tag === 'string' ? getCanonicalTag(tag) : '').filter((t: string) => t)
-            : [];
-
-          return tags.some((tag: string) => tag === canonicalSearchTag);
-        });
-
-        return matchesRegularSearch && matchesTagSearch;
-      });
+      media = media.filter((item: any) => chartItemMatchesSearch(item, allTerms));
     }
 
     if (bpmFilterRange !== 'all') {
@@ -2839,7 +2869,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           <div className="flex flex-wrap gap-2">
                             {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
                               const hash = `#${tag}`;
-                              const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
+                              const selected = queueSearchTerms.some(
+                                (t) => t.startsWith('#') && tagsMatch(t.slice(1), tag)
+                              );
                               const weight = Math.max(0.75, Math.min(1.25, total / 50));
                               const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
 
@@ -2848,7 +2880,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                   key={tag}
                                   onClick={() =>
                                     setQueueSearchTerms((prev) =>
-                                      selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
+                                      selected
+                                        ? prev.filter((t) => !(t.startsWith('#') && tagsMatch(t.slice(1), tag)))
+                                        : [...prev, hash]
                                     )
                                   }
                                   className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
