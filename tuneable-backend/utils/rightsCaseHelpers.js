@@ -233,29 +233,72 @@ function artistLineFromMedia(media) {
   return names.join(', ') || 'Unknown artist';
 }
 
+const OUTREACH_FORMATS = ['email', 'instagram', 'link'];
+
+function normalizeInstagramHandle(value) {
+  let raw = String(value || '').trim();
+  if (!raw) return '';
+  raw = raw.replace(/^@+/, '');
+  const fromUrl = raw.match(/(?:instagram\.com|instagr\.am)\/(?:[a-z]{2}\/)?([^/?#]+)/i)
+    || raw.match(/ig\.me\/m\/([^/?#]+)/i);
+  if (fromUrl) raw = fromUrl[1];
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // keep raw if it isn't a valid URI sequence
+  }
+  raw = raw.replace(/\/+$/, '').trim();
+  const reserved = new Set(['p', 'reel', 'reels', 'stories', 'explore', 'accounts', 'direct', 'legal']);
+  if (!raw || reserved.has(raw.toLowerCase())) return '';
+  return raw.replace(/^@+/, '');
+}
+
+function instagramDmUrl(handle) {
+  const normalized = normalizeInstagramHandle(handle);
+  return normalized ? `https://ig.me/m/${encodeURIComponent(normalized)}` : 'https://www.instagram.com/';
+}
+
+function primaryInstagramFromContacts(contacts) {
+  const row = (contacts || []).find((c) => c.type === 'instagram' && c.value);
+  return normalizeInstagramHandle(row?.value);
+}
+
+function primaryInstagramFromParty(party) {
+  return primaryInstagramFromContacts(party?.contacts);
+}
+
+function tuneUrlFromMedia(media, frontendUrl = 'https://tuneable.stream') {
+  const base = String(frontendUrl || 'https://tuneable.stream').replace(/\/$/, '');
+  return media?.uuid ? `${base}/tune/${media.uuid}` : base;
+}
+
 function buildOutreachContent({
   template = 'claim_keep_invite',
   media,
   party,
   customMessage = '',
   frontendUrl = 'https://tuneable.stream',
+  format = 'email',
 }) {
   const title = media?.title || 'your work';
   const greetName = party?.displayName || 'there';
   const artistLine = artistLineFromMedia(media);
-  const tuneUrl = media?.uuid ? `${frontendUrl.replace(/\/$/, '')}/tune/${media.uuid}` : frontendUrl;
+  const tuneUrl = tuneUrlFromMedia(media, frontendUrl);
   const claimHint = `You can review the listing and file a keep or takedown claim here: ${tuneUrl}`;
   const note = customMessage?.trim() || '';
+  const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
+  const resolvedTemplate = OUTREACH_TEMPLATES.includes(template) ? template : 'custom';
 
-  const templates = {
+  const emailTemplates = {
     claim_keep_invite: {
-      subject: `Your work on Tuneable: ${title}`,
+      subject: `Your tune has been tipped on Tuneable: ${title}`,
       intro:
         `Hi ${greetName},\n\n` +
-        `"${title}" (${artistLine}) is on Tuneable awaiting rights clearance. ` +
+        `Your tune "${title}" (${artistLine}) has been tipped on Tuneable. ` +
         `Tips for this listing are held in escrow until a rights holder claims it.\n\n` +
         `If this is your work, create a Tuneable account and file a keep claim with proof of ownership. ` +
-        `Approved claims assign ownership and release held tips to you.\n\n` +
+        `Approved claims assign ownership and release held tips to you. ` +
+        `If you do not want it live, you can request a takedown instead.\n\n` +
         `${claimHint}`,
     },
     takedown_option: {
@@ -270,7 +313,8 @@ function buildOutreachContent({
       subject: `Following up: ${title} on Tuneable`,
       intro:
         `Hi ${greetName},\n\n` +
-        `Checking in about "${title}" on Tuneable. We have not heard back and wanted to make sure our last note reached you.\n\n` +
+        `Checking in about "${title}" on Tuneable — your tune has been tipped and we have not heard back. ` +
+        `Wanted to make sure our last note reached you.\n\n` +
         `${claimHint}`,
     },
     copyright_reporter: {
@@ -283,18 +327,65 @@ function buildOutreachContent({
         `Listing: ${tuneUrl}`,
     },
     custom: {
-      subject: `Regarding "${title}" on Tuneable`,
+      subject: `Your tune has been tipped on Tuneable: ${title}`,
       intro: `Hi ${greetName},\n\n`,
     },
   };
 
-  const chosen = templates[template] || templates.custom;
+  const instagramTemplates = {
+    claim_keep_invite:
+      `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable. ` +
+      `Tips sit in escrow until you claim the listing (keep it live or take it down).\n\n${tuneUrl}`,
+    takedown_option:
+      `Hey ${greetName} — "${title}" is on Tuneable in rights-pending limbo. ` +
+      `If you want it taken down, you can request that here:\n\n${tuneUrl}`,
+    follow_up:
+      `Hey ${greetName} — following up: your tune "${title}" has been tipped on Tuneable. ` +
+      `Claim or take it down here:\n\n${tuneUrl}`,
+    copyright_reporter:
+      `Thanks for the rights report on "${title}". We have a case open — extra proof or preferred resolution welcome.\n\n${tuneUrl}`,
+    custom: `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+  };
+
+  const linkTemplates = {
+    claim_keep_invite: `Your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+    takedown_option: `Take-down option for "${title}" on Tuneable.\n\n${tuneUrl}`,
+    follow_up: `Following up: your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+    copyright_reporter: `We received your rights report for "${title}".\n\n${tuneUrl}`,
+    custom: `Your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+  };
+
+  if (chosenFormat === 'link') {
+    const text = [linkTemplates[resolvedTemplate], note].filter(Boolean).join('\n\n').trim();
+    return {
+      template: resolvedTemplate,
+      format: 'link',
+      subject: '',
+      text,
+      tuneUrl,
+    };
+  }
+
+  if (chosenFormat === 'instagram') {
+    const text = [instagramTemplates[resolvedTemplate], note].filter(Boolean).join('\n\n').trim();
+    return {
+      template: resolvedTemplate,
+      format: 'instagram',
+      subject: '',
+      text,
+      tuneUrl,
+    };
+  }
+
+  const chosen = emailTemplates[resolvedTemplate] || emailTemplates.custom;
   const body = [chosen.intro, note].filter(Boolean).join('\n\n').trim();
 
   return {
-    template: templates[template] ? template : 'custom',
+    template: resolvedTemplate,
+    format: 'email',
     subject: chosen.subject,
     text: body,
+    tuneUrl,
   };
 }
 
@@ -309,16 +400,22 @@ module.exports = {
   CONTACT_CONFIDENCES,
   CASE_SOURCES,
   OUTREACH_TEMPLATES,
+  OUTREACH_FORMATS,
   DEFAULT_FOLLOW_UP_DAYS,
   normalizePartyKey,
   suggestedPartiesFromMedia,
   primaryEmailFromParty,
   primaryEmailFromContacts,
+  primaryInstagramFromParty,
+  primaryInstagramFromContacts,
+  normalizeInstagramHandle,
+  instagramDmUrl,
   statusAfterContactAdded,
   statusAfterOutboundEmail,
   statusAfterInboundReply,
   defaultFollowUpAt,
   artistLineFromMedia,
+  tuneUrlFromMedia,
   buildOutreachContent,
   escapeRegex,
   namesMatch,

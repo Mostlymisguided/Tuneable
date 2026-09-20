@@ -3019,9 +3019,20 @@ export const rightsAPI = {
     const response = await api.post(`/rights/admin/cases/${id}/outreach`, body);
     return response.data as { case: any };
   },
-  previewOutreach: async (id: string, body: { template?: string; customMessage?: string }) => {
+  previewOutreach: async (id: string, body: {
+    template?: string;
+    customMessage?: string;
+    format?: 'email' | 'instagram' | 'link';
+  }) => {
     const response = await api.post(`/rights/admin/cases/${id}/preview`, body);
-    return response.data as { template: string; subject: string; text: string };
+    return response.data as {
+      template: string;
+      subject: string;
+      text: string;
+      tuneUrl?: string;
+      format?: string;
+      instagramHandle?: string | null;
+    };
   },
   searchContacts: async (params: { name?: string; role?: string; mediaId?: string }) => {
     const response = await api.get('/rights/admin/contacts', { params });

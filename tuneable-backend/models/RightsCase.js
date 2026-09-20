@@ -43,7 +43,7 @@ const partySchema = new mongoose.Schema({
 const outreachEventSchema = new mongoose.Schema({
   channel: {
     type: String,
-    enum: ['email', 'in_app', 'manual', 'note'],
+    enum: ['email', 'instagram', 'link', 'in_app', 'manual', 'note'],
     required: true,
   },
   direction: {

@@ -12,9 +12,12 @@ const {
   CONTACT_SOURCES,
   CONTACT_CONFIDENCES,
   OUTREACH_TEMPLATES,
+  OUTREACH_FORMATS,
   normalizePartyKey,
   suggestedPartiesFromMedia,
   primaryEmailFromParty,
+  primaryInstagramFromParty,
+  normalizeInstagramHandle,
   statusAfterContactAdded,
   statusAfterOutboundEmail,
   statusAfterInboundReply,
@@ -518,6 +521,8 @@ async function addOutreach(id, payload, actorId) {
   const channel = payload.channel || 'email';
   const direction = payload.direction || (channel === 'note' ? 'note' : 'outbound');
   const template = OUTREACH_TEMPLATES.includes(payload.template) ? payload.template : 'custom';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tuneable.stream';
+  const customMessage = payload.customMessage || payload.body || '';
 
   if (channel === 'email' && direction === 'outbound') {
     const to = (payload.to || primaryEmailFromParty(rightsCase.party) || '').trim();
@@ -531,8 +536,9 @@ async function addOutreach(id, payload, actorId) {
       template,
       media: rightsCase.mediaId,
       party: rightsCase.party,
-      customMessage: payload.customMessage || payload.body || '',
-      frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
+      customMessage,
+      frontendUrl,
+      format: 'email',
     });
     const subject = payload.subject || content.subject;
 
@@ -555,6 +561,49 @@ async function addOutreach(id, payload, actorId) {
       subject,
       body: content.text,
       resendId: sent?.id || null,
+      sentBy: actorId,
+      sentAt: new Date(),
+    });
+    rightsCase.status = statusAfterOutboundEmail(rightsCase.status);
+    rightsCase.nextFollowUpAt = payload.nextFollowUpAt
+      ? new Date(payload.nextFollowUpAt)
+      : defaultFollowUpAt();
+  } else if ((channel === 'instagram' || channel === 'link') && direction === 'outbound') {
+    const format = channel === 'instagram' ? 'instagram' : 'link';
+    const content = buildOutreachContent({
+      template,
+      media: rightsCase.mediaId,
+      party: rightsCase.party,
+      customMessage,
+      frontendUrl,
+      format,
+    });
+    const body = (payload.body || content.text || '').trim();
+    if (!body) {
+      const error = new Error('A message body is required');
+      error.status = 400;
+      throw error;
+    }
+    const to = channel === 'instagram'
+      ? (normalizeInstagramHandle(payload.to) || primaryInstagramFromParty(rightsCase.party))
+      : (payload.to || content.tuneUrl || '').trim();
+
+    if (channel === 'instagram' && to) {
+      const already = rightsCase.party.contacts.some(
+        (c) => c.type === 'instagram' && normalizeInstagramHandle(c.value).toLowerCase() === to.toLowerCase()
+      );
+      if (!already) {
+        rightsCase.party.contacts.push({ type: 'instagram', value: to });
+      }
+    }
+
+    rightsCase.outreach.push({
+      channel,
+      direction: 'outbound',
+      template,
+      to,
+      subject: payload.subject || content.subject || '',
+      body,
       sentBy: actorId,
       sentAt: new Date(),
     });
@@ -678,20 +727,25 @@ async function openFromCopyrightReport(report, media) {
   });
 }
 
-async function previewOutreach({ caseId, template, customMessage }) {
+async function previewOutreach({ caseId, template, customMessage, format = 'email' }) {
   const rightsCase = await RightsCase.findById(caseId).populate('mediaId', MEDIA_SELECT);
   if (!rightsCase) {
     const error = new Error('Rights case not found');
     error.status = 404;
     throw error;
   }
-  return buildOutreachContent({
-    template,
-    media: rightsCase.mediaId,
-    party: rightsCase.party,
-    customMessage,
-    frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
-  });
+  const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
+  return {
+    ...buildOutreachContent({
+      template,
+      media: rightsCase.mediaId,
+      party: rightsCase.party,
+      customMessage,
+      frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
+      format: chosenFormat,
+    }),
+    instagramHandle: primaryInstagramFromParty(rightsCase.party) || null,
+  };
 }
 
 module.exports = {

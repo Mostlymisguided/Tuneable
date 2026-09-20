@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import {
   Clock,
+  Copy,
   ExternalLink,
+  Instagram,
+  Link2,
   Mail,
   Music,
   Plus,
@@ -113,6 +116,15 @@ const TEMPLATE_LABELS: Record<string, string> = {
   custom: 'Custom',
 };
 
+const CHANNEL_LABELS: Record<string, string> = {
+  email: 'Email',
+  instagram: 'Instagram',
+  link: 'Link',
+  note: 'Note',
+  manual: 'Manual',
+  in_app: 'In-app',
+};
+
 function artistLine(media: any): string {
   if (!media) return 'Unknown artist';
   if (media.creatorDisplay) return media.creatorDisplay;
@@ -133,6 +145,49 @@ function formatDate(value?: string | Date | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString();
+}
+
+function instagramHandleFromValue(value?: string | null): string {
+  let raw = String(value || '').trim();
+  if (!raw) return '';
+  raw = raw.replace(/^@+/, '');
+  const fromUrl = raw.match(/(?:instagram\.com|instagr\.am)\/(?:[a-z]{2}\/)?([^/?#]+)/i)
+    || raw.match(/ig\.me\/m\/([^/?#]+)/i);
+  if (fromUrl) raw = fromUrl[1];
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // keep raw if it isn't a valid URI sequence
+  }
+  raw = raw.replace(/\/+$/, '').trim().replace(/^@+/, '');
+  const reserved = new Set(['p', 'reel', 'reels', 'stories', 'explore', 'accounts', 'direct', 'legal']);
+  if (!raw || reserved.has(raw.toLowerCase())) return '';
+  return raw;
+}
+
+function instagramDmUrl(handle?: string | null): string {
+  const normalized = instagramHandleFromValue(handle);
+  return normalized ? `https://ig.me/m/${encodeURIComponent(normalized)}` : 'https://www.instagram.com/';
+}
+
+function firstContactValue(contacts: Array<{ type?: string; value?: string }> | undefined, type: string): string {
+  return contacts?.find((c) => c.type === type)?.value || '';
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -237,6 +292,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   const [template, setTemplate] = useState('claim_keep_invite');
   const [customMessage, setCustomMessage] = useState('');
   const [outreachTo, setOutreachTo] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
   const [manualNote, setManualNote] = useState('');
   const [caseStatus, setCaseStatus] = useState('');
   const [followUp, setFollowUp] = useState('');
@@ -369,6 +425,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setPartyName(first?.displayName || artistLine(media));
     setPartyRole(first?.role || 'artist');
     setPartyEmail('');
+    setInstagramHandle('');
     setTemplate('claim_keep_invite');
     setCustomMessage('');
     setSendOnCreate(false);
@@ -381,8 +438,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setSelectedCase(rightsCase);
     setCaseStatus(rightsCase.status);
     setFollowUp(toDatetimeLocal(rightsCase.nextFollowUpAt));
-    const email = (rightsCase.party?.contacts || []).find((c: any) => c.type === 'email')?.value || '';
+    const email = firstContactValue(rightsCase.party?.contacts, 'email');
     setOutreachTo(email);
+    setInstagramHandle(instagramHandleFromValue(firstContactValue(rightsCase.party?.contacts, 'instagram')));
     setTemplate(rightsCase.source === 'report' ? 'copyright_reporter' : 'claim_keep_invite');
     setCustomMessage('');
     setManualNote('');
@@ -407,6 +465,10 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
     if (selectedLimbo) {
       setPartyEmail(candidate.email || '');
+      const ig = instagramHandleFromValue(
+        candidate.contacts?.find((c) => c.type === 'instagram')?.value
+      );
+      if (ig) setInstagramHandle(ig);
       return;
     }
 
@@ -439,6 +501,10 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         },
       });
       if (candidate.email) setOutreachTo(candidate.email);
+      const ig = instagramHandleFromValue(
+        candidate.contacts?.find((c) => c.type === 'instagram')?.value
+      );
+      if (ig) setInstagramHandle(ig);
       toast.success(candidate.email ? 'Contact attached' : 'Match linked (no email on file)');
       await reloadSelectedCase(selectedCase._id);
     } catch (error: any) {
@@ -455,56 +521,80 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     }
   };
 
-  const handleCreateFromLimbo = async () => {
-    if (!selectedLimbo) return;
+  const createCaseFromLimbo = async () => {
+    if (!selectedLimbo) return null;
     if (!partyName.trim()) {
       toast.error('Party name is required');
-      return;
+      return null;
     }
+    const match = (selectedLimbo.suggestedParties || []).find(
+      (p: any) => p.displayName === partyName.trim() && p.role === partyRole
+    );
+    const emailChanged = accepted?.email && partyEmail.trim().toLowerCase() !== accepted.email.toLowerCase();
+    const contacts: Array<{
+      type: string;
+      value: string;
+      notes?: string;
+      source?: string;
+      confidence?: string;
+    }> = [];
+    if (partyEmail.trim()) {
+      contacts.push({
+        type: 'email',
+        value: partyEmail.trim(),
+        notes: accepted?.evidence || '',
+        source: accepted && !emailChanged ? accepted.source : 'manual',
+        confidence: accepted && !emailChanged ? accepted.confidence : 'manual',
+      });
+    }
+    const ig = instagramHandleFromValue(instagramHandle);
+    if (ig) {
+      contacts.push({
+        type: 'instagram',
+        value: ig,
+        notes: accepted?.evidence || '',
+        source: accepted ? accepted.source : 'manual',
+        confidence: accepted ? accepted.confidence : 'manual',
+      });
+    }
+    if (accepted?.contacts) {
+      for (const contact of accepted.contacts) {
+        if (!contact.value) continue;
+        if (contact.type === 'email' || contact.type === 'instagram') continue;
+        contacts.push({
+          type: contact.type,
+          value: contact.value,
+          notes: accepted.evidence || '',
+          source: accepted.source,
+          confidence: accepted.confidence,
+        });
+      }
+    }
+    const created = await rightsAPI.createCase({
+      mediaId: selectedLimbo._id,
+      party: {
+        displayName: partyName.trim(),
+        role: partyRole,
+        userId: accepted?.userId || match?.userId || undefined,
+        labelId: accepted?.labelId || match?.labelId || undefined,
+        collectiveId: accepted?.collectiveId || match?.collectiveId || undefined,
+        contacts,
+      },
+      source: 'import',
+    });
+    return created;
+  };
+
+  const handleCreateFromLimbo = async () => {
+    if (!selectedLimbo) return;
     if (sendOnCreate && !partyEmail.trim()) {
       toast.error('Add an email, or uncheck send now');
       return;
     }
     try {
       setBusy(true);
-      const match = (selectedLimbo.suggestedParties || []).find(
-        (p: any) => p.displayName === partyName.trim() && p.role === partyRole
-      );
-      const emailChanged = accepted?.email && partyEmail.trim().toLowerCase() !== accepted.email.toLowerCase();
-      const contacts = partyEmail.trim()
-        ? [{
-          type: 'email',
-          value: partyEmail.trim(),
-          notes: accepted?.evidence || '',
-          source: accepted && !emailChanged ? accepted.source : 'manual',
-          confidence: accepted && !emailChanged ? accepted.confidence : 'manual',
-        }]
-        : [];
-      if (accepted?.contacts) {
-        for (const contact of accepted.contacts) {
-          if (contact.type === 'email') continue;
-          if (!contact.value) continue;
-          contacts.push({
-            type: contact.type,
-            value: contact.value,
-            notes: accepted.evidence || '',
-            source: accepted.source,
-            confidence: accepted.confidence,
-          });
-        }
-      }
-      const created = await rightsAPI.createCase({
-        mediaId: selectedLimbo._id,
-        party: {
-          displayName: partyName.trim(),
-          role: partyRole,
-          userId: accepted?.userId || match?.userId || undefined,
-          labelId: accepted?.labelId || match?.labelId || undefined,
-          collectiveId: accepted?.collectiveId || match?.collectiveId || undefined,
-          contacts,
-        },
-        source: 'import',
-      });
+      const created = await createCaseFromLimbo();
+      if (!created) return;
       if (sendOnCreate && partyEmail.trim()) {
         await rightsAPI.sendOutreach(created.case._id, {
           channel: 'email',
@@ -526,25 +616,97 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     }
   };
 
+  const ensureSelectedCaseId = async () => {
+    if (selectedCase?._id) return String(selectedCase._id);
+    const created = await createCaseFromLimbo();
+    if (!created) return null;
+    await refreshCounts();
+    setQueue('open');
+    await reloadSelectedCase(created.case._id);
+    return String(created.case._id);
+  };
+
   const handleSendEmail = async () => {
-    if (!selectedCase) return;
-    if (!outreachTo.trim()) {
+    const to = (selectedCase ? outreachTo : partyEmail).trim();
+    if (!to) {
       toast.error('Email address required');
       return;
     }
     try {
       setBusy(true);
-      await rightsAPI.sendOutreach(selectedCase._id, {
+      const caseId = await ensureSelectedCaseId();
+      if (!caseId) return;
+      await rightsAPI.sendOutreach(caseId, {
         channel: 'email',
         template,
-        to: outreachTo.trim(),
+        to,
         customMessage,
       });
       toast.success('Email sent');
-      await reloadSelectedCase(selectedCase._id);
+      await reloadSelectedCase(caseId);
       setCustomMessage('');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send email');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      setBusy(true);
+      const caseId = await ensureSelectedCaseId();
+      if (!caseId) return;
+      const preview = await rightsAPI.previewOutreach(caseId, {
+        template,
+        customMessage,
+        format: 'link',
+      });
+      await copyToClipboard(preview.text);
+      await rightsAPI.sendOutreach(caseId, {
+        channel: 'link',
+        template,
+        customMessage,
+        body: preview.text,
+        to: preview.tuneUrl,
+      });
+      toast.success('Tipped-on-Tuneable message and listing link copied');
+      await reloadSelectedCase(caseId);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to copy listing message');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCopyInstagram = async () => {
+    try {
+      setBusy(true);
+      const caseId = await ensureSelectedCaseId();
+      if (!caseId) return;
+      const preview = await rightsAPI.previewOutreach(caseId, {
+        template,
+        customMessage,
+        format: 'instagram',
+      });
+      await copyToClipboard(preview.text);
+      const handle = instagramHandleFromValue(instagramHandle) || instagramHandleFromValue(preview.instagramHandle);
+      await rightsAPI.sendOutreach(caseId, {
+        channel: 'instagram',
+        template,
+        customMessage,
+        body: preview.text,
+        to: handle,
+      });
+      if (handle) {
+        window.open(instagramDmUrl(handle), '_blank', 'noopener,noreferrer');
+        toast.success('IG message copied — paste it in the DM');
+      } else {
+        toast.success('IG message copied — open the artist’s profile and paste it');
+      }
+      await reloadSelectedCase(caseId);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to copy Instagram message');
     } finally {
       setBusy(false);
     }
@@ -614,7 +776,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             Rights
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Outreach cases for rights holders. Replies go to {replyTo}. Playability still lives on the media rights status.
+            Outreach cases for rights holders. Copy a tipped-on-Tuneable link, send email, or paste an Instagram DM. Replies go to {replyTo}. Playability still lives on the media rights status.
           </p>
         </div>
         <button
@@ -797,6 +959,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                         setPartyRole(party.role);
                         setAccepted(null);
                         setPartyEmail('');
+                        setInstagramHandle('');
                         setSendOnCreate(false);
                       }}
                       className={`px-2 py-1 rounded text-xs ${
@@ -837,6 +1000,15 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                 <input type="email" value={partyEmail} onChange={(e) => setPartyEmail(e.target.value)} placeholder="rights holder" className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
               </label>
               <label className="block text-sm text-gray-300">
+                Instagram
+                <input
+                  value={instagramHandle}
+                  onChange={(e) => setInstagramHandle(e.target.value)}
+                  placeholder="@handle"
+                  className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
                 Template
                 <select value={template} onChange={(e) => setTemplate(e.target.value)} className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white">
                   {Object.entries(TEMPLATE_LABELS).map(([id, label]) => (
@@ -851,9 +1023,41 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                 rows={3}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
               />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  disabled={busy}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendEmail}
+                  disabled={busy || !partyEmail.trim()}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  Send email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyInstagram}
+                  disabled={busy}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Copy IG DM
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Copy link / IG logs the outreach and opens a case. IG copies a DM then opens Instagram to paste it.
+              </p>
               <label className="flex items-center gap-2 text-sm text-gray-300">
                 <input type="checkbox" checked={sendOnCreate} onChange={(e) => setSendOnCreate(e.target.checked)} />
-                Send email now (reply-to {replyTo})
+                Also send email when opening a case (reply-to {replyTo})
               </label>
               {accepted && !accepted.allowSend && (
                 <p className="text-xs text-amber-400">
@@ -931,7 +1135,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   {timeline.map((event: any) => (
                     <div key={event._id} className="bg-gray-700/70 rounded p-2 text-xs text-gray-300">
                       <div className="flex justify-between gap-2 text-gray-400">
-                        <span>{event.channel} · {event.direction}{event.template && event.template !== 'none' ? ` · ${event.template}` : ''}</span>
+                        <span>{CHANNEL_LABELS[event.channel] || event.channel} · {event.direction}{event.template && event.template !== 'none' ? ` · ${event.template}` : ''}</span>
                         <span>{formatDate(event.sentAt)}</span>
                       </div>
                       {event.subject && <p className="text-white mt-1">{event.subject}</p>}
@@ -943,13 +1147,22 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
               <div className="space-y-2 border-t border-gray-700 pt-4">
                 <h4 className="text-sm font-medium text-gray-200 flex items-center gap-2">
-                  <Mail className="h-4 w-4" /> Send email
+                  <Send className="h-4 w-4" /> Your tune has been tipped
                 </h4>
+                <p className="text-xs text-gray-500">
+                  Copy a listing message, send email (reply-to {replyTo}), or copy an Instagram DM.
+                </p>
                 <input
                   type="email"
                   value={outreachTo}
                   onChange={(e) => setOutreachTo(e.target.value)}
-                  placeholder="To"
+                  placeholder="Email"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                />
+                <input
+                  value={instagramHandle}
+                  onChange={(e) => setInstagramHandle(e.target.value)}
+                  placeholder="Instagram @handle"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                 />
                 <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm">
@@ -964,14 +1177,35 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                 />
-                <button
-                  onClick={handleSendEmail}
-                  disabled={busy}
-                  className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  Send via Resend
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    disabled={busy}
+                    className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    disabled={busy}
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyInstagram}
+                    disabled={busy}
+                    className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Instagram className="h-4 w-4" />
+                    Copy IG DM
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2 border-t border-gray-700 pt-4">

@@ -134,6 +134,7 @@ router.post('/admin/cases/:id/preview', adminMiddleware, async (req, res) => {
       caseId: req.params.id,
       template: req.body.template,
       customMessage: req.body.customMessage,
+      format: req.body.format,
     });
     res.json(preview);
   } catch (error) {

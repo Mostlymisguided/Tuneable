@@ -12,6 +12,8 @@ const {
   statusAfterInboundReply,
   defaultFollowUpAt,
   buildOutreachContent,
+  normalizeInstagramHandle,
+  instagramDmUrl,
   OPEN_STATUSES,
   TERMINAL_STATUSES,
   PARTY_ROLES,
@@ -102,20 +104,61 @@ describe('defaultFollowUpAt', () => {
   });
 });
 
+describe('normalizeInstagramHandle', () => {
+  it('strips @ and profile/DM urls', () => {
+    expect(normalizeInstagramHandle('@foo')).toBe('foo');
+    expect(normalizeInstagramHandle('https://www.instagram.com/foo/')).toBe('foo');
+    expect(normalizeInstagramHandle('https://ig.me/m/foo')).toBe('foo');
+  });
+
+  it('builds an Instagram DM url', () => {
+    expect(instagramDmUrl('@foo')).toBe('https://ig.me/m/foo');
+  });
+});
+
 describe('buildOutreachContent', () => {
   const media = { title: 'Around the World', uuid: 'abc', artist: [{ name: 'Daft Punk' }] };
   const party = { displayName: 'Thomas' };
 
-  it('includes the tune URL in a keep invite', () => {
+  it('uses the tipped hook and tune URL in a keep invite', () => {
     const content = buildOutreachContent({
       template: 'claim_keep_invite',
       media,
       party,
       frontendUrl: 'https://tuneable.stream',
     });
-    expect(content.subject).toContain('Around the World');
+    expect(content.subject).toMatch(/tipped on Tuneable/i);
+    expect(content.text).toContain('has been tipped on Tuneable');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
     expect(content.text).toContain('escrow');
+    expect(content.tuneUrl).toBe('https://tuneable.stream/tune/abc');
+  });
+
+  it('builds a short Instagram DM', () => {
+    const content = buildOutreachContent({
+      template: 'claim_keep_invite',
+      media,
+      party,
+      format: 'instagram',
+    });
+    expect(content.format).toBe('instagram');
+    expect(content.subject).toBe('');
+    expect(content.text).toContain('has been tipped on Tuneable');
+    expect(content.text).toContain('https://tuneable.stream/tune/abc');
+    expect(content.text.startsWith('Hey Thomas')).toBe(true);
+  });
+
+  it('builds a copy-link message', () => {
+    const content = buildOutreachContent({
+      template: 'claim_keep_invite',
+      media,
+      party,
+      format: 'link',
+    });
+    expect(content.format).toBe('link');
+    expect(content.text).toBe(
+      'Your tune "Around the World" has been tipped on Tuneable.\n\nhttps://tuneable.stream/tune/abc'
+    );
   });
 
   it('appends a custom note', () => {
