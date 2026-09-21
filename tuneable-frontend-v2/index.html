@@ -34,6 +34,27 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var RELOAD_KEY = 'tuneable-stale-asset-reload';
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) { reg.unregister(); });
+          });
+        }
+        window.addEventListener('error', function (event) {
+          var el = event.target;
+          if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK')) return;
+          var url = el.src || el.href;
+          if (!url || url.indexOf('/assets/') === -1) return;
+          if (sessionStorage.getItem(RELOAD_KEY)) return;
+          sessionStorage.setItem(RELOAD_KEY, '1');
+          fetch(url, { cache: 'reload', credentials: 'omit' }).finally(function () {
+            window.location.reload();
+          });
+        }, true);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
