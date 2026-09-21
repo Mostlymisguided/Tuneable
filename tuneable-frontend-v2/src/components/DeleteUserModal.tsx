@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import { userAPI } from '../lib/api';
 import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
@@ -22,7 +22,6 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
   onDeleted,
 }) => {
   const [confirmUsername, setConfirmUsername] = useState('');
-  const [confirmNotTest, setConfirmNotTest] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof userAPI.getUserPurgePreview>> | null>(null);
@@ -30,7 +29,6 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
   useEffect(() => {
     if (!isOpen || !userId) return;
     setConfirmUsername('');
-    setConfirmNotTest(false);
     setPreview(null);
     setIsLoading(true);
     userAPI.getUserPurgePreview(userId)
@@ -48,13 +46,13 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
 
   const usernameMatches = confirmUsername.trim().toLowerCase() === username.trim().toLowerCase();
   const flaggedTest = preview?.user.isTestUser ?? isTestUser;
-  const canDelete = usernameMatches && (flaggedTest || confirmNotTest) && !isDeleting && !isLoading;
+  const canDelete = usernameMatches && !!flaggedTest && !isDeleting && !isLoading;
 
   const handleDelete = async () => {
     if (!canDelete) return;
     setIsDeleting(true);
     try {
-      const result = await userAPI.purgeUser(userId, confirmUsername.trim(), !flaggedTest);
+      const result = await userAPI.purgeUser(userId, confirmUsername.trim());
       const tipCount = result?.tips?.refundedCount ?? 0;
       toast.success(
         tipCount > 0
@@ -93,7 +91,7 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
 
         <div className="p-6 space-y-4">
           <p className="text-sm text-gray-300">
-            Permanently delete <span className="font-semibold text-white">{username}</span> and unwind their tips
+            Permanently delete test account <span className="font-semibold text-white">{username}</span> and unwind their tips
             from charts, escrow, and party queues. Media they uploaded is left in place.
           </p>
 
@@ -120,21 +118,10 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
             </div>
           ) : null}
 
-          {!flaggedTest && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-900/30 border border-yellow-700 text-yellow-200 text-sm">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-              <div>
-                This account is not flagged as a test user. Deleting it still unwinds tips and removes the account.
-                <label className="mt-2 flex items-center gap-2 text-yellow-100">
-                  <input
-                    type="checkbox"
-                    checked={confirmNotTest}
-                    onChange={(e) => setConfirmNotTest(e.target.checked)}
-                  />
-                  I understand this is not a test account
-                </label>
-              </div>
-            </div>
+          {preview && !flaggedTest && (
+            <p className="text-sm text-yellow-200 bg-yellow-900/30 border border-yellow-700 rounded-lg p-3">
+              Only accounts flagged as test users can be permanently deleted. Real accounts stay on the anonymize path.
+            </p>
           )}
 
           <div>

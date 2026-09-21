@@ -38,6 +38,8 @@ import RekordboxPlaylistIngest from '../components/RekordboxPlaylistIngest';
 import MediaMergePanel from '../components/MediaMergePanel';
 import MetadataEnrichmentAdmin from '../components/MetadataEnrichmentAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
+import CreateTestUserModal from '../components/CreateTestUserModal';
+import DeleteUserModal from '../components/DeleteUserModal';
 import InviteReferrals from '../components/InviteReferrals';
 import UserTopUpModal from '../components/UserTopUpModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
@@ -60,6 +62,7 @@ interface User {
   username: string;
   email?: string;
   role: string[];
+  isTestUser?: boolean;
   balance: number;
   inviteCredits?: number;
   tuneBytes?: number;
@@ -175,6 +178,8 @@ const Admin: React.FC = () => {
   // Warning modal state
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [selectedUserForWarning, setSelectedUserForWarning] = useState<{ id: string; username: string } | null>(null);
+  const [createTestUserOpen, setCreateTestUserOpen] = useState(false);
+  const [selectedUserForDelete, setSelectedUserForDelete] = useState<{ id: string; username: string; isTestUser?: boolean } | null>(null);
 
   const [isInviteManagementCollapsed, setIsInviteManagementCollapsed] = useState(true);
 
@@ -1599,12 +1604,20 @@ const Admin: React.FC = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-white">User Management</h2>
-                  <button
-                    onClick={() => loadUsers()}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                  >
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCreateTestUserOpen(true)}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                    >
+                      Create test user
+                    </button>
+                    <button
+                      onClick={() => loadUsers()}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-gray-800 rounded-lg p-4">
@@ -1729,13 +1742,20 @@ const Admin: React.FC = () => {
                     {getSortedUsers().map((user) => (
                       <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Link
-                            to={`/user/${user._id}`}
-                            className="text-sm font-medium text-white hover:text-purple-300 underline"
-                            title="View profile"
-                          >
-                            {user.username}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              to={`/user/${user._id}`}
+                              className="text-sm font-medium text-white hover:text-purple-300 underline"
+                              title="View profile"
+                            >
+                              {user.username}
+                            </Link>
+                            {user.isTestUser && (
+                              <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-900 text-amber-200">
+                                Test
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">{user.email}</div>
@@ -1921,6 +1941,41 @@ const Admin: React.FC = () => {
                                 >
                                   Make Admin
                                 </button>
+                                {user.isTestUser ? (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUserForDelete({
+                                        id: user._id,
+                                        username: user.username,
+                                        isTestUser: true,
+                                      });
+                                    }}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                    title="Permanently delete this test account and unwind its tips"
+                                  >
+                                    Delete
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={async () => {
+                                      const confirmed = window.confirm(
+                                        `Flag ${user.username} as a test account? Only do this for accounts you created for testing. You can then permanently delete them and unwind their tips.`
+                                      );
+                                      if (!confirmed) return;
+                                      try {
+                                        await userAPI.markTestUser(user._id, user.username);
+                                        toast.success(`Flagged ${user.username} as a test account`);
+                                        loadUsers();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to flag test account');
+                                      }
+                                    }}
+                                    className="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm transition-colors"
+                                    title="Flag as a test account so it can be permanently deleted"
+                                  >
+                                    Flag test
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -4440,6 +4495,23 @@ const Admin: React.FC = () => {
               description="Cross-check Rekordbox or iTunes Library.xml against the production catalog and fill in missing BPM and key fields. Existing values are never overwritten."
             />
           </div>
+        )}
+
+        <CreateTestUserModal
+          isOpen={createTestUserOpen}
+          onClose={() => setCreateTestUserOpen(false)}
+          onCreated={() => loadUsers()}
+        />
+
+        {selectedUserForDelete && (
+          <DeleteUserModal
+            isOpen
+            onClose={() => setSelectedUserForDelete(null)}
+            userId={selectedUserForDelete.id}
+            username={selectedUserForDelete.username}
+            isTestUser={selectedUserForDelete.isTestUser}
+            onDeleted={() => loadUsers()}
+          />
         )}
 
         {/* Warning Modal */}

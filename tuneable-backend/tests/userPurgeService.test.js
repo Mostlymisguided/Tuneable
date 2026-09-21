@@ -4,7 +4,7 @@
  */
 
 const assert = require('assert');
-const { assertCanPurge, assertUsernameShape } = require('../services/userPurgeService');
+const { assertCanPurge, assertTestAccount, assertUsernameShape } = require('../services/userPurgeService');
 
 function expectStatus(fn, status, messageIncludes) {
   try {
@@ -38,6 +38,8 @@ function testPurgeGuards() {
     'Admin accounts'
   );
   assertCanPurge({ _id: 'tester', role: ['user'], username: 'testuser1' }, actor);
+  expectStatus(() => assertTestAccount({ isTestUser: false }), 403, 'test accounts');
+  assertTestAccount({ isTestUser: true });
 }
 
 function run() {

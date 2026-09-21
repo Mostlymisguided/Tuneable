@@ -100,6 +100,20 @@ function assertCanPurge(targetUser, actorUser) {
   }
 }
 
+function assertConfirmUsername(user, confirmUsername) {
+  const expected = String(user.username || '').trim();
+  const provided = String(confirmUsername || '').trim();
+  if (!provided || provided.toLowerCase() !== expected.toLowerCase()) {
+    throw httpError(400, 'Type the username to confirm');
+  }
+}
+
+function assertTestAccount(user) {
+  if (!user?.isTestUser) {
+    throw httpError(403, 'Only test accounts can be permanently deleted');
+  }
+}
+
 function poundsToPence(amount) {
   const n = Number(amount);
   if (!Number.isFinite(n) || n < 0) {
@@ -432,22 +446,30 @@ async function deleteOwnedDocs(userId) {
   };
 }
 
-async function purgeUser(userId, { actor, confirmUsername, confirmNotTestUser } = {}) {
+async function markTestUser(userId, { actor, confirmUsername } = {}) {
   const user = await User.findById(userId);
   assertCanPurge(user, actor);
+  assertConfirmUsername(user, confirmUsername);
 
-  const expected = String(user.username || '').trim();
-  const provided = String(confirmUsername || '').trim();
-  if (!provided || provided.toLowerCase() !== expected.toLowerCase()) {
-    throw httpError(400, 'Type the username to confirm deletion');
+  if (!user.isTestUser) {
+    user.isTestUser = true;
+    await user.save();
+    console.log(`🧪 Admin ${actor.username} flagged ${user.username} as a test user`);
   }
 
-  if (!user.isTestUser && confirmNotTestUser !== true) {
-    throw httpError(
-      400,
-      'This is not a test account. Pass confirmNotTestUser: true to delete it anyway'
-    );
-  }
+  return {
+    message: `${user.username} is flagged as a test account`,
+    username: user.username,
+    userId: String(user._id),
+    isTestUser: true,
+  };
+}
+
+async function purgeUser(userId, { actor, confirmUsername } = {}) {
+  const user = await User.findById(userId);
+  assertCanPurge(user, actor);
+  assertConfirmUsername(user, confirmUsername);
+  assertTestAccount(user);
 
   const preview = await previewPurge(userId);
   const unwind = await unwindActiveTips(user, actor._id);
@@ -488,8 +510,10 @@ async function purgeUser(userId, { actor, confirmUsername, confirmNotTestUser } 
 module.exports = {
   createTestUser,
   previewPurge,
+  markTestUser,
   purgeUser,
   assertCanPurge,
+  assertTestAccount,
   assertUsernameShape,
   generateInviteCode,
   generatePassword,

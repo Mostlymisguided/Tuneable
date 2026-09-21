@@ -230,6 +230,7 @@ const {
 const authMiddleware = require('../middleware/authMiddleware');
 const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const userPurgeService = require('../services/userPurgeService');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
@@ -5973,6 +5974,66 @@ router.post('/admin/warnings', authMiddleware, adminMiddleware, async (req, res)
   } catch (error) {
     console.error('Error issuing warning:', error);
     res.status(500).json({ error: 'Failed to issue warning', details: error.message });
+  }
+});
+
+function sendPurgeError(res, error, fallback) {
+  const status = Number(error.status) || 500;
+  if (status >= 500) {
+    console.error(fallback, error);
+    return res.status(500).json({ error: fallback });
+  }
+  return res.status(status).json({ error: error.message || fallback });
+}
+
+// Admin: Create a flagged test user (password account, joined to Global Party)
+router.post('/admin/test-users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { username, password, balance } = req.body || {};
+    const result = await userPurgeService.createTestUser({
+      username,
+      password,
+      balancePounds: balance,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to create test user');
+  }
+});
+
+// Admin: Preview what a permanent delete would unwind
+router.get('/admin/users/:userId/purge-preview', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const preview = await userPurgeService.previewPurge(req.params.userId);
+    return res.json(preview);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to preview user deletion');
+  }
+});
+
+// Admin: Flag an existing non-admin account as a test user so it can be purged
+router.post('/admin/users/:userId/mark-test', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await userPurgeService.markTestUser(req.params.userId, {
+      actor: req.user,
+      confirmUsername: req.body?.confirmUsername,
+    });
+    return res.json(result);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to flag test user');
+  }
+});
+
+// Admin: Permanently delete a test user and unwind their tips
+router.delete('/admin/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await userPurgeService.purgeUser(req.params.userId, {
+      actor: req.user,
+      confirmUsername: req.body?.confirmUsername,
+    });
+    return res.json(result);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to delete user');
   }
 });
 

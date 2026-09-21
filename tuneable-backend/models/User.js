@@ -173,6 +173,8 @@ const userSchema = new mongoose.Schema({
     default: ['user'] 
   },
   isActive: { type: Boolean, default: true },
+  // Admin-created accounts used for tipping tests. Only these can be hard-deleted.
+  isTestUser: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
   
   // Email verification

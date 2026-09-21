@@ -1414,10 +1414,18 @@ export const userAPI = {
     };
   },
 
-  // Admin: Permanently delete a user and unwind their tips
-  purgeUser: async (userId: string, confirmUsername: string, confirmNotTestUser = false) => {
+  // Admin: Flag an existing account as a test user (required before purge)
+  markTestUser: async (userId: string, confirmUsername: string) => {
+    const response = await api.post(`/users/admin/users/${userId}/mark-test`, {
+      confirmUsername,
+    });
+    return response.data as { message?: string; username?: string; isTestUser?: boolean };
+  },
+
+  // Admin: Permanently delete a test user and unwind their tips
+  purgeUser: async (userId: string, confirmUsername: string) => {
     const response = await api.delete(`/users/admin/users/${userId}`, {
-      data: { confirmUsername, confirmNotTestUser },
+      data: { confirmUsername },
     });
     return response.data as {
       message?: string;
