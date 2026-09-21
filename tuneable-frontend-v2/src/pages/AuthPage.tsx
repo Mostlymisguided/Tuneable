@@ -880,7 +880,7 @@ const AuthPage: React.FC = () => {
             <img
               src="/Tuneable-Logo-180x180.svg"
               alt=""
-              className="h-7 w-7 grayscale"
+              className="h-7 w-7"
             />
             <h2 className="text-base font-semibold tracking-tight text-zinc-100">
               {isRegisterPage ? 'Create account' : 'Sign in'}
