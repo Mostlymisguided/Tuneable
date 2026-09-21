@@ -274,6 +274,17 @@ const About: React.FC = () => {
               here is building Tuneable so a founder becomes a billionaire from your tips.
             </p>
           </div>
+          <div className="mt-6 bg-white/5 rounded-xl p-6 border border-white/10 flex items-start gap-4">
+            <Shield className="h-8 w-8 text-pink-300 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-semibold text-white mb-2">No billionaires</h3>
+              <p className="text-indigo-100 leading-relaxed">
+                We pledge that Tuneable will not create billionaires. Anyone whose net worth exceeds
+                £1 billion must sell their shares in Tuneable and end their involvement with the
+                organisation.
+              </p>
+            </div>
+          </div>
           <p className="text-center text-sm text-indigo-200 mt-8">
             The current split and this direction are also in our{' '}
             <Link to="/terms-of-service" className="underline hover:text-white">

@@ -337,6 +337,11 @@ const TermsOfService: React.FC = () => {
                   Interest Company purpose. Tuneable CIC is not designed to produce billionaire outcomes from
                   artist tips.
                 </p>
+                <p className="mb-2">
+                  We pledge that no billionaire will be created from Tuneable. If a person&apos;s net worth
+                  exceeds £1 billion, they must sell their shares in Tuneable and cease to be involved with
+                  the organisation.
+                </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.4 Future Features</h3>
                 <p className="mb-2">
