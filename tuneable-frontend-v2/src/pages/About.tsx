@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  BookOpen,
+  Headphones,
   Heart,
   Globe,
+  Library,
   Music,
   Users,
   Shield,
@@ -74,9 +77,9 @@ const About: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
             <h1 className="text-5xl md:text-7xl font-bold p-6 leading-tight">
-              <span className="text-white">Creative</span>
+              <span className="text-white">Tip What</span>
               <br />
-              <span className="text-pink-400">Democracy</span>
+              <span className="text-pink-400">You Love</span>
             </h1>
             <p
               className="text-xl md:text-2xl p-12 text-gray-200 max-w-3xl mx-auto leading-relaxed"
@@ -105,17 +108,45 @@ const About: React.FC = () => {
 
       {/* The idea */}
       <section className="bg-white py-16">
-        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="mb-6 text-3xl font-bold text-gray-900 md:text-4xl">The idea</h2>
-          <p className="mb-6 text-xl leading-relaxed text-gray-700">
-            Tuneable is a public shelf for your taste — music, podcasts, and books, and other
-            media as we grow.
-          </p>
-          <p className="text-lg leading-relaxed text-gray-600">
-            Streaming asks you to rent a whole catalog. Here you tip only what you want to stand
-            behind. That tip pays the creator, moves global and local charts, and adds the work to
-            your library for anyone to see.
-          </p>
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">The idea</h2>
+            <p className="mt-3 text-lg text-gray-600">A public shelf for your taste.</p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 sm:gap-6">
+            {[
+              { icon: Music, label: 'Music', panel: 'bg-purple-100 text-purple-600' },
+              { icon: Headphones, label: 'Podcasts', panel: 'bg-pink-100 text-pink-600' },
+              { icon: BookOpen, label: 'Books', panel: 'bg-indigo-100 text-indigo-600' },
+            ].map(({ icon: Icon, label, panel }) => (
+              <div
+                key={label}
+                className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+              >
+                <div className={`flex h-28 items-center justify-center sm:h-40 ${panel}`}>
+                  <Icon className="h-10 w-10 sm:h-14 sm:w-14" />
+                </div>
+                <p className="px-2 py-3 text-center text-sm font-semibold text-gray-900 sm:py-4 sm:text-base">
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-center text-sm text-gray-500">More media as we grow.</p>
+
+          <div className="mt-8 grid gap-3 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-4 sm:grid-cols-3 sm:p-6">
+            {[
+              { icon: Heart, label: 'Pays the creator' },
+              { icon: Globe, label: 'Moves the charts' },
+              { icon: Library, label: 'Stays on your shelf' },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="flex items-center justify-center gap-3 py-2">
+                <Icon className="h-5 w-5 shrink-0 text-purple-600" />
+                <span className="font-medium text-gray-800">{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
