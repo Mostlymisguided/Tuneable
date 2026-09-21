@@ -103,6 +103,22 @@ const About: React.FC = () => {
         </div>
       </section>
 
+      {/* The idea */}
+      <section className="bg-white py-16">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="mb-6 text-3xl font-bold text-gray-900 md:text-4xl">The idea</h2>
+          <p className="mb-6 text-xl leading-relaxed text-gray-700">
+            Tuneable is a public shelf for your taste — music, podcasts, and books, and other
+            media as we grow.
+          </p>
+          <p className="text-lg leading-relaxed text-gray-600">
+            Streaming asks you to rent a whole catalog. Here you tip only what you want to stand
+            behind. That tip pays the creator, moves global and local charts, and adds the work to
+            your library for anyone to see.
+          </p>
+        </div>
+      </section>
+
       {/* How Tuneable Works */}
       <section className="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

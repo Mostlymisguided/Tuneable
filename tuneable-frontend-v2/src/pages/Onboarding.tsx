@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
+  Library,
   Loader2,
   MapPin,
   Music,
@@ -24,18 +25,18 @@ import {
   refreshCurrentLocation,
 } from '../utils/currentLocationCache';
 
-type OnboardingStep = 'location' | 'import';
+type OnboardingStep = 'intro' | 'location' | 'import';
 type ImportSource = 'spotify' | 'soundcloud' | 'youtube';
 
 const ONBOARDING_IMPORT_LIMIT = 25;
 const SPOTIFY_READONLY_COPY =
   'Tuneable only reads your likes. We cannot change your Spotify library, playlists, or playback.';
 
-const STEP_ORDER: OnboardingStep[] = ['location', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['intro', 'location', 'import'];
 
 function parseStep(value: string | null): OnboardingStep {
-  if (value === 'import') return 'import';
-  return 'location';
+  if (value === 'location' || value === 'import') return value;
+  return 'intro';
 }
 
 function parseImportSource(value: string | null): ImportSource | null {
@@ -482,6 +483,34 @@ const Onboarding: React.FC = () => {
       </div>
 
       <div className="flex-1 rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
+        {step === 'intro' && (
+          <div className="space-y-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-600/20 text-purple-300">
+                <Library className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Your shelf, not a subscription</h2>
+                <p className="mt-2 text-sm leading-relaxed text-gray-300">
+                  Tuneable is where you show your taste in music, podcasts, and books.
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-gray-400">
+                  Tip what you love. Each tip supports the creator, moves global and local charts,
+                  and puts that work on your public shelf.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => goToStep('location')}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 font-semibold text-white hover:bg-purple-500"
+            >
+              Continue
+              <ArrowRight className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
         {step === 'location' && (
           <div className="space-y-6">
             <div className="flex items-start gap-3">
@@ -557,6 +586,14 @@ const Onboarding: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => goToStep('intro')}
+                disabled={isSaving}
+                className="rounded-xl border border-gray-600 px-5 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+              >
+                Back
+              </button>
               <button
                 type="button"
                 onClick={skipLocationStep}

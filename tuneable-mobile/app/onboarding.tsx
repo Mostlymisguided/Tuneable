@@ -42,16 +42,17 @@ import type { ResolvedLocation } from '@/src/types/user';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type OnboardingStep = 'location' | 'import';
+type OnboardingStep = 'intro' | 'location' | 'import';
 type ImportSource = 'soundcloud' | 'youtube';
 
-const STEP_ORDER: OnboardingStep[] = ['location', 'import'];
+const STEP_ORDER: OnboardingStep[] = ['intro', 'location', 'import'];
 const ONBOARDING_IMPORT_LIMIT = 25;
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === 'import' || raw === 'notifications') return 'import';
-  return 'location';
+  if (raw === 'location') return 'location';
+  return 'intro';
 }
 
 function parseSource(value: string | string[] | undefined): ImportSource | null {
@@ -497,6 +498,31 @@ export default function OnboardingScreen() {
           </View>
 
           <View style={styles.card}>
+            {step === 'intro' && (
+              <View style={styles.stepBody}>
+                <View style={styles.stepHeader}>
+                  <View style={styles.iconBubble}>
+                    <Ionicons name="library-outline" size={20} color={colors.accentLight} />
+                  </View>
+                  <View style={styles.stepHeaderCopy}>
+                    <Text style={styles.stepTitle}>Your shelf, not a subscription</Text>
+                    <Text style={styles.introLead}>
+                      Tuneable is where you show your taste in music, podcasts, and books.
+                    </Text>
+                    <Text style={styles.stepText}>
+                      Tip what you love. Each tip supports the creator, moves global and local
+                      charts, and puts that work on your public shelf.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => goToStep('location')}>
+                  <Text style={styles.primaryBtnText}>Continue</Text>
+                </Pressable>
+              </View>
+            )}
+
             {step === 'location' && (
               <View style={styles.stepBody}>
                 <View style={styles.stepHeader}>
@@ -594,6 +620,12 @@ export default function OnboardingScreen() {
                     goToStep('import');
                   }}>
                   <Text style={styles.secondaryBtnText}>Skip for now</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.backBtn}
+                  disabled={busy}
+                  onPress={() => goToStep('intro')}>
+                  <Text style={styles.backBtnText}>Back</Text>
                 </Pressable>
               </View>
             )}
@@ -835,6 +867,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     lineHeight: 19,
+  },
+  introLead: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
   },
   creditBanner: {
     borderRadius: 12,
