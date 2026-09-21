@@ -612,7 +612,7 @@ export const mediaAPI = {
   },
 
   getProfile: async (mediaId: string) => {
-    const response = await api.get(`/media/${mediaId}/profile`);
+    const response = await api.get(`/media/${encodeURIComponent(mediaId)}/profile`);
     return response.data;
   },
   
@@ -1296,7 +1296,7 @@ export type ImportJobStatus = {
 
 export const userAPI = {
   getProfile: async (userId: string) => {
-    const response = await api.get(`/users/${userId}/profile`);
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/profile`);
     return response.data;
   },
 
@@ -1435,7 +1435,7 @@ export const userAPI = {
   // Get user's tag rankings
   getTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};
-    const response = await api.get(`/users/${userId}/tag-rankings`, { params });
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tag-rankings`, { params });
     return response.data;
   },
 
@@ -1451,14 +1451,14 @@ export const userAPI = {
       badgeLimit?: number;
     }
   ) => {
-    const response = await api.get(`/users/${userId}/champion-titles`, { params });
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/champion-titles`, { params });
     return response.data;
   },
 
   // TuneBytes discovery tag rankings (champion badges on profile)
   getTuneBytesTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};
-    const response = await api.get(`/users/${userId}/tunebytes-tag-rankings`, { params });
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tunebytes-tag-rankings`, { params });
     return response.data;
   },
 
@@ -1637,7 +1637,7 @@ export const userAPI = {
 
   // Get another user's tune library by userId (for viewing their profile)
   getTuneLibraryByUserId: async (userId: string) => {
-    const response = await api.get(`/users/${userId}/tune-library`);
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tune-library`);
     return response.data;
   },
 

@@ -4,6 +4,7 @@ import { Music, Podcast, Play, Heart, Plus, ArrowUpDown, ArrowUp, ArrowDown, Che
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import MiniSupportersBar from './MiniSupportersBar';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 
 export interface LibraryBid {
   userId?: {
@@ -18,6 +19,7 @@ export interface LibraryBid {
 export interface LibraryItem {
   mediaId: string;
   mediaUuid: string;
+  slug?: string | null;
   title: string;
   artist: string;
   coverArt?: string;
@@ -110,7 +112,12 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
   };
 
   const resolvePath = (item: LibraryItem) =>
-    itemPath ? itemPath(item) : `/tune/${item.mediaId || item.mediaUuid}`;
+    itemPath ? itemPath(item) : getMediaProfileUrl({
+      _id: item.mediaId,
+      uuid: item.mediaUuid,
+      slug: item.slug || undefined,
+      contentForm: item.contentForm,
+    });
 
   const visibleItems =
     initialVisibleCount && !showAll ? items.slice(0, initialVisibleCount) : items;

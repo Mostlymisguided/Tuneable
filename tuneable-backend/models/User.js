@@ -376,6 +376,44 @@ userSchema.statics.findByLoginIdentifier = async function(identifier) {
   });
 };
 
+/**
+ * Public profile lookup: username | uuid | ObjectId.
+ * Usernames are 3–20 chars so they never collide with UUID (36) or ObjectId (24 hex).
+ */
+userSchema.statics.findByIdentifier = async function findByIdentifier(identifier, options = {}) {
+  const {
+    isUuidString,
+    isMongoObjectIdString,
+    escapeRegex,
+    normalizeIdentifier,
+  } = require('../utils/identifierFormat');
+
+  if (!identifier && identifier !== 0) return null;
+  if (identifier instanceof mongoose.Types.ObjectId) {
+    let query = this.findById(identifier);
+    if (options.select) query = query.select(options.select);
+    if (options.lean) query = query.lean();
+    return query;
+  }
+
+  const value = normalizeIdentifier(identifier);
+  if (!value) return null;
+
+  let filter;
+  if (isUuidString(value)) {
+    filter = { uuid: value };
+  } else if (isMongoObjectIdString(value)) {
+    filter = { _id: value };
+  } else {
+    filter = { username: { $regex: new RegExp(`^${escapeRegex(value)}$`, 'i') } };
+  }
+
+  let query = this.findOne(filter);
+  if (options.select) query = query.select(options.select);
+  if (options.lean) query = query.lean();
+  return query;
+};
+
 // Generate email verification token
 userSchema.methods.generateEmailVerificationToken = function() {
   const crypto = require('crypto');

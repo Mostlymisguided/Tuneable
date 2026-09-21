@@ -92,6 +92,7 @@ import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMedi
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
@@ -431,6 +432,17 @@ const TuneProfile: React.FC = () => {
       console.log('❌ No mediaId provided');
     }
   }, [mediaId]);
+
+  useEffect(() => {
+    if (!media) return;
+    const canonical = getMediaProfileUrl(media);
+    if (!canonical || canonical.endsWith('/')) return;
+    const qs = searchParams.toString();
+    const target = qs ? `${canonical}?${qs}` : canonical;
+    if (window.location.pathname !== canonical) {
+      navigate(target, { replace: true });
+    }
+  }, [media, navigate, searchParams]);
 
   // Fetch global party minimum bid
   useEffect(() => {
@@ -1800,7 +1812,7 @@ const TuneProfile: React.FC = () => {
     if (playableItems.length === 0) {
       if (startItem) {
         toast.info('This track is not playable yet — opening the tune page instead.');
-        navigate(`/tune/${startItem._id || startItem.uuid}`);
+        navigate(getMediaProfileUrl(startItem));
       } else {
         toast.info('No playable related tunes yet.');
       }
@@ -1814,7 +1826,7 @@ const TuneProfile: React.FC = () => {
       );
       if (matchIndex < 0) {
         toast.info('This track is not playable yet — opening the tune page instead.');
-        navigate(`/tune/${startItem._id || startItem.uuid}`);
+        navigate(getMediaProfileUrl(startItem));
         return;
       }
       startIndex = matchIndex;
@@ -1838,7 +1850,7 @@ const TuneProfile: React.FC = () => {
   const handleOpenRecommendedTip = (item: RecommendedMediaItem) => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      const returnUrl = `/tune/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1889,7 +1901,7 @@ const TuneProfile: React.FC = () => {
   const handleOpenTipModal = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      const returnUrl = `/tune/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1900,7 +1912,7 @@ const TuneProfile: React.FC = () => {
   const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      const returnUrl = `/tune/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1957,8 +1969,8 @@ const TuneProfile: React.FC = () => {
   // Use frontend URL for sharing (canonical URL that users will see)
   // Backend route /api/media/share/:id is for Facebook's crawler to get meta tags
   // Use _id instead of uuid for shorter URLs
-  const shareUrl = media?._id 
-    ? `${window.location.origin}/tune/${media._id}`
+  const shareUrl = media
+    ? `${window.location.origin}${getMediaProfileUrl(media)}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
@@ -1984,8 +1996,8 @@ const TuneProfile: React.FC = () => {
       : getAbsoluteImageUrl(media.coverArt);
     const ogTitle = `${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`;
     const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media?._id 
-      ? `${window.location.origin}/tune/${media._id}`
+    const ogUrl = media
+      ? `${window.location.origin}${getMediaProfileUrl(media)}`
       : window.location.href;
 
     // Create or update meta tags
@@ -2449,7 +2461,7 @@ const TuneProfile: React.FC = () => {
             onActionClick={() => {}}
             onPlay={() => startRecommendedQueue(items, item)}
             onTip={() => handleOpenRecommendedTip(item)}
-            mediaHref={`/tune/${item.uuid || item._id}`}
+            mediaHref={getMediaProfileUrl(item)}
           />
         );
       })}

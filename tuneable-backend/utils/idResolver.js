@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { isUuidString, isMongoObjectIdString, normalizeIdentifier } = require('./identifierFormat');
 
 /**
  * Resolves an ID (either MongoDB ObjectId or UUID) to a MongoDB ObjectId
@@ -9,13 +10,14 @@ const mongoose = require('mongoose');
  */
 async function resolveId(id, Model, field = 'uuid') {
     try {
-        // If it's a valid MongoDB ObjectId, return it directly
-        if (mongoose.isValidObjectId(id)) {
-            return id;
+        const value = normalizeIdentifier(id);
+        if (!value) return null;
+
+        if (isMongoObjectIdString(value)) {
+            return value;
         }
-        
-        // If it's not a valid ObjectId, treat it as a UUID and find the document
-        const doc = await Model.findOne({ [field]: id });
+
+        const doc = await Model.findOne({ [field]: value });
         return doc ? doc._id.toString() : null;
     } catch (error) {
         console.error('Error resolving ID:', error);
@@ -99,21 +101,20 @@ function resolvePartyId() {
 }
 
 /**
- * Middleware to resolve user ID from UUID to ObjectId
+ * Middleware to resolve user ID from username, UUID, or ObjectId
  */
 function resolveUserId() {
     return async (req, res, next) => {
         try {
             const { userId } = req.params;
             const User = require('../models/User');
-            
-            const resolvedId = await resolveId(userId, User, 'uuid');
-            
-            if (!resolvedId) {
+
+            const user = await User.findByIdentifier(userId, { select: '_id' });
+            if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
-            
-            req.params.userId = resolvedId;
+
+            req.params.userId = user._id.toString();
             next();
         } catch (error) {
             console.error('Error resolving user ID:', error);
@@ -126,5 +127,8 @@ module.exports = {
     resolveId,
     resolvePartyId,
     resolvePartyIdValue,
-    resolveUserId
+    resolveUserId,
+    isUuidString,
+    isMongoObjectIdString,
+    normalizeIdentifier,
 };

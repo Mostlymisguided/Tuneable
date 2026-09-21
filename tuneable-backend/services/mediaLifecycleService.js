@@ -10,13 +10,7 @@ const bidMetricsEngine = require('./bidMetricsEngine');
 
 async function resolveMediaByIdentifier(mediaId) {
   if (!mediaId) return null;
-  if (mongoose.isValidObjectId(mediaId)) {
-    return Media.findById(mediaId);
-  }
-  if (typeof mediaId === 'string' && mediaId.includes('-')) {
-    return Media.findOne({ uuid: mediaId });
-  }
-  return null;
+  return Media.findByIdentifier(mediaId);
 }
 
 async function reverseEscrowForBid(bid, refundAmount) {

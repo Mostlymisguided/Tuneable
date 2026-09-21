@@ -353,12 +353,12 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
 router.get('/:bookId', async (req, res) => {
   try {
     const { bookId } = req.params;
-    if (!mongoose.isValidObjectId(bookId)) {
-      return res.status(400).json({ error: 'Invalid book ID' });
-    }
-    const book = await Media.findOne({ _id: bookId, ...BOOK_CATALOG_QUERY })
+    const resolved = await Media.findByIdentifier(bookId, { select: '_id' });
+    if (!resolved) return res.status(404).json({ error: 'Book not found' });
+    const book = await Media.findOne({ _id: resolved._id, ...BOOK_CATALOG_QUERY })
       .populate('addedBy', 'username profilePic uuid');
     if (!book) return res.status(404).json({ error: 'Book not found' });
+    await Media.ensureSlug(book);
     res.json({ book: serializeBook(book) });
   } catch (error) {
     console.error('Error loading book:', error);

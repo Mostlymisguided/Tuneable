@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import type { LibraryItem } from './TuneLibraryTable';
-import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getMediaProfileUrl, toMediaPathFields } from '../utils/mediaNavigation';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import { penceToPounds } from '../utils/currency';
 import { sortChartItems, type ChartSortKey } from '../utils/chartSort';
@@ -555,11 +555,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
           {visibleItems.map((item, index) => {
             const queueShape = libraryItemToQueueShape(item);
             const mediaData = normalizeQueueMediaData(queueShape);
-            const mediaId = item.mediaUuid || item.mediaId;
-            const mediaHref = getMediaProfileUrl({
-              _id: mediaId,
-              contentForm: item.contentForm,
-            });
+            const mediaHref = getMediaProfileUrl(toMediaPathFields(item));
             return (
               <QueueMediaCard
                 key={`lib-${item.mediaId}-${index}`}

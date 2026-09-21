@@ -3,6 +3,7 @@ import { Trophy, ChevronDown, ChevronUp, Globe, Users, Coins, MapPin } from 'luc
 import { Link } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 interface User {
   _id?: string;
@@ -135,7 +136,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
           <div className="min-w-0">
             <div className="text-xs text-gray-300 mb-0.5">{label}</div>
             <Link
-              to={`/user/${user._id || user.uuid}`}
+              to={getUserProfileUrl(user)}
               className="text-sm font-medium text-white hover:text-purple-300 transition-colors truncate block"
             >
               @{user.username}
@@ -230,7 +231,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <Link
-                          to={`/user/${supporter.user._id || supporter.user.uuid}`}
+                          to={getUserProfileUrl(supporter.user)}
                           className="text-sm font-medium text-white hover:text-purple-300 transition-colors truncate block"
                         >
                           @{supporter.user.username}
@@ -289,7 +290,7 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <Link
-                          to={`/user/${bid.userId?.uuid}`}
+                          to={getUserProfileUrl(bid.userId)}
                           className="text-sm font-medium text-white hover:text-yellow-300 transition-colors truncate block"
                         >
                           @{bid.userId?.username || 'Unknown'}

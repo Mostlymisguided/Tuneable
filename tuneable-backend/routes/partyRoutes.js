@@ -929,7 +929,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             .populate({
                 path: 'media.mediaId',
                 model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay rightsStatus rightsCleared contentType contentForm', // ✅ Updated to schema grammar field names
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation globalMediaBidTop globalMediaBidTopUser globalMediaAggregateTop globalMediaAggregateTopUser featuring creatorDisplay rightsStatus rightsCleared contentType contentForm uuid slug', // ✅ Updated to schema grammar field names
                 populate: [
                     {
                         path: 'bids',
@@ -1377,7 +1377,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid contentType contentForm bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared'
+                    select: 'title artist duration coverArt sources globalMediaAggregate tags category uuid slug contentType contentForm bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared'
                 });
         }
 
@@ -3747,7 +3747,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 .populate({
                     path: 'media.mediaId',
                     model: 'Media',
-                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid featuring creatorDisplay rightsStatus rightsCleared contentType contentForm createdAt uploadedAt',
+                    select: 'title artist duration coverArt sources globalMediaAggregate bids addedBy tags category bpm releaseDate releaseYear primaryLocation uuid slug featuring creatorDisplay rightsStatus rightsCleared contentType contentForm createdAt uploadedAt',
                     populate: [
                         {
                             path: 'bids',

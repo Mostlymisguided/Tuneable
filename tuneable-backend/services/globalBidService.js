@@ -6,7 +6,6 @@ const Media = require('../models/Media');
 const User = require('../models/User');
 const Bid = require('../models/Bid');
 const Party = require('../models/Party');
-const { isValidObjectId } = require('../utils/validators');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { normalizeTagForStorage } = require('../utils/tagNormalizer');
@@ -51,17 +50,13 @@ async function placeGlobalBid(userId, {
   }
 
   let media;
-  const isObjectId = isValidObjectId(mediaId);
-  const isUuid = !isObjectId && mediaId && mediaId.includes('-');
-  const isExternalRequest = !isObjectId && !isUuid;
+  const { isUuidString, isMongoObjectIdString } = require('../utils/identifierFormat');
 
-  if (isObjectId) {
-    media = await Media.findById(mediaId);
-  } else if (isUuid) {
-    media = await Media.findOne({ uuid: mediaId });
-  } else {
-    media = null;
+  if (mediaId && mediaId !== 'external') {
+    media = await Media.findByIdentifier(mediaId);
   }
+
+  const isExternalRequest = !media && Boolean(externalMedia) && !isUuidString(mediaId) && !isMongoObjectIdString(mediaId);
 
   if (!media && isExternalRequest) {
     if (!externalMedia) {

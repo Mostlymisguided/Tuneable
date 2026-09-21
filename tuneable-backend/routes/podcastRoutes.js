@@ -2235,11 +2235,11 @@ router.post('/discovery/create-or-find-series', authMiddleware, async (req, res)
 // Get podcast series info only (without episodes - for fast initial load)
 router.get('/series/:seriesId/info', async (req, res) => {
   try {
-    const { seriesId } = req.params;
-    
-    if (!isValidObjectId(seriesId)) {
-      return res.status(400).json({ error: 'Invalid series ID' });
+    const resolved = await Media.findByIdentifier(req.params.seriesId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Podcast series not found' });
     }
+    const seriesId = resolved._id;
 
     // Get series only (no episodes, no import)
     const series = await Media.findById(seriesId)
@@ -2254,6 +2254,8 @@ router.get('/series/:seriesId/info', async (req, res) => {
     if (!series.contentForm?.includes('podcastseries')) {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
+
+    await Media.ensureSlug(series);
 
     // Get basic stats (count only, no full episode list)
     const episodeCount = await Media.countDocuments({
@@ -2562,7 +2564,11 @@ function serializeSeriesEpisodes(episodes, seriesCoverArt) {
 // Get podcast series with episodes
 router.get('/series/:seriesId', async (req, res) => {
   try {
-    const { seriesId } = req.params;
+    const resolved = await Media.findByIdentifier(req.params.seriesId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Podcast series not found' });
+    }
+    const seriesId = resolved._id.toString();
     const { autoImport = 'true', refresh = 'false', loadMore = 'false', offset = '0' } = req.query;
     const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : 'mostTipped';
     const { match: episodeMatch, query: searchQuery } = buildSeriesEpisodeMatch(
@@ -2574,10 +2580,6 @@ router.get('/series/:seriesId', async (req, res) => {
     const applyLimit = Object.prototype.hasOwnProperty.call(req.query, 'limit');
     const requestedLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const episodeOffset = Math.max(parseInt(offset, 10) || 0, 0);
-    
-    if (!isValidObjectId(seriesId)) {
-      return res.status(400).json({ error: 'Invalid series ID' });
-    }
 
     // Get series (need non-lean for potential updates)
     let series = await Media.findById(seriesId)
@@ -2591,6 +2593,8 @@ router.get('/series/:seriesId', async (req, res) => {
     if (!series.contentForm?.includes('podcastseries')) {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
+
+    await Media.ensureSlug(series);
 
     const existingEpisodeCount = await Media.countDocuments(seriesEpisodeMatch(seriesId));
 

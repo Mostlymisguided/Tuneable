@@ -294,6 +294,16 @@ async function mergeMedia(sourceId, keepId, actorId, { dryRun = false } = {}) {
   if (!keep.album && source.album) keep.album = source.album;
   mergeMediaOwners(keep, source);
 
+  if (source.slug && source.slug !== keep.slug) {
+    const aliases = new Set([...(keep.slugAliases || []), source.slug, ...(source.slugAliases || [])]);
+    keep.slugAliases = Array.from(aliases);
+    source.slug = undefined;
+    source.set('slug', undefined, { strict: false });
+    source.$unset('slug');
+  } else if (Array.isArray(source.slugAliases) && source.slugAliases.length) {
+    keep.slugAliases = Array.from(new Set([...(keep.slugAliases || []), ...source.slugAliases]));
+  }
+
   // Union tags
   if (Array.isArray(source.tags) && source.tags.length) {
     const tagSet = new Set([...(keep.tags || []), ...source.tags]);

@@ -28,6 +28,7 @@ import BidConfirmationModal from './BidConfirmationModal';
 export interface TippedQueueItem {
   _id: string;
   uuid?: string;
+  slug?: string | null;
   title: string;
   artist?: unknown;
   featuring?: unknown;
@@ -174,6 +175,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     _id: item._id,
     id: item.uuid || item._id,
     uuid: item.uuid || item._id,
+    slug: item.slug || undefined,
     title: item.title,
     artist: item.artist,
     featuring: item.featuring,

@@ -318,7 +318,7 @@ router.get('/:slug', async (req, res) => {
         { 'featuring.collectiveId': collective._id }
       ]
     })
-    .select('title artist coverArt releaseDate globalMediaAggregate uuid _id')
+    .select('title artist coverArt releaseDate globalMediaAggregate uuid slug _id')
     .sort({ releaseDate: -1 })
     .limit(10)
     .lean();
@@ -331,7 +331,7 @@ router.get('/:slug', async (req, res) => {
         { 'featuring.collectiveId': collective._id }
       ]
     })
-    .select('title artist coverArt globalMediaAggregate uuid _id')
+    .select('title artist coverArt globalMediaAggregate uuid slug _id')
     .sort({ globalMediaAggregate: -1 })
     .limit(5)
     .lean();
@@ -492,7 +492,7 @@ router.get('/:slug/media', async (req, res) => {
         { 'featuring.collectiveId': collective._id }
       ]
     })
-    .select('title artist coverArt releaseDate globalMediaAggregate uuid _id')
+    .select('title artist coverArt releaseDate globalMediaAggregate uuid slug _id')
     .sort(sort)
     .limit(limit * 1)
     .skip((page - 1) * limit);

@@ -10,6 +10,7 @@ import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { requireAuthToPlay } from '../utils/playAuth';
 
 interface TopTunesSong {
@@ -120,7 +121,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
 
     if (!isMediaPlayable(enriched)) {
       toast.info('This track is not playable yet — visit the tune page to tip support.');
-      navigate(`/tune/${mediaId}`);
+      navigate(getMediaProfileUrl(song));
       return;
     }
 
@@ -251,7 +252,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
 
               {/* Cover Art with Play Button Overlay */}
               <div className="flex-shrink-0 relative w-12 h-12">
-                <Link to={`/tune/${song._id || song.id}`} className="block w-full h-full">
+                <Link to={getMediaProfileUrl(song)} className="block w-full h-full">
                   <img
                     src={song.coverArt || DEFAULT_COVER_ART}
                     alt={song.title}
@@ -276,7 +277,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               <div className="flex-1 min-w-0">
                 <h3 className="text-white font-medium truncate">
                   <Link
-                    to={`/tune/${song._id || song.id}`}
+                    to={getMediaProfileUrl(song)}
                     className="cursor-pointer hover:text-purple-300 transition-colors"
                   >
                     {song.title}

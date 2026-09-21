@@ -880,7 +880,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
     
     // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
+      .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
       .populate('podcastSeries', 'title')
       .populate('globalMediaAggregateTopUser', 'username uuid _id')
       .lean();
@@ -996,7 +996,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, contentForm, sources;
+        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, slug, contentForm, sources;
         let playability = {};
 
         if (media) {
@@ -1011,6 +1011,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
           tags = media.tags || [];
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
+          slug = media.slug || null;
           contentForm = media.contentForm || [];
           playability = enrichMediaWithPlayability(media, { authenticated });
           sources = playability.sources || {};
@@ -1028,6 +1029,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
           tags = [];
           globalMediaAggregate = aggregate.userBidTotal || 0; // Best we have without Media
           mediaUuid = aggregate.mediaId;
+          slug = null;
           contentForm = [];
           sources = {};
         }
@@ -1041,6 +1043,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
           return {
             mediaId: aggregate.mediaId,
             mediaUuid,
+            slug,
             title,
             artist,
             coverArt,
@@ -1097,7 +1100,7 @@ async function buildPlaybackQueueResponse(user) {
     .map((mediaId) => mediaId.toString());
 
   const mediaDocs = await Media.find({ _id: { $in: mediaIds } })
-    .select('title artist creatorDisplay coverArt duration uuid _id tags contentForm sources rightsStatus rightsCleared')
+    .select('title artist creatorDisplay coverArt duration uuid slug _id tags contentForm sources rightsStatus rightsCleared')
     .lean();
 
   const mediaLookup = new Map(mediaDocs.map((media) => [media._id.toString(), media]));
@@ -1115,6 +1118,7 @@ async function buildPlaybackQueueResponse(user) {
         note: entry.note || '',
         mediaId: media._id.toString(),
         mediaUuid: media.uuid || media._id.toString(),
+        slug: media.slug || null,
         title: media.title || 'Unknown Title',
         artist: formatMediaArtist(media),
         coverArt: media.coverArt || null,
@@ -1448,7 +1452,7 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
 
     const total = await ListeningHistory.countDocuments(query);
     const items = await ListeningHistory.find(query)
-      .populate('mediaId', 'title artist creatorDisplay coverArt duration uuid _id tags contentForm')
+      .populate('mediaId', 'title artist creatorDisplay coverArt duration uuid slug _id tags contentForm')
       .sort({ lastPlayedAt: -1 })
       .skip(skip)
       .limit(limitNumber)
@@ -1474,6 +1478,7 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
         media: media ? {
           _id: media._id,
           uuid: media.uuid,
+          slug: media.slug || null,
           title: media.title,
           artist: formatMediaArtist(media),
           coverArt: media.coverArt,
@@ -2134,14 +2139,7 @@ router.get('/me/import/jobs/:jobId', authMiddleware, async (req, res) => {
 router.get('/:userId/tune-library', optionalAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
-    let user;
-    if (userId.includes('-')) {
-      user = await User.findOne({ uuid: userId });
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId);
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
+    const user = await User.findByIdentifier(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
     const result = await fetchTuneLibraryForUser(user, { authenticated: Boolean(req.user) });
     res.json(result);
@@ -3506,19 +3504,8 @@ router.get('/:userId/profile', async (req, res) => {
     
     const { userId } = req.params;
 
-    // Find user by UUID or ObjectId
-    // First try without lean() to get full Mongoose document
-    let user;
-    if (userId.includes('-')) {
-      // UUID format
-      user = await User.findOne({ uuid: userId });
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      // ObjectId format
-      user = await User.findById(userId);
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
-
+    // Find user by username, UUID, or ObjectId
+    let user = await User.findByIdentifier(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -3535,7 +3522,7 @@ router.get('/:userId/profile', async (req, res) => {
       .populate({
         path: 'mediaId',
         model: 'Media',
-        select: 'title artist coverArt duration globalMediaAggregate uuid _id contentType contentForm tags', // Updated to schema grammar - added tags
+        select: 'title artist coverArt duration globalMediaAggregate uuid slug _id contentType contentForm tags', // Updated to schema grammar - added tags
       })
       .populate({
         path: 'partyId',
@@ -4768,27 +4755,11 @@ router.get('/:userId/tag-rankings', async (req, res) => {
     const mongoose = require('mongoose');
     const tagRankingsService = require('../services/tagRankingsService');
     
-    // Find user by UUID or ObjectId
-    let actualUserId;
-    let user;
-    
-    if (userId.includes('-')) {
-      // UUID format
-      user = await User.findOne({ uuid: userId }).select('_id tagRankings tagRankingsUpdatedAt');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      actualUserId = user._id;
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      // ObjectId format
-      actualUserId = new mongoose.Types.ObjectId(userId);
-      user = await User.findById(actualUserId).select('_id tagRankings tagRankingsUpdatedAt');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
+    const user = await User.findByIdentifier(userId, { select: '_id tagRankings tagRankingsUpdatedAt' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
+    const actualUserId = user._id;
 
     // Check if we have cached rankings and they're recent (unless forcing refresh)
     const hasCachedRankings = user.tagRankings && user.tagRankings.length > 0;
@@ -4868,15 +4839,7 @@ router.get('/:userId/tunebytes-tag-rankings', async (req, res) => {
     const mongoose = require('mongoose');
     const tuneBytesTagRankingsService = require('../services/tuneBytesTagRankingsService');
 
-    let user;
-    if (typeof userId === 'string' && userId.includes('-')) {
-      user = await User.findOne({ uuid: userId }).select('_id');
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId).select('_id');
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
-
+    const user = await User.findByIdentifier(userId, { select: '_id' });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -4911,13 +4874,18 @@ router.get('/:userId/tunebytes', authMiddleware, async (req, res) => {
     const { userId } = req.params;
     const requestingUserId = req.user._id;
 
+    const targetUser = await User.findByIdentifier(userId, { select: '_id' });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     // Users can only view their own TuneBytes data
-    if (userId !== requestingUserId.toString()) {
+    if (targetUser._id.toString() !== requestingUserId.toString()) {
       return res.status(403).json({ error: 'You can only view your own TuneBytes data' });
     }
 
     const tuneBytesService = require('../services/tuneBytesService');
-    const stats = await tuneBytesService.getUserTuneBytesStats(userId);
+    const stats = await tuneBytesService.getUserTuneBytesStats(targetUser._id);
 
     res.json({
       success: true,
@@ -4939,14 +4907,19 @@ router.get('/:userId/tunebytes/history', authMiddleware, async (req, res) => {
     const requestingUserId = req.user._id;
     const { limit = 50, offset = 0 } = req.query;
 
+    const targetUser = await User.findByIdentifier(userId, { select: '_id' });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     // Users can only view their own TuneBytes data
-    if (userId !== requestingUserId.toString()) {
+    if (targetUser._id.toString() !== requestingUserId.toString()) {
       return res.status(403).json({ error: 'You can only view your own TuneBytes data' });
     }
 
     const TuneBytesTransaction = require('../models/TuneBytesTransaction');
     const transactions = await TuneBytesTransaction.find({ 
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: targetUser._id,
       status: 'confirmed'
     })
     .populate('mediaId', 'title artist coverArt')
@@ -4956,7 +4929,7 @@ router.get('/:userId/tunebytes/history', authMiddleware, async (req, res) => {
     .limit(parseInt(limit));
 
     const totalCount = await TuneBytesTransaction.countDocuments({ 
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: targetUser._id,
       status: 'confirmed'
     });
 

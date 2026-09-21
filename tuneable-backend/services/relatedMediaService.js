@@ -177,6 +177,7 @@ const formatMediaEntry = (record, playabilityOptions = {}) => {
   return {
     _id: media._id.toString(),
     uuid: media.uuid,
+    slug: media.slug || null,
     title: media.title,
     artist: getPrimaryArtistName(media) || 'Unknown Artist',
     coverArt: media.coverArt || null,
@@ -269,7 +270,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   const playabilityOptions = { authenticated: settings.authenticated === true };
 
   const source = await Media.findById(mediaId)
-    .select('_id uuid title artist tags contentType contentForm relationships globalMediaAggregate')
+    .select('_id uuid slug title artist tags contentType contentForm relationships globalMediaAggregate')
     .lean();
 
   if (!source) {
@@ -301,7 +302,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   }
 
   const candidateMedia = await Media.find(candidateQuery)
-    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay rightsStatus rightsCleared')
+    .select('_id uuid slug title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay rightsStatus rightsCleared')
     .populate('globalMediaAggregateTopUser', 'username uuid _id')
     .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
     .limit(settings.candidatePoolSize)

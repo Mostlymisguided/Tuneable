@@ -12,7 +12,6 @@ const sharp = require('sharp');
 sharp.cache(false);
 sharp.concurrency(1);
 const Media = require('../models/Media');
-const { isValidObjectId } = require('../utils/validators');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { getMediaTagRankings } = require('./mediaTagRankingsService');
 const { getMediaLocationRankings } = require('./locationProfileService');
@@ -225,17 +224,9 @@ function ogOverlaySvg(copy) {
 async function resolveMedia(id) {
   const cleanId = id ? String(id).trim() : '';
   if (!cleanId) return null;
-  if (cleanId.includes('-') && cleanId.length > 20) {
-    return Media.findOne({ uuid: cleanId })
-      .populate('podcastSeries', 'title coverArt genres tags')
-      .lean();
-  }
-  if (isValidObjectId(cleanId)) {
-    return Media.findById(cleanId)
-      .populate('podcastSeries', 'title coverArt genres tags')
-      .lean();
-  }
-  return null;
+  return Media.findByIdentifier(cleanId)
+    .populate('podcastSeries', 'title coverArt genres tags')
+    .lean();
 }
 
 async function loadCardContext(media) {
@@ -331,7 +322,7 @@ async function buildMediaStoryCard(id, { format = 'story' } = {}) {
   const coverUrl = absoluteCoverUrl(getMediaCoverArt(media));
   const buffer = await renderPng(copy, coverUrl, cardFormat);
   const frontendUrl = (process.env.FRONTEND_URL || 'https://tuneable.stream').replace(/\/$/, '');
-  const sharePath = canonicalMediaPath(kind, media._id);
+  const sharePath = canonicalMediaPath(kind, media.slug || media.uuid || media._id);
   const shareUrl = `${frontendUrl}${sharePath}`;
 
   const result = {

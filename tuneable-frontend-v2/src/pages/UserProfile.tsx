@@ -132,7 +132,8 @@ import {
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
-import { getMediaProfileUrl, isBookMedia } from '../utils/mediaNavigation';
+import { getMediaProfileUrl, isBookMedia, toMediaPathFields } from '../utils/mediaNavigation';
+import { getUserProfileUrl, isCanonicalUserParam } from '../utils/profileNavigation';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -239,6 +240,7 @@ interface PlaybackQueueItem {
   note?: string;
   mediaId: string;
   mediaUuid: string;
+  slug?: string | null;
   title: string;
   artist: string;
   coverArt?: string;
@@ -266,6 +268,7 @@ interface ListeningHistoryItem {
   media: {
     _id: string;
     uuid?: string | null;
+    slug?: string | null;
     title: string;
     artist: string;
     coverArt?: string;
@@ -843,9 +846,8 @@ const UserProfile: React.FC = () => {
     if (userId) {
       // If userId is "profile", redirect to proper profile route
       if (userId === 'profile') {
-        if (currentUser && (currentUser._id || currentUser.uuid)) {
-          // Redirect to proper user profile route
-          navigate(`/user/${currentUser._id || currentUser.uuid}${searchParams.toString() ? '?' + searchParams.toString() : ''}`, { replace: true });
+        if (currentUser && (currentUser.username || currentUser._id || currentUser.uuid)) {
+          navigate(getUserProfileUrl(currentUser, searchParams), { replace: true });
           return;
         } else {
           // No current user, redirect to profile page which will handle auth
@@ -858,6 +860,12 @@ const UserProfile: React.FC = () => {
       }
     }
   }, [userId, currentUser, navigate, searchParams, fetchUserProfile]);
+
+  useEffect(() => {
+    if (!user?.username || !userId) return;
+    if (isCanonicalUserParam(userId, user.username)) return;
+    navigate(getUserProfileUrl(user, searchParams), { replace: true });
+  }, [user, userId, navigate, searchParams]);
 
   // Separate useEffect for OAuth callbacks to avoid dependency issues with isOwnProfile
   useEffect(() => {
@@ -1414,7 +1422,7 @@ const UserProfile: React.FC = () => {
   const handlePlayLibraryItem = (item: LibraryItem, _index?: number, sourceList?: LibraryItem[]) => {
     const baseList = sourceList ?? getSortedLibrary();
     if (isBookItem(item)) {
-      navigate(getMediaProfileUrl({ _id: item.mediaId || item.mediaUuid, contentForm: item.contentForm }));
+      navigate(getMediaProfileUrl(toMediaPathFields(item)));
       return;
     }
     if (isPodcastItem(item)) {
@@ -2488,7 +2496,7 @@ const UserProfile: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <p className="text-white font-medium truncate text-sm md:text-base">
                                 <Link
-                                  to={`/tune/${media._id || media.id}`}
+                                  to={getMediaProfileUrl(media)}
                                   className="cursor-pointer hover:text-purple-300 transition-colors"
                                   title="View tune profile"
                                 >
@@ -2768,12 +2776,7 @@ const UserProfile: React.FC = () => {
                 showTipButton={!!isOwnProfile}
                 showQueueButton={!!isOwnProfile}
                 artistColumnLabel="Artist / Show / Author"
-                itemPath={(item) =>
-                  getMediaProfileUrl({
-                    _id: item.mediaId || item.mediaUuid,
-                    contentForm: item.contentForm,
-                  })
-                }
+                itemPath={(item) => getMediaProfileUrl(toMediaPathFields(item))}
               />
             )}
               </>
@@ -2830,10 +2833,7 @@ const UserProfile: React.FC = () => {
                         {index + 1}
                       </div>
                       <Link
-                        to={getMediaProfileUrl({
-                          _id: item.mediaUuid || item.mediaId,
-                          contentForm: item.contentForm,
-                        })}
+                        to={getMediaProfileUrl(toMediaPathFields(item))}
                         className="flex-shrink-0"
                       >
                         <img
@@ -2845,10 +2845,7 @@ const UserProfile: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <Link
-                            to={getMediaProfileUrl({
-                              _id: item.mediaUuid || item.mediaId,
-                              contentForm: item.contentForm,
-                            })}
+                            to={getMediaProfileUrl(toMediaPathFields(item))}
                             className="text-left text-white font-semibold truncate hover:text-purple-300 transition-colors"
                           >
                             {item.title}
@@ -2922,10 +2919,7 @@ const UserProfile: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {listeningHistory.map((entry) => {
-                  const path = getMediaProfileUrl({
-                    _id: entry.media.uuid || entry.media._id,
-                    contentForm: entry.media.contentForm,
-                  });
+                  const path = getMediaProfileUrl(toMediaPathFields(entry.media));
                   return (
                     <div key={entry._id} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
                       <div className="flex items-start gap-4">
@@ -3056,7 +3050,7 @@ const UserProfile: React.FC = () => {
                       {/* Media Cover Art */}
                       {tip.media?.coverArt && (
                         (tip.media?._id || tip.media?.uuid) ? (
-                          <Link to={`/tune/${tip.media._id || tip.media.uuid}`} className="flex-shrink-0">
+                          <Link to={getMediaProfileUrl(tip.media)} className="flex-shrink-0">
                             <img
                               src={tip.media.coverArt}
                               alt={tip.media.title || 'Media'}
@@ -3077,7 +3071,7 @@ const UserProfile: React.FC = () => {
                         <h3 className="text-lg font-semibold text-white mb-1">
                           {(tip.media?._id || tip.media?.uuid) ? (
                             <Link
-                              to={`/tune/${tip.media._id || tip.media.uuid}`}
+                              to={getMediaProfileUrl(tip.media)}
                               className="cursor-pointer hover:text-purple-300 transition-colors"
                             >
                               {tip.media?.title || tip.mediaTitle || 'Unknown Media'}

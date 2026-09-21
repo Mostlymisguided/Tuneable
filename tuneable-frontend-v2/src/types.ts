@@ -189,6 +189,7 @@ export interface MediaRelationship {
 export interface Media {
   id: string;
   uuid: string;
+  slug?: string;
   title: string;
   
   // Content classification

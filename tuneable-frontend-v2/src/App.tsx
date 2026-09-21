@@ -14,6 +14,7 @@ import MP3Player from './components/MP3Player';
 import PersistentPodcastPlayer from './components/PersistentPodcastPlayer';
 import { isMediaPlayable } from './utils/mediaPlayability';
 import { hasAuthToken, setPlayAuthRedirect } from './utils/playAuth';
+import { getUserProfileUrl } from './utils/profileNavigation';
 import About from './pages/About';
 import AuthPage from './pages/AuthPage';
 import AuthCallback from './pages/AuthCallback';
@@ -149,11 +150,11 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 const ProfileRedirect = () => {
   const { user } = useAuth();
   
-  if (!user || (!user._id && !user.uuid)) {
+  if (!user || (!user.username && !user._id && !user.uuid)) {
     return <Navigate to="/login" />;
   }
   
-  return <Navigate to={`/user/${user._id || user.uuid}`} replace />;
+  return <Navigate to={getUserProfileUrl(user)} replace />;
 };
 
 const OnboardingRedirect = () => {

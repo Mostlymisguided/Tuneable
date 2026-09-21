@@ -40,6 +40,7 @@ const MEDIA_CHART_SELECT = [
   'releaseYear',
   'primaryLocation',
   'uuid',
+  'slug',
   'globalMediaAggregate',
   'globalMediaBidTop',
   'globalMediaBidTopUser',
@@ -705,7 +706,8 @@ async function fetchAllTimeGlobalChart({
     return {
       _id: media._id,
       id: media._id || media.uuid,
-      uuid: media._id || media.uuid,
+      uuid: media.uuid || media._id,
+      slug: media.slug || null,
       title: media.title,
       artist: artistNameFromMedia(media),
       artists: Array.isArray(media.artist) ? media.artist : [],
@@ -1048,7 +1050,8 @@ async function fetchPeriodGlobalChart({
     return {
       _id: media._id,
       id: media._id || media.uuid,
-      uuid: media._id || media.uuid,
+      uuid: media.uuid || media._id,
+      slug: media.slug || null,
       title: media.title,
       artist: artistNameFromMedia(media),
       artists: Array.isArray(media.artist) ? media.artist : [],

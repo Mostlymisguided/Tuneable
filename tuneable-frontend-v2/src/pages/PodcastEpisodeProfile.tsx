@@ -68,6 +68,7 @@ import DeleteMediaSection from '../components/DeleteMediaSection';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getEpisodeDisplayTags } from '../utils/podcastTags';
 
 interface Media {
@@ -364,6 +365,17 @@ const PodcastEpisodeProfile: React.FC = () => {
     }
   }, [mediaId]);
 
+  useEffect(() => {
+    if (!media) return;
+    const canonical = getMediaProfileUrl(media);
+    if (!canonical || canonical.endsWith('/')) return;
+    const qs = searchParams.toString();
+    const target = qs ? `${canonical}?${qs}` : canonical;
+    if (window.location.pathname !== canonical) {
+      navigate(target, { replace: true });
+    }
+  }, [media, navigate, searchParams]);
+
   // Fetch global party minimum bid
   useEffect(() => {
     const fetchGlobalPartyMinimumBid = async () => {
@@ -475,8 +487,11 @@ const PodcastEpisodeProfile: React.FC = () => {
   };
 
   const getEpisodeDeleteRedirect = () => {
-    if (media?.podcastSeries && typeof media.podcastSeries === 'object' && media.podcastSeries._id) {
-      return `/podcast/${media.podcastSeries._id}`;
+    if (media?.podcastSeries && typeof media.podcastSeries === 'object') {
+      return getMediaProfileUrl({
+        ...media.podcastSeries,
+        contentForm: ['podcastseries'],
+      });
     }
     return '/podcasts';
   };
@@ -1556,7 +1571,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const handleOpenTipModal = () => {
     if (!user) {
       toast.info('Please log in to support this episode');
-      const returnUrl = `/podcasts/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId, contentForm: ['podcastepisode'] });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1567,7 +1582,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this episode');
-      const returnUrl = `/podcasts/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId, contentForm: ['podcastepisode'] });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1617,8 +1632,8 @@ const PodcastEpisodeProfile: React.FC = () => {
   // Use frontend URL for sharing (canonical URL that users will see)
   // Backend route /api/media/share/:id is for Facebook's crawler to get meta tags
   // Use _id instead of uuid for shorter URLs
-  const shareUrl = media?._id 
-    ? `${window.location.origin}/podcasts/${media._id}`
+  const shareUrl = media
+    ? `${window.location.origin}${getMediaProfileUrl(media)}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this episode'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
@@ -1647,8 +1662,8 @@ const PodcastEpisodeProfile: React.FC = () => {
       : media.artist || '';
     const ogTitle = `${media.title}${artistDisplay ? ` by ${artistDisplay}` : ''} | Tuneable`;
     const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media?._id 
-      ? `${window.location.origin}/podcasts/${media._id}`
+    const ogUrl = media
+      ? `${window.location.origin}${getMediaProfileUrl(media)}`
       : window.location.href;
 
     // Create or update meta tags
@@ -2053,9 +2068,9 @@ const PodcastEpisodeProfile: React.FC = () => {
     media.podcastSeries && typeof media.podcastSeries === 'object'
       ? media.podcastSeries.title
       : null;
-  const seriesId =
+  const seriesPath =
     media.podcastSeries && typeof media.podcastSeries === 'object'
-      ? media.podcastSeries._id
+      ? getMediaProfileUrl({ ...media.podcastSeries, contentForm: ['podcastseries'] })
       : null;
 
   const externalLinks = (() => {
@@ -2245,7 +2260,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         >
           <div className="relative mb-2">
             <Link
-              to={`/podcasts/${episode._id || episode.uuid}`}
+              to={getMediaProfileUrl(episode)}
               className="block w-full"
             >
               <img
@@ -2264,7 +2279,7 @@ const PodcastEpisodeProfile: React.FC = () => {
             </button>
           </div>
           <Link
-            to={`/podcasts/${episode._id || episode.uuid}`}
+            to={getMediaProfileUrl(episode)}
             className="block w-full text-left"
           >
             <div className="text-sm font-semibold text-white truncate hover:text-purple-300 transition-colors">{episode.title}</div>
@@ -2364,9 +2379,9 @@ const PodcastEpisodeProfile: React.FC = () => {
             <div className="flex-1 w-full text-white">
               <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
-                {seriesId ? (
+                {seriesPath ? (
                   <a
-                    href={`/podcast/${seriesId}`}
+                    href={seriesPath}
                     className="hover:text-purple-200 hover:underline transition-colors"
                   >
                     {seriesTitle}
@@ -2593,9 +2608,9 @@ const PodcastEpisodeProfile: React.FC = () => {
                 <Mic className="h-5 w-5 text-cyan-300" />
                 More from this series
               </h2>
-              {seriesId && (
+              {seriesPath && (
                 <Link
-                  to={`/podcast/${seriesId}`}
+                  to={seriesPath}
                   className="text-sm text-purple-300 hover:text-purple-200 transition-colors"
                 >
                   View series

@@ -13,6 +13,7 @@ import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from '../utils/toast';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 
 // Helper function to format time (seconds to MM:SS)
 const formatTime = (seconds: number): string => {
@@ -722,7 +723,7 @@ const PersistentWebPlayer: React.FC = () => {
             {currentMedia ? (
               <div className="text-center">
                 <Link 
-                  to={`/tune/${(currentMedia as any)._id || currentMedia.id}`}
+                  to={getMediaProfileUrl(currentMedia as any)}
                   className="hover:text-zinc-300 transition-colors no-underline"
                 >
                   <h4 className="text-base font-semibold text-white leading-tight">
@@ -750,7 +751,7 @@ const PersistentWebPlayer: React.FC = () => {
             {/* Left: Artwork */}
             {currentMedia ? (
               <Link 
-                to={`/tune/${(currentMedia as any)._id || currentMedia.id}`}
+                to={getMediaProfileUrl(currentMedia as any)}
                 className="flex w-12 h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
               >
                 <img

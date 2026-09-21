@@ -50,11 +50,7 @@ function asPlainString(value, fallback = '') {
 async function resolveMediaByIdentifier(identifier) {
   if (!identifier) return null;
   try {
-    if (mongoose.Types.ObjectId.isValid(identifier) && String(identifier).length === 24) {
-      const byId = await Media.findById(identifier);
-      if (byId) return byId;
-    }
-    return Media.findOne({ uuid: identifier });
+    return Media.findByIdentifier(identifier);
   } catch (error) {
     console.error('Failed to resolve media for listening history:', error);
     return null;

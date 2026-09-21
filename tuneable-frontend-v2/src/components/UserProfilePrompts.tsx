@@ -7,11 +7,13 @@ import { hasCustomProfilePic, DEFAULT_TIP_POUNDS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { formatLocation } from '../utils/locationHelpers';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 interface User {
   _id?: string;
   id?: string;
   uuid?: string;
+  username?: string;
   emailVerified?: boolean;
   profilePic?: string;
   onboarding?: {
@@ -77,18 +79,16 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
   };
 
   const handleAddProfilePicture = () => {
-    const userId = user._id || user.id || user.uuid;
-    if (userId) {
-      navigate(`/user/${userId}?settings=true&tab=profile&action=uploadPic`);
+    if (user.username || user._id || user.id || user.uuid) {
+      navigate(getUserProfileUrl(user, 'settings=true&tab=profile&action=uploadPic'));
     } else {
       toast.error('Unable to navigate to profile');
     }
   };
 
   const handleSetDefaultTip = () => {
-    const userId = user._id || user.id || user.uuid;
-    if (userId) {
-      navigate(`/user/${userId}?settings=true&tab=notifications`);
+    if (user.username || user._id || user.id || user.uuid) {
+      navigate(getUserProfileUrl(user, 'settings=true&tab=notifications'));
     } else {
       toast.error('Unable to navigate to profile');
     }
@@ -108,9 +108,8 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
       if (getCurrentLocationStatus() === 'denied') {
         toast.error('Location permission denied. Search for your city on your profile.');
       }
-      const userId = user._id || user.id || user.uuid;
-      if (userId) {
-        navigate(`/user/${userId}?settings=true&tab=profile`);
+      if (user.username || user._id || user.id || user.uuid) {
+        navigate(getUserProfileUrl(user, 'settings=true&tab=profile'));
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Could not set home location');

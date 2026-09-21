@@ -11,6 +11,7 @@ import EntertainingLoader from '../components/EntertainingLoader';
 import MediaChampions from '../components/MediaChampions';
 import { getReadElsewhereTarget } from '../utils/listenElsewhere';
 import { getTipCurrentLocation } from '../utils/currentLocationCache';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 
 const BookProfile: React.FC = () => {
   const { mediaId } = useParams();
@@ -40,6 +41,15 @@ const BookProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaId]);
 
+  useEffect(() => {
+    if (!book) return;
+    const canonical = getMediaProfileUrl(book);
+    if (!canonical || canonical.endsWith('/')) return;
+    if (window.location.pathname !== canonical) {
+      navigate(canonical, { replace: true });
+    }
+  }, [book, navigate]);
+
   const authors = useMemo(() => {
     if (!book) return '';
     if (book.creatorDisplay) return book.creatorDisplay;
@@ -52,11 +62,11 @@ const BookProfile: React.FC = () => {
   const defaultTip = user?.preferences?.defaultTip || 1.11;
 
   const handleConfirmTip = async (_tags: string[], amount: number) => {
-    if (!mediaId) return;
+    if (!book?._id) return;
     setTipping(true);
     try {
       const currentLocation = getTipCurrentLocation();
-      const result = await booksAPI.boost(mediaId, amount, currentLocation);
+      const result = await booksAPI.boost(book._id, amount, currentLocation);
       setBook(result.book);
       setShowTipModal(false);
       toast.success('Tip placed');
@@ -109,7 +119,7 @@ const BookProfile: React.FC = () => {
               <button
                 onClick={() => {
                   if (!user) {
-                    navigate(`/login?returnUrl=${encodeURIComponent(`/book/${mediaId}`)}`);
+                    navigate(`/login?returnUrl=${encodeURIComponent(getMediaProfileUrl(book || { _id: mediaId, contentForm: ['book'] }))}`);
                     return;
                   }
                   setShowTipModal(true);

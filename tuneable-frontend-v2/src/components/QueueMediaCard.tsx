@@ -9,6 +9,7 @@ import { DEFAULT_COVER_ART } from '../constants';
 import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { roundBpm } from '../utils/bpm';
 
 const META_LINK_CLASS =
@@ -98,7 +99,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     !new URLSearchParams(routeLocation.search).get('location');
   const href =
     mediaHref ||
-    (mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined);
+    (mediaData.slug || mediaData.uuid || mediaData._id ? getMediaProfileUrl(mediaData) : undefined);
 
   const metaParts: React.ReactNode[] = [];
   metaParts.push(

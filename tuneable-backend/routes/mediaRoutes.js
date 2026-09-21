@@ -53,6 +53,15 @@ const Gear = require('../models/Gear');
 
 router.use(optionalAuthMiddleware);
 
+async function findMediaByParam(mediaId, options = {}) {
+  return Media.findByIdentifier(mediaId, options);
+}
+
+async function resolveMediaIdFromParam(mediaId) {
+  const media = await Media.findByIdentifier(mediaId, { select: '_id' });
+  return media?._id || null;
+}
+
 /**
  * Extract release year from releaseDate or use provided releaseYear
  * @param {Date|string|null} releaseDate - The release date
@@ -967,15 +976,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
 
     console.log(`🎵 attach-upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
 
-    let media;
-    if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-    } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
-
+    let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -1422,7 +1423,7 @@ router.get('/top-tunes', async (req, res) => {
           select: 'username profilePic uuid',
         },
       })
-      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags'); // Updated to schema grammar
+      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid slug contentType contentForm genres category tags'); // Updated to schema grammar
 
     // Apply fuzzy tag matching on results if tags are specified
     if (tags && Array.isArray(tags) && tags.length > 0) {
@@ -1512,20 +1513,7 @@ router.get('/:mediaId/profile', async (req, res) => {
     const { mediaId } = req.params;
     console.log('🔍 Media profile request for mediaId:', mediaId);
 
-    // Find media by UUID or ObjectId
-    let media;
-    if (mediaId.includes('-')) {
-      // UUID format
-      console.log('🔍 Searching by UUID:', mediaId);
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      // ObjectId format
-      console.log('🔍 Searching by ObjectId:', mediaId);
-      media = await Media.findById(mediaId);
-    } else {
-      console.log('❌ Invalid media ID format:', mediaId);
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
+    let media = await findMediaByParam(mediaId);
 
     if (!media) {
       console.log('❌ Media not found for ID:', mediaId);
@@ -1535,6 +1523,8 @@ router.get('/:mediaId/profile', async (req, res) => {
     if (media.status === 'deleted') {
       return res.status(404).json({ error: 'Media not found' });
     }
+
+    await Media.ensureSlug(media);
     
     console.log('✅ Media found:', media.title);
 
@@ -1578,7 +1568,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       .populate({
         path: 'podcastSeries',
         model: 'Media',
-        select: '_id title coverArt description frequency genres tags'
+        select: '_id uuid slug title coverArt description frequency genres tags'
       });
 
     // Fetch recent comments
@@ -1723,14 +1713,11 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
     const { mediaId } = req.params;
     const { relatedLimit = 12, fansLimit = 8 } = req.query;
 
-    let resolvedMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!mediaByUuid) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      resolvedMediaId = mediaByUuid._id;
+    const resolved = await findMediaByParam(mediaId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const resolvedMediaId = resolved._id;
 
     const playlists = await getRelatedPlaylistsForMedia(resolvedMediaId, {
       relatedLimit: Math.min(Math.max(parseInt(relatedLimit, 10) || 12, 1), 24),
@@ -2762,16 +2749,7 @@ router.get('/:mediaId/comments', async (req, res) => {
     const { mediaId } = req.params;
     const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
-    // Find media
-    let media;
-    if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-    } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
-
+    let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -2836,16 +2814,7 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Comment must be less than 1000 characters' });
     }
 
-    // Validate media exists
-    let media;
-    if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-    } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
-
+    let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -2983,13 +2952,7 @@ router.post('/:mediaId/tag-claims', authMiddleware, async (req, res) => {
     const { tags, agreeTop, agreeLimit } = req.body || {};
     const userId = req.user._id;
 
-    let media;
-    if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId).select('_id');
-    } else if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId }).select('_id');
-    }
-
+    const media = await findMediaByParam(mediaId, { select: '_id' });
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -3086,22 +3049,11 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       });
     }
 
-    // Find media by ObjectId (preferred) or UUID (fallback)
-    // Note: ObjectId is preferred for consistency with other routes, UUID is fallback for compatibility
-    let media;
-    const isObjectId = isValidObjectId(mediaId);
-    const isUuid = !isObjectId && mediaId.includes('-');
-    const isExternalRequest = !isObjectId && !isUuid;
-
-    if (isObjectId) {
-      // ObjectId format (preferred)
-      media = await Media.findById(mediaId);
-    } else if (isUuid) {
-      // UUID format (fallback)
-      media = await Media.findOne({ uuid: mediaId });
-    } else {
-      media = null; // Treat as external creation request
-    }
+    const { isUuidString, isMongoObjectIdString } = require('../utils/identifierFormat');
+    let media = (mediaId && mediaId !== 'external')
+      ? await findMediaByParam(mediaId)
+      : null;
+    const isExternalRequest = !media && Boolean(externalMedia) && !isUuidString(mediaId) && !isMongoObjectIdString(mediaId);
 
     if (!media && isExternalRequest) {
       if (!externalMedia) {
@@ -3507,16 +3459,11 @@ router.get('/:mediaId/top-parties', async (req, res) => {
 
     console.log('🎪 Top parties request for media:', mediaId);
 
-    // Handle both ObjectIds and UUIDs
-    let actualMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      // If it's not an ObjectId, try to find by UUID
-      const media = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!media) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      actualMediaId = media._id;
+    const media = await findMediaByParam(mediaId, { select: '_id' });
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const actualMediaId = media._id;
 
     console.log('✅ Using media ID:', actualMediaId);
 
@@ -3573,16 +3520,11 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 
     console.log('🏷️ Tag rankings request for media:', mediaId);
 
-    // Handle both ObjectIds and UUIDs
-    let actualMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      // If it's not an ObjectId, try to find by UUID
-      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!mediaByUuid) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      actualMediaId = mediaByUuid._id;
+    const resolved = await findMediaByParam(mediaId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const actualMediaId = resolved._id;
 
     const media = await Media.findById(actualMediaId)
       .populate('podcastSeries', 'title coverArt genres tags')
@@ -3616,14 +3558,11 @@ router.get('/:mediaId/location-rankings', async (req, res) => {
 
     console.log('📍 Location rankings request for media:', mediaId);
 
-    let actualMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!mediaByUuid) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      actualMediaId = mediaByUuid._id;
+    const resolved = await findMediaByParam(mediaId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const actualMediaId = resolved._id;
 
     const media = await Media.findById(actualMediaId)
       .select('_id primaryLocation globalMediaAggregate contentType contentForm status')
@@ -4523,16 +4462,8 @@ router.get('/share/:id', async (req, res) => {
     // For debugging - log what we detect
     const shouldServeMetaTags = isCrawler; // Serve meta tags without redirect for crawlers
 
-    // Find media by _id (ObjectId) or UUID (for backward compatibility)
-    let media;
-    if (id.includes('-') && id.length > 20) {
-      // UUID format (has dashes and is longer)
-      media = await Media.findOne({ uuid: id });
-    } else if (isValidObjectId(id)) {
-      // ObjectId format (shorter, 24 characters)
-      media = await Media.findById(id);
-    } else {
-      // For share route, always return error page with meta tags (never redirect)
+    let media = await findMediaByParam(cleanId);
+    if (!media) {
       console.error('❌ Invalid media ID in share route:', cleanId);
       return res.status(400).send(`
         <!DOCTYPE html>
@@ -4548,20 +4479,6 @@ router.get('/share/:id', async (req, res) => {
         </head>
         <body>
           <p>Invalid media ID.</p>
-        </body>
-        </html>
-      `);
-      // For regular browsers, redirect
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta http-equiv="refresh" content="0;url=${frontendUrl}">
-          <title>Tuneable - Invalid ID</title>
-        </head>
-        <body>
-          <p>Invalid media ID. Redirecting to <a href="${frontendUrl}">Tuneable</a>...</p>
         </body>
         </html>
       `);
@@ -4654,7 +4571,7 @@ router.get('/share/:id', async (req, res) => {
     const artistText = creatorDisplay ? ` by ${creatorDisplay}` : '';
     const mediaTitle = (media.title && media.title.trim()) || 'Untitled Tune';
     const mediaKind = detectMediaKind(media);
-    const sharePath = canonicalMediaPath(mediaKind, media._id);
+    const sharePath = canonicalMediaPath(mediaKind, media.slug || media.uuid || media._id);
     
     // Ensure we have a valid cover art URL
     const ogImage = publicStoryCardUrl(req, media._id, 'og');
@@ -4849,17 +4766,9 @@ router.post('/:mediaId/veto', authMiddleware, adminMiddleware, async (req, res) 
     const notificationService = require('../services/notificationService');
 
     // Handle both ObjectId and UUID formats
-    let actualMediaId = mediaId;
-    let media = null;
-    
-    if (mongoose.isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-      actualMediaId = mediaId;
-    } else {
-      media = await Media.findOne({ uuid: mediaId });
-      if (media) {
-        actualMediaId = media._id.toString();
-      }
+    let media = await findMediaByParam(mediaId);
+    if (media) {
+      actualMediaId = media._id.toString();
     }
 
     if (!media) {

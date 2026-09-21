@@ -5,6 +5,8 @@ import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook,
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 import { DEFAULT_PROFILE_PIC, COUNTRIES } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
@@ -800,7 +802,7 @@ const LabelProfile: React.FC = () => {
                         />
                         <div className="flex-1 min-w-0">
                           <Link 
-                            to={`/tune/${release._id || release.uuid}`}
+                            to={getMediaProfileUrl(release)}
                             className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
                           >
                             {release.title}
@@ -833,7 +835,7 @@ const LabelProfile: React.FC = () => {
                         />
                         <div className="flex-1 min-w-0">
                           <Link 
-                            to={`/tune/${media._id || media.uuid}`}
+                            to={getMediaProfileUrl(media)}
                             className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
                           >
                             {media.title}
@@ -869,7 +871,7 @@ const LabelProfile: React.FC = () => {
                   {artists.map((artist) => (
                     <Link
                       key={artist._id}
-                      to={`/profile/${artist.username}`}
+                      to={getUserProfileUrl(artist)}
                       className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
                     >
                       <div className="flex items-center space-x-4">
@@ -916,7 +918,7 @@ const LabelProfile: React.FC = () => {
                         className="w-full h-48 rounded-lg object-cover mb-4"
                       />
                       <Link 
-                        to={`/tune/${release._id || release.uuid}`}
+                        to={getMediaProfileUrl(release)}
                         className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block mb-1"
                       >
                         {release.title}

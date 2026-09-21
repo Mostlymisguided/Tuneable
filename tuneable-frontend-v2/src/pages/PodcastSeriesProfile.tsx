@@ -40,6 +40,7 @@ import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlay
 import { requireAuthToPlay } from '../utils/playAuth';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { shareStoryCardWithToast } from '../utils/shareMediaCard';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 
 interface PodcastSeries {
   _id: string;
@@ -204,6 +205,15 @@ const PodcastSeriesProfile: React.FC = () => {
       cancelled = true;
     };
   }, [seriesId]);
+
+  useEffect(() => {
+    if (!series) return;
+    const canonical = getMediaProfileUrl({ ...series, contentForm: ['podcastseries'] });
+    if (!canonical || canonical.endsWith('/')) return;
+    if (window.location.pathname !== canonical) {
+      navigate(canonical, { replace: true });
+    }
+  }, [series, navigate]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -636,8 +646,8 @@ const PodcastSeriesProfile: React.FC = () => {
   };
 
   // Share functionality
-  const shareUrl = seriesId
-    ? `${window.location.origin}/podcast/${seriesId}`
+  const shareUrl = series
+    ? `${window.location.origin}${getMediaProfileUrl({ ...series, contentForm: ['podcastseries'] })}`
     : window.location.href;
   const shareText = `Check out "${series?.title || 'this podcast'}" on Tuneable! Support your favourite Creators and discover new content.`;
   const storyMediaId = series?._id || seriesId;
@@ -1261,7 +1271,7 @@ const PodcastSeriesProfile: React.FC = () => {
                   <div className="flex flex-col sm:flex-row gap-4">
                     {/* Cover Art with Play overlay */}
                     <div className="relative flex-shrink-0 cursor-pointer group">
-                      <Link to={`/podcasts/${episode._id}`} className="block">
+                      <Link to={getMediaProfileUrl(episode)} className="block">
                         <img
                           src={
                             (isHttpCover(episode.coverArt) ? episode.coverArt : series?.coverArt) ||
@@ -1293,7 +1303,7 @@ const PodcastSeriesProfile: React.FC = () => {
                             <span className="text-purple-400 font-bold text-lg">#{(currentPage - 1) * episodesPerPage + index + 1}</span>
                             <h3 className="text-xl font-bold truncate">
                               <Link
-                                to={`/podcasts/${episode._id}`}
+                                to={getMediaProfileUrl(episode)}
                                 className="cursor-pointer hover:text-purple-300"
                               >
                                 {episode.title}

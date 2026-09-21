@@ -45,6 +45,7 @@ import {
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import { getCanonicalTag, generateTagSlug, tagsMatch } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { hasAuthToken, requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
@@ -3149,7 +3150,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                     <div className="flex-1 min-w-0">
                                       <p className="text-white font-medium truncate text-sm md:text-base">
                                         <Link
-                                          to={`/tune/${media._id || media.id}`}
+                                          to={getMediaProfileUrl(media)}
                                           className="cursor-pointer hover:text-purple-300 transition-colors"
                                           title="View tune profile"
                                         >

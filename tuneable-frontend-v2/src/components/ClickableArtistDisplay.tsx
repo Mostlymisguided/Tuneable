@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 interface Artist {
   name: string;
-  userId?: string | { _id: string; uuid?: string } | null;
+  userId?: string | { _id: string; uuid?: string; username?: string } | null;
   collectiveId?: string | { _id: string } | null;
   verified?: boolean;
 }
@@ -78,11 +79,14 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
               ? artist.userId
               : null;
             
-            const uuid = typeof artist.userId === 'object' && artist.userId?.uuid
-              ? artist.userId.uuid
+            const populated = typeof artist.userId === 'object' && artist.userId
+              ? artist.userId
               : null;
-            
-            const linkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
+            const linkPath = populated
+              ? getUserProfileUrl(populated)
+              : userId
+                ? getUserProfileUrl(userId)
+                : null;
             
             const relation = (artist as any)?.relationToNext;
             const relationText = relation && relation !== ','
@@ -120,11 +124,14 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
                   ? feat.userId
                   : null;
                 
-                const uuid = typeof feat.userId === 'object' && feat.userId?.uuid
-                  ? feat.userId.uuid
+                const populated = typeof feat.userId === 'object' && feat.userId
+                  ? feat.userId
                   : null;
-                
-                const linkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
+                const linkPath = populated
+                  ? getUserProfileUrl(populated)
+                  : userId
+                    ? getUserProfileUrl(userId)
+                    : null;
                 
                 return (
                   <React.Fragment key={idx}>
@@ -164,11 +171,14 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
       ? firstArtist.userId
       : null;
     
-    const uuid = typeof firstArtist.userId === 'object' && firstArtist.userId?.uuid
-      ? firstArtist.userId.uuid
+    const populated = typeof firstArtist.userId === 'object' && firstArtist.userId
+      ? firstArtist.userId
       : null;
-    
-    const linkPath = uuid ? `/user/${uuid}` : userId ? `/user/${userId}` : null;
+    const linkPath = populated
+      ? getUserProfileUrl(populated)
+      : userId
+        ? getUserProfileUrl(userId)
+        : null;
     
     if (linkPath) {
       // If first artist has userId, make the whole display clickable

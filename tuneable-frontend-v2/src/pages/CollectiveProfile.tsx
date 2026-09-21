@@ -5,6 +5,8 @@ import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook,
 import { collectiveAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
@@ -804,7 +806,7 @@ useEffect(() => {
                         />
                         <div className="flex-1 min-w-0">
                           <Link 
-                            to={`/tune/${release._id || release.uuid}`}
+                            to={getMediaProfileUrl(release)}
                             className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
                           >
                             {release.title}
@@ -837,7 +839,7 @@ useEffect(() => {
                         />
                         <div className="flex-1 min-w-0">
                           <Link 
-                            to={`/tune/${media._id || media.uuid}`}
+                            to={getMediaProfileUrl(media)}
                             className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
                           >
                             {media.title}
@@ -867,17 +869,17 @@ useEffect(() => {
                     const memberUser = typeof member.userId === 'string' 
                       ? null 
                       : member.userId;
-                    const memberId = typeof member.userId === 'string' 
+                    const memberKey = typeof member.userId === 'string' 
                       ? member.userId 
-                      : (member.userId._id || member.userId.uuid || member.userId);
+                      : (member.userId._id || member.userId.uuid || String(index));
                     
                     return (
                       <div
-                        key={index}
+                        key={memberKey}
                         className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
                       >
                         {memberUser ? (
-                          <Link to={`/profile/${memberUser.username || memberId}`}>
+                          <Link to={getUserProfileUrl(memberUser)}>
                             <div className="flex items-center space-x-4">
                               <img
                                 src={memberUser.profilePic || DEFAULT_PROFILE_PIC}
@@ -939,7 +941,7 @@ useEffect(() => {
                         className="w-full h-48 rounded-lg object-cover mb-4"
                       />
                       <Link 
-                        to={`/tune/${release._id || release.uuid}`}
+                        to={getMediaProfileUrl(release)}
                         className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block mb-1"
                       >
                         {release.title}

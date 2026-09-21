@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import { penceToPounds } from '../utils/currency';
 import { chartKindPath, isChartsPath, isPlacesPath } from '../utils/chartKind';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 function ghostNavClass(active: boolean, loggedOut = false) {
   const idle = loggedOut ? 'text-gray-300' : 'text-white';
@@ -98,7 +99,7 @@ const Navbar: React.FC = () => {
                     {penceToPounds(user.balance)}
                   </Link>
                   <Link
-                    to={`/user/${user._id || user.uuid}`}
+                    to={getUserProfileUrl(user)}
                     className="px-2 sm:px-4 py-1 sm:py-2 text-white rounded-lg font-medium transition-colors text-sm sm:text-base hover:bg-gray-600"
                     style={{ textDecoration: 'none' }}
                   >

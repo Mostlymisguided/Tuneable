@@ -15,21 +15,12 @@ async function calculateAndUpdateUserTagRankings(userId, limit = 10, forceRecalc
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
 
-    // Resolve user ID
-    let actualUserId;
-    if (mongoose.Types.ObjectId.isValid(userId)) {
-      actualUserId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-    } else {
-      // Try UUID
-      const user = await User.findOne({ uuid: userId }).select('_id');
-      if (!user) {
-        throw new Error('User not found');
-      }
-      actualUserId = user._id;
+    const resolvedUser = await User.findByIdentifier(userId, { select: '_id tagRankings tagRankingsUpdatedAt' });
+    if (!resolvedUser) {
+      throw new Error('User not found');
     }
-
-    // Check if we need to recalculate (if updated recently and not forcing)
-    const user = await User.findById(actualUserId).select('tagRankingsUpdatedAt');
+    const actualUserId = resolvedUser._id;
+    const user = resolvedUser;
     if (!user) {
       throw new Error('User not found');
     }
@@ -168,19 +159,11 @@ async function calculateAndUpdateUserTagRankings(userId, limit = 10, forceRecalc
 async function invalidateUserTagRankings(userId) {
   try {
     const User = require('../models/User');
-    
-    // Resolve user ID
-    let actualUserId;
-    if (mongoose.Types.ObjectId.isValid(userId)) {
-      actualUserId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-    } else {
-      // Try UUID
-      const user = await User.findOne({ uuid: userId }).select('_id');
-      if (!user) {
-        return; // User not found, silently fail
-      }
-      actualUserId = user._id;
+    const user = await User.findByIdentifier(userId, { select: '_id' });
+    if (!user) {
+      return;
     }
+    const actualUserId = user._id;
 
     // Update timestamp to trigger recalculation on next request
     // Set to null or old date to force recalculation

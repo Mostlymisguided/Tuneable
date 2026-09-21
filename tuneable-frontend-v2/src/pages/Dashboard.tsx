@@ -23,6 +23,8 @@ import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { normalizeSources, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
 
 interface SearchResult {
@@ -1135,7 +1137,7 @@ Join here: ${inviteLink}`.trim();
                                           </div>
                                         )}
                                         <Link
-                                          to={`/tune/${String(item._id || item.uuid)}`}
+                                          to={getMediaProfileUrl(item)}
                                           className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                         >
                                           {item.title}
@@ -1166,7 +1168,7 @@ Join here: ${inviteLink}`.trim();
                                     </td>
                                     <td className="px-4 py-3">
                                       <Link
-                                        to={`/tune/${String(item._id || item.uuid)}`}
+                                        to={getMediaProfileUrl(item)}
                                         className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                       >
                                         View
@@ -2489,7 +2491,7 @@ Join here: ${inviteLink}`.trim();
                   {React.createElement(
                     isClickable ? Link : 'div',
                     {
-                      ...(isClickable ? { to: `/tune/${mediaId}` } : {}),
+                      ...(isClickable ? { to: getMediaProfileUrl(result) } : {}),
                       className: `flex items-start md:items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`,
                     } as any,
                     <>
@@ -2862,7 +2864,7 @@ Join here: ${inviteLink}`.trim();
           </div>
           {user && (user._id || user.uuid) && (
             <Link
-              to={`/user/${user._id || user.uuid}?view=tip-history`}
+              to={getUserProfileUrl(user, 'view=tip-history')}
               className="flex items-center space-x-2 px-4 mx-4 md:mx-0 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
             >
               <History className="h-4 w-4" />

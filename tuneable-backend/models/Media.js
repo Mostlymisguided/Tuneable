@@ -9,6 +9,16 @@ const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
+  // Public URL slug (artist-title). IDs stay on uuid/_id.
+  slug: {
+    type: String,
+    unique: true,
+    sparse: true,
+    lowercase: true,
+    trim: true,
+    maxlength: 120,
+  },
+  slugAliases: [{ type: String, lowercase: true, trim: true }],
   
   // Core identification
   title: { type: String, required: true },
@@ -579,6 +589,16 @@ mediaSchema.pre('save', function (next) {
   next();
 });
 
+mediaSchema.pre('save', async function generateMediaSlug(next) {
+  if (this.slug) return next();
+  try {
+    this.slug = await this.constructor.generateUniqueSlug(this);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Post-save hook: Check and create tag parties when media is saved
 // Note: This hook is intentionally NOT async to avoid blocking the save operation
 // Only creates tag parties for music media (excludes podcasts)
@@ -698,6 +718,7 @@ mediaSchema.index({ "externalIds.googleBooks": 1 });
 mediaSchema.index({ "sources.soundcloud": 1 }); // Index for SoundCloud permalink matching
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.targetId": 1 }); // Index for finding relationships to specific media
+mediaSchema.index({ slugAliases: 1 });
 mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by owner
 mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
 mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user
@@ -1211,6 +1232,98 @@ mediaSchema.statics.repairIsbnUniqueness = async function repairIsbnUniqueness()
     unsetCount: unsetResult.modifiedCount || 0,
     dropped,
   };
+};
+
+mediaSchema.statics.generateUniqueSlug = async function generateUniqueSlug(media, excludeId = null) {
+  const { buildMediaSlugBase } = require('../utils/mediaSlug');
+  const { isUuidString, isMongoObjectIdString } = require('../utils/identifierFormat');
+
+  let base = buildMediaSlugBase(media);
+  if (!base) base = 'untitled';
+  if (isUuidString(base) || isMongoObjectIdString(base)) {
+    base = `${base}-media`;
+  }
+
+  let slug = base;
+  let counter = 2;
+  const idToExclude = excludeId || media?._id || null;
+
+  while (counter < 60) {
+    const query = { $or: [{ slug }, { slugAliases: slug }] };
+    if (idToExclude) query._id = { $ne: idToExclude };
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await this.findOne(query).select('_id').lean();
+    if (!existing) return slug;
+    slug = `${base}-${counter}`;
+    counter += 1;
+  }
+
+  const short = String(media?.uuid || Date.now()).replace(/-/g, '').slice(0, 8);
+  return `${String(base).slice(0, 70)}-${short}`;
+};
+
+/**
+ * Persist a public slug if this media does not have one yet.
+ * Used on profile reads so UUID/ObjectId URLs can canonical-redirect.
+ */
+mediaSchema.statics.ensureSlug = async function ensureSlug(media) {
+  if (!media) return media;
+  if (media.slug) return media;
+  try {
+    const slug = await this.generateUniqueSlug(media);
+    await this.updateOne({ _id: media._id }, { $set: { slug } });
+    media.slug = slug;
+  } catch (err) {
+    if (err && err.code === 11000) {
+      try {
+        const retry = await this.generateUniqueSlug(media);
+        await this.updateOne({ _id: media._id }, { $set: { slug: retry } });
+        media.slug = retry;
+      } catch (retryErr) {
+        console.error('ensureSlug collision retry failed:', retryErr.message);
+      }
+    } else {
+      console.error('ensureSlug failed:', err.message);
+    }
+  }
+  return media;
+};
+
+/**
+ * Public media lookup: slug | uuid | ObjectId.
+ */
+mediaSchema.statics.findByIdentifier = function findByIdentifier(identifier, options = {}) {
+  const {
+    isUuidString,
+    isMongoObjectIdString,
+    normalizeIdentifier,
+  } = require('../utils/identifierFormat');
+  const mongoose = require('mongoose');
+
+  if (identifier instanceof mongoose.Types.ObjectId) {
+    let query = this.findById(identifier);
+    if (options.select) query = query.select(options.select);
+    if (options.lean) query = query.lean();
+    return query;
+  }
+
+  const value = normalizeIdentifier(identifier);
+  if (!value) return Promise.resolve(null);
+
+  let filter;
+  if (isUuidString(value)) {
+    filter = { $or: [{ uuid: value }, { slug: value.toLowerCase() }, { slugAliases: value.toLowerCase() }] };
+  } else if (isMongoObjectIdString(value)) {
+    filter = { $or: [{ _id: value }, { slug: value.toLowerCase() }, { slugAliases: value.toLowerCase() }] };
+  } else {
+    const slug = value.toLowerCase();
+    filter = { $or: [{ slug }, { slugAliases: slug }] };
+  }
+
+  let query = this.findOne(filter);
+  if (options.select) query = query.select(options.select);
+  if (options.lean) query = query.lean();
+  return query;
 };
 
 module.exports = mongoose.models.Media || mongoose.model('Media', mediaSchema);
