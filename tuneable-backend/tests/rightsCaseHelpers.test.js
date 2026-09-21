@@ -120,7 +120,7 @@ describe('buildOutreachContent', () => {
   const media = { title: 'Around the World', uuid: 'abc', artist: [{ name: 'Daft Punk' }] };
   const party = { displayName: 'Thomas' };
 
-  it('uses the tipped hook and tune URL in a keep invite', () => {
+  it('uses the tipped hook and two CTAs in a keep invite', () => {
     const content = buildOutreachContent({
       template: 'claim_keep_invite',
       media,
@@ -129,12 +129,16 @@ describe('buildOutreachContent', () => {
     });
     expect(content.subject).toMatch(/tipped on Tuneable/i);
     expect(content.text).toContain('has been tipped on Tuneable');
+    expect(content.text).toContain('Reply YES to this email');
+    expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
+    expect(content.text).toContain('founding artist');
     expect(content.text).toContain('escrow');
     expect(content.tuneUrl).toBe('https://tuneable.stream/tune/abc');
+    expect(content.registerUrl).toContain('/creator/register');
   });
 
-  it('builds a short Instagram DM', () => {
+  it('builds a short Instagram DM with both CTAs', () => {
     const content = buildOutreachContent({
       template: 'claim_keep_invite',
       media,
@@ -144,11 +148,14 @@ describe('buildOutreachContent', () => {
     expect(content.format).toBe('instagram');
     expect(content.subject).toBe('');
     expect(content.text).toContain('has been tipped on Tuneable');
+    expect(content.text).toContain('Reply YES');
+    expect(content.text).toContain('founding artist');
+    expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
     expect(content.text.startsWith('Hey Thomas')).toBe(true);
   });
 
-  it('builds a copy-link message', () => {
+  it('builds a copy-link message with both CTAs', () => {
     const content = buildOutreachContent({
       template: 'claim_keep_invite',
       media,
@@ -156,9 +163,10 @@ describe('buildOutreachContent', () => {
       format: 'link',
     });
     expect(content.format).toBe('link');
-    expect(content.text).toBe(
-      'Your tune "Around the World" has been tipped on Tuneable.\n\nhttps://tuneable.stream/tune/abc'
-    );
+    expect(content.text).toContain('Your tune "Around the World" has been tipped on Tuneable.');
+    expect(content.text).toContain('Reply YES');
+    expect(content.text).toContain('Become a founding artist: https://tuneable.stream/creator/register?from=rights&tune=abc');
+    expect(content.text).toContain('https://tuneable.stream/tune/abc');
   });
 
   it('appends a custom note', () => {

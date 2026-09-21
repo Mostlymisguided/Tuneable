@@ -432,10 +432,10 @@ const CreatorRegister: React.FC = () => {
       const response = await creatorAPI.apply(submitData);
       
       toast.success(response.message);
-      
-      // Navigate to profile or back to where they came from
+
+      const tippedTune = searchParams.get('tune');
       setTimeout(() => {
-        navigate('/profile');
+        navigate(tippedTune ? `/tune/${encodeURIComponent(tippedTune)}` : '/profile');
       }, 2000);
     } catch (error: any) {
       console.error('Error submitting creator application:', error);

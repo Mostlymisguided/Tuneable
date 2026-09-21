@@ -3030,6 +3030,7 @@ export const rightsAPI = {
       subject: string;
       text: string;
       tuneUrl?: string;
+      registerUrl?: string;
       format?: string;
       instagramHandle?: string | null;
     };

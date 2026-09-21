@@ -1150,7 +1150,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   <Send className="h-4 w-4" /> Your tune has been tipped
                 </h4>
                 <p className="text-xs text-gray-500">
-                  Copy a listing message, send email (reply-to {replyTo}), or copy an Instagram DM.
+                  Copy a YES / founding-artist message, send email (reply-to {replyTo}), or copy an Instagram DM.
                 </p>
                 <input
                   type="email"

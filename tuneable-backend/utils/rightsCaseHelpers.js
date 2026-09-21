@@ -267,9 +267,20 @@ function primaryInstagramFromParty(party) {
   return primaryInstagramFromContacts(party?.contacts);
 }
 
+function frontendBase(frontendUrl = 'https://tuneable.stream') {
+  return String(frontendUrl || 'https://tuneable.stream').replace(/\/$/, '');
+}
+
 function tuneUrlFromMedia(media, frontendUrl = 'https://tuneable.stream') {
-  const base = String(frontendUrl || 'https://tuneable.stream').replace(/\/$/, '');
+  const base = frontendBase(frontendUrl);
   return media?.uuid ? `${base}/tune/${media.uuid}` : base;
+}
+
+function creatorRegisterUrl(media, frontendUrl = 'https://tuneable.stream') {
+  const base = frontendBase(frontendUrl);
+  const params = new URLSearchParams({ from: 'rights' });
+  if (media?.uuid) params.set('tune', String(media.uuid));
+  return `${base}/creator/register?${params.toString()}`;
 }
 
 function buildOutreachContent({
@@ -284,7 +295,11 @@ function buildOutreachContent({
   const greetName = party?.displayName || 'there';
   const artistLine = artistLineFromMedia(media);
   const tuneUrl = tuneUrlFromMedia(media, frontendUrl);
-  const claimHint = `You can review the listing and file a keep or takedown claim here: ${tuneUrl}`;
+  const registerUrl = creatorRegisterUrl(media, frontendUrl);
+  const yesCta = 'Reply YES to this email and we will make it playable so you can start receiving those tips.';
+  const founderCta = `Or become a founding artist here: ${registerUrl}`;
+  const listingLine = `Check it out: ${tuneUrl}`;
+  const takedownLine = 'If this is not your work or you want it taken down, just say so.';
   const note = customMessage?.trim() || '';
   const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
   const resolvedTemplate = OUTREACH_TEMPLATES.includes(template) ? template : 'custom';
@@ -295,27 +310,28 @@ function buildOutreachContent({
       intro:
         `Hi ${greetName},\n\n` +
         `Your tune "${title}" (${artistLine}) has been tipped on Tuneable. ` +
-        `Tips for this listing are held in escrow until a rights holder claims it.\n\n` +
-        `If this is your work, create a Tuneable account and file a keep claim with proof of ownership. ` +
-        `Approved claims assign ownership and release held tips to you. ` +
-        `If you do not want it live, you can request a takedown instead.\n\n` +
-        `${claimHint}`,
+        `Tips for this listing are waiting in escrow.\n\n` +
+        `${yesCta}\n\n` +
+        `${founderCta}\n\n` +
+        `${listingLine}\n\n` +
+        takedownLine,
     },
     takedown_option: {
       subject: `Take-down option for "${title}" on Tuneable`,
       intro:
         `Hi ${greetName},\n\n` +
         `"${title}" (${artistLine}) is listed on Tuneable in rights-pending limbo. ` +
-        `If you do not want it live, you can request a takedown. We will remove the listing and refund tippers.\n\n` +
-        `${claimHint}`,
+        `If you do not want it live, reply and we will take it down and refund tippers.\n\n` +
+        `${listingLine}`,
     },
     follow_up: {
       subject: `Following up: ${title} on Tuneable`,
       intro:
         `Hi ${greetName},\n\n` +
-        `Checking in about "${title}" on Tuneable — your tune has been tipped and we have not heard back. ` +
-        `Wanted to make sure our last note reached you.\n\n` +
-        `${claimHint}`,
+        `Checking in — your tune "${title}" has been tipped on Tuneable and we have not heard back.\n\n` +
+        `${yesCta}\n\n` +
+        `${founderCta}\n\n` +
+        `${listingLine}`,
     },
     copyright_reporter: {
       subject: `We received your rights report for "${title}"`,
@@ -334,25 +350,37 @@ function buildOutreachContent({
 
   const instagramTemplates = {
     claim_keep_invite:
-      `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable. ` +
-      `Tips sit in escrow until you claim the listing (keep it live or take it down).\n\n${tuneUrl}`,
+      `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable.\n\n` +
+      `Reply YES and we'll make it playable so you can start receiving those tips.\n\n` +
+      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
     takedown_option:
       `Hey ${greetName} — "${title}" is on Tuneable in rights-pending limbo. ` +
-      `If you want it taken down, you can request that here:\n\n${tuneUrl}`,
+      `If you want it taken down, just reply.\n\n${tuneUrl}`,
     follow_up:
-      `Hey ${greetName} — following up: your tune "${title}" has been tipped on Tuneable. ` +
-      `Claim or take it down here:\n\n${tuneUrl}`,
+      `Hey ${greetName} — following up: your tune "${title}" has been tipped on Tuneable.\n\n` +
+      `Reply YES and we'll make it playable so you can start receiving those tips.\n\n` +
+      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
     copyright_reporter:
       `Thanks for the rights report on "${title}". We have a case open — extra proof or preferred resolution welcome.\n\n${tuneUrl}`,
-    custom: `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+    custom:
+      `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable.\n\n` +
+      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
   };
 
   const linkTemplates = {
-    claim_keep_invite: `Your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+    claim_keep_invite:
+      `Your tune "${title}" has been tipped on Tuneable.\n\n` +
+      `Reply YES and we'll make it playable so you can start receiving those tips.\n` +
+      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
     takedown_option: `Take-down option for "${title}" on Tuneable.\n\n${tuneUrl}`,
-    follow_up: `Following up: your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+    follow_up:
+      `Following up: your tune "${title}" has been tipped on Tuneable.\n\n` +
+      `Reply YES and we'll make it playable so you can start receiving those tips.\n` +
+      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
     copyright_reporter: `We received your rights report for "${title}".\n\n${tuneUrl}`,
-    custom: `Your tune "${title}" has been tipped on Tuneable.\n\n${tuneUrl}`,
+    custom:
+      `Your tune "${title}" has been tipped on Tuneable.\n\n` +
+      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
   };
 
   if (chosenFormat === 'link') {
@@ -363,6 +391,7 @@ function buildOutreachContent({
       subject: '',
       text,
       tuneUrl,
+      registerUrl,
     };
   }
 
@@ -374,6 +403,7 @@ function buildOutreachContent({
       subject: '',
       text,
       tuneUrl,
+      registerUrl,
     };
   }
 
@@ -386,6 +416,7 @@ function buildOutreachContent({
     subject: chosen.subject,
     text: body,
     tuneUrl,
+    registerUrl,
   };
 }
 
@@ -416,6 +447,7 @@ module.exports = {
   defaultFollowUpAt,
   artistLineFromMedia,
   tuneUrlFromMedia,
+  creatorRegisterUrl,
   buildOutreachContent,
   escapeRegex,
   namesMatch,
