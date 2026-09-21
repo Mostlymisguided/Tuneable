@@ -3,7 +3,7 @@ type MediaPathFields = {
   mediaId?: string;
   uuid?: string;
   mediaUuid?: string;
-  slug?: string;
+  slug?: string | null;
   contentForm?: string[] | string;
   contentType?: string[] | string;
 };
