@@ -695,20 +695,9 @@ const PersistentWebPlayer: React.FC = () => {
       {/* Audio element removed - MP3Player handles audio now */}
 
       {/* Main Player Bar - Fixed to bottom of viewport */}
-      <div 
-        className="backdrop-blur-xl border-t border-gray-700/50 shadow-2xl"
-        style={{ 
-          position: 'fixed', 
-          bottom: 0, 
-          left: 0, 
-          right: 0, 
-          width: '100%',
-          zIndex: 9999,
-          background: 'linear-gradient(to top, rgba(17, 24, 39, 0.2), rgba(31, 41, 55, 0.2), rgba(55, 65, 81, 0.2))'
-        }}
-      >
+      <div className="fixed bottom-0 left-0 right-0 z-[9999] w-full bg-zinc-950/85 backdrop-blur-xl border-t border-white/10 shadow-2xl">
         {/* Progress Bar Row */}
-        <div className="w-full bg-gray-800/50 h-1 group cursor-pointer" onClick={(e) => {
+        <div className="w-full bg-white/10 h-1 group cursor-pointer" onClick={(e) => {
           if (duration && currentMedia) {
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -718,7 +707,7 @@ const PersistentWebPlayer: React.FC = () => {
           }
         }}>
           <div 
-            className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-100 relative"
+            className="h-full bg-white transition-all duration-100 relative"
             style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
           >
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
@@ -734,22 +723,22 @@ const PersistentWebPlayer: React.FC = () => {
               <div className="text-center">
                 <Link 
                   to={`/tune/${(currentMedia as any)._id || currentMedia.id}`}
-                  className="hover:opacity-80 transition-opacity no-underline"
+                  className="hover:text-zinc-300 transition-colors no-underline"
                 >
                   <h4 className="text-base font-semibold text-white leading-tight">
                     {currentMedia.title}
                   </h4>
                 </Link>
-                <p className="text-sm text-gray-300 leading-tight mt-1">
+                <p className="text-sm text-zinc-400 leading-tight mt-1">
                   <ClickableArtistDisplay media={currentMedia} />
                 </p>
               </div>
             ) : (
               <div className="text-center">
-                <h4 className="text-base font-semibold text-gray-400">
+                <h4 className="text-base font-semibold text-zinc-400">
                   No media playing
                 </h4>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-zinc-500 mt-1">
                   Select media to start
                 </p>
               </div>
@@ -762,7 +751,7 @@ const PersistentWebPlayer: React.FC = () => {
             {currentMedia ? (
               <Link 
                 to={`/tune/${(currentMedia as any)._id || currentMedia.id}`}
-                className="flex w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 shadow-lg hover:opacity-80 transition-opacity"
+                className="flex w-12 h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
               >
                 <img
                   src={currentMedia.coverArt || 'https://uploads.tuneable.stream/cover-art/default-cover.png'}
@@ -771,13 +760,13 @@ const PersistentWebPlayer: React.FC = () => {
                 />
               </Link>
             ) : (
-              <div className="w-12 h-12 bg-gray-800/50 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center shadow-lg">
-                <Play className="h-6 w-6 text-gray-400" />
+              <div className="w-12 h-12 bg-zinc-800 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                <Play className="h-6 w-6 text-zinc-500" />
               </div>
             )}
 
             {/* Time Display */}
-            <div className="text-xs text-gray-400 font-mono w-12 text-right">
+            <div className="text-xs text-zinc-500 font-mono w-12 text-right">
               {formatTime(currentTime)}
             </div>
 
@@ -791,75 +780,75 @@ const PersistentWebPlayer: React.FC = () => {
                   value={currentTime}
                   onChange={handleScrubberChange}
                   disabled={!currentMedia}
-                  className="w-full h-2 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer player-mono-slider disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: currentMedia && duration 
-                      ? `linear-gradient(to right, #9333ea 0%, #9333ea ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) 100%)`
-                      : 'rgba(75, 85, 99, 0.5)'
+                      ? `linear-gradient(to right, #fafafa 0%, #fafafa ${(currentTime / duration) * 100}%, rgba(255, 255, 255, 0.12) ${(currentTime / duration) * 100}%, rgba(255, 255, 255, 0.12) 100%)`
+                      : 'rgba(255, 255, 255, 0.12)'
                   }}
                 />
               </div>
-              <div className="text-xs text-gray-400 font-mono w-12">
+              <div className="text-xs text-zinc-500 font-mono w-12">
                 {formatTime(duration)}
               </div>
             </div>
 
             {/* YouTube Player - Compact inline version */}
             {playerType === 'youtube' && (
-              <div 
-                ref={playerRef} 
-                className="w-12 h-8 sm:w-32 sm:h-20 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 shadow-lg border border-gray-600"
-              />
+              <div className="relative w-12 h-8 sm:w-32 sm:h-20 bg-zinc-900 rounded-lg overflow-hidden flex-shrink-0 border border-white/10 grayscale">
+                <div ref={playerRef} className="w-full h-full" />
+                <div className="absolute inset-0 z-10 bg-zinc-950/70 pointer-events-none" />
+              </div>
             )}
 
             {/* Right: Controls and Volume */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1 sm:space-x-2">
             {/* Playback Controls */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center">
               <button
                   onClick={() => previous()}
                 disabled={currentMediaIndex === 0 || !currentMedia}
-                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Previous Song"
               >
-                <SkipBack className="h-3 w-3 md:h-4 md:w-4" />
+                <SkipBack className="h-4 w-4" />
               </button>
 
               <button
                   onClick={() => togglePlayPause()}
               disabled={!currentMedia}
-                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-600 border border-purple-500 text-white hover:bg-purple-700 hover:border-purple-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center bg-white text-zinc-950 hover:bg-zinc-200 shadow-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               title={currentMedia ? (isPlaying ? 'Pause' : 'Play') : 'No media playing'}
               >
                 {isPlaying ? (
-                  <Pause className="h-3 w-3 md:h-4 md:w-4 ml-0.5" />
+                  <Pause className="h-4 w-4 md:h-5 md:w-5 ml-0.5 fill-current" />
                 ) : (
-                  <Play className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+                  <Play className="h-4 w-4 md:h-5 md:w-5 ml-0.5 fill-current" />
                 )}
               </button>
 
               <button
                   onClick={next}
                 disabled={currentMediaIndex >= queue.length - 1 || !currentMedia}
-                  className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Next Song"
               >
-                <SkipForward className="h-3 w-3 md:h-4 md:w-4" />
+                <SkipForward className="h-4 w-4" />
               </button>
             </div>
 
               {/* Volume Control */}
-            <div className="flex items-center space-x-2 group">
+            <div className="flex items-center group">
               {/* Mute Toggle */}
               <button
                 onClick={toggleMute}
-                className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? (
-                  <VolumeX className="h-3 w-3 md:h-4 md:w-4" />
+                  <VolumeX className="h-4 w-4" />
                 ) : (
-                  <Volume2 className="h-3 w-3 md:h-4 md:w-4" />
+                  <Volume2 className="h-4 w-4" />
                 )}
               </button>
               
@@ -883,9 +872,9 @@ const PersistentWebPlayer: React.FC = () => {
                       toggleMute();
                     }
                   }}
-                  className="w-full h-2 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb"
+                  className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer player-mono-slider"
                   style={{
-                    background: `linear-gradient(to right, #9333ea 0%, #9333ea ${isMuted ? 0 : volume}%, rgba(75, 85, 99, 0.5) ${isMuted ? 0 : volume}%, rgba(75, 85, 99, 0.5) 100%)`
+                    background: `linear-gradient(to right, #fafafa 0%, #fafafa ${isMuted ? 0 : volume}%, rgba(255, 255, 255, 0.12) ${isMuted ? 0 : volume}%, rgba(255, 255, 255, 0.12) 100%)`
                   }}
                   title={`Volume: ${volume}%`}
                 />
@@ -896,11 +885,11 @@ const PersistentWebPlayer: React.FC = () => {
               <button
                 onClick={handleOpenTipModal}
                 disabled={!currentMedia}
-                className="w-6 h-6 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-200 bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-rose-400 bg-rose-500/10 hover:text-rose-300 hover:bg-rose-500/25 hover:scale-110 transition-all duration-200 disabled:opacity-40 disabled:hover:bg-rose-500/10 disabled:hover:scale-100 disabled:cursor-not-allowed"
                 title={currentMedia ? 'Send a tip' : 'No media playing'}
                 aria-label="Send a tip"
               >
-                <Heart className="h-3 w-3 md:h-4 md:w-4" />
+                <Heart className="h-5 w-5 md:h-6 md:w-6 fill-current drop-shadow-[0_0_8px_rgba(251,113,133,0.65)]" />
               </button>
           </div>
         </div>
@@ -908,40 +897,6 @@ const PersistentWebPlayer: React.FC = () => {
         </div>
       </div>
 
-
-      {/* Custom slider styles */}
-      <style>{`
-        .slider-thumb::-webkit-slider-thumb {
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: white;
-          cursor: pointer;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-          border: 2px solid #9333ea;
-        }
-        
-        .slider-thumb::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: white;
-          cursor: pointer;
-          border: 2px solid #9333ea;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-        }
-
-        .slider-thumb:disabled::-webkit-slider-thumb {
-          cursor: not-allowed;
-          border-color: #6b7280;
-        }
-        
-        .slider-thumb:disabled::-moz-range-thumb {
-          cursor: not-allowed;
-          border-color: #6b7280;
-        }
-      `}</style>
 
       <BidConfirmationModal
         isOpen={isTipModalOpen}
