@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { authAPI } from '../lib/api';
+
+const inputClass =
+  'block w-full h-11 rounded-lg border border-white/10 bg-zinc-900/80 px-3.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition-colors focus:border-white/30 focus:ring-1 focus:ring-white/20';
+
+const primaryBtnClass =
+  'w-full h-11 inline-flex items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50';
+
+const ghostBtnClass =
+  'w-full h-11 inline-flex items-center justify-center rounded-lg border border-white/15 bg-zinc-900 px-4 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-800';
 
 const ForgotPassword: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -31,116 +40,78 @@ const ForgotPassword: React.FC = () => {
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-black via-purple-900 to-black">
-        <div className="max-w-md w-full">
-          <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-2xl p-8 text-center">
-            <div className="mb-6">
-              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-10 w-10 text-green-400" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-3">
-                Check Your Email
-              </h1>
-              <p className="text-gray-300 text-lg">
-                We've sent you a password reset link
-              </p>
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-[400px] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+        {submitted ? (
+          <div className="px-5 py-6 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-zinc-900">
+              <CheckCircle className="h-6 w-6 text-zinc-200" />
             </div>
-
-            <div className="bg-black/30 rounded-lg p-6 mb-6">
-              <p className="text-gray-300 mb-4">
-                We've sent a password reset link to <strong className="text-white">{email}</strong>
-              </p>
-              <p className="text-gray-400 text-sm">
-                Click the link in the email to reset your password. The link will expire in 1 hour.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <Link
-                to="/login"
-                className="block w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all text-center"
-              >
-                Back to Login
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">Check your email</h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              We sent a reset link to <span className="text-zinc-100">{email}</span>. It expires in 1 hour.
+            </p>
+            <div className="mt-6 space-y-2.5">
+              <Link to="/login" className={primaryBtnClass}>
+                Back to sign in
               </Link>
               <button
+                type="button"
                 onClick={() => {
                   setSubmitted(false);
                   setEmail('');
                 }}
-                className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-all"
+                className={ghostBtnClass}
               >
-                Send Another Email
+                Send another email
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-black via-purple-900 to-black">
-      <div className="max-w-md w-full">
-        <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-2xl p-8">
-          <Link
-            to="/login"
-            className="inline-flex items-center text-purple-300 hover:text-purple-100 mb-6 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Login
-          </Link>
-
-          <div className="mb-8">
-            <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mb-4">
-              <Mail className="h-8 w-8 text-purple-300" />
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-3">
-              Reset Your Password
-            </h1>
-            <p className="text-gray-300">
-              Enter your email address and we'll send you a link to reset your password.
+        ) : (
+          <div className="px-5 py-6">
+            <Link
+              to="/login"
+              className="mb-6 inline-flex items-center text-sm text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back to sign in
+            </Link>
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">Reset password</h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              Enter your email and we&apos;ll send you a reset link.
+            </p>
+            <form onSubmit={handleSubmit} className="mt-5 space-y-3">
+              <div>
+                <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass}
+                  placeholder="you@example.com"
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <button type="submit" disabled={isLoading} className={`${primaryBtnClass} mt-1`}>
+                {isLoading ? 'Sending…' : 'Send reset link'}
+              </button>
+            </form>
+            <p className="mt-6 text-center text-sm text-zinc-500">
+              Don&apos;t have an account?{' '}
+              <Link to="/register" className="font-medium text-zinc-100 underline-offset-2 hover:underline">
+                Sign up
+              </Link>
             </p>
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Sending...' : 'Send Reset Link'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-400">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-purple-300 hover:text-purple-100 font-medium">
-              Sign up
-            </Link>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default ForgotPassword;
-

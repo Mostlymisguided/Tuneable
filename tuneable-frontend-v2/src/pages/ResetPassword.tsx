@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { Lock, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { authAPI } from '../lib/api';
+
+const inputClass =
+  'block w-full h-11 rounded-lg border border-white/10 bg-zinc-900/80 px-3.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition-colors focus:border-white/30 focus:ring-1 focus:ring-white/20';
+
+const primaryBtnClass =
+  'w-full h-11 inline-flex items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50';
 
 const ResetPassword: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,7 +20,7 @@ const ResetPassword: React.FC = () => {
     confirmPassword: '',
   });
   const [token, setToken] = useState<string | null>(null);
-  
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -68,8 +74,7 @@ const ResetPassword: React.FC = () => {
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || 'Failed to reset password';
       toast.error(errorMsg);
-      
-      // If token is invalid or expired, redirect to forgot password page
+
       if (error.response?.status === 400) {
         setTimeout(() => {
           navigate('/forgot-password');
@@ -80,140 +85,101 @@ const ResetPassword: React.FC = () => {
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-black via-purple-900 to-black">
-        <div className="max-w-md w-full">
-          <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-2xl p-8 text-center">
-            <div className="mb-6">
-              <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-10 w-10 text-green-400" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-3">
-                Password Reset!
-              </h1>
-              <p className="text-gray-300 text-lg">
-                Your password has been successfully updated
-              </p>
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-[400px] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-2xl">
+        {submitted ? (
+          <div className="px-5 py-6 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-zinc-900">
+              <CheckCircle className="h-6 w-6 text-zinc-200" />
             </div>
-
-            <div className="bg-black/30 rounded-lg p-6 mb-6">
-              <p className="text-gray-300">
-                You can now log in with your new password.
-              </p>
-            </div>
-
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">Password updated</h1>
+            <p className="mt-2 text-sm text-zinc-400">You can now sign in with your new password.</p>
+            <Link to="/login" className={`${primaryBtnClass} mt-6`}>
+              Go to sign in
+            </Link>
+          </div>
+        ) : (
+          <div className="px-5 py-6">
             <Link
               to="/login"
-              className="block w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all text-center"
+              className="mb-6 inline-flex items-center text-sm text-zinc-400 transition-colors hover:text-zinc-100"
             >
-              Go to Login
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Back to sign in
             </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-black via-purple-900 to-black">
-      <div className="max-w-md w-full">
-        <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-2xl p-8">
-          <Link
-            to="/login"
-            className="inline-flex items-center text-purple-300 hover:text-purple-100 mb-6 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Login
-          </Link>
-
-          <div className="mb-8">
-            <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mb-4">
-              <Lock className="h-8 w-8 text-purple-300" />
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-3">
-              Set New Password
-            </h1>
-            <p className="text-gray-300">
-              Enter your new password below.
+            <h1 className="text-lg font-semibold tracking-tight text-zinc-100">Set new password</h1>
+            <p className="mt-2 text-sm text-zinc-400">Enter a new password for your account.</p>
+            <form onSubmit={handleSubmit} className="mt-5 space-y-3">
+              <div>
+                <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  New password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleChange}
+                    className={`${inputClass} pr-10`}
+                    placeholder="At least 6 characters"
+                    required
+                    autoComplete="new-password"
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-3 flex items-center text-zinc-500 hover:text-zinc-300"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Confirm password
+                </label>
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className={`${inputClass} pr-10`}
+                    placeholder="Confirm password"
+                    required
+                    autoComplete="new-password"
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-3 flex items-center text-zinc-500 hover:text-zinc-300"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <button type="submit" disabled={isLoading} className={`${primaryBtnClass} mt-1`}>
+                {isLoading ? 'Resetting…' : 'Reset password'}
+              </button>
+            </form>
+            <p className="mt-6 text-center text-sm text-zinc-500">
+              Remember your password?{' '}
+              <Link to="/login" className="font-medium text-zinc-100 underline-offset-2 hover:underline">
+                Sign in
+              </Link>
             </p>
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                New Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 pr-12"
-                  placeholder="Enter new password"
-                  required
-                  autoComplete="new-password"
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                Confirm New Password
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-black/30 border border-purple-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 pr-12"
-                  placeholder="Confirm new password"
-                  required
-                  autoComplete="new-password"
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Resetting...' : 'Reset Password'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-400">
-            Remember your password?{' '}
-            <Link to="/login" className="text-purple-300 hover:text-purple-100 font-medium">
-              Sign in
-            </Link>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default ResetPassword;
-
