@@ -58,6 +58,8 @@ eas submit --platform ios --profile production
 
 Production/preview profiles set `EXPO_PUBLIC_API_URL=https://tuneable.stream`. Enable **Sign in with Apple** on the App ID. Create IAP products before TestFlight wallet testing.
 
+Review notes for App Store Connect and Play Console (playable chart vs catalogue metadata, escrow, demo account): [`docs/APP_REVIEW_NOTES.md`](../docs/APP_REVIEW_NOTES.md).
+
 ## Wallet payments
 
 | Client | Rail |
