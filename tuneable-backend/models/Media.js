@@ -508,7 +508,9 @@ const mediaSchema = new mongoose.Schema({
   vetoedReason: { type: String },
   deletedAt: { type: Date },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  deletedReason: { type: String }
+  deletedReason: { type: String },
+  // Live media that replaced this deleted duplicate. Public tune URLs follow it.
+  supersededBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', default: null }
 }, { 
   timestamps: true // Automatically manage createdAt and updatedAt
 });
@@ -1292,7 +1294,7 @@ mediaSchema.statics.ensureSlug = async function ensureSlug(media) {
 /**
  * Public media lookup: slug | uuid | ObjectId.
  */
-mediaSchema.statics.findByIdentifier = function findByIdentifier(identifier, options = {}) {
+mediaSchema.statics.findByIdentifier = async function findByIdentifier(identifier, options = {}) {
   const {
     isUuidString,
     isMongoObjectIdString,
@@ -1300,30 +1302,42 @@ mediaSchema.statics.findByIdentifier = function findByIdentifier(identifier, opt
   } = require('../utils/identifierFormat');
   const mongoose = require('mongoose');
 
-  if (identifier instanceof mongoose.Types.ObjectId) {
-    let query = this.findById(identifier);
+  const applyReadOptions = (query) => {
     if (options.select) query = query.select(options.select);
     if (options.lean) query = query.lean();
     return query;
+  };
+
+  if (identifier instanceof mongoose.Types.ObjectId) {
+    return applyReadOptions(this.findById(identifier));
   }
 
   const value = normalizeIdentifier(identifier);
-  if (!value) return Promise.resolve(null);
+  if (!value) return null;
 
   let filter;
+  let slugLookup = false;
   if (isUuidString(value)) {
     filter = { $or: [{ uuid: value }, { slug: value.toLowerCase() }, { slugAliases: value.toLowerCase() }] };
   } else if (isMongoObjectIdString(value)) {
     filter = { $or: [{ _id: value }, { slug: value.toLowerCase() }, { slugAliases: value.toLowerCase() }] };
   } else {
+    slugLookup = true;
     const slug = value.toLowerCase();
     filter = { $or: [{ slug }, { slugAliases: slug }] };
   }
 
-  let query = this.findOne(filter);
-  if (options.select) query = query.select(options.select);
-  if (options.lean) query = query.lean();
-  return query;
+  // UUID / ObjectId address one document, including soft-deleted media (restore, purge).
+  if (!slugLookup) {
+    return applyReadOptions(this.findOne(filter));
+  }
+
+  // Artist-title URLs should open the living tune when a deleted copy still
+  // holds the same slug or lists it as an alias.
+  const matches = await this.find(filter).select('_id status').limit(8).lean();
+  if (!matches.length) return null;
+  const chosen = matches.find((match) => match.status !== 'deleted') || matches[0];
+  return applyReadOptions(this.findById(chosen._id));
 };
 
 module.exports = mongoose.models.Media || mongoose.model('Media', mediaSchema);

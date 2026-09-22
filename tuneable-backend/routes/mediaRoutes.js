@@ -50,11 +50,36 @@ const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const Gear = require('../models/Gear');
+const { resolveDeletedSuccessor } = require('../services/mediaSlugHandoff');
+
+function excludeDeletedMedia(query) {
+  if (query.status?.$nin) {
+    if (!query.status.$nin.includes('deleted')) query.status.$nin.push('deleted');
+    return query;
+  }
+  if (query.status?.$ne && query.status.$ne !== 'deleted') {
+    query.status = { $nin: [query.status.$ne, 'deleted'] };
+    return query;
+  }
+  if (!query.status) query.status = { $ne: 'deleted' };
+  return query;
+}
 
 router.use(optionalAuthMiddleware);
 
 async function findMediaByParam(mediaId, options = {}) {
   return Media.findByIdentifier(mediaId, options);
+}
+
+/** Public reads: a deleted duplicate's uuid/slug opens the live recording. */
+async function findPlayableMedia(mediaId) {
+  let media = await findMediaByParam(mediaId);
+  if (media?.status === 'deleted') {
+    const successor = await resolveDeletedSuccessor(Media, media);
+    if (successor?._id) media = await Media.findById(successor._id);
+  }
+  if (!media || media.status === 'deleted') return null;
+  return media;
 }
 
 async function resolveMediaIdFromParam(mediaId) {
@@ -1230,6 +1255,8 @@ router.get('/', async (req, res) => {
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
     sortObj.createdAt = -1; // Secondary sort by creation date
 
+    excludeDeletedMedia(query);
+
     const media = await Media.find(query)
       .sort(sortObj)
       .skip(skip)
@@ -1301,6 +1328,8 @@ router.get('/public', async (req, res) => {
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
     sortObj.createdAt = -1; // Secondary sort by creation date
 
+    excludeDeletedMedia(query);
+
     const media = await Media.find(query)
       .sort(sortObj)
       .skip(skip)
@@ -1366,7 +1395,8 @@ router.get('/top-tunes', async (req, res) => {
     // Build query object
     let query = { 
       globalMediaAggregate: { $gt: 0 }, // Updated to schema grammar
-      contentType: { $in: ['music'] } // Only music content for now
+      contentType: { $in: ['music'] }, // Only music content for now
+      status: { $ne: 'deleted' },
     };
     
     // Ensure proper population by manually checking and populating if needed
@@ -1513,14 +1543,10 @@ router.get('/:mediaId/profile', async (req, res) => {
     const { mediaId } = req.params;
     console.log('🔍 Media profile request for mediaId:', mediaId);
 
-    let media = await findMediaByParam(mediaId);
+    const media = await findPlayableMedia(mediaId);
 
     if (!media) {
       console.log('❌ Media not found for ID:', mediaId);
-      return res.status(404).json({ error: 'Media not found' });
-    }
-
-    if (media.status === 'deleted') {
       return res.status(404).json({ error: 'Media not found' });
     }
 
@@ -1713,7 +1739,7 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
     const { mediaId } = req.params;
     const { relatedLimit = 12, fansLimit = 8 } = req.query;
 
-    const resolved = await findMediaByParam(mediaId, { select: '_id' });
+    const resolved = await findPlayableMedia(mediaId);
     if (!resolved) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -3520,7 +3546,7 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 
     console.log('🏷️ Tag rankings request for media:', mediaId);
 
-    const resolved = await findMediaByParam(mediaId, { select: '_id' });
+    const resolved = await findPlayableMedia(mediaId);
     if (!resolved) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -3558,7 +3584,7 @@ router.get('/:mediaId/location-rankings', async (req, res) => {
 
     console.log('📍 Location rankings request for media:', mediaId);
 
-    const resolved = await findMediaByParam(mediaId, { select: '_id' });
+    const resolved = await findPlayableMedia(mediaId);
     if (!resolved) {
       return res.status(404).json({ error: 'Media not found' });
     }
