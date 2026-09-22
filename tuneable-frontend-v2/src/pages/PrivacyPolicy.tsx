@@ -26,7 +26,7 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Username, email address, and password (for traditional accounts)</li>
                   <li>Profile information including name, profile picture, and location</li>
-                  <li>OAuth provider information (Facebook, Google, SoundCloud, Instagram) when using social login</li>
+                  <li>OAuth provider information when using social login (Facebook and Google in the apps; Facebook, Google, SoundCloud, and Instagram on the website)</li>
                   <li>Creator profile information (for verified artists and creators)</li>
                 </ul>
 
@@ -41,8 +41,8 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">1.3 Catalogue Import Information</h3>
                 <p className="mb-2">
-                  When you import a public playlist or similar catalogue source (for example a public YouTube playlist), we may collect 
-                  publicly available catalogue metadata so those items can be matched to tracks in Tuneable's library. This may include:
+                  On the Tuneable website, when you import a public playlist or similar catalogue source (for example a public YouTube playlist), we may collect 
+                  publicly available catalogue metadata so those items can be matched to tracks in Tuneable's library. The iOS and Android apps do not import from SoundCloud or YouTube. This may include:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Track titles, artist names, and related catalogue metadata</li>
@@ -154,7 +154,7 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li><strong>Stripe:</strong> Payment processing and financial transactions (see Stripe's privacy policy)</li>
                   <li><strong>OAuth Providers:</strong> Facebook, Google, SoundCloud, Instagram for authentication (see their respective privacy policies)</li>
-                  <li><strong>Catalogue sources:</strong> Public catalogue metadata you choose to import (for example a public YouTube playlist) for library matching</li>
+                  <li><strong>Catalogue sources:</strong> Public catalogue metadata you choose to import on the website (for example a public YouTube playlist) for library matching</li>
                   <li><strong>Hosting Providers:</strong> Cloud infrastructure and data storage services</li>
                   <li><strong>Analytics Services:</strong> Platform usage analytics (in anonymized form where possible)</li>
                 </ul>
@@ -289,7 +289,7 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li><strong>Facebook:</strong> OAuth authentication - <a href="https://www.facebook.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Facebook Privacy Policy</a></li>
                   <li><strong>Google:</strong> OAuth authentication - <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Google Privacy Policy</a></li>
-                  <li><strong>SoundCloud:</strong> OAuth authentication - <a href="https://soundcloud.com/pages/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">SoundCloud Privacy Policy</a></li>
+                  <li><strong>SoundCloud:</strong> OAuth authentication on the website - <a href="https://soundcloud.com/pages/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">SoundCloud Privacy Policy</a></li>
                   <li><strong>Instagram:</strong> OAuth authentication - <a href="https://help.instagram.com/519522125107875" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-500">Instagram Privacy Policy</a></li>
                 </ul>
 
@@ -302,7 +302,7 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">6.3 Content and Media Services</h3>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Tuneable may import public catalogue information you provide (for example titles and artists from a public YouTube playlist) so it can be matched to tracks in Tuneable's library</li>
+                  <li>On the website, Tuneable may import public catalogue information you provide (for example titles and artists from a public YouTube playlist) so it can be matched to tracks in Tuneable's library. The iOS and Android apps do not offer this import</li>
                   <li>Tuneable does not play YouTube video or audio on the Service, and does not embed a YouTube player</li>
                   <li>We do not download, store, or rehost any video or audio content from third-party platforms</li>
                 </ul>

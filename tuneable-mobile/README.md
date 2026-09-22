@@ -44,7 +44,7 @@ Restart Expo after changing `.env`.
 - [x] Sign in with Apple (native; iOS store/dev builds)
 - [x] In-app account deletion + Privacy/Terms links
 - [x] Music search + Add & tip to global chart
-- [ ] SoundCloud OAuth / polish
+- SoundCloud and YouTube library import stay on the website, not in the app
 
 ## App Store / EAS
 
