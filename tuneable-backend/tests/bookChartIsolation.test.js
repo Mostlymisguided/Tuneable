@@ -11,6 +11,7 @@ describe('books vs music chart isolation', () => {
   it('keeps Global Party charts on music + tune', () => {
     expect(GLOBAL_PARTY_TUNES_FILTER.contentType).toEqual({ $in: ['music'] });
     expect(GLOBAL_PARTY_TUNES_FILTER.contentForm).toEqual({ $in: ['tune'] });
+    expect(GLOBAL_PARTY_TUNES_FILTER.status).toEqual({ $ne: 'deleted' });
   });
 
   it('keeps the books chart on written + book', () => {
@@ -54,6 +55,20 @@ describe('books vs music chart isolation', () => {
 
   it('omits the playable clause when All is requested', () => {
     expect(chartTunesFilter({ playableOnly: false })).toEqual(GLOBAL_PARTY_TUNES_FILTER);
+  });
+
+  it('still excludes deleted duplicates when the query also skips vetoed tracks', () => {
+    const filter = chartTunesFilter({
+      playableOnly: true,
+      extra: {
+        bids: { $exists: true, $ne: [] },
+        status: { $ne: 'vetoed' },
+      },
+    });
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: { $ne: 'deleted' } }),
+      expect.objectContaining({ status: { $ne: 'vetoed' } }),
+    ]));
   });
 
   it('counts excluded catalog only while Playable is on', () => {

@@ -55,9 +55,11 @@ const deriveCodeFromPartyId = (objectId) => {
 
 // Global Party: only show tunes (contentType: music, contentForm: tune). Exclude podcast episodes/series.
 // Spread this into Media.find() wherever Global Party aggregates media. Later we may add a filterable global feed.
+// Callers that also set status must use $nin so this deleted exclusion is not overwritten.
 const GLOBAL_PARTY_TUNES_FILTER = {
   contentType: { $in: ['music'] },
-  contentForm: { $in: ['tune'] }
+  contentForm: { $in: ['tune'] },
+  status: { $ne: 'deleted' },
 };
 
 /**
@@ -777,7 +779,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                         } 
                     },
                     bids: { $exists: true, $ne: [] },
-                    status: { $ne: 'vetoed' }
+                    status: { $nin: ['vetoed', 'deleted'] }
                 })
                 .select(MEDIA_CHART_SELECT)
                 .sort({ globalMediaAggregate: -1 })
@@ -870,7 +872,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 } else {
                     const allMediaWithBids = await Media.find({
                         _id: { $in: mediaIds },
-                        status: { $ne: 'vetoed' }
+                        status: { $nin: ['vetoed', 'deleted'] }
                     })
                     .select(MEDIA_CHART_SELECT)
                     .sort({ globalMediaAggregate: -1 })
@@ -1348,7 +1350,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
             const hits = await Media.find({
                 ...GLOBAL_PARTY_TUNES_FILTER,
                 bids: { $exists: true, $ne: [] },
-                status: { $ne: 'vetoed' },
+                status: { $nin: ['vetoed', 'deleted'] },
                 ...searchClause,
             }).select(SEARCH_SELECT).limit(40).lean();
             party = { media: hits.map((media) => ({ mediaId: media })) };
@@ -1366,7 +1368,7 @@ router.get('/:partyId/search', authMiddleware, resolvePartyId(), async (req, res
                         } 
                     },
                     bids: { $exists: true, $ne: [] },
-                    status: { $ne: 'vetoed' },
+                    status: { $nin: ['vetoed', 'deleted'] },
                     ...searchClause,
                 }).select(SEARCH_SELECT).limit(40).lean();
                 party = { media: hits.map((media) => ({ mediaId: media })) };
@@ -2240,7 +2242,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         
         if (isRequestingGlobalParty) {
             const Media = require('../models/Media');
-            const queueFilter = { ...GLOBAL_PARTY_TUNES_FILTER, bids: { $exists: true, $ne: [] }, status: { $ne: 'vetoed' } };
+            const queueFilter = { ...GLOBAL_PARTY_TUNES_FILTER, bids: { $exists: true, $ne: [] }, status: { $nin: ['vetoed', 'deleted'] } };
             queueSize = await Media.countDocuments(queueFilter);
             queuePosition = (await Media.exists({ _id: actualMediaId, ...queueFilter })) ? queueSize : null;
         } else if (isTagParty) {
@@ -2256,7 +2258,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
                         } 
                     },
                     bids: { $exists: true, $ne: [] },
-                    status: { $ne: 'vetoed' },
+                    status: { $nin: ['vetoed', 'deleted'] },
                 };
                 queueSize = await Media.countDocuments(queueFilter);
                 queuePosition = (await Media.exists({ _id: actualMediaId, ...queueFilter })) ? queueSize : null;
