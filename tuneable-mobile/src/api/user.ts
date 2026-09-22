@@ -155,6 +155,16 @@ export const userAPI = {
     return response.data;
   },
 
+  updateNotificationPreferences: async (preferences: {
+    push?: boolean;
+  }): Promise<{ success: boolean }> => {
+    const response = await api.put<{ success: boolean }>(
+      '/users/notification-preferences',
+      preferences
+    );
+    return response.data;
+  },
+
   trackListeningHistory: async (payload: {
     mediaId: string;
     sessionId: string;

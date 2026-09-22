@@ -56,6 +56,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     currentLocation,
     status: currentLocationStatus,
     promptDismissed,
+    locationChecked,
     enableCurrentLocation,
     dismissPrompt,
   } = useCurrentLocation();
@@ -94,28 +95,12 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     }
   };
 
-  const handleAddLocation = async () => {
-    setIsEnablingLocation(true);
-    try {
-      const location = await enableCurrentLocation();
-      if (location) {
-        await authAPI.updateProfile({ homeLocation: location });
-        await refreshUser();
-        toast.success(`Home location set to ${formatLocation(location)}`);
-        return;
-      }
-      const { getCurrentLocationStatus } = await import('../utils/currentLocationCache');
-      if (getCurrentLocationStatus() === 'denied') {
-        toast.error('Location permission denied. Search for your city on your profile.');
-      }
-      if (user.username || user._id || user.id || user.uuid) {
-        navigate(getUserProfileUrl(user, 'settings=true&tab=profile'));
-      }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Could not set home location');
-    } finally {
-      setIsEnablingLocation(false);
+  const handleSetHomePlace = () => {
+    if (user.username || user._id || user.id || user.uuid) {
+      navigate(getUserProfileUrl(user, 'settings=true&tab=profile'));
+      return;
     }
+    toast.error('Unable to open profile settings');
   };
 
   const handleEnableCurrentLocation = async () => {
@@ -141,6 +126,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
 
   const hasHomeLocation = !!(user.homeLocation?.city || user.homeLocation?.country || user.homeLocation?.placeId);
   const showCurrentLocationPrompt =
+    locationChecked &&
     hasHomeLocation &&
     !currentLocation &&
     !promptDismissed &&
@@ -185,33 +171,32 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     });
   }
 
-  // Home location — persistent until set (skippable at onboarding, not forgettable)
   if (!hasHomeLocation) {
     prompts.push({
       id: 'location',
-      title: 'Enable location for local charts',
-      description: 'Tips influence charts where you are. Use current location, or set home on your profile.',
+      title: 'Set a home place for local charts',
+      description: 'Tips on local charts use the home place you save. You can search for a city on your profile.',
       icon: MapPin,
-      action: handleAddLocation,
-      actionLabel: isEnablingLocation ? 'Detecting...' : 'Use current location',
+      action: handleSetHomePlace,
+      actionLabel: 'Set home place',
       priority: 1,
       persistent: true,
     });
   }
 
-  // Current location — tip-time presence for local charts
+  // Current place — tip-time presence. Does not change the saved home place.
   if (showCurrentLocationPrompt) {
     prompts.push({
       id: 'currentLocation',
-      title: 'Enable Current Location',
-      description: 'Tip once and influence charts at home and where you are now',
+      title: 'Count tips where you are',
+      description: 'While this site is open, a tip can also influence charts at your current place. This does not change your home place.',
       icon: Navigation,
       action: handleEnableCurrentLocation,
       actionLabel: isEnablingLocation
         ? 'Detecting...'
         : currentLocationStatus === 'unavailable' || currentLocationStatus === 'error'
           ? 'Try again'
-          : 'Enable',
+          : 'Use current place',
       priority: 5
     });
   }
@@ -260,8 +245,7 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
           const Icon = prompt.icon;
           const isBusy =
             (isSendingEmail && prompt.id === 'email') ||
-            (isEnablingLocation &&
-              (prompt.id === 'currentLocation' || prompt.id === 'location'));
+            (isEnablingLocation && prompt.id === 'currentLocation');
           return (
             <div
               key={prompt.id}

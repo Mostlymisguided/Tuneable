@@ -38,6 +38,15 @@ export async function getNotificationPermissionStatus(): Promise<string> {
   return status;
 }
 
+export async function getPushPermissionSnapshot(): Promise<{
+  status: Notifications.PermissionStatus;
+  canAskAgain: boolean;
+} | null> {
+  if (Platform.OS === 'web') return null;
+  const existing = await Notifications.getPermissionsAsync();
+  return { status: existing.status, canAskAgain: existing.canAskAgain };
+}
+
 export async function requestAndRegisterPush(): Promise<PushPermissionResult> {
   if (Platform.OS === 'web') return 'unavailable';
 
@@ -68,20 +77,30 @@ export async function requestAndRegisterPush(): Promise<PushPermissionResult> {
   }
 }
 
-/**
- * Show the OS permission sheet only if the user has not answered yet.
- * In-app "Allow" UI is redundant — iOS/Android always require this dialog.
- */
-export async function maybePromptForPush(): Promise<void> {
+/** Turn push off for this device and stop delivery for the account. */
+export async function disablePushOnThisDevice(): Promise<void> {
   if (Platform.OS === 'web') return;
-  const existing = await Notifications.getPermissionsAsync();
-  if (existing.status === 'granted' || existing.canAskAgain === false) return;
-  await requestAndRegisterPush();
+  let token: string | undefined;
+  try {
+    const existing = await Notifications.getPermissionsAsync();
+    const easProjectId = projectId();
+    if (existing.status === 'granted' && easProjectId) {
+      token = (
+        await Notifications.getExpoPushTokenAsync({ projectId: easProjectId })
+      ).data;
+    }
+  } catch {
+    // Preference still turns delivery off if the token cannot be read
+  }
+  if (token) {
+    await userAPI.unregisterPushDevice(token);
+  }
+  await userAPI.updateNotificationPreferences({ push: false });
 }
 
 /** Re-register if the OS already granted permission (no prompt). */
-export async function syncPushTokenIfGranted(): Promise<void> {
-  if (Platform.OS === 'web') return;
+export async function syncPushTokenIfGranted(pushEnabled = true): Promise<void> {
+  if (Platform.OS === 'web' || !pushEnabled) return;
   try {
     const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') return;

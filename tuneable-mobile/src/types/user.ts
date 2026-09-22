@@ -32,6 +32,10 @@ export interface User {
     defaultTip?: number; // pounds
     anonymousMode?: boolean;
     favoriteTags?: string[];
+    notifications?: {
+      push?: boolean;
+      email?: boolean;
+    };
   };
   hasPushDevice?: boolean;
   onboarding?: {

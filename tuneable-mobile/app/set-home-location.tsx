@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -35,13 +35,16 @@ export default function SetHomeLocationScreen() {
   const [locationFromGps, setLocationFromGps] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = saving || requestingGps;
+  const seededHome = useRef(false);
+
+  useEffect(() => {
+    if (seededHome.current || !hasHomeLocation(user?.homeLocation)) return;
+    seededHome.current = true;
+    setHomeLocation(user?.homeLocation ?? null);
+  }, [user]);
 
   if (!isLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
-  }
-
-  if (!isLoading && user && hasHomeLocation(user.homeLocation)) {
-    return <Redirect href="/(tabs)" />;
   }
 
   const requestDeviceLocation = async () => {
@@ -77,7 +80,8 @@ export default function SetHomeLocationScreen() {
     try {
       await authAPI.updateProfile({ homeLocation });
       await refreshUser();
-      router.replace('/(tabs)');
+      if (router.canGoBack()) router.back();
+      else router.replace('/(tabs)');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save home location.'));
     } finally {
@@ -93,11 +97,11 @@ export default function SetHomeLocationScreen() {
         <Pressable onPress={() => router.back()} hitSlop={8}>
           <Text style={styles.back}>← Back</Text>
         </Pressable>
-        <Text style={styles.title}>Enable location for local charts</Text>
+        <Text style={styles.title}>Home place for local charts</Text>
         <Text style={styles.lede}>
-          Tips influence charts where you are — at home, and wherever you tip.
-          Location is only used while Tuneable is open. Search if GPS isn&apos;t
-          home.
+          Tips on local charts use the home place you save here. Use your current
+          place once, or search. GPS is only used while Tuneable is open. The
+          saved place stays on your profile.
         </Text>
 
         <Pressable
@@ -120,7 +124,7 @@ export default function SetHomeLocationScreen() {
                 style={
                   homeLocation?.placeId ? styles.gpsBtnOutlineText : styles.buttonText
                 }>
-                {locationFromGps ? 'Detect again' : 'Enable location'}
+                {locationFromGps ? 'Detect again' : 'Use current place'}
               </Text>
             </View>
           )}
@@ -128,8 +132,8 @@ export default function SetHomeLocationScreen() {
 
         {locationFromGps && homeLocation ? (
           <Text style={styles.successHint}>
-            Detected {formatLocationLabel(homeLocation)}. Confirm below, or
-            search if that&apos;s not home.
+            Detected {formatLocationLabel(homeLocation)}. Save it as your home
+            place, or search if that isn&apos;t home.
           </Text>
         ) : null}
 

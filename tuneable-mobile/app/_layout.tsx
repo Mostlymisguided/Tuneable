@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, AppState, View } from 'react-native';
 import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
@@ -11,6 +11,7 @@ import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
 import { subscribeNotificationResponses } from '@/src/lib/pushNotifications';
+import { recheckLocationPermission } from '@/src/lib/currentLocation';
 import { colors } from '@/src/theme/colors';
 
 export { ErrorBoundary } from 'expo-router';
@@ -54,6 +55,13 @@ function RootNavigator() {
 
   useEffect(() => {
     return subscribeNotificationResponses();
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void recheckLocationPermission();
+    });
+    return () => sub.remove();
   }, []);
 
   if (isLoading) {

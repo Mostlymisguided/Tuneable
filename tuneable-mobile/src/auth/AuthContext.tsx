@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken);
     setUser(newUser);
     await saveSession(newToken, JSON.stringify(newUser));
-    void syncPushTokenIfGranted();
+    void syncPushTokenIfGranted(newUser.preferences?.notifications?.push !== false);
     return newUser;
   }, []);
 
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const { user: fresh } = await authAPI.getProfile();
             setUser(fresh);
             await saveSession(storedToken, JSON.stringify(fresh));
-            void syncPushTokenIfGranted();
+            void syncPushTokenIfGranted(fresh.preferences?.notifications?.push !== false);
           } catch {
             await clearSession();
             setToken(null);
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: fresh } = await authAPI.getProfile();
       setUser(fresh);
       await saveSession(oauthToken, JSON.stringify(fresh));
-      void syncPushTokenIfGranted();
+      void syncPushTokenIfGranted(fresh.preferences?.notifications?.push !== false);
       return fresh;
     } catch (error) {
       setToken(null);

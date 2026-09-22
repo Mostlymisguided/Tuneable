@@ -261,11 +261,11 @@ export default function OnboardingScreen() {
                     <Ionicons name="location-outline" size={20} color={colors.accentLight} />
                   </View>
                   <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Enable location for local charts</Text>
+                    <Text style={styles.stepTitle}>Set a home place for local charts</Text>
                     <Text style={styles.stepText}>
-                      Tips influence charts where you are — at home, and wherever
-                      you tip. Location is only used while Tuneable is open,
-                      never in the background. Search if GPS isn&apos;t home.
+                      Tips on local charts use the home place you save. Use your
+                      current place once, or search. GPS is only used while
+                      Tuneable is open. The saved place stays on your profile.
                     </Text>
                   </View>
                 </View>
@@ -292,7 +292,7 @@ export default function OnboardingScreen() {
                             ? styles.gpsBtnOutlineText
                             : styles.primaryBtnText
                         }>
-                        {locationFromGps ? 'Detect again' : 'Enable location'}
+                        {locationFromGps ? 'Detect again' : 'Use current place'}
                       </Text>
                     </View>
                   )}
@@ -300,8 +300,8 @@ export default function OnboardingScreen() {
 
                 {locationFromGps && homeLocation ? (
                   <Text style={styles.successHint}>
-                    Detected {formatLocationLabel(homeLocation)}. Confirm below,
-                    or search if that&apos;s not home.
+                    Detected {formatLocationLabel(homeLocation)}. Save it as your
+                    home place, or search if that isn&apos;t home.
                   </Text>
                 ) : null}
 

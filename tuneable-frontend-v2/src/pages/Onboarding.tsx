@@ -518,10 +518,10 @@ const Onboarding: React.FC = () => {
                 <MapPin className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">Enable location for local charts</h2>
+                <h2 className="text-xl font-semibold text-white">Set a home place for local charts</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                  Tips influence charts where you are — at home, and wherever you tip.
-                  Location is only used while Tuneable is open. Search if GPS isn&apos;t home.
+                  Tips on local charts use the home place you save. Use your current place once, or search.
+                  GPS is only used while Tuneable is open. The saved place stays on your profile.
                   You can skip and set it later.
                 </p>
               </div>
@@ -546,13 +546,13 @@ const Onboarding: React.FC = () => {
                 ? 'Detecting your location…'
                 : locationFromGps
                   ? 'Detect again'
-                  : 'Enable location'}
+                  : 'Use current place'}
             </button>
 
             {gpsError && <p className="text-sm text-amber-300/90">{gpsError}</p>}
             {locationFromGps && homeLocation && (
               <p className="text-sm text-green-300">
-                Detected {formatLocation(homeLocation)}. Confirm below, or search if that&apos;s not home.
+                Detected {formatLocation(homeLocation)}. Save it as your home place, or search if that&apos;s not home.
               </p>
             )}
 

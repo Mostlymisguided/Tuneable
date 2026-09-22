@@ -78,6 +78,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const {
     currentLocation,
     status: currentLocationStatus,
+    locationChecked,
     enableCurrentLocation,
   } = useCurrentLocation();
 
@@ -408,12 +409,12 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                   </p>
                 )}
 
-                {!currentLocation && canOfferCurrentLocation && (
+                {!currentLocation && canOfferCurrentLocation && locationChecked && (
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-gray-400">
                       {locationNeedsRetry
-                        ? 'We couldn’t detect your location. Try again, or tip with home only.'
-                        : 'Enable location to also influence charts where you are.'}
+                        ? 'We couldn’t detect your location. Try again, or tip with your home place only.'
+                        : 'Also count this tip where you are now. Location is only used while this site is open.'}
                     </p>
                     <button
                       type="button"
@@ -429,14 +430,14 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                       ) : (
                         <>
                           <Navigation className="h-3.5 w-3.5" />
-                          {locationNeedsRetry ? 'Try again' : 'Enable'}
+                          {locationNeedsRetry ? 'Try again' : 'Also count this tip where I am'}
                         </>
                       )}
                     </button>
                   </div>
                 )}
 
-                {!currentLocation && currentLocationStatus === 'denied' && (
+                {!currentLocation && locationChecked && currentLocationStatus === 'denied' && (
                   <p className="text-xs text-amber-300/90 mt-2">
                     Location blocked in browser settings — tip will use home only.
                   </p>

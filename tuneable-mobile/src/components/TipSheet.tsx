@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -20,6 +19,7 @@ import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard'
 import { LEGAL_URLS } from '@/src/components/LegalLinks';
 import { mediaAPI } from '@/src/api/media';
 import {
+  canRequestLocationPermission,
   getCurrentLocationStatus,
   getTipCurrentLocation,
   maybeRefreshCurrentLocationIfGranted,
@@ -92,9 +92,6 @@ function roundPounds(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Soft-gate skip for this app session after "Tip with home only". */
-let skipLocationPromptThisSession = false;
-
 export function TipSheet({
   visible,
   title,
@@ -126,6 +123,7 @@ export function TipSheet({
   const [locationStatus, setLocationStatus] = useState<CurrentLocationStatus>(
     getCurrentLocationStatus
   );
+  const [canAskLocation, setCanAskLocation] = useState(canRequestLocationPermission);
   const [enablingLocation, setEnablingLocation] = useState(false);
 
   const resolvedMediaId = useMemo(() => {
@@ -167,8 +165,9 @@ export function TipSheet({
       currentLocation?.placeId &&
       homeLocation.placeId === currentLocation.placeId
   );
-  // Denied needs Settings. Timeouts / location-services-off are retryable.
-  const canOfferCurrentLocation = locationStatus !== 'denied';
+  // Hard-denied needs Settings. A one-time deny can still be requested again.
+  const locationBlocked = locationStatus === 'denied' && !canAskLocation;
+  const canOfferCurrentLocation = !locationBlocked;
   const locationNeedsRetry =
     locationStatus === 'unavailable' || locationStatus === 'error';
 
@@ -176,6 +175,7 @@ export function TipSheet({
     return subscribeCurrentLocation(() => {
       setCurrentLocation(getTipCurrentLocation());
       setLocationStatus(getCurrentLocationStatus());
+      setCanAskLocation(canRequestLocationPermission());
     });
   }, []);
 
@@ -272,10 +272,10 @@ export function TipSheet({
       const location = await refreshCurrentLocation({ force: true });
       if (!location) {
         const status = getCurrentLocationStatus();
-        if (status === 'denied') {
-          setError(
-            'Location permission denied. You can enable it in Settings.'
-          );
+        if (status === 'denied' && !canRequestLocationPermission()) {
+          setError(null);
+        } else if (status === 'denied') {
+          setError('Location permission denied. You can try again.');
         } else {
           setError('Could not detect your current location');
         }
@@ -376,17 +376,6 @@ export function TipSheet({
     }
   };
 
-  const enableLocationThenTip = async () => {
-    setError(null);
-    setEnablingLocation(true);
-    try {
-      await refreshCurrentLocation({ force: true });
-    } finally {
-      setEnablingLocation(false);
-    }
-    await executeTip();
-  };
-
   const submit = async () => {
     setError(null);
     if (amount < effectiveMinTip) {
@@ -397,36 +386,6 @@ export function TipSheet({
     if (neededPence > liveBalancePence) {
       setError(
         `Insufficient balance (${formatPoundsFromPence(liveBalancePence)} available)`
-      );
-      return;
-    }
-
-    const shouldPromptLocation =
-      !currentLocation &&
-      canOfferCurrentLocation &&
-      !skipLocationPromptThisSession;
-
-    if (shouldPromptLocation) {
-      Alert.alert(
-        'Influence local charts?',
-        'Enable location so this tip also counts where you are now. You can still tip using home only.',
-        [
-          {
-            text: 'Enable current location',
-            style: 'default',
-            onPress: () => {
-              void enableLocationThenTip();
-            },
-          },
-          {
-            text: 'Tip without location',
-            onPress: () => {
-              skipLocationPromptThisSession = true;
-              void executeTip();
-            },
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ]
       );
       return;
     }
@@ -643,8 +602,8 @@ export function TipSheet({
                   <View style={styles.enableRow}>
                     <Text style={styles.enableCopy}>
                       {locationNeedsRetry
-                        ? 'We couldn’t detect your location. Try again, or tip with home only.'
-                        : 'Without location, this tip only counts on your home charts. Enable it to also influence charts where you are.'}
+                        ? 'We couldn’t detect your location. Try again, or tip with your home place only.'
+                        : 'Also count this tip where you are now. Location is only used while Tuneable is open.'}
                     </Text>
                     <Pressable
                       style={styles.enableBtn}
@@ -660,9 +619,9 @@ export function TipSheet({
                         <>
                           <Ionicons name="navigate" size={16} color="#fff" />
                           <Text style={styles.enableBtnText}>
-                            {locationNeedsRetry
+                            {locationNeedsRetry || locationStatus === 'denied'
                               ? 'Try again'
-                              : 'Enable location'}
+                              : 'Also count this tip where I am'}
                           </Text>
                         </>
                       )}
@@ -670,10 +629,19 @@ export function TipSheet({
                   </View>
                 ) : null}
 
-                {!currentLocation && locationStatus === 'denied' ? (
-                  <Text style={styles.influenceWarn}>
-                    Location blocked in Settings — tip will use home only.
-                  </Text>
+                {!currentLocation && locationBlocked ? (
+                  <View style={styles.enableRow}>
+                    <Text style={styles.influenceWarn}>
+                      Location is off for Tuneable. This tip will use your home place only.
+                    </Text>
+                    <Pressable
+                      style={styles.enableBtn}
+                      onPress={() => void Linking.openSettings()}
+                      disabled={submitting}>
+                      <Ionicons name="settings-outline" size={16} color="#fff" />
+                      <Text style={styles.enableBtnText}>Open Settings</Text>
+                    </Pressable>
+                  </View>
                 ) : null}
 
                 {!homeLabel && !currentLocation ? (
@@ -965,17 +933,19 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     backgroundColor: colors.accent,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    justifyContent: 'center',
   },
   enableBtnText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   tagsSection: {
     marginTop: 16,

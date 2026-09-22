@@ -274,9 +274,10 @@ export async function refreshCurrentLocation(options?: {
 }
 
 /**
- * Silently refresh if the browser already granted permission (no prompt).
+ * Re-read browser permission without prompting.
+ * If access was turned back on, refresh quietly.
  */
-export async function maybeRefreshCurrentLocationIfGranted(): Promise<void> {
+export async function recheckLocationPermission(): Promise<void> {
   if (!navigator.geolocation || !navigator.permissions?.query) {
     return;
   }
@@ -284,12 +285,25 @@ export async function maybeRefreshCurrentLocationIfGranted(): Promise<void> {
     const result = await navigator.permissions.query({ name: 'geolocation' });
     if (result.state === 'granted') {
       await refreshCurrentLocation({ force: false });
-    } else if (result.state === 'denied') {
+      return;
+    }
+    if (result.state === 'denied') {
       setStatus('denied', 'Location permission denied');
+      return;
+    }
+    if (status === 'denied') {
+      setStatus('idle');
     }
   } catch {
     // Permissions API unsupported — leave idle until user opts in
   }
+}
+
+/**
+ * Silently refresh if the browser already granted permission (no prompt).
+ */
+export async function maybeRefreshCurrentLocationIfGranted(): Promise<void> {
+  await recheckLocationPermission();
 }
 
 // Hydrate memory from session on module load
