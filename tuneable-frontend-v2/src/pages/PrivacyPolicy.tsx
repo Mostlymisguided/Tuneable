@@ -34,8 +34,8 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Music preferences and listening history</li>
                   <li>Party participation, song bids, and queue interactions</li>
-                  <li>Payment and transaction information (processed securely through Stripe)</li>
-                  <li>Device information, IP address, and browser type</li>
+                  <li>Payment and transaction information (processed securely through Stripe on the website, and through Apple In-App Purchase or Google Play Billing in the iOS and Android apps)</li>
+                  <li>Device information, IP address, browser or app version, and operating system</li>
                   <li>Platform usage patterns and feature interactions</li>
                 </ul>
 
@@ -84,6 +84,30 @@ const PrivacyPolicy: React.FC = () => {
                   <strong>Security:</strong> All artist escrow data is stored securely with encryption at rest and in transit. Access is restricted 
                   to authorized personnel only on a need-to-know basis for payout processing and verification purposes.
                 </p>
+
+                <h3 className="text-xl font-medium text-gray-900">1.5 Mobile App Information</h3>
+                <p className="mb-2">
+                  When you use the Tuneable iOS or Android app, we may also collect:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 mb-4">
+                  <li>
+                    <strong>Approximate location:</strong> if you allow location access so tips can influence charts
+                    where you are, and so you can set a home place. We reverse-geocode coordinates to a place name;
+                    we do not continuously track you in the background.
+                  </li>
+                  <li>
+                    <strong>Photos and camera:</strong> only when you choose a profile picture. Images are uploaded
+                    to our storage provider. We do not access your photo library except through the system picker.
+                  </li>
+                  <li>
+                    <strong>Push notification tokens:</strong> if you allow notifications, so we can send account and
+                    activity alerts. You can disable these in system settings.
+                  </li>
+                  <li>
+                    <strong>In-app purchase tokens:</strong> Apple or Google Play transaction identifiers used only to
+                    verify wallet top-ups and credit your balance. We do not receive your full card number from the stores.
+                  </li>
+                </ul>
               </div>
             </section>
 
@@ -152,7 +176,11 @@ const PrivacyPolicy: React.FC = () => {
                   We share information with trusted third-party service providers who help us operate our platform:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li><strong>Stripe:</strong> Payment processing and financial transactions (see Stripe's privacy policy)</li>
+                  <li><strong>Stripe:</strong> Payment processing for website wallet top-ups and artist payouts (see Stripe's privacy policy)</li>
+                  <li><strong>Apple:</strong> Sign in with Apple and In-App Purchase verification for iOS wallet top-ups</li>
+                  <li><strong>Google Play:</strong> Play Billing verification for Android wallet top-ups</li>
+                  <li><strong>Mapbox:</strong> Place search and reverse-geocoding when you set a location or allow location access</li>
+                  <li><strong>Expo / push delivery:</strong> Device push tokens so we can send notifications you have opted into</li>
                   <li><strong>OAuth Providers:</strong> Facebook, Google, SoundCloud, Instagram for authentication (see their respective privacy policies)</li>
                   <li><strong>Catalogue sources:</strong> Public catalogue metadata you choose to import on the website (for example a public YouTube playlist) for library matching</li>
                   <li><strong>Hosting Providers:</strong> Cloud infrastructure and data storage services</li>
@@ -229,8 +257,9 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">5.3 Right to Erasure ("Right to be Forgotten")</h3>
                 <p className="mb-2">
-                  You can request deletion of your account and associated personal data. We will delete your data within 30 days, 
-                  except where we are required to retain it for:
+                  You can delete your account in the Tuneable iOS or Android app (Profile → Settings → Delete account),
+                  or request deletion by emailing <strong>hi@tuneable.stream</strong>. We will delete or anonymize your
+                  personal data within 30 days, except where we are required to retain it for:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Legal or regulatory compliance (e.g., financial records, tax information)</li>

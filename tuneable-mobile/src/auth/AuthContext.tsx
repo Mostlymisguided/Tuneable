@@ -21,6 +21,7 @@ import {
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { syncPushTokenIfGranted } from '@/src/lib/pushNotifications';
+import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
 
 interface AuthContextValue {
   user: User | null;
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     setToken(null);
     setUser(null);
+    useBlockedUsersStore.getState().clear();
     await clearSession();
     await useMusicPlayerStore.getState().clear();
     await usePodcastPlayerStore.getState().clear();
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
     await saveSession(newToken, JSON.stringify(newUser));
     void syncPushTokenIfGranted(newUser.preferences?.notifications?.push !== false);
+    void useBlockedUsersStore.getState().load();
     return newUser;
   }, []);
 
@@ -104,10 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(fresh);
             await saveSession(storedToken, JSON.stringify(fresh));
             void syncPushTokenIfGranted(fresh.preferences?.notifications?.push !== false);
+            void useBlockedUsersStore.getState().load();
           } catch {
             await clearSession();
             setToken(null);
             setUser(null);
+            useBlockedUsersStore.getState().clear();
           }
         }
       } finally {

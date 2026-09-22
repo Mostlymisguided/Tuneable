@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
+import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { booksAPI } from '@/src/api/books';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
@@ -30,6 +31,7 @@ export default function BookProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tipOpen, setTipOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -85,10 +87,15 @@ export default function BookProfileScreen() {
             tintColor={colors.accentLight}
           />
         }>
-        <Pressable onPress={() => router.back()} style={styles.back} accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+        <View style={styles.topRow}>
+          <Pressable onPress={() => router.back()} style={styles.back} accessibilityLabel="Back">
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+          {book ? (
+            <ReportHeaderButton onPress={() => setReportOpen(true)} />
+          ) : null}
+        </View>
 
         {loading && !book ? (
           <ActivityIndicator color={colors.accentLight} style={styles.loader} />
@@ -128,6 +135,13 @@ export default function BookProfileScreen() {
         onClose={() => setTipOpen(false)}
         onConfirm={onConfirmTip}
       />
+      <ReportSheet
+        visible={reportOpen}
+        reportType="media"
+        targetId={book ? mediaId(book) : id || ''}
+        targetTitle={book?.title || 'Untitled'}
+        onClose={() => setReportOpen(false)}
+      />
     </Screen>
   );
 }
@@ -138,12 +152,18 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     alignItems: 'center',
   },
+  topRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   back: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    marginBottom: 16,
   },
   backText: {
     color: colors.text,

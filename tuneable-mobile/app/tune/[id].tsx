@@ -25,6 +25,7 @@ import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { TagClaimSheet } from '@/src/components/TagClaimSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
+import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence, formatBpmLabel, roundBpm } from '@/src/lib/format';
@@ -92,6 +93,7 @@ export default function TuneProfileScreen() {
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [tagClaimOpen, setTagClaimOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [rankedTags, setRankedTags] = useState<
     Array<{ tag: string; aggregate?: number; tipperCount?: number }>
@@ -354,6 +356,9 @@ export default function TuneProfileScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
+        {media ? (
+          <ReportHeaderButton onPress={() => setReportOpen(true)} />
+        ) : null}
       </View>
 
       {loading && !media ? (
@@ -677,7 +682,7 @@ export default function TuneProfileScreen() {
               <Text style={styles.supportSubtitle}>
                 {playable
                   ? 'Boost global ranking and support the artist'
-                  : 'Tip to help get this track fully added once audio is uploaded.'}
+                  : 'This track is not playable on Tuneable yet. Your tip still supports the listing.'}
               </Text>
               <Text style={styles.supportBalance}>
                 Balance {formatPoundsFromPence(user.balance)}
@@ -788,6 +793,13 @@ export default function TuneProfileScreen() {
               );
             }}
           />
+          <ReportSheet
+            visible={reportOpen}
+            reportType="media"
+            targetId={mediaId(media) || id || ''}
+            targetTitle={media.title || 'Untitled'}
+            onClose={() => setReportOpen(false)}
+          />
         </>
       ) : null}
     </Screen>
@@ -798,6 +810,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingTop: 8,
     marginBottom: 4,

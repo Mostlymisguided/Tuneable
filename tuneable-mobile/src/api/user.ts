@@ -7,6 +7,14 @@ import type {
   UserProfileResponse,
 } from '@/src/types/user';
 
+export type BlockedUser = {
+  id: string;
+  uuid?: string;
+  _id?: string;
+  username?: string;
+  profilePic?: string;
+};
+
 export type SpotifyImportAccess = {
   connected: boolean;
   oauthAvailable?: boolean;
@@ -66,6 +74,25 @@ export const userAPI = {
 
   deleteAccount: async (): Promise<{ message?: string }> => {
     const response = await api.delete<{ message?: string }>('/users/me');
+    return response.data;
+  },
+
+  getBlockedUsers: async (): Promise<{ blocked: BlockedUser[] }> => {
+    const response = await api.get<{ blocked: BlockedUser[] }>('/users/me/blocked');
+    return response.data;
+  },
+
+  blockUser: async (userId: string): Promise<{ blocked: boolean; userId?: string }> => {
+    const response = await api.post<{ blocked: boolean; userId?: string }>(
+      `/users/${userId}/block`
+    );
+    return response.data;
+  },
+
+  unblockUser: async (userId: string): Promise<{ blocked: boolean; userId?: string }> => {
+    const response = await api.delete<{ blocked: boolean; userId?: string }>(
+      `/users/${userId}/block`
+    );
     return response.data;
   },
 

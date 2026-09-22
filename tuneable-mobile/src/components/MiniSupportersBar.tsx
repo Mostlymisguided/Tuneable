@@ -6,6 +6,7 @@ import { colors } from '@/src/theme/colors';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import type { ChartMediaItem } from '@/src/types/media';
 import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
+import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
 
 type Bid = NonNullable<ChartMediaItem['bids']>[number];
 
@@ -14,6 +15,8 @@ type Supporter = {
   username: string;
   profilePic?: string;
   total: number;
+  uuid?: string;
+  _id?: string;
 };
 
 export type ChampionSupporter = {
@@ -58,6 +61,8 @@ function aggregateSupporters(bids: Bid[]): Supporter[] {
         username: user.username,
         profilePic: user.profilePic,
         total: 0,
+        uuid: user.uuid,
+        _id: user._id,
       };
     }
     map[id].total += amount;
@@ -78,22 +83,30 @@ export function MiniSupportersBar({
   variant = 'chips',
   onStackPress,
 }: Props) {
+  const isBlocked = useBlockedUsersStore((s) => s.isBlocked);
+
   const supporters = useMemo(() => {
-    if (champions && champions.length > 0) {
-      return champions
-        .filter((c) => c.user?.username)
-        .map((c) => {
-          const user = c.user!;
-          return {
-            id: String(user.uuid || user._id || user.username),
-            username: user.username,
-            profilePic: user.profilePic || undefined,
-            total: c.totalAmount || 0,
-          };
-        });
-    }
-    return aggregateSupporters(bids);
-  }, [bids, champions]);
+    const raw =
+      champions && champions.length > 0
+        ? champions
+            .filter((c) => c.user?.username)
+            .map((c) => {
+              const user = c.user!;
+              return {
+                id: String(user.uuid || user._id || user.username),
+                username: user.username,
+                profilePic: user.profilePic || undefined,
+                total: c.totalAmount || 0,
+                uuid: user.uuid,
+                _id: user._id,
+              };
+            })
+        : aggregateSupporters(bids);
+
+    return raw.filter(
+      (s) => !isBlocked(s.id, s.uuid, s._id, s.username)
+    );
+  }, [bids, champions, isBlocked]);
 
   const podiumRankById = useMemo(() => {
     const m = new Map<string, number>();

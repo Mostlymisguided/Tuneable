@@ -278,7 +278,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           )}
           {isNonPlayable && (
             <p className="text-amber-300/90 text-xs mt-2">
-              This track is not playable yet. Your tip adds support now — playback and download can follow once audio is uploaded.
+              This track is not playable yet. Your tip still adds support for this listing.
             </p>
           )}
         </div>

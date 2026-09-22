@@ -209,7 +209,7 @@ export function getBlockedCoverCopy(kind: CoverOverlayKind): {
   }
   return {
     title: 'Awaiting audio',
-    hint: 'Claim this media and upload audio if you are the rights holder',
+    hint: 'This tune does not have audio on Tuneable yet',
     showClaim: true,
   };
 }

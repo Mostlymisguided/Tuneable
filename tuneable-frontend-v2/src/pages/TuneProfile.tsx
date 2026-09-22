@@ -52,7 +52,7 @@ import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMe
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { canEditMedia, canDeleteMedia, isCreator, isAdmin, isAdminOrCreator } from '../utils/permissionHelpers';
+import { canEditMedia, canDeleteMedia, isAdmin } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { formatBpmLabel, roundBpm } from '../utils/bpm';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
@@ -401,13 +401,11 @@ const TuneProfile: React.FC = () => {
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
   const [isRemovingCoverArt, setIsRemovingCoverArt] = useState(false);
 
-  // Attach audio to catalog entry (awaiting rights/audio)
+  // Replace hosted audio on a tune the editor already owns
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [showAttachAudioModal, setShowAttachAudioModal] = useState(false);
-  const [attachAudioReplace, setAttachAudioReplace] = useState(false);
   const [attachAudioFile, setAttachAudioFile] = useState<File | null>(null);
   const [attachAudioRightsConfirmed, setAttachAudioRightsConfirmed] = useState(false);
-  const [attachAudioDisclaimer, setAttachAudioDisclaimer] = useState('');
   const [isAttachingAudio, setIsAttachingAudio] = useState(false);
 
   // WebPlayer integration
@@ -526,20 +524,11 @@ const TuneProfile: React.FC = () => {
     return canDeleteMedia(user, media);
   };
 
-  const canAttachAudio = () => {
-    if (!user || !media || isMediaPlayable(media)) return false;
-    return canEditTune() || isAdminOrCreator(user);
-  };
-
   const canReplaceAudio = () => {
     if (!user || !media) return false;
     const sources = normalizeSources(media.sources);
     if (!sources.upload) return false;
-    return canEditTune() || isAdminOrCreator(user);
-  };
-
-  const isContributorAudioUpload = () => {
-    return canAttachAudio() && isCreator(user) && !canEditTune();
+    return canEditTune();
   };
 
   // Helper function to get country code from country name
@@ -1344,15 +1333,14 @@ const TuneProfile: React.FC = () => {
     }
   };
 
-  const handleAttachAudioClick = (e: React.MouseEvent, replace = false) => {
+  const handleAttachAudioClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast.info('Please log in to upload audio');
+      toast.info('Please log in to replace audio');
       navigate('/login');
       return;
     }
-    if (replace ? !canReplaceAudio() : !canAttachAudio()) return;
-    setAttachAudioReplace(replace);
+    if (!canReplaceAudio()) return;
     setShowAttachAudioModal(true);
   };
 
@@ -1375,10 +1363,8 @@ const TuneProfile: React.FC = () => {
 
   const closeAttachAudioModal = () => {
     setShowAttachAudioModal(false);
-    setAttachAudioReplace(false);
     setAttachAudioFile(null);
     setAttachAudioRightsConfirmed(false);
-    setAttachAudioDisclaimer('');
     setIsAttachingAudio(false);
     if (audioFileInputRef.current) {
       audioFileInputRef.current.value = '';
@@ -1391,37 +1377,24 @@ const TuneProfile: React.FC = () => {
       toast.error('Please confirm your rights to upload this audio');
       return;
     }
-    if (isContributorAudioUpload() && !attachAudioDisclaimer.trim()) {
-      toast.error('Please describe your authorization to upload on behalf of the rights holder');
-      return;
-    }
 
     setIsAttachingAudio(true);
     try {
-      const isContributor = isContributorAudioUpload();
       const response = await mediaAPI.attachUpload(
         media?._id || mediaId,
         attachAudioFile,
-        {
-          ...(isContributor
-            ? {
-                uploaderRole: 'third_party' as const,
-                rightsDisclaimer: attachAudioDisclaimer.trim(),
-              }
-            : { uploaderRole: 'owner' as const }),
-          ...(attachAudioReplace ? { replaceExisting: true } : {}),
-        }
+        { uploaderRole: 'owner', replaceExisting: true }
       );
       if (response.media) {
         setMedia(enrichMediaWithPlayability(response.media));
       } else {
         await fetchMediaProfile();
       }
-      toast.success(attachAudioReplace ? 'Audio replaced — playback updated' : 'Audio uploaded — this tune is now playable!');
+      toast.success('Audio replaced — playback updated');
       closeAttachAudioModal();
     } catch (err: any) {
-      console.error('Error attaching audio:', err);
-      toast.error(err.response?.data?.error || 'Failed to upload audio');
+      console.error('Error replacing audio:', err);
+      toast.error(err.response?.data?.error || 'Failed to replace audio');
       setIsAttachingAudio(false);
     }
   };
@@ -2371,7 +2344,7 @@ const TuneProfile: React.FC = () => {
               </h3>
               <p className="text-gray-300 text-sm mt-1">
                 {!isMediaPlayable(media)
-                  ? 'Tip to help get this track fully added once audio is uploaded.'
+                  ? 'This track is not playable on Tuneable yet. Your tip still supports the listing.'
                   : 'Boost global ranking and support the artist'}
               </p>
             </div>
@@ -4145,7 +4118,7 @@ const TuneProfile: React.FC = () => {
                     ) : null}
                     <button
                       type="button"
-                      onClick={(e) => handleAttachAudioClick(e, true)}
+                      onClick={handleAttachAudioClick}
                       disabled={isAttachingAudio}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
                     >
@@ -4334,18 +4307,12 @@ const TuneProfile: React.FC = () => {
         </div>
       )}
 
-      {/* Attach Audio Modal */}
+      {/* Replace audio on a tune that already has a hosted file */}
       {showAttachAudioModal && media && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
           <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl md:text-2xl font-bold text-white">
-                {attachAudioReplace
-                  ? 'Replace audio'
-                  : isContributorAudioUpload()
-                    ? 'Upload on behalf'
-                    : 'Upload audio'}
-              </h2>
+              <h2 className="text-xl md:text-2xl font-bold text-white">Replace audio</h2>
               <button
                 onClick={closeAttachAudioModal}
                 disabled={isAttachingAudio}
@@ -4356,23 +4323,8 @@ const TuneProfile: React.FC = () => {
             </div>
 
             <p className="text-gray-300 text-sm mb-4">
-              {attachAudioReplace
-                ? `Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`
-                : isContributorAudioUpload()
-                  ? `Attach an audio file (MP3) for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
-                  : `Attach your audio file (MP3) for "${media.title}". This will make the tune playable on Tuneable.`}
+              {`Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`}
             </p>
-
-            {isContributorAudioUpload() && (
-              <div className="mb-4 bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
-                <p className="text-amber-200 text-sm font-medium mb-2">Contributor upload</p>
-                <p className="text-gray-300 text-sm">
-                  You are uploading as a verified contributor, not as the primary rights holder.
-                  Please confirm you have explicit authorization from the rights holder to upload
-                  this audio file to Tuneable.
-                </p>
-              </div>
-            )}
 
             <div className="mb-4">
               <label className="block text-white font-medium mb-2">Audio File</label>
@@ -4399,25 +4351,6 @@ const TuneProfile: React.FC = () => {
               )}
             </div>
 
-            {isContributorAudioUpload() && (
-              <div className="mb-4">
-                <label className="block text-white font-medium mb-2">
-                  Authorization from rights holder
-                </label>
-                <textarea
-                  value={attachAudioDisclaimer}
-                  onChange={(e) => setAttachAudioDisclaimer(e.target.value)}
-                  placeholder="Describe how you are authorized to upload this file (e.g. label manager, distributor, artist representative, written permission)..."
-                  className="input min-h-24"
-                  maxLength={1000}
-                  disabled={isAttachingAudio}
-                />
-                <div className="text-xs text-gray-400 mt-1">
-                  {attachAudioDisclaimer.length}/1000 characters
-                </div>
-              </div>
-            )}
-
             <div className="mb-6 bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
               <div className="flex items-start space-x-3">
                 <input
@@ -4430,12 +4363,10 @@ const TuneProfile: React.FC = () => {
                 />
                 <label htmlFor="attach-audio-rights-confirmation" className="text-sm text-gray-300">
                   <strong className="text-white">Rights confirmation:</strong>{' '}
-                  {isContributorAudioUpload()
-                    ? 'I confirm I have authorization from the rights holder to upload this audio, and I grant Tuneable CIC a non-exclusive license to host and stream it.'
-                    : 'I confirm that I own or have authorization to distribute the rights in this work, and I grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.'}
+                  I confirm that I own or have authorization to distribute the rights in this work, and I grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.
                   {' '}
-                  <Link to="/terms-of-service" className="text-purple-400 underline hover:text-purple-300">
-                    View Terms
+                  <Link to="/terms-of-service#copyright" className="text-purple-400 underline hover:text-purple-300">
+                    Copyright and takedown terms
                   </Link>
                 </label>
               </div>
@@ -4453,12 +4384,7 @@ const TuneProfile: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAttachAudioSubmit}
-                disabled={
-                  isAttachingAudio ||
-                  !attachAudioFile ||
-                  !attachAudioRightsConfirmed ||
-                  (isContributorAudioUpload() && !attachAudioDisclaimer.trim())
-                }
+                disabled={isAttachingAudio || !attachAudioFile || !attachAudioRightsConfirmed}
                 className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isAttachingAudio ? (
@@ -4469,7 +4395,7 @@ const TuneProfile: React.FC = () => {
                 ) : (
                   <>
                     <Upload className="h-5 w-5" />
-                    <span>Upload</span>
+                    <span>Replace</span>
                   </>
                 )}
               </button>

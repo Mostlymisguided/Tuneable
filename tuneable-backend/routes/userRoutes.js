@@ -1188,6 +1188,35 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/users/me/blocked
+ * @desc    List users the authenticated account has blocked
+ * @access  Private
+ */
+router.get('/me/blocked', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('blockedUsers')
+      .populate('blockedUsers', 'uuid username profilePic');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const blocked = (user.blockedUsers || [])
+      .filter((entry) => entry && (entry._id || entry.uuid))
+      .map((entry) => ({
+        id: entry.uuid || String(entry._id),
+        uuid: entry.uuid,
+        _id: entry._id,
+        username: entry.username,
+        profilePic: entry.profilePic,
+      }));
+
+    return res.json({ blocked });
+  } catch (error) {
+    console.error('Error listing blocked users:', error);
+    return res.status(500).json({ error: 'Failed to list blocked users' });
+  }
+});
+
+/**
  * @route   DELETE /api/users/me
  * @desc    Permanently deactivate and anonymize the authenticated account (App Store / GDPR)
  * @access  Private
@@ -3467,7 +3496,45 @@ router.post('/make-admin/:userId', async (req, res) => {
   }
 });
 
-// @route   GET /api/users/:userId/profile
+async function setUserBlocked(req, res, shouldBlock) {
+  try {
+    const target = await User.findByIdentifier(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ error: 'You cannot block yourself' });
+    }
+
+    const update = shouldBlock
+      ? { $addToSet: { blockedUsers: target._id } }
+      : { $pull: { blockedUsers: target._id } };
+    await User.updateOne({ _id: req.user._id }, update);
+
+    return res.json({
+      blocked: shouldBlock,
+      userId: target.uuid || String(target._id),
+    });
+  } catch (error) {
+    console.error(`Error ${shouldBlock ? 'blocking' : 'unblocking'} user:`, error);
+    return res.status(500).json({
+      error: shouldBlock ? 'Failed to block user' : 'Failed to unblock user',
+    });
+  }
+}
+
+/**
+ * @route   POST /api/users/:userId/block
+ * @desc    Block a user so their profile and activity can be hidden
+ * @access  Private
+ */
+router.post('/:userId/block', authMiddleware, (req, res) => setUserBlocked(req, res, true));
+
+/**
+ * @route   DELETE /api/users/:userId/block
+ * @desc    Unblock a previously blocked user
+ * @access  Private
+ */
+router.delete('/:userId/block', authMiddleware, (req, res) => setUserBlocked(req, res, false));
+
 // @desc    Get comprehensive user profile with bidding history
 // @access  Public (for viewing user profiles), but authenticated users see their own data
 router.get('/:userId/profile', async (req, res) => {
@@ -3486,9 +3553,9 @@ router.get('/:userId/profile', async (req, res) => {
           const decoded = jwt.verify(token, SECRET_KEY);
           // Fetch user by UUID or ObjectId
           if (decoded.userId && decoded.userId.includes('-')) {
-            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role');
+            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role blockedUsers');
           } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
-            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role');
+            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role blockedUsers');
           }
         }
       } catch (tokenError) {
@@ -3717,9 +3784,16 @@ router.get('/:userId/profile', async (req, res) => {
       userResponseKeys: Object.keys(userResponse)
     });
     
+    const blockedByMe = Boolean(
+      req.user?.blockedUsers?.some(
+        (blockedId) => blockedId?.toString() === userObj._id.toString()
+      )
+    );
+
     res.json({
       message: 'User profile fetched successfully',
       user: userResponse,
+      blockedByMe,
       stats: {
         totalBids,
         totalAmountBid,

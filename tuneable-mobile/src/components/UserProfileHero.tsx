@@ -79,6 +79,7 @@ type Props = {
   isOwnProfile?: boolean;
   onWalletPress?: () => void;
   onSettingsPress?: () => void;
+  onReportPress?: () => void;
 };
 
 export function UserProfileHero({
@@ -90,6 +91,7 @@ export function UserProfileHero({
   isOwnProfile = false,
   onWalletPress,
   onSettingsPress,
+  onReportPress,
 }: Props) {
   const homeLabel = formatLocationLabel(user.homeLocation);
   const secondaryLabel = formatLocationLabel(user.secondaryLocation);
@@ -238,6 +240,15 @@ export function UserProfileHero({
             accessibilityRole="button"
             accessibilityLabel="Settings">
             <Ionicons name="settings-outline" size={20} color={colors.text} />
+          </Pressable>
+        ) : onReportPress ? (
+          <Pressable
+            style={styles.gearBtn}
+            onPress={onReportPress}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Report user">
+            <Ionicons name="flag-outline" size={20} color={colors.text} />
           </Pressable>
         ) : null}
       </View>

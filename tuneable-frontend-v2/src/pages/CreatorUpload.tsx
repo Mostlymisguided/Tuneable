@@ -499,6 +499,7 @@ const CreatorUpload: React.FC = () => {
       const uploadData = new FormData();
       uploadData.append('audioFile', file);
       uploadData.append('title', formData.title.trim());
+      uploadData.append('rightsConfirmed', 'true');
 
       const cleanedArtists = artistEntries
         .map((artist, idx) => ({
@@ -1540,8 +1541,8 @@ const CreatorUpload: React.FC = () => {
                 <br /><br />
                 <strong className="text-white">✨Your Rights✨ You retain full rights over your works. You may 
                 revoke any rights granted to Tuneable at any time by removing your works from the platform.</strong>
-                <Link to="/terms-of-service" className="text-purple-400 underline ml-1 hover:text-purple-300">
-                  View Terms
+                <Link to="/terms-of-service#copyright" className="text-purple-400 underline ml-1 hover:text-purple-300">
+                  Copyright and takedown terms
                 </Link>
               </label>
             </div>

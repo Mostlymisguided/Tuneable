@@ -676,7 +676,7 @@ const SearchPage: React.FC = () => {
             <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
               <Link className="h-3 w-3 text-purple-600 dark:text-purple-400" />
               <span>
-                <strong>Tip:</strong> Results not already in Tuneable can still be tipped and added now, then played later once audio is uploaded.
+                <strong>Tip:</strong> Results not already in Tuneable can still be tipped and added to the catalog. Playback is available when the track has audio hosted on Tuneable.
               </span>
             </div>
           )}

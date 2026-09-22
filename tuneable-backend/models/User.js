@@ -176,6 +176,8 @@ const userSchema = new mongoose.Schema({
   // Admin-created accounts used for tipping tests. Only these can be hard-deleted.
   isTestUser: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
+  // Users this account has blocked (Play / App Store UGC requirement).
+  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   
   // Email verification
   emailVerified: { type: Boolean, default: false },
@@ -329,6 +331,7 @@ const userSchema = new mongoose.Schema({
     transform(_doc, ret) {
       ret.hasPushDevice = Array.isArray(ret.pushDevices) && ret.pushDevices.length > 0;
       delete ret.pushDevices;
+      delete ret.blockedUsers;
       return ret;
     },
   },

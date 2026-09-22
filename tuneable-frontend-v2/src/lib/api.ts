@@ -602,9 +602,10 @@ export const mediaAPI = {
 
   uploadMedia: async (file: File, metadata: { title: string; artist: string }) => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('audioFile', file);
     formData.append('title', metadata.title);
-    formData.append('artist', metadata.artist);
+    formData.append('artistName', metadata.artist);
+    formData.append('rightsConfirmed', 'true');
     const response = await api.post('/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

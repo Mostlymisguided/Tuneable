@@ -8,10 +8,11 @@ import {
   Text,
   TextInput,
   View,
+  Linking,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import axios from 'axios';
 import { Screen } from '@/src/components/Screen';
 import {
@@ -25,6 +26,7 @@ import {
   AUDIO_PICKER_TYPES,
   getAudioUploadRejection,
 } from '@/src/lib/audioUpload';
+import { LEGAL_URLS } from '@/src/components/LegalLinks';
 import { colors } from '@/src/theme/colors';
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -36,9 +38,7 @@ function formatBytes(size: number | null | undefined): string {
 }
 
 export default function UploadScreen() {
-  const { attachTo } = useLocalSearchParams<{ attachTo?: string }>();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const isAttachMode = Boolean(attachTo);
 
   const [file, setFile] = useState<AudioFileAsset | null>(null);
   const [title, setTitle] = useState('');
@@ -52,9 +52,8 @@ export default function UploadScreen() {
 
   const canSubmit = useMemo(() => {
     if (!file || !rightsConfirmed || uploading) return false;
-    if (isAttachMode) return Boolean(attachTo);
     return title.trim().length > 0;
-  }, [file, rightsConfirmed, uploading, isAttachMode, attachTo, title]);
+  }, [file, rightsConfirmed, uploading, title]);
 
   if (!authLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
@@ -89,7 +88,7 @@ export default function UploadScreen() {
         size: asset.size,
       });
 
-      if (!isAttachMode && !title.trim()) {
+      if (!title.trim()) {
         setTitle(name.replace(/\.mp3$/i, ''));
       }
     } catch (err) {
@@ -102,15 +101,6 @@ export default function UploadScreen() {
     setUploading(true);
     setError(null);
     try {
-      if (isAttachMode && attachTo) {
-        const res = await mediaAPI.attachUpload(attachTo, file);
-        const id = mediaId(res.media) || attachTo;
-        Alert.alert('Uploaded', 'Audio attached — this tune is now playable.', [
-          { text: 'View tune', onPress: () => router.replace(`/tune/${id}`) },
-        ]);
-        return;
-      }
-
       const res = await mediaAPI.uploadMedia(file, {
         title: title.trim(),
         artistName: artistName.trim() || undefined,
@@ -141,9 +131,7 @@ export default function UploadScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
-        <Text style={styles.topTitle}>
-          {isAttachMode ? 'Attach audio' : 'Upload'}
-        </Text>
+        <Text style={styles.topTitle}>Upload</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -166,9 +154,7 @@ export default function UploadScreen() {
         ) : (
           <>
             <Text style={styles.lede}>
-              {isAttachMode
-                ? 'Attach an audio file to this catalog tune so it can play in the app.'
-                : 'Upload an audio file (max 50MB). It becomes playable as soon as processing finishes.'}
+              Upload an audio file (max 50MB). It becomes playable as soon as processing finishes.
             </Text>
 
             {user && !user.emailVerified ? (
@@ -196,50 +182,57 @@ export default function UploadScreen() {
               <Ionicons name="folder-open-outline" size={20} color={colors.textMuted} />
             </Pressable>
 
-            {!isAttachMode ? (
-              <>
-                <Text style={styles.fieldLabel}>Title *</Text>
-                <TextInput
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Track title"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
+            <Text style={styles.fieldLabel}>Title *</Text>
+            <TextInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Track title"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+            />
 
-                <Text style={styles.fieldLabel}>Artist</Text>
-                <TextInput
-                  value={artistName}
-                  onChangeText={setArtistName}
-                  placeholder="Artist name"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
+            <Text style={styles.fieldLabel}>Artist</Text>
+            <TextInput
+              value={artistName}
+              onChangeText={setArtistName}
+              placeholder="Artist name"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+            />
 
-                <Text style={styles.fieldLabel}>Tags</Text>
-                <TextInput
-                  value={tags}
-                  onChangeText={setTags}
-                  placeholder="house, electronic (comma-separated)"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                  autoCapitalize="none"
-                />
-              </>
-            ) : null}
+            <Text style={styles.fieldLabel}>Tags</Text>
+            <TextInput
+              value={tags}
+              onChangeText={setTags}
+              placeholder="house, electronic (comma-separated)"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+              autoCapitalize="none"
+            />
 
-            <Pressable
-              style={styles.rightsRow}
-              onPress={() => setRightsConfirmed((v) => !v)}>
-              <Ionicons
-                name={rightsConfirmed ? 'checkbox' : 'square-outline'}
-                size={22}
-                color={rightsConfirmed ? colors.accentLight : colors.textMuted}
-              />
+            <View style={styles.rightsRow}>
+              <Pressable
+                onPress={() => setRightsConfirmed((v) => !v)}
+                hitSlop={8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: rightsConfirmed }}>
+                <Ionicons
+                  name={rightsConfirmed ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={rightsConfirmed ? colors.accentLight : colors.textMuted}
+                />
+              </Pressable>
               <Text style={styles.rightsText}>
-                I confirm I have the rights to upload and distribute this audio.
+                I confirm I have the rights to upload and distribute this audio.{' '}
+                <Text
+                  style={styles.rightsLink}
+                  onPress={() => {
+                    void Linking.openURL(`${LEGAL_URLS.terms}#copyright`);
+                  }}>
+                  Copyright terms
+                </Text>
               </Text>
-            </Pressable>
+            </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -250,9 +243,7 @@ export default function UploadScreen() {
               {uploading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.submitText}>
-                  {isAttachMode ? 'Attach & make playable' : 'Upload track'}
-                </Text>
+                <Text style={styles.submitText}>Upload track</Text>
               )}
             </Pressable>
           </>
@@ -368,6 +359,10 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
     marginBottom: 16,
+  },
+  rightsLink: {
+    color: colors.accentLight,
+    textDecorationLine: 'underline',
   },
   rightsText: {
     flex: 1,

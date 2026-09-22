@@ -89,7 +89,7 @@ export function ProfileSettingsSheet({
                           'Could not delete account',
                           err instanceof Error
                             ? err.message
-                            : 'Please try again or email privacy@tuneable.com'
+                            : 'Please try again or email hi@tuneable.stream'
                         );
                       } finally {
                         setBusy(false);

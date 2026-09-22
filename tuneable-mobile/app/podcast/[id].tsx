@@ -21,6 +21,7 @@ import {
 import { Screen } from '@/src/components/Screen';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
+import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -84,6 +85,7 @@ export default function PodcastEpisodeProfileScreen() {
   const [supportError, setSupportError] = useState<string | null>(null);
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const setQueueAndPlay = usePodcastPlayerStore((s) => s.setQueueAndPlay);
 
   const loadSeriesEpisodes = useCallback(
@@ -378,6 +380,9 @@ export default function PodcastEpisodeProfileScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
+        {media ? (
+          <ReportHeaderButton onPress={() => setReportOpen(true)} />
+        ) : null}
       </View>
 
       {loading && !media ? (
@@ -743,6 +748,13 @@ export default function PodcastEpisodeProfileScreen() {
             }}
             onConfirm={onConfirmTip}
           />
+          <ReportSheet
+            visible={reportOpen}
+            reportType="media"
+            targetId={mediaId(media) || id || ''}
+            targetTitle={media.title || 'Episode'}
+            onClose={() => setReportOpen(false)}
+          />
         </>
       ) : null}
     </Screen>
@@ -753,6 +765,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingTop: 8,
     marginBottom: 4,

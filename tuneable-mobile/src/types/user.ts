@@ -152,6 +152,7 @@ export interface UserLibraryItem {
 export interface UserProfileResponse {
   message?: string;
   user: User;
+  blockedByMe?: boolean;
   stats: UserStats;
   topBids?: Array<{
     _id?: string;

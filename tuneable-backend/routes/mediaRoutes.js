@@ -578,6 +578,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     if (!canUploadMedia(user)) {
       return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
+
+    const { rightsConfirmed } = req.body;
+    if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
+      return res.status(400).json({ error: 'Rights confirmation is required' });
+    }
     
     if (!req.files || !req.files.audioFile || req.files.audioFile.length === 0) {
       return res.status(400).json({ error: 'No audio file uploaded' });
@@ -842,9 +847,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       // Production equipment / gear (structured)
       productionStack: stackWithGear,
 
-      // Rights: creator self-upload is cleared. Admins can mark permitted
-      // (off-platform permission, artist not on Tuneable yet) — playable,
-      // but not stamped as the admin's own work.
+      // Rights attestation from the upload form (rightsConfirmed) is stored as
+      // rightsConfirmedBy / rightsConfirmedAt. Creator self-upload is cleared.
+      // Admins can mark permitted (off-platform permission, artist not on
+      // Tuneable yet) — playable, but not stamped as the admin's own work.
       ...(isAdmin(user) && requestedRightsStatus === 'permitted'
         ? permittedRightsFields(userId)
         : {
@@ -967,8 +973,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 });
 
 // @route   POST /api/media/:mediaId/attach-upload
-// @desc    Attach an MP3 to existing media (e.g. YouTube catalog entry) and enable playback
-// @access  Private (admin, media editor, or uploader with rights confirmation)
+// @desc    Replace the MP3 on media that already has hosted audio
+// @access  Private (admin or media editor, with rights confirmation)
 router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields([
   { name: 'audioFile', maxCount: 1 },
   { name: 'libraryXmlFile', maxCount: 1 },
@@ -1006,15 +1012,17 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    const canAttach = isAdmin(user) || canEditMedia(user, media) || canUploadMedia(user);
-    if (!canAttach) {
-      return res.status(403).json({ error: 'Not authorized to attach audio to this media' });
-    }
-
     const hasExistingUpload = !!(media.sources?.get?.('upload') || media.sources?.upload);
     const allowReplace = replaceExisting === 'true' || replaceExisting === true;
-    if (hasExistingUpload && !(allowReplace && canAttach)) {
-      return res.status(409).json({ error: 'This media already has an uploaded audio file' });
+    if (!hasExistingUpload || !allowReplace) {
+      return res.status(403).json({
+        error: 'Audio cannot be attached to an existing catalog entry. Upload a new track if you have the rights.',
+      });
+    }
+
+    const canReplace = isAdmin(user) || canEditMedia(user, media);
+    if (!canReplace) {
+      return res.status(403).json({ error: 'Not authorized to replace audio on this media' });
     }
 
     let fileUrl;

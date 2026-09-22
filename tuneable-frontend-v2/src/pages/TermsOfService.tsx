@@ -1,7 +1,15 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const TermsOfService: React.FC = () => {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) el.scrollIntoView({ block: 'start' });
+  }, [hash]);
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -215,7 +223,7 @@ const TermsOfService: React.FC = () => {
                   obtained from that platform, or remove specific content, Tuneable will comply and remove related metadata.
                 </p>
 
-                <h3 className="text-xl font-medium text-gray-900">5.4.3 Copyright Takedown (DMCA-Style)</h3>
+                <h3 id="copyright" className="text-xl font-medium text-gray-900 scroll-mt-24">5.4.3 Copyright Takedown (DMCA-Style)</h3>
                 <p className="mb-2">
                   Tuneable respects intellectual property rights and will process valid copyright takedown requests. 
                   To submit a copyright takedown request, send an email to <strong>hi@tuneable.stream</strong> with:

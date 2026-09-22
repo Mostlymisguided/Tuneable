@@ -2463,7 +2463,7 @@ const UserProfile: React.FC = () => {
                     </button>
                   </div>
                   <p className="mt-3 text-xs text-gray-400">
-                    Tunes found in MusicBrainz or Spotify can be tipped into your library now and become playable once audio is uploaded.
+                    Tunes found in MusicBrainz or Spotify can be tipped into your library. Playback is available when the track has audio hosted on Tuneable.
                   </p>
                 </>
               )}

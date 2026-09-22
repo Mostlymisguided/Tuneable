@@ -60,11 +60,6 @@ export type UploadMediaResponse = {
   media: ChartMediaItem;
 };
 
-export type AttachUploadResponse = {
-  message?: string;
-  media: ChartMediaItem;
-};
-
 const UPLOAD_TIMEOUT_MS = 120000;
 
 function appendAudioFile(form: FormData, file: AudioFileAsset) {
@@ -180,31 +175,10 @@ export const mediaAPI = {
       form.append('description', fields.description.trim());
     }
     form.append('explicit', String(Boolean(fields.explicit)));
+    form.append('rightsConfirmed', 'true');
 
     const response = await api.post<UploadMediaResponse>(
       '/media/upload',
-      form,
-      { timeout: UPLOAD_TIMEOUT_MS }
-    );
-    return response.data;
-  },
-
-  /** Attach MP3 to an existing catalog entry so it becomes playable. */
-  attachUpload: async (
-    mediaId: string,
-    file: AudioFileAsset,
-    options?: { replaceExisting?: boolean }
-  ): Promise<AttachUploadResponse> => {
-    const form = new FormData();
-    appendAudioFile(form, file);
-    form.append('rightsConfirmed', 'true');
-    form.append('uploaderRole', 'owner');
-    if (options?.replaceExisting) {
-      form.append('replaceExisting', 'true');
-    }
-
-    const response = await api.post<AttachUploadResponse>(
-      `/media/${mediaId}/attach-upload`,
       form,
       { timeout: UPLOAD_TIMEOUT_MS }
     );

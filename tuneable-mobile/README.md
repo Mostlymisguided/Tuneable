@@ -54,11 +54,21 @@ eas login
 eas build:configure   # once — writes EAS projectId
 eas build --platform ios --profile production
 eas submit --platform ios --profile production
+
+# Android / Play (internal track first)
+eas build --platform android --profile production
+eas submit --platform android --profile production
 ```
 
-Production/preview profiles set `EXPO_PUBLIC_API_URL=https://tuneable.stream`. Enable **Sign in with Apple** on the App ID. Create IAP products before TestFlight wallet testing.
+Production/preview profiles set `EXPO_PUBLIC_API_URL=https://tuneable.stream`. Enable **Sign in with Apple** on the App ID. Create IAP products before TestFlight / Play wallet testing.
 
 Review notes for App Store Connect and Play Console (playable chart vs catalogue metadata, escrow, demo account): [`docs/APP_REVIEW_NOTES.md`](../docs/APP_REVIEW_NOTES.md).
+
+Play Console listing assets:
+
+- Feature graphic: `assets/store/feature-graphic.png` (1024×500)
+- App icon / splash: generated from `assets/images/tuneable-logo.png`
+- Phone screenshots: capture from a store/dev build (Play needs at least 2)
 
 ## Wallet payments
 
