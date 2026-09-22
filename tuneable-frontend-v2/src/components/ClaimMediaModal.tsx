@@ -5,6 +5,7 @@ import { Award, Ban, CheckCircle, X } from 'lucide-react';
 import { claimAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isCreator } from '../utils/permissionHelpers';
+import type { RightsStatus } from '../utils/rightsStatus';
 
 export type ClaimIntent = 'claim_keep' | 'takedown';
 
@@ -14,14 +15,24 @@ interface ClaimMediaModalProps {
   mediaId: string;
   mediaTitle: string;
   contentLabel?: 'Tune' | 'Episode';
+  rightsStatus?: RightsStatus;
   onClose: () => void;
   onSubmitted?: () => void;
+}
+
+function intentIntro(contentLabel: string, rightsStatus?: RightsStatus): string {
+  const label = contentLabel.toLowerCase();
+  if (rightsStatus === 'permitted') {
+    return `This ${label} has permission from its rights holder and is playable. Tips are held until the artist joins Tuneable and claims them. What would you like to do?`;
+  }
+  return `This ${label} is awaiting rights clearance. What would you like to do?`;
 }
 
 const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
   mediaId,
   mediaTitle,
   contentLabel = 'Tune',
+  rightsStatus,
   onClose,
   onSubmitted,
 }) => {
@@ -104,7 +115,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
         {step === 'intent' && (
           <>
             <p className="text-gray-300 mb-6">
-              This {contentLabel.toLowerCase()} is awaiting rights clearance. What would you like to do?
+              {intentIntro(contentLabel, rightsStatus)}
             </p>
 
             <div className="space-y-3 mb-6">
@@ -116,7 +127,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
                 <div className="flex items-start gap-3">
                   <Award className="h-5 w-5 text-emerald-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-white font-semibold">Claim & keep it live</p>
+                    <p className="text-white font-semibold">Claim & keep live</p>
                     <p className="text-sm text-gray-400 mt-1">
                       Verify you&apos;re the rights holder, attach ownership, and receive tips held in escrow.
                     </p>
@@ -134,7 +145,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
                   <div>
                     <p className="text-white font-semibold">Take it down</p>
                     <p className="text-sm text-gray-400 mt-1">
-                      Remove this {contentLabel.toLowerCase()} from Tuneable and refund active tips to supporters.
+                      Verify you&apos;re the rights holder, remove this {contentLabel.toLowerCase()} from Tuneable, and refund active tips to supporters.
                     </p>
                   </div>
                 </div>

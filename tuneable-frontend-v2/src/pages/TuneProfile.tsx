@@ -4204,6 +4204,7 @@ const TuneProfile: React.FC = () => {
           mediaId={media._id}
           mediaTitle={media.title}
           contentLabel="Tune"
+          rightsStatus={media.rightsStatus}
           onClose={() => setShowClaimModal(false)}
         />
       )}

@@ -3910,6 +3910,7 @@ const PodcastEpisodeProfile: React.FC = () => {
           mediaId={media._id}
           mediaTitle={media.title}
           contentLabel="Episode"
+          rightsStatus={media.rightsStatus}
           onClose={() => setShowClaimModal(false)}
         />
       )}

@@ -779,6 +779,7 @@ export default function TuneProfileScreen() {
             visible={claimOpen}
             mediaId={mediaId(media) || id || ''}
             mediaTitle={media.title || 'Untitled'}
+            rightsStatus={media.rightsStatus}
             onClose={() => setClaimOpen(false)}
             onSubmitted={() => {
               Alert.alert(

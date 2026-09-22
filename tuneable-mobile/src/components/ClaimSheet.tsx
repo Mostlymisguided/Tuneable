@@ -26,6 +26,7 @@ type Props = {
   visible: boolean;
   mediaId: string;
   mediaTitle: string;
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   onClose: () => void;
   onSubmitted?: () => void;
 };
@@ -40,6 +41,7 @@ export function ClaimSheet({
   visible,
   mediaId,
   mediaTitle,
+  rightsStatus,
   onClose,
   onSubmitted,
 }: Props) {
@@ -143,7 +145,9 @@ export function ClaimSheet({
             {step === 'intent' && (
               <>
                 <Text style={styles.copy}>
-                  This tune is awaiting rights clearance. What would you like to do?
+                  {rightsStatus === 'permitted'
+                    ? 'This tune has permission from its rights holder and is playable. Tips are held until the artist joins Tuneable and claims them. What would you like to do?'
+                    : 'This tune is awaiting rights clearance. What would you like to do?'}
                 </Text>
                 <Pressable
                   style={[styles.choice, styles.choiceKeep]}
@@ -151,7 +155,7 @@ export function ClaimSheet({
                 >
                   <Ionicons name="ribbon-outline" size={22} color="#34d399" />
                   <View style={styles.choiceText}>
-                    <Text style={styles.choiceTitle}>Claim & keep it live</Text>
+                    <Text style={styles.choiceTitle}>Claim & keep live</Text>
                     <Text style={styles.choiceSub}>
                       Verify you're the rights holder and receive tips held in
                       escrow.
@@ -166,7 +170,8 @@ export function ClaimSheet({
                   <View style={styles.choiceText}>
                     <Text style={styles.choiceTitle}>Take it down</Text>
                     <Text style={styles.choiceSub}>
-                      Remove this tune and refund active tips to supporters.
+                      Verify you're the rights holder, remove this tune from
+                      Tuneable, and refund active tips to supporters.
                     </Text>
                   </View>
                 </Pressable>
