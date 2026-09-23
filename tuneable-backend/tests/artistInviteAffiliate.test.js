@@ -9,6 +9,7 @@ const {
   affiliateWindowInfo,
   isAffiliateEligible,
   ownerPaidSharePence,
+  inviteeAffiliateDisclosure,
 } = require('../utils/artistInviteAffiliate');
 
 const UPLOAD = 'https://uploads.tuneable.stream/media-uploads/example.mp3';
@@ -26,6 +27,14 @@ const originalMedia = {
     verificationSource: 'upload',
   }],
 };
+
+describe('inviteeAffiliateDisclosure', () => {
+  it('tells the artist the 3% comes from Tuneable', () => {
+    expect(inviteeAffiliateDisclosure('Ada')).toBe(
+      "If you upload your own music, Ada earns 3% of your paid tips for your first year — taken from Tuneable's share, not yours."
+    );
+  });
+});
 
 describe('computeAffiliateSharePence', () => {
   it('is 3% of paid artist share', () => {

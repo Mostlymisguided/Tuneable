@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
+import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
 import { 
   Music, 
   User, 
@@ -1548,7 +1548,7 @@ const TuneProfile: React.FC = () => {
     const artistName = media?.artist || 'this artist';
     const title = media?.title || 'this track';
     const link = `${window.location.origin}/creator/register?invite=${inviteCode}`;
-    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator with my invite code ${inviteCode}, then upload or claim it so tips can reach you.\n\n${link}`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator with my invite code ${inviteCode}, then upload or claim it so tips can reach you.\n\nIf you upload your own music, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.\n\n${link}`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(message);

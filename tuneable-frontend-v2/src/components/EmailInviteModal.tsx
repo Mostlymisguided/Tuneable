@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Send, Loader2 } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { emailAPI } from '../lib/api';
+import { ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
 
 interface EmailInviteModalProps {
   isOpen: boolean;
@@ -204,9 +205,10 @@ const EmailInviteModal: React.FC<EmailInviteModalProps> = ({
           {/* Info */}
           <div className="bg-purple-900/20 border border-purple-500/20 rounded-lg p-3">
             <p className="text-xs text-gray-300">
-              Recipients will receive an email with a link to sign up. The invite code{' '}
-              <span className="font-mono text-purple-400">{inviteCode}</span> will be automatically
-              prefilled in the sign-up form.
+              Recipients get a creator signup link with invite code{' '}
+              <span className="font-mono text-purple-400">{inviteCode}</span> filled in.
+              The email says they keep 70% of paid tips, and that you earn {ARTIST_INVITE_AFFILIATE_PERCENT}%
+              of those tips for their first year from Tuneable&apos;s share when they upload their own music.
             </p>
           </div>
         </div>

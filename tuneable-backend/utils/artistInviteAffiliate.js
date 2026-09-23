@@ -67,6 +67,12 @@ function isInvitedCreator(user) {
   return status === 'verified' || status === 'pending';
 }
 
+/** Sentence sent to the invited artist. The cut comes from Tuneable, not their 70%. */
+function inviteeAffiliateDisclosure(inviterName) {
+  const who = inviterName || 'Your inviter';
+  return `If you upload your own music, ${who} earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.`;
+}
+
 /**
  * Add creator/upload/window/commission fields for invitee lists.
  */
@@ -149,4 +155,5 @@ module.exports = {
   isAffiliateEligible,
   ownerPaidSharePence,
   attachAffiliateInviteStats,
+  inviteeAffiliateDisclosure,
 };
