@@ -1678,7 +1678,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       media = media.filter((item: any) => mediaMatchesBpmFilter(item, bpmFilterRange));
     }
 
-    const sorted = sortChartItems(media, chartSort, {
+    return sortChartItems(media, chartSort, {
       getDate: (item: any) => {
         const mediaItem = item.mediaId || item;
         return isGlobalParty
@@ -1693,49 +1693,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         return mediaItem.globalMediaAggregate || 0;
       },
     });
-
-    // Most-tipped Global is capped at the top 250, so a just-tipped upload
-    // disappears from the chart. Keep the viewer's own recent adds visible.
-    if (!isGlobalParty || chartSort !== 'most-tipped' || !user) return sorted;
-
-    const viewerIds = new Set(
-      [user._id, (user as any).id, user.uuid].filter(Boolean).map((id) => String(id))
-    );
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const mine: any[] = [];
-    const rest: any[] = [];
-    for (const item of sorted) {
-      const mediaItem = item.mediaId || item;
-      const addedBy = mediaItem.addedBy;
-      const addedByIds = [
-        addedBy?._id,
-        addedBy?.id,
-        addedBy?.uuid,
-        typeof addedBy === 'string' ? addedBy : null,
-      ]
-        .filter(Boolean)
-        .map((id) => String(id));
-      const created = new Date(
-        mediaItem.createdAt || mediaItem.uploadedAt || item.createdAt || 0
-      ).getTime();
-      const isMine = addedByIds.some((id) => viewerIds.has(id));
-      if (isMine && Number.isFinite(created) && created >= cutoff) {
-        mine.push(item);
-      } else {
-        rest.push(item);
-      }
-    }
-    if (mine.length === 0) return sorted;
-    mine.sort((a, b) => {
-      const aItem = a.mediaId || a;
-      const bItem = b.mediaId || b;
-      return (
-        new Date(bItem.createdAt || bItem.uploadedAt || 0).getTime() -
-        new Date(aItem.createdAt || aItem.uploadedAt || 0).getTime()
-      );
-    });
-    return [...mine, ...rest];
-  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty, user]);
+  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty]);
 
   const chartRanks = useMemo(
     () => buildChartRankMap(displayMedia, partyMediaKey),

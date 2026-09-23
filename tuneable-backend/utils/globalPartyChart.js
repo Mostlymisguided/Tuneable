@@ -13,7 +13,7 @@ const {
   playableHostedMusicMongoFilter,
   normalizeSources,
 } = require('./mediaPlayability');
-const { normalizeChartSort, mediaChartMongoSort } = require('./chartSort');
+const { normalizeChartSort, mediaChartMongoSort, sortChartItems } = require('./chartSort');
 const {
   normalizeLocationScope,
   locationScopeIncludesOrigin,
@@ -190,6 +190,24 @@ async function fetchViewerRecentTippedMedia({
       })
     ).sort({ createdAt: -1 })
   );
+}
+
+/**
+ * Recent reserves and the viewer's own tips are merged into the page so they
+ * stay reachable past the top-N cut. Rank that merged list by the chart sort.
+ */
+function sortAssembledChartRows(rows, sortBy) {
+  return sortChartItems(rows, sortBy, {
+    getDate: (row) => {
+      const media = row?.media || row;
+      return media?.createdAt || media?.uploadedAt || row?.createdAt || null;
+    },
+    getTip: (row) => {
+      if (typeof row?.timePeriodBidValue === 'number') return row.timePeriodBidValue;
+      const media = row?.media || row;
+      return media?.globalMediaAggregate || 0;
+    },
+  });
 }
 
 function effectiveChartLimit(limit) {
@@ -688,16 +706,17 @@ async function fetchAllTimeGlobalChart({
     playableOnly,
   });
   if (viewerRecent.length) {
-    mediaList.unshift(...viewerRecent);
+    mediaList.push(...viewerRecent);
   }
+  const rankedMedia = sortAssembledChartRows(mediaList, chartSort);
 
-  const mediaIds = mediaList.map((m) => m._id);
+  const mediaIds = rankedMedia.map((m) => m._id);
   const supportersByMedia = await loadTopSupportersByMedia(mediaIds, {
     supportersLimit,
     userId,
   });
 
-  const chartMedia = mediaList.map((media) => {
+  const chartMedia = rankedMedia.map((media) => {
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
     const aggregate = media.globalMediaAggregate || 0;
     const playability = withPublicPlayability(
@@ -1006,16 +1025,10 @@ async function fetchPeriodGlobalChart({
       .populate('addedBy', 'username profilePic uuid')
       .lean();
 
-    mediaList = fetched
-      .map((media) => {
-        const id = media._id.toString();
-        return { media, timePeriodBidValue: mediaBidValues[id] || 0 };
-      })
-      .sort((a, b) => {
-        const diff = b.timePeriodBidValue - a.timePeriodBidValue;
-        if (diff !== 0) return diff;
-        return (b.media.globalMediaAggregate || 0) - (a.media.globalMediaAggregate || 0);
-      });
+    mediaList = fetched.map((media) => {
+      const id = media._id.toString();
+      return { media, timePeriodBidValue: mediaBidValues[id] || 0 };
+    });
   }
 
   if (startOffset === 0) {
@@ -1026,12 +1039,14 @@ async function fetchPeriodGlobalChart({
       playableOnly,
     });
     if (viewerRecent.length) {
-      mediaList.unshift(...viewerRecent.map((media) => ({
+      mediaList.push(...viewerRecent.map((media) => ({
         media,
         timePeriodBidValue: mediaBidValues[media._id.toString()] || media.globalMediaAggregate || 0,
       })));
     }
   }
+
+  mediaList = sortAssembledChartRows(mediaList, chartSort);
 
   const pageMediaIds = mediaList.map((row) => row.media._id);
   // Origin-matched rows still show global tippers; supported-by shows local supporters
@@ -1130,4 +1145,5 @@ module.exports = {
   toObjectIds,
   hiddenCatalogCount,
   countHiddenCatalogTunes,
+  sortAssembledChartRows,
 };

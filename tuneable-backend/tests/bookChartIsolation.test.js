@@ -78,6 +78,20 @@ describe('books vs music chart isolation', () => {
     expect(hiddenCatalogCount(false, 250, 22)).toBe(0);
   });
 
+  it('ranks merged recent rows by tip total instead of leaving them first', () => {
+    const { sortAssembledChartRows } = require('../utils/globalPartyChart');
+    const ranked = sortAssembledChartRows([
+      { title: 'Default tip', globalMediaAggregate: 111, createdAt: '2026-09-18T21:07:00.000Z' },
+      { title: 'Several tips', globalMediaAggregate: 203, createdAt: '2025-12-02T10:19:00.000Z' },
+      { title: 'Also several', globalMediaAggregate: 113, createdAt: '2025-11-07T21:26:00.000Z' },
+    ], 'most-tipped');
+    expect(ranked.map((row) => row.title)).toEqual([
+      'Several tips',
+      'Also several',
+      'Default tip',
+    ]);
+  });
+
   it('casts hex strings back to ObjectIds for Bid.aggregate $in', () => {
     const mongoose = require('mongoose');
     const { toObjectIds } = require('../utils/globalPartyChart');
