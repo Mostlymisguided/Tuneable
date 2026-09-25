@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen,
+  Crown,
   Headphones,
   Heart,
   Globe,
@@ -135,11 +136,12 @@ const About: React.FC = () => {
           </div>
           <p className="mt-4 text-center text-sm text-gray-500">More media as we grow.</p>
 
-          <div className="mt-8 grid gap-3 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-4 sm:grid-cols-3 sm:p-6">
+          <div className="mt-8 grid gap-3 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
             {[
               { icon: Heart, label: 'Pays the creator' },
               { icon: Globe, label: 'Moves the charts' },
               { icon: Library, label: 'Stays on your shelf' },
+              { icon: Crown, label: 'Crowns a champion' },
             ].map(({ icon: Icon, label }) => (
               <div key={label} className="flex items-center justify-center gap-3 py-2">
                 <Icon className="h-5 w-5 shrink-0 text-purple-600" />
@@ -147,6 +149,11 @@ const About: React.FC = () => {
               </div>
             ))}
           </div>
+          <p className="mx-auto mt-6 max-w-2xl text-center text-base leading-relaxed text-gray-600">
+            The person who tips a work the most becomes its champion — a public name beside the
+            song, podcast, or book they love. Vie for that place where you live, or worldwide.
+            Anyone can take it by tipping more.
+          </p>
         </div>
       </section>
 

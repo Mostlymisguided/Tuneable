@@ -498,6 +498,10 @@ const Onboarding: React.FC = () => {
                   Tip what you love. Each tip supports the creator, moves global and local charts,
                   and puts that work on your public shelf.
                 </p>
+                <p className="mt-3 text-sm leading-relaxed text-gray-400">
+                  Tip a work more than anyone else where you live — or worldwide — and you become its
+                  champion. Your name stands beside the media you love most.
+                </p>
               </div>
             </div>
             <button

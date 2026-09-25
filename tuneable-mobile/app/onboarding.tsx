@@ -242,7 +242,9 @@ export default function OnboardingScreen() {
                     </Text>
                     <Text style={styles.stepText}>
                       Tip what you love. Each tip supports the creator, moves global and local
-                      charts, and puts that work on your public shelf.
+                      charts, and puts that work on your public shelf. Tip a work more than anyone
+                      else where you live — or worldwide — and you become its champion. Your name
+                      stands beside the media you love most.
                     </Text>
                   </View>
                 </View>

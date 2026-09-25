@@ -898,7 +898,9 @@ const AuthPage: React.FC = () => {
 
         <div className="max-h-[calc(90vh-64px)] overflow-y-auto px-5 py-5">
           <p className="mb-5 text-sm text-zinc-400">
-            {isRegisterPage ? 'Join Tuneable to start sharing music.' : 'Welcome back.'}
+            {isRegisterPage
+              ? 'Join Tuneable to champion the media you love, locally and worldwide.'
+              : 'Welcome back.'}
           </p>
           {isRegisterPage ? renderRegisterForm() : renderLoginForm()}
         </div>
