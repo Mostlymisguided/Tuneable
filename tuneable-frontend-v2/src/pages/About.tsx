@@ -112,12 +112,11 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      {/* The idea */}
+      {/* Showcase */}
       <section className="bg-white py-16">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">The idea</h2>
-            <p className="mt-3 text-lg text-gray-600">A public shelf for your taste.</p>
+            <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">Showcase your taste</h2>
           </div>
 
           <div className="grid grid-cols-3 gap-3 sm:gap-6">
@@ -145,7 +144,7 @@ const About: React.FC = () => {
             {[
               { icon: Heart, label: 'Pays the creator' },
               { icon: Globe, label: 'Moves the charts' },
-              { icon: Library, label: 'Stays on your shelf' },
+              { icon: Library, label: 'Stays in your library' },
               { icon: Crown, label: 'Crowns a champion' },
             ].map(({ icon: Icon, label }) => (
               <div key={label} className="flex items-center justify-center gap-3 py-2">

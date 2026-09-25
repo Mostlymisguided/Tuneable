@@ -225,13 +225,13 @@ const Onboarding: React.FC = () => {
                 <Library className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-white">Your shelf, not a subscription</h2>
+                <h2 className="text-xl font-semibold text-white">Your showcase, not a subscription</h2>
                 <p className="mt-2 text-sm leading-relaxed text-gray-300">
                   Tuneable is where you show your taste in music, podcasts, and books.
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-gray-400">
                   Tip what you love. Each tip supports the creator, moves global and local charts,
-                  and puts that work on your public shelf.
+                  and puts that work in your public showcase.
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-gray-400">
                   Tip a work more than anyone else where you live — or worldwide — and you become its

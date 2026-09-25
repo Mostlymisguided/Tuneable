@@ -236,13 +236,13 @@ export default function OnboardingScreen() {
                     <Ionicons name="library-outline" size={20} color={colors.accentLight} />
                   </View>
                   <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Your shelf, not a subscription</Text>
+                    <Text style={styles.stepTitle}>Your showcase, not a subscription</Text>
                     <Text style={styles.introLead}>
                       Tuneable is where you show your taste in music, podcasts, and books.
                     </Text>
                     <Text style={styles.stepText}>
                       Tip what you love. Each tip supports the creator, moves global and local
-                      charts, and puts that work on your public shelf. Tip a work more than anyone
+                      charts, and puts that work in your public showcase. Tip a work more than anyone
                       else where you live — or worldwide — and you become its champion. Your name
                       stands beside the media you love most.
                     </Text>
