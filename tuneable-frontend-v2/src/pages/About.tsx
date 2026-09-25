@@ -18,6 +18,9 @@ import {
   Vote,
   Gift,
   Ticket,
+  Shirt,
+  Disc3,
+  Sparkles,
 } from 'lucide-react';
 
 const About: React.FC = () => {
@@ -308,27 +311,28 @@ const About: React.FC = () => {
       <section id="tunebytes" className="py-16 bg-white scroll-mt-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">TuneBytes</h2>
-            <p className="text-lg md:text-xl text-gray-600 leading-relaxed">
-              TuneBytes are what you earn for finding media early. Tip a song, podcast, or book, and
-              as other people tip it after you, you earn TuneBytes. Earlier tips earn more. They are
-              a record of who believed in a work before it grew.
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">TuneBytes</h2>
+            <p className="text-lg md:text-xl text-gray-600">
+              Tip media before it grows. Earlier tips earn more.
             </p>
           </div>
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-8 md:p-10 mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              After the MVP, they become spendable
+          <div className="mb-8 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-6 text-center sm:p-8">
+            <h3 className="text-xl font-bold text-gray-900 md:text-2xl">
+              After the MVP, spend them with that creator
             </h3>
-            <p className="text-gray-700 leading-relaxed mb-4">
-              TuneBytes will become an artist-based currency. The TuneBytes you earn from a
-              creator&apos;s media are the ones you can spend with that creator.
-            </p>
-            <p className="text-gray-700 leading-relaxed">
-              Creators will choose a percentage of their share of each tip to put into a community
-              pool that backs their TuneBytes. When that pool reaches a threshold, they can use it
-              to make merch, collectible vinyl, gig tickets, and other perks — offered in exchange
-              for TuneBytes fans earned from their media.
-            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { icon: Shirt, label: 'Merch' },
+                { icon: Disc3, label: 'Vinyl' },
+                { icon: Ticket, label: 'Gigs' },
+                { icon: Sparkles, label: 'Perks' },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="rounded-xl bg-white px-3 py-4 shadow-sm">
+                  <Icon className="mx-auto mb-2 h-7 w-7 text-purple-600" />
+                  <p className="text-sm font-semibold text-gray-900">{label}</p>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl p-6 shadow-md border border-gray-100">
