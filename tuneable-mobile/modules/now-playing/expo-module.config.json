@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["NowPlayingModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.nowplaying.NowPlayingModule"]
+  }
+}

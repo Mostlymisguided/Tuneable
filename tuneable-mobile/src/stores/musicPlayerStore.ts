@@ -6,6 +6,12 @@ import {
   MUSIC_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
 import { getUploadUrl, isUploadPlayable, mediaId, getCreatorDisplay } from '@/src/lib/media';
+import {
+  clearNowPlaying,
+  ensureNowPlayingRemoteHandlers,
+  setNowPlaying,
+  updateNowPlayingElapsed,
+} from '@/src/lib/nowPlaying';
 import { showToast } from '@/src/stores/toastStore';
 import {
   completeListeningHistory,
@@ -49,6 +55,7 @@ async function ensureAudioMode() {
     playThroughEarpieceAndroid: false,
   });
   audioModeReady = true;
+  ensureNowPlayingRemoteHandlers();
 }
 
 function getStore(): MusicPlayerState {
@@ -139,6 +146,12 @@ function onStatus(status: AVPlaybackStatus) {
       sourceType: 'direct',
       isPlaying: status.isPlaying,
     });
+    updateNowPlayingElapsed({
+      positionMs: status.positionMillis ?? 0,
+      durationMs: status.durationMillis ?? (item.duration ?? 0) * 1000,
+      playbackRate: 1,
+      isPlaying: status.isPlaying,
+    });
   }
 
   if (status.didJustFinish && !status.isLooping) {
@@ -183,6 +196,16 @@ async function loadAndPlay(item: ChartMediaItem) {
       onStatus
     );
     sound = created.sound;
+    setNowPlaying({
+      title: item.title,
+      artist: getCreatorDisplay(item),
+      artworkUrl: item.coverArt,
+      durationMs: getStore().durationMs,
+      positionMs: 0,
+      playbackRate: 1,
+      isPlaying: true,
+      mode: 'music',
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
@@ -317,6 +340,7 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   clear: async () => {
     endListeningHistorySession();
     await unloadSound();
+    clearNowPlaying();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
     set({
