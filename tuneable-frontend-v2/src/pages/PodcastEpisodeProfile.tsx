@@ -69,6 +69,9 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
+import { stripHtml } from '../utils/stripHtml';
 import { getEpisodeDisplayTags } from '../utils/podcastTags';
 
 interface Media {
@@ -1637,75 +1640,32 @@ const PodcastEpisodeProfile: React.FC = () => {
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this episode'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
+  const episodePath = media ? getMediaProfileUrl(media) : '';
+  const episodeBlurb = media
+    ? clipText(stripHtml(media.description)) || clipText(`Tip “${media.title}”${creatorDisplay ? ` by ${creatorDisplay}` : ''} on Tuneable and move it up the podcast chart.`)
+    : '';
 
-  // Update Open Graph meta tags for better Facebook sharing
-  useEffect(() => {
-    if (!media) return;
-
-    // Helper function to get absolute image URL
-    const getAbsoluteImageUrl = (imageUrl: string | undefined): string => {
-      if (!imageUrl) return `${window.location.origin}${DEFAULT_COVER_ART}`;
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        return imageUrl;
-      }
-      if (imageUrl.startsWith('/')) {
-        return `${window.location.origin}${imageUrl}`;
-      }
-      return `${window.location.origin}/${imageUrl}`;
-    };
-
-    const ogImage = media._id
-      ? getStoryCardUrl(media._id, 'og')
-      : getAbsoluteImageUrl(media.coverArt);
-    const artistDisplay = Array.isArray(media.artist) 
-      ? media.artist.map((a: any) => a.name || a).join(', ')
-      : media.artist || '';
-    const ogTitle = `${media.title}${artistDisplay ? ` by ${artistDisplay}` : ''} | Tuneable`;
-    const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media
-      ? `${window.location.origin}${getMediaProfileUrl(media)}`
-      : window.location.href;
-
-    // Create or update meta tags
-    const updateMetaTag = (property: string, content: string) => {
-      let meta = document.querySelector(`meta[property="${property}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('property', property);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    // Update Open Graph tags
-    updateMetaTag('og:title', ogTitle);
-    updateMetaTag('og:description', ogDescription);
-    updateMetaTag('og:image', ogImage);
-    updateMetaTag('og:url', ogUrl);
-    updateMetaTag('og:type', 'music.song');
-    updateMetaTag('og:site_name', 'Tuneable');
-
-    // Update Twitter Card tags for better cross-platform sharing
-    const updateTwitterTag = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name="${name}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    updateTwitterTag('twitter:card', 'summary_large_image');
-    updateTwitterTag('twitter:title', ogTitle);
-    updateTwitterTag('twitter:description', ogDescription);
-    updateTwitterTag('twitter:image', ogImage);
-
-    // Cleanup function to restore default meta tags when component unmounts
-    return () => {
-      // Optionally restore default tags here if needed
-    };
-  }, [media, shareUrl, shareText]);
+  usePageMeta(media ? {
+    title: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    description: episodeBlurb,
+    path: episodePath,
+    image: media._id ? getStoryCardUrl(media._id, 'og') : media.coverArt,
+    imageAlt: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    imageWidth: media._id ? 1200 : undefined,
+    imageHeight: media._id ? 630 : undefined,
+    twitterCard: 'summary_large_image',
+    type: 'article',
+    robots: searchParams.get('edit') === 'true' ? 'noindex, nofollow' : 'index, follow',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'PodcastEpisode',
+      name: media.title,
+      description: episodeBlurb,
+      ...(creatorDisplay ? { author: { '@type': 'Person', name: creatorDisplay } } : {}),
+      url: `${SITE_ORIGIN}${episodePath}`,
+      ...(media.coverArt ? { image: media.coverArt } : {}),
+    },
+  } : null);
 
   const handleNativeShare = async () => {
     if (!media?._id) {

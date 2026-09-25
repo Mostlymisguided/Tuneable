@@ -23,6 +23,8 @@ import {
   type CollectiveType,
   type VenueKind,
 } from '../utils/collectiveTypes';
+import { usePageMeta } from '../seo/usePageMeta';
+import { clipText } from '../seo/pageMeta';
 
 interface Collective {
   _id: string;
@@ -85,6 +87,13 @@ const CollectiveProfile: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [collective, setCollective] = useState<Collective | null>(null);
+  usePageMeta(collective ? {
+    title: collective.name,
+    description: clipText(collective.description) || `${collective.name} on Tuneable. See their music and listener support.`,
+    path: `/collective/${encodeURIComponent(collective.slug)}`,
+    image: collective.profilePicture || collective.coverImage,
+    imageAlt: collective.name,
+  } : null);
   const [recentReleases, setRecentReleases] = useState<Media[]>([]);
   const [topMedia, setTopMedia] = useState<Media[]>([]);
   const [members, setMembers] = useState<Collective['members']>([]);

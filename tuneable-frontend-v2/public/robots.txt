@@ -1,0 +1,28 @@
+# https://tuneable.stream/robots.txt
+User-agent: *
+Allow: /
+
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /auth/
+Disallow: /onboarding
+Disallow: /dashboard
+Disallow: /wallet
+Disallow: /payment
+Disallow: /import
+Disallow: /admin
+Disallow: /notifications
+Disallow: /search
+Disallow: /creator/upload
+Disallow: /creator/library-enrich
+Disallow: /artist-escrow
+Disallow: /conversations
+Disallow: /books/search
+Disallow: /podcasts/search
+Disallow: /party-v2/
+Disallow: /api/
+
+Sitemap: https://tuneable.stream/sitemap.xml

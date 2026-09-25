@@ -8,6 +8,7 @@ import { CurrentLocationProvider } from './contexts/CurrentLocationContext';
 import { useWebPlayerStore } from './stores/webPlayerStore';
 import { usePodcastPlayerStore } from './stores/podcastPlayerStore';
 import Navbar from './components/Navbar';
+import SeoManager from './components/SeoManager';
 import AppToaster from './components/AppToaster';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
 import MP3Player from './components/MP3Player';
@@ -201,6 +202,7 @@ const PlayAuthRedirectBinder = () => {
 const AppContent = () => {
   return (
     <Router>
+      <SeoManager />
       <AuthDeepLinkListener />
       <PlayAuthRedirectBinder />
       <div className="min-h-screen">

@@ -33,6 +33,7 @@ import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
 import EntertainingLoader from '../components/EntertainingLoader';
+import { usePageMeta } from '../seo/usePageMeta';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import {
   getEpisodeAudioUrl,
@@ -398,6 +399,16 @@ const TagProfile: React.FC = () => {
               Number(displayName) <= 400
             ? 'BPM'
             : 'Tag';
+
+  usePageMeta(slug ? {
+    title: kindLabel === 'BPM' ? `${displayName} BPM` : displayName,
+    description: kindLabel === 'Year'
+      ? `Music from ${displayName} on Tuneable. Tip a tune and move it up the chart.`
+      : kindLabel === 'BPM'
+        ? `Tunes around ${displayName} BPM on Tuneable.`
+        : `Tunes tagged ${displayName} on Tuneable. Tip one and move it up the chart.`,
+    path: `/tag/${encodeURIComponent(tag?.slug || slug)}`,
+  } : null);
   const tipTotal = stats?.globalTagAggregate ?? 0;
   const mosaicCovers = media.slice(0, 4).map((item, index) => ({
     id: item._id || `${item.title}-${index}`,

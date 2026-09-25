@@ -13,6 +13,7 @@ import {
   type PluginCategory,
   type HardwareCategory,
 } from '../data/gear';
+import { usePageMeta } from '../seo/usePageMeta';
 
 interface GearEntity {
   _id: string;
@@ -64,6 +65,13 @@ const GearProfile: React.FC = () => {
   const legacyType = (searchParams.get('type') as GearType | null) || undefined;
 
   const [gear, setGear] = useState<GearEntity | null>(null);
+  const gearTitle = gear ? (gear.manufacturer ? `${gear.name} by ${gear.manufacturer}` : gear.name) : '';
+  usePageMeta(gear ? {
+    title: gearTitle,
+    description: `${gearTitle} on Tuneable. See tunes made with this gear.`,
+    path: `/gear/${encodeURIComponent(gear.slug || slug)}`,
+    imageAlt: gear.name,
+  } : null);
   const [media, setMedia] = useState<GearMediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [rankings, setRankings] = useState<RankingGear[]>([]);

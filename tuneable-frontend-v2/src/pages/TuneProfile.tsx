@@ -93,6 +93,8 @@ import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
@@ -1947,72 +1949,28 @@ const TuneProfile: React.FC = () => {
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
+  const tunePath = media ? getMediaProfileUrl(media) : '';
 
-  // Update Open Graph meta tags for better Facebook sharing
-  useEffect(() => {
-    if (!media) return;
-
-    // Helper function to get absolute image URL
-    const getAbsoluteImageUrl = (imageUrl: string | undefined): string => {
-      if (!imageUrl) return `${window.location.origin}${DEFAULT_COVER_ART}`;
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        return imageUrl;
-      }
-      if (imageUrl.startsWith('/')) {
-        return `${window.location.origin}${imageUrl}`;
-      }
-      return `${window.location.origin}/${imageUrl}`;
-    };
-
-    const ogImage = media._id
-      ? getStoryCardUrl(media._id, 'og')
-      : getAbsoluteImageUrl(media.coverArt);
-    const ogTitle = `${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`;
-    const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media
-      ? `${window.location.origin}${getMediaProfileUrl(media)}`
-      : window.location.href;
-
-    // Create or update meta tags
-    const updateMetaTag = (property: string, content: string) => {
-      let meta = document.querySelector(`meta[property="${property}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('property', property);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    // Update Open Graph tags
-    updateMetaTag('og:title', ogTitle);
-    updateMetaTag('og:description', ogDescription);
-    updateMetaTag('og:image', ogImage);
-    updateMetaTag('og:url', ogUrl);
-    updateMetaTag('og:type', 'music.song');
-    updateMetaTag('og:site_name', 'Tuneable');
-
-    // Update Twitter Card tags for better cross-platform sharing
-    const updateTwitterTag = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name="${name}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    updateTwitterTag('twitter:card', 'summary_large_image');
-    updateTwitterTag('twitter:title', ogTitle);
-    updateTwitterTag('twitter:description', ogDescription);
-    updateTwitterTag('twitter:image', ogImage);
-
-    // Cleanup function to restore default meta tags when component unmounts
-    return () => {
-      // Optionally restore default tags here if needed
-    };
-  }, [media, shareUrl, shareText]);
+  usePageMeta(media ? {
+    title: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    description: clipText(`Tip “${media.title}”${creatorDisplay ? ` by ${creatorDisplay}` : ''} on Tuneable. Listener tips support the artists and decide its place on the global chart.`),
+    path: tunePath,
+    image: media._id ? getStoryCardUrl(media._id, 'og') : media.coverArt,
+    imageAlt: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    imageWidth: media._id ? 1200 : undefined,
+    imageHeight: media._id ? 630 : undefined,
+    twitterCard: 'summary_large_image',
+    type: 'music.song',
+    robots: searchParams.get('edit') === 'true' ? 'noindex, nofollow' : 'index, follow',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'MusicRecording',
+      name: media.title,
+      ...(creatorDisplay ? { byArtist: { '@type': 'MusicGroup', name: creatorDisplay } } : {}),
+      url: `${SITE_ORIGIN}${tunePath}`,
+      ...(media.coverArt ? { image: media.coverArt } : {}),
+    },
+  } : null);
 
   const handleNativeShare = async () => {
     if (!media?._id) {

@@ -13,6 +13,8 @@ import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import EntertainingLoader from '../components/EntertainingLoader';
+import { usePageMeta } from '../seo/usePageMeta';
+import { clipText } from '../seo/pageMeta';
 import TipCtaLabel from '../components/TipCtaLabel';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
@@ -323,6 +325,13 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const periodParam = searchParams.get('period');
   const initialPeriod = periodParam && VALID_TIME_PERIODS.includes(periodParam as any) ? periodParam : 'today';
   const isGlobalParty = partyId === 'global';
+
+  usePageMeta(!isGlobalParty && party?.name ? {
+    title: party.name,
+    description: clipText(party.description) || `Join ${party.name} on Tuneable and tip tunes into the queue.`,
+    path: `/party/${encodeURIComponent(party.uuid || partyId || '')}`,
+    robots: party.privacy === 'private' ? 'noindex, nofollow' : 'index, follow',
+  } : null);
   
   // Helper function to get effective minimum bid
   const getEffectiveMinimumBid = (media?: any): number => {

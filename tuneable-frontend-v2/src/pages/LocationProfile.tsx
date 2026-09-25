@@ -12,6 +12,7 @@ import EntertainingLoader from '../components/EntertainingLoader';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import { useAuth } from '../contexts/AuthContext';
 import { venueKindLabel } from '../utils/collectiveTypes';
+import { usePageMeta } from '../seo/usePageMeta';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 
 interface PlaceEntity {
@@ -62,6 +63,11 @@ const LocationProfile: React.FC = () => {
   const placeId = placeIdParam ? decodeURIComponent(placeIdParam) : '';
 
   const [place, setPlace] = useState<PlaceEntity | null>(null);
+  usePageMeta(place ? {
+    title: place.name,
+    description: `Music tipped from ${[place.name, place.country].filter(Boolean).join(', ')} on Tuneable.`,
+    path: getPlaceProfilePath(place.placeId) || `/place/${encodeURIComponent(placeId)}`,
+  } : null);
   const [stats, setStats] = useState<PlaceStats | null>(null);
   const [relatedPlaces, setRelatedPlaces] = useState<RelatedPlace[]>([]);
   const [relatedTags, setRelatedTags] = useState<RelatedTag[]>([]);

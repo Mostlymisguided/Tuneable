@@ -41,6 +41,8 @@ import { requireAuthToPlay } from '../utils/playAuth';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { shareStoryCardWithToast } from '../utils/shareMediaCard';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
 interface PodcastSeries {
   _id: string;
@@ -730,6 +732,32 @@ const PodcastSeriesProfile: React.FC = () => {
       toast.error('Failed to copy link');
     }
   };
+
+  const seriesPath = series
+    ? getMediaProfileUrl({ ...series, contentForm: ['podcastseries'] })
+    : '';
+  const seriesHost = series?.host?.map((host) => host.name).filter(Boolean).join(', ');
+  const seriesBlurb = series
+    ? clipText(stripHtml(series.description || series.summary)) ||
+      clipText(`Tip episodes of ${series.title} on Tuneable and support the show.`)
+    : '';
+
+  usePageMeta(series ? {
+    title: series.title,
+    description: seriesBlurb,
+    path: seriesPath,
+    image: series.coverArt,
+    imageAlt: series.title,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'PodcastSeries',
+      name: series.title,
+      description: seriesBlurb,
+      ...(seriesHost ? { author: { '@type': 'Person', name: seriesHost } } : {}),
+      url: `${SITE_ORIGIN}${seriesPath}`,
+      ...(series.coverArt ? { image: series.coverArt } : {}),
+    },
+  } : null);
 
   const topTagRankings = tagRankings.slice(0, 3);
   const topLocationRankings = locationRankings.slice(0, 3);

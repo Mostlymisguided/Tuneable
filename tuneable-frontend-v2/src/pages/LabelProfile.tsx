@@ -12,6 +12,8 @@ import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 import InviteMemberModal from '../components/labels/InviteMemberModal';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
 interface Label {
   _id: string;
@@ -82,6 +84,19 @@ const LabelProfile: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [label, setLabel] = useState<Label | null>(null);
+  usePageMeta(label ? {
+    title: label.name,
+    description: clipText(label.description) || `${label.name} on Tuneable. See their releases and how listeners are tipping them.`,
+    path: `/label/${encodeURIComponent(label.slug)}`,
+    image: label.profilePicture || label.coverImage,
+    imageAlt: label.name,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: label.name,
+      url: `${SITE_ORIGIN}/label/${encodeURIComponent(label.slug)}`,
+    },
+  } : null);
   const [recentReleases, setRecentReleases] = useState<Media[]>([]);
   const [topMedia, setTopMedia] = useState<Media[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);

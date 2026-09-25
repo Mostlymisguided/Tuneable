@@ -134,6 +134,8 @@ import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import { getMediaProfileUrl, isBookMedia, toMediaPathFields } from '../utils/mediaNavigation';
 import { getUserProfileUrl, isCanonicalUserParam } from '../utils/profileNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -288,6 +290,24 @@ const UserProfile: React.FC = () => {
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
+  const profileName = user?.creatorProfile?.artistName || user?.username || '';
+  usePageMeta(user?.username ? {
+    title: profileName,
+    description: clipText(user.creatorProfile?.bio) || `${profileName} on Tuneable. See the tunes they support.`,
+    path: `/user/${encodeURIComponent(user.username)}`,
+    image: user.profilePic,
+    imageAlt: profileName,
+    type: 'profile',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      mainEntity: {
+        '@type': 'Person',
+        name: profileName,
+        url: `${SITE_ORIGIN}/user/${encodeURIComponent(user.username)}`,
+      },
+    },
+  } : null);
   const [, setStats] = useState<UserStats | null>(null);
   const [, setMediaWithBids] = useState<MediaWithBids[]>([]);
   const [tuneBytesTagRankings, setTuneBytesTagRankings] = useState<Array<{

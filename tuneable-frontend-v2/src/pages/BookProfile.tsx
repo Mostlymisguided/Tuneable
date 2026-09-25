@@ -12,6 +12,8 @@ import MediaChampions from '../components/MediaChampions';
 import { getReadElsewhereTarget } from '../utils/listenElsewhere';
 import { getTipCurrentLocation } from '../utils/currentLocationCache';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
 const BookProfile: React.FC = () => {
   const { mediaId } = useParams();
@@ -58,6 +60,23 @@ const BookProfile: React.FC = () => {
     return 'Unknown author';
   }, [book]);
 
+  const bookPath = book ? getMediaProfileUrl(book) : '';
+  usePageMeta(book ? {
+    title: authors && authors !== 'Unknown author' ? `${book.title} by ${authors}` : book.title,
+    description: clipText(book.description) || `Tip “${book.title}”${authors && authors !== 'Unknown author' ? ` by ${authors}` : ''} on Tuneable and move it up the book chart.`,
+    path: bookPath,
+    image: book.coverArt,
+    imageAlt: book.title,
+    type: 'book',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Book',
+      name: book.title,
+      ...(authors && authors !== 'Unknown author' ? { author: { '@type': 'Person', name: authors } } : {}),
+      url: `${SITE_ORIGIN}${bookPath}`,
+    },
+  } : null);
+
   const elsewhere = book ? getReadElsewhereTarget(book) : null;
   const defaultTip = user?.preferences?.defaultTip || 1.11;
 
@@ -96,7 +115,7 @@ const BookProfile: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-6">
           <img
             src={book.coverArt || DEFAULT_COVER_ART}
-            alt=""
+            alt={book.title}
             className="w-40 h-56 object-cover rounded-xl shadow-lg"
           />
           <div className="flex-1">
