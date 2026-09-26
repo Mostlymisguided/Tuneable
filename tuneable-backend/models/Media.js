@@ -341,6 +341,14 @@ const mediaSchema = new mongoose.Schema({
     default: null,
     min: [0.01, 'Minimum bid must be at least £0.01']
   },
+
+  // Share of tippers who can keep a copy. 100 = everyone who tipped, 1 = top 1%.
+  copySharePercent: {
+    type: Number,
+    default: 50,
+    min: [1, 'Copy share must be at least 1%'],
+    max: [100, 'Copy share cannot exceed 100%'],
+  },
   
   // Release information
   album: { type: String },

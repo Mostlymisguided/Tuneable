@@ -61,6 +61,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { computeChampionTipContext } from '../utils/tipStats';
+import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -284,6 +285,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     elements: [] as string[],
     coverArt: '',
     minimumBid: null as number | null,
+    copySharePercent: 50,
     primaryLocation: null as ResolvedLocation | null,
     secondaryLocation: null as ResolvedLocation | null
   });
@@ -298,6 +300,12 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   // Global bidding state
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
+  const [copyAccess, setCopyAccess] = useState<{
+    sharePercent?: number;
+    thresholdPence: number | null;
+    unlocked: boolean;
+    grandfathered: boolean;
+  } | null>(null);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -417,6 +425,11 @@ const PodcastEpisodeProfile: React.FC = () => {
       console.log('📥 Podcast episode profile response:', response);
       setMedia(response.media);
       setComments(response.media.comments || []);
+      try {
+        setCopyAccess(await mediaAPI.getCopyAccess(mediaId!));
+      } catch {
+        setCopyAccess(null);
+      }
       console.log('✅ Podcast episode profile loaded successfully');
       return response.media;
     } catch (err: any) {
@@ -904,6 +917,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         elements: (media as any).elements || [],
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
+        copySharePercent: normalizeCopySharePercent((media as any).copySharePercent),
         primaryLocation: (() => {
           const loc = (media as any).primaryLocation || null;
           if (loc && loc.country && !loc.countryCode) {
@@ -2121,6 +2135,9 @@ const PodcastEpisodeProfile: React.FC = () => {
               <p className="text-gray-300 text-sm mt-1">
                 Boost global ranking and support the creators
               </p>
+              {copyAccess && (
+                <p className="text-purple-200 text-xs mt-1">{copyAccessSentence(copyAccess)}</p>
+              )}
             </div>
             {user && (
               <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
@@ -2915,6 +2932,9 @@ const PodcastEpisodeProfile: React.FC = () => {
                       <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
                         Boost this episode's global ranking and support the creators
                       </p>
+                      {copyAccess && (
+                        <p className="text-purple-200 text-xs md:text-sm mb-4">{copyAccessSentence(copyAccess)}</p>
+                      )}
                       
                       <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                         <button
@@ -3744,6 +3764,27 @@ const PodcastEpisodeProfile: React.FC = () => {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   Set a custom minimum tip amount for this media. If not set, the party's minimum tip will be used.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Who can keep a copy
+                </label>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={editForm.copySharePercent}
+                  onChange={(e) => setEditForm({
+                    ...editForm,
+                    copySharePercent: normalizeCopySharePercent(e.target.value),
+                  })}
+                  className="w-full accent-purple-500"
+                />
+                <p className="text-sm text-white mt-2">{copyShareLabel(editForm.copySharePercent)}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  100% is everyone who tips. 1% is only the most generous. People who already cleared the line keep the copy if you raise it.
                 </p>
               </div>
 

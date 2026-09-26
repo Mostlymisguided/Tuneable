@@ -616,6 +616,18 @@ export const mediaAPI = {
     const response = await api.get(`/media/${encodeURIComponent(mediaId)}/profile`);
     return response.data;
   },
+
+  getCopyAccess: async (mediaId: string) => {
+    const response = await api.get(`/media/${encodeURIComponent(mediaId)}/copy-access`);
+    return response.data as {
+      sharePercent: number;
+      thresholdPence: number | null;
+      tipperCount: number;
+      userTotalPence: number | null;
+      unlocked: boolean;
+      grandfathered: boolean;
+    };
+  },
   
   getComments: async (mediaId: string, page = 1, limit = 20) => {
     const response = await api.get(`/media/${mediaId}/comments?page=${page}&limit=${limit}`);

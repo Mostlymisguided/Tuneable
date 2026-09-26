@@ -86,6 +86,7 @@ import {
 } from '../utils/listenElsewhere';
 import { requireAuthToPlay } from '../utils/playAuth';
 import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
+import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
@@ -356,6 +357,7 @@ const TuneProfile: React.FC = () => {
     aiUsage: { ...EMPTY_AI_USAGE } as AiUsage,
     coverArt: '',
     minimumBid: null as number | null,
+    copySharePercent: 50,
     primaryLocation: null as ResolvedLocation | null,
     secondaryLocation: null as ResolvedLocation | null
   });
@@ -370,6 +372,12 @@ const TuneProfile: React.FC = () => {
 
   // Global bidding state
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
+  const [copyAccess, setCopyAccess] = useState<{
+    sharePercent?: number;
+    thresholdPence: number | null;
+    unlocked: boolean;
+    grandfathered: boolean;
+  } | null>(null);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -488,6 +496,11 @@ const TuneProfile: React.FC = () => {
       setMedia(enrichMediaWithPlayability(response.media));
       setComments(response.media.comments || []);
       setRankedTags(response.rankedTags || []);
+      try {
+        setCopyAccess(await mediaAPI.getCopyAccess(mediaId!));
+      } catch {
+        setCopyAccess(null);
+      }
       console.log('✅ Media profile loaded successfully');
     } catch (err: any) {
       console.error('❌ Error fetching media profile:', err);
@@ -955,6 +968,7 @@ const TuneProfile: React.FC = () => {
         },
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
+        copySharePercent: normalizeCopySharePercent((media as any).copySharePercent),
         primaryLocation: (() => {
           const loc = (media as any).primaryLocation || null;
           if (loc && loc.country && !loc.countryCode) {
@@ -2298,6 +2312,8 @@ const TuneProfile: React.FC = () => {
     )
   );
 
+  const copyAccessLine = () => (copyAccess ? copyAccessSentence(copyAccess) : null);
+
   const renderSlimSupportSection = () => (
     <div id="support-tune" className="mb-6 px-2 md:px-0">
       <div className="max-w-2xl mx-auto">
@@ -2313,6 +2329,9 @@ const TuneProfile: React.FC = () => {
                   ? 'This track is not playable on Tuneable yet. Your tip still supports the listing.'
                   : 'Boost global ranking and support the artist'}
               </p>
+              {copyAccessLine() && (
+                <p className="text-purple-200 text-xs mt-1">{copyAccessLine()}</p>
+              )}
             </div>
             {user && (
               <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
@@ -3119,6 +3138,9 @@ const TuneProfile: React.FC = () => {
                       <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
                         Boost this tune's global ranking and support the artist
                       </p>
+                      {copyAccessLine() && (
+                        <p className="text-purple-200 text-xs md:text-sm mb-4">{copyAccessLine()}</p>
+                      )}
                       
                       <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                         <button
@@ -3990,6 +4012,27 @@ const TuneProfile: React.FC = () => {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   Set a custom minimum tip amount for this media. If not set, the party's minimum tip will be used.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Who can keep a copy
+                </label>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={editForm.copySharePercent}
+                  onChange={(e) => setEditForm({
+                    ...editForm,
+                    copySharePercent: normalizeCopySharePercent(e.target.value),
+                  })}
+                  className="w-full accent-purple-500"
+                />
+                <p className="text-sm text-white mt-2">{copyShareLabel(editForm.copySharePercent)}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  100% is everyone who tips. 1% is only the most generous. People who already cleared the line keep the copy if you raise it.
                 </p>
               </div>
 
