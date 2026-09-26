@@ -98,6 +98,13 @@ export interface User {
     verifiedAt?: Date;
     submittedAt?: Date;
   };
+  /** Founding Creators — status/benefits only, not equity */
+  isFoundingCreator?: boolean;
+  foundingSeatNumber?: number | null;
+  foundingSeatAssignedAt?: string | null;
+  foundingUploadQuotaBytes?: number | null;
+  foundingUploadUsedBytes?: number | null;
+  foundingUploadRemainingBytes?: number | null;
 }
 
 interface RegisterData {
