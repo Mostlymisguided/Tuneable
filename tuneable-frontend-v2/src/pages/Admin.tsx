@@ -1475,6 +1475,28 @@ const Admin: React.FC = () => {
               {!isInviteManagementCollapsed && (
                 <div className="mt-4">
                   <InviteReferrals />
+                  <div className="mt-6 pt-4 border-t border-gray-700">
+                    <h4 className="text-sm font-semibold text-white mb-2">Founding Creators</h4>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Assign founding seats to the earliest users who already have verified original uploads (up to the cap).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const result = await userAPI.backfillFoundingCreators();
+                          toast.success(
+                            `Backfill done: ${result.assigned ?? 0} assigned, ${result.claimed ?? 0}/${result.cap ?? 1111} claimed`
+                          );
+                        } catch (error: any) {
+                          toast.error(error.response?.data?.error || 'Founding backfill failed');
+                        }
+                      }}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
+                    >
+                      Backfill founding seats
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

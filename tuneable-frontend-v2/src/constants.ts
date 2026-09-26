@@ -20,6 +20,10 @@ export const PLATFORM_TAKE_TARGET_PERCENT = 10;
 /** Share of an invited artist's paid tip revenue paid to the inviter for year one (from the platform cut) */
 export const ARTIST_INVITE_AFFILIATE_PERCENT = 3;
 
+/** Founding Creators program (first N original uploaders). Mirror backend defaults. */
+export const FOUNDING_CREATOR_CAP = 1111;
+export const FOUNDING_UPLOAD_QUOTA_MB = 2048;
+
 // Support email address
 export const SUPPORT_EMAIL = 'support@tuneable.stream';
 

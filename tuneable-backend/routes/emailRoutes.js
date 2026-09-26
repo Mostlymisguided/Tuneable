@@ -299,7 +299,8 @@ router.post('/invite', authMiddleware, [
           email,
           inviter.username,
           inviteCode,
-          inviteLink
+          inviteLink,
+          { inviterIsFounding: Boolean(inviter.isFoundingCreator) }
         );
         
         if (emailSent) {

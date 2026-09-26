@@ -145,6 +145,32 @@ export interface User {
     website?: string;
     label?: string;
   };
+  /** Founding Creators — status/benefits only, not equity */
+  isFoundingCreator?: boolean;
+  foundingSeatNumber?: number | null;
+  foundingSeatAssignedAt?: string | null;
+  foundingUploadQuotaBytes?: number | null;
+  foundingUploadUsedBytes?: number | null;
+  foundingUploadRemainingBytes?: number | null;
+  foundingProgram?: {
+    cap: number;
+    claimed: number;
+    remaining: number;
+    open: boolean;
+    uploadQuotaMb: number;
+  };
+}
+
+export interface FoundingCreatorsStatus {
+  cap: number;
+  claimed: number;
+  remaining: number;
+  open: boolean;
+  uploadQuotaMb: number;
+  uploadQuotaBytes: number;
+  affiliatePercent: number;
+  affiliateExclusiveToFounding: boolean;
+  description?: string;
 }
 
 export interface RegisterData {

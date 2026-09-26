@@ -1509,6 +1509,24 @@ export const userAPI = {
     return response.data;
   },
 
+  // Public Founding Creators program status
+  getFoundingCreatorsStatus: async () => {
+    const response = await api.get('/users/founding-creators');
+    return response.data;
+  },
+
+  // Current user's founding seat + upload allowance
+  getMyFoundingCreator: async () => {
+    const response = await api.get('/users/me/founding-creator');
+    return response.data;
+  },
+
+  // Admin: backfill founding seats for earliest original uploaders
+  backfillFoundingCreators: async () => {
+    const response = await api.post('/users/admin/backfill-founding-creators');
+    return response.data;
+  },
+
   // Admin: Replenish invite credits for a user
   replenishInviteCredits: async (userId: string, credits: number) => {
     const response = await api.post('/users/admin/replenish-invite-credits', { userId, credits });

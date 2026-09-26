@@ -110,6 +110,26 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   }, // Paid artist-invite affiliate earnings in PENCE (also added to artistEscrowBalance)
+
+  // ========================================
+  // FOUNDING CREATORS (first N original uploaders)
+  // Status/benefits only — not equity or ownership
+  // ========================================
+  isFoundingCreator: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  foundingSeatNumber: {
+    type: Number,
+    default: null,
+    sparse: true,
+    unique: true,
+    min: 1,
+  },
+  foundingSeatAssignedAt: { type: Date, default: null },
+  foundingUploadQuotaBytes: { type: Number, default: null, min: 0 },
+  foundingSeatClaimReason: { type: String, default: null },
   totalEscrowEarned: { 
     type: Number, 
     default: 0 

@@ -702,12 +702,13 @@ router.get('/profile', authMiddleware, async (req, res) => {
     
     // Add statistics to user object
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
-    const userWithStats = withWelcomeCreditOffer({
+    const { attachFoundingProfileFields } = require('../utils/foundingCreators');
+    const userWithStats = withWelcomeCreditOffer(await attachFoundingProfileFields({
       ...user.toObject(),
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
-    });
+    }));
     
     res.json({ message: 'User profile', user: userWithStats });
   } catch (error) {
@@ -807,6 +808,74 @@ router.get('/invited', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching invited users:', error);
     res.status(500).json({ error: 'Error fetching invited users', details: error.message });
+  }
+});
+
+// @route   GET /api/users/founding-creators
+// @desc    Public Founding Creators program status (cap, claimed, remaining)
+// @access  Public
+router.get('/founding-creators', async (req, res) => {
+  try {
+    const {
+      getProgramStatus,
+      FOUNDING_CREATOR_CAP,
+      FOUNDING_UPLOAD_QUOTA_MB,
+    } = require('../utils/foundingCreators');
+    const { AFFILIATE_SHARE_PERCENT } = require('../utils/artistInviteAffiliate');
+    const status = await getProgramStatus();
+    res.json({
+      ...status,
+      affiliatePercent: AFFILIATE_SHARE_PERCENT,
+      affiliateExclusiveToFounding: true,
+      description:
+        `First ${FOUNDING_CREATOR_CAP} creators who upload their own music become founding creators. `
+        + `Perks: ${FOUNDING_UPLOAD_QUOTA_MB} MB upload allowance and exclusive ${AFFILIATE_SHARE_PERCENT}% artist-invite commission `
+        + `(from Tuneable's share). Founding status is not equity or ownership.`,
+    });
+  } catch (error) {
+    console.error('Error fetching founding creators status:', error);
+    res.status(500).json({ error: 'Failed to fetch founding creators status' });
+  }
+});
+
+// @route   GET /api/users/me/founding-creator
+// @desc    Current user's founding status + upload allowance usage
+// @access  Private
+router.get('/me/founding-creator', authMiddleware, async (req, res) => {
+  try {
+    const { attachFoundingProfileFields, getProgramStatus } = require('../utils/foundingCreators');
+    const user = await User.findById(req.user._id).select(
+      'username isFoundingCreator foundingSeatNumber foundingSeatAssignedAt foundingUploadQuotaBytes'
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const enriched = await attachFoundingProfileFields(user);
+    const program = await getProgramStatus();
+    res.json({
+      isFoundingCreator: enriched.isFoundingCreator,
+      foundingSeatNumber: enriched.foundingSeatNumber,
+      foundingSeatAssignedAt: enriched.foundingSeatAssignedAt,
+      uploadQuotaBytes: enriched.foundingUploadQuotaBytes,
+      uploadUsedBytes: enriched.foundingUploadUsedBytes,
+      uploadRemainingBytes: enriched.foundingUploadRemainingBytes,
+      program,
+    });
+  } catch (error) {
+    console.error('Error fetching founding creator profile:', error);
+    res.status(500).json({ error: 'Failed to fetch founding creator profile' });
+  }
+});
+
+// @route   POST /api/users/admin/backfill-founding-creators
+// @desc    Assign founding seats to earliest original uploaders (admin)
+// @access  Private (Admin)
+router.post('/admin/backfill-founding-creators', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { backfillFoundingSeats } = require('../utils/foundingCreators');
+    const result = await backfillFoundingSeats();
+    res.json({ message: 'Founding creator backfill complete', ...result });
+  } catch (error) {
+    console.error('Error backfilling founding creators:', error);
+    res.status(500).json({ error: 'Failed to backfill founding creators' });
   }
 });
 

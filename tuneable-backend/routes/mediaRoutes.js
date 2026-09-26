@@ -40,7 +40,12 @@ const {
   permittedRightsFields,
   applyRightsStatus,
   isValidRightsStatus,
+  isVerifiedOriginalUpload,
 } = require('../utils/mediaRights');
+const {
+  assertWithinUploadQuota,
+  tryClaimFoundingSeat,
+} = require('../utils/foundingCreators');
 const {
   attachGearIdsToProductionStack,
   refreshGearStats,
@@ -595,6 +600,21 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     if (coverArtFile) {
       console.log(`🖼️ Cover art file: ${coverArtFile.originalname} (${coverArtFile.size} bytes)`);
     }
+
+    // Founding creators have a cumulative upload allowance (tuneable via env).
+    const isAdminPermittedUpload = isAdmin(user) && (
+      req.body.rightsStatus === 'permitted'
+    );
+    if (!isAdminPermittedUpload) {
+      const quotaCheck = await assertWithinUploadQuota(user, audioFile.size);
+      if (!quotaCheck.ok) {
+        return res.status(quotaCheck.status).json({
+          error: quotaCheck.error,
+          usedBytes: quotaCheck.usedBytes,
+          quotaBytes: quotaCheck.quotaBytes,
+        });
+      }
+    }
     
     // Extract metadata from uploaded file
     let extractedMetadata = null;
@@ -882,6 +902,16 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     
     await media.save();
     await refreshGearStatsForStack(media.productionStack);
+
+    // First qualifying original upload claims a Founding Creator seat (cap 1111).
+    let foundingClaim = null;
+    if (isVerifiedOriginalUpload(media)) {
+      try {
+        foundingClaim = await tryClaimFoundingSeat(userId, { reason: 'original_upload' });
+      } catch (foundingErr) {
+        console.error('Founding seat claim failed (upload still saved):', foundingErr.message);
+      }
+    }
     
     // Process cover art file if provided
     if (coverArtFile) {
@@ -963,7 +993,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         artist: media.artist,
         coverArt: media.coverArt,
         sources: media.sources
-      }
+      },
+      foundingCreator: foundingClaim ? {
+        status: foundingClaim.status,
+        seatNumber: foundingClaim.seatNumber || null,
+      } : null,
     });
     
   } catch (error) {
@@ -1003,6 +1037,18 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
     if (!audioFile.buffer?.length) {
       return res.status(400).json({ error: 'Uploaded audio file is empty' });
+    }
+
+    const fullUser = await User.findById(userId);
+    if (fullUser) {
+      const quotaCheck = await assertWithinUploadQuota(fullUser, audioFile.size);
+      if (!quotaCheck.ok) {
+        return res.status(quotaCheck.status).json({
+          error: quotaCheck.error,
+          usedBytes: quotaCheck.usedBytes,
+          quotaBytes: quotaCheck.quotaBytes,
+        });
+      }
     }
 
     console.log(`🎵 attach-upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
@@ -1085,6 +1131,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       media.sources = new Map(Object.entries(media.sources || {}));
     }
     media.sources.set('upload', fileUrl);
+    media.fileSize = audioFile.size;
     Object.assign(
       media,
       adminPermitted
@@ -1115,6 +1162,17 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         lastUpdatedAt: new Date(),
         lastUpdatedBy: userId,
       });
+    } else if (clearRights && !isThirdParty) {
+      existingOwner.verified = true;
+      existingOwner.verifiedAt = new Date();
+      existingOwner.verifiedBy = userId;
+      existingOwner.verificationMethod = 'Self-upload';
+      existingOwner.verificationSource = 'upload';
+      if (!existingOwner.percentage || existingOwner.percentage <= 0) {
+        existingOwner.percentage = 100;
+      }
+      existingOwner.lastUpdatedAt = new Date();
+      existingOwner.lastUpdatedBy = userId;
     }
 
     if (audioFile.buffer) {
@@ -1155,6 +1213,15 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
 
     await media.save();
 
+    let foundingClaim = null;
+    if (isVerifiedOriginalUpload(media)) {
+      try {
+        foundingClaim = await tryClaimFoundingSeat(userId, { reason: 'attach_upload' });
+      } catch (foundingErr) {
+        console.error('Founding seat claim failed (attach still saved):', foundingErr.message);
+      }
+    }
+
     const sourcesObj = {};
     media.sources.forEach((value, key) => {
       sourcesObj[key] = value;
@@ -1174,6 +1241,10 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         rightsCleared: media.rightsCleared,
         ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }, playabilityOptionsFromRequest(req)),
       },
+      foundingCreator: foundingClaim ? {
+        status: foundingClaim.status,
+        seatNumber: foundingClaim.seatNumber || null,
+      } : null,
     });
   } catch (error) {
     console.error('Error attaching upload:', error);

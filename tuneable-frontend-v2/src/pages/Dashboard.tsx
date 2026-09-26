@@ -6,7 +6,13 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from '../utils/toast';
-import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
+import {
+  DEFAULT_PROFILE_PIC,
+  ARTIST_INVITE_AFFILIATE_PERCENT,
+  FOUNDING_CREATOR_CAP,
+  FOUNDING_UPLOAD_QUOTA_MB,
+} from '../constants';
+import type { FoundingCreatorsStatus } from '../types';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -58,6 +64,14 @@ const Dashboard: React.FC = () => {
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
   const [isInviteCodesCollapsed, setIsInviteCodesCollapsed] = useState(true);
   const [isInvitedUsersCollapsed, setIsInvitedUsersCollapsed] = useState(true);
+  const [foundingStatus, setFoundingStatus] = useState<FoundingCreatorsStatus | null>(null);
+  const [foundingMe, setFoundingMe] = useState<{
+    isFoundingCreator?: boolean;
+    foundingSeatNumber?: number | null;
+    uploadQuotaBytes?: number | null;
+    uploadUsedBytes?: number | null;
+    uploadRemainingBytes?: number | null;
+  } | null>(null);
   
   // Increase tip modal (Dashboard tune library)
   const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
@@ -155,14 +169,22 @@ const Dashboard: React.FC = () => {
     return `${window.location.origin}/creator/register?invite=${inviteCode}`;
   }, [user?.primaryInviteCode, user?.personalInviteCode]);
 
+  const isFoundingCreator = Boolean(
+    foundingMe?.isFoundingCreator ?? user?.isFoundingCreator
+  );
+
   const inviteMessage = useMemo(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    const affiliateBlurb = isFoundingCreator
+      ? `If you sign up with my invite code ${inviteCode || ''}, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours. I'm a founding creator.`
+      : `Upload your own music to claim a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}) — ${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB upload allowance and founding invite benefits. Use my invite code ${inviteCode || ''}.`;
+
     return `Hey! I'm inviting you to join Tuneable as a creator. Upload your own music and you keep 70% of paid tips.
 
-If you sign up with my invite code ${inviteCode || ''}, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.
+${affiliateBlurb}
 
 Join here: ${inviteLink}`.trim();
-  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
+  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode, isFoundingCreator]);
 
 
   const handleCopyInvite = useCallback(async () => {
@@ -216,14 +238,16 @@ Join here: ${inviteLink}`.trim();
 
   const handleFacebookShare = useCallback(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
-    const quote = inviteCode 
-      ? `Invite artists to Tuneable — they keep 70% of paid tips, and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
+    const quote = inviteCode
+      ? (isFoundingCreator
+        ? `Invite artists to Tuneable — they keep 70% of paid tips, and as a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
+        : `Join Tuneable as a creator — upload to claim a founding seat (first ${FOUNDING_CREATOR_CAP}). Code: ${inviteCode}`)
       : 'Support your favourite Creators on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;
     window.open(shareUrl, '_blank', 'noopener');
-  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
+  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode, isFoundingCreator]);
 
   const handleInstagramShare = useCallback(async () => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
@@ -233,7 +257,9 @@ Join here: ${inviteLink}`.trim();
     }
 
     // Create Instagram-friendly invite message
-    const instagramMessage = `Invite artists to Tuneable 🎵\n\nThey keep 70% of paid tips. You earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`;
+    const instagramMessage = isFoundingCreator
+      ? `Invite artists to Tuneable 🎵\n\nThey keep 70% of paid tips. As a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`
+      : `Join Tuneable as a creator 🎵\n\nUpload your music to claim a founding seat (first ${FOUNDING_CREATOR_CAP}).\n\nCode: ${inviteCode}\n\n${inviteLink}`;
 
     try {
       // Copy message to clipboard first
@@ -295,7 +321,7 @@ Join here: ${inviteLink}`.trim();
       console.error('Failed to share to Instagram:', error);
       toast.error('Could not share to Instagram. Please try again.');
     }
-  }, [user?.primaryInviteCode, user?.personalInviteCode, inviteLink]);
+  }, [user?.primaryInviteCode, user?.personalInviteCode, inviteLink, isFoundingCreator]);
 
   const handleSystemShare = useCallback(() => {
     const sharePayload = {
@@ -392,6 +418,25 @@ Join here: ${inviteLink}`.trim();
     };
     loadInvitedUsers();
   }, []);
+
+  useEffect(() => {
+    const loadFounding = async () => {
+      try {
+        const status = await userAPI.getFoundingCreatorsStatus();
+        setFoundingStatus(status);
+      } catch (error) {
+        console.error('Failed to load founding creators status:', error);
+      }
+      if (!user) return;
+      try {
+        const me = await userAPI.getMyFoundingCreator();
+        setFoundingMe(me);
+      } catch (error) {
+        console.error('Failed to load founding creator profile:', error);
+      }
+    };
+    loadFounding();
+  }, [user?._id, user?.uuid]);
 
   useEffect(() => {
     const loadTuneLibrary = async () => {
@@ -2678,6 +2723,42 @@ Join here: ${inviteLink}`.trim();
 
       {/* Invite Codes Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="bg-black/30 border border-amber-500/25 rounded-lg p-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-200">
+                {isFoundingCreator
+                  ? `Founding Creator #${foundingMe?.foundingSeatNumber ?? user?.foundingSeatNumber ?? '—'}`
+                  : 'Founding Creators'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {foundingStatus
+                  ? `${foundingStatus.claimed.toLocaleString()} / ${foundingStatus.cap.toLocaleString()} seats claimed`
+                  : `First ${FOUNDING_CREATOR_CAP.toLocaleString()} creators who upload their own music`}
+                {isFoundingCreator
+                  ? ` · ${(FOUNDING_UPLOAD_QUOTA_MB).toLocaleString()} MB upload allowance`
+                  : ' · upload your music to claim a seat'}
+                . Not equity — see Terms.
+              </p>
+              {isFoundingCreator && foundingMe?.uploadQuotaBytes != null && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload space used:{' '}
+                  {((foundingMe.uploadUsedBytes || 0) / (1024 * 1024)).toFixed(1)} MB /{' '}
+                  {((foundingMe.uploadQuotaBytes || 0) / (1024 * 1024)).toFixed(0)} MB
+                </p>
+              )}
+            </div>
+            {foundingStatus && (
+              <div className="text-right">
+                <p className="text-2xl font-semibold text-white tabular-nums">
+                  {foundingStatus.remaining.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-400">seats left</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <button
           onClick={() => setIsInviteCodesCollapsed(prev => !prev)}
           className="card w-full flex items-center justify-between mb-4 hover:bg-gray-800/50 transition-colors"
@@ -2702,9 +2783,15 @@ Join here: ${inviteLink}`.trim();
           <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
               <div>
-                <p className="text-sm text-gray-300">Invite an artist — earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one</p>
+                <p className="text-sm text-gray-300">
+                  {isFoundingCreator
+                    ? `Invite an artist — earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one`
+                    : 'Invite creators — founding seats include the invite commission perk'}
+                </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Taken from Tuneable&apos;s share, not theirs, and only on music they upload themselves.
+                  {isFoundingCreator
+                    ? "Taken from Tuneable's share, not theirs, and only on music they upload themselves."
+                    : `Upload your own music to join the first ${FOUNDING_CREATOR_CAP.toLocaleString()} founding creators and unlock the ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission.`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1 break-all">
                   {inviteLink}
@@ -2982,6 +3069,7 @@ Join here: ${inviteLink}`.trim();
         onClose={() => setIsEmailInviteModalOpen(false)}
         inviteCode={user?.primaryInviteCode || user?.personalInviteCode || ''}
         inviterUsername={user?.username || ''}
+        inviterIsFounding={isFoundingCreator}
       />
     </React.Fragment>
   );

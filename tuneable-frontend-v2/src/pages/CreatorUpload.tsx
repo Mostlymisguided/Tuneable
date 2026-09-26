@@ -4,7 +4,7 @@ import { toast } from '../utils/toast';
 import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building, Bot, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
-import { labelAPI, emailAPI, mediaAPI } from '../lib/api';
+import { labelAPI, emailAPI, mediaAPI, userAPI } from '../lib/api';
 import axios from 'axios';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -14,6 +14,7 @@ import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
 import { roundBpm } from '../utils/bpm';
+import { FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -141,10 +142,57 @@ const CreatorUpload: React.FC = () => {
   ]);
   const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
+  const [foundingBanner, setFoundingBanner] = useState<{
+    claimed: number;
+    cap: number;
+    remaining: number;
+    isFoundingCreator?: boolean;
+    seatNumber?: number | null;
+    usedMb?: number;
+    quotaMb?: number;
+  } | null>(null);
   
   // Check if user is verified creator or admin
   const isAdmin = user && (user as any).role?.includes('admin');
   const isCreator = user && (user as any).role?.includes('creator');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await userAPI.getFoundingCreatorsStatus();
+        let me: any = null;
+        try {
+          me = await userAPI.getMyFoundingCreator();
+        } catch {
+          me = null;
+        }
+        if (cancelled) return;
+        setFoundingBanner({
+          claimed: status.claimed,
+          cap: status.cap,
+          remaining: status.remaining,
+          isFoundingCreator: me?.isFoundingCreator,
+          seatNumber: me?.foundingSeatNumber,
+          usedMb: me?.uploadUsedBytes != null
+            ? Math.round((me.uploadUsedBytes / (1024 * 1024)) * 10) / 10
+            : undefined,
+          quotaMb: me?.uploadQuotaBytes != null
+            ? Math.round(me.uploadQuotaBytes / (1024 * 1024))
+            : FOUNDING_UPLOAD_QUOTA_MB,
+        });
+      } catch {
+        if (!cancelled) {
+          setFoundingBanner({
+            claimed: 0,
+            cap: FOUNDING_CREATOR_CAP,
+            remaining: FOUNDING_CREATOR_CAP,
+          });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?._id]);
 
   if (!isCreator && !isAdmin) {
     return (
@@ -604,7 +652,16 @@ const CreatorUpload: React.FC = () => {
         }
       });
 
-      toast.success('Upload successful!');
+      const founding = response.data.foundingCreator;
+      if (founding?.status === 'assigned' && founding.seatNumber) {
+        toast.success(`Upload successful — you're Founding Creator #${founding.seatNumber}!`);
+      } else if (founding?.status === 'already') {
+        toast.success('Upload successful!');
+      } else if (founding?.status === 'full') {
+        toast.success('Upload successful! Founding creator seats are full.');
+      } else {
+        toast.success('Upload successful!');
+      }
       
       // Redirect to the new tune's profile
       if (response.data.media?._id) {
@@ -645,6 +702,20 @@ const CreatorUpload: React.FC = () => {
           <p className="text-gray-300">
             Share your music with the Tuneable community
           </p>
+          {foundingBanner && (
+            <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3">
+              <p className="text-sm text-amber-100 font-medium">
+                {foundingBanner.isFoundingCreator
+                  ? `Founding Creator #${foundingBanner.seatNumber ?? '—'}`
+                  : 'Founding Creators'}
+              </p>
+              <p className="text-xs text-gray-300 mt-1">
+                {foundingBanner.isFoundingCreator
+                  ? `Your allowance: ${foundingBanner.usedMb ?? 0} / ${foundingBanner.quotaMb ?? FOUNDING_UPLOAD_QUOTA_MB} MB used. Affiliate invite commission unlocked.`
+                  : `${foundingBanner.claimed.toLocaleString()} / ${foundingBanner.cap.toLocaleString()} seats claimed — ${foundingBanner.remaining.toLocaleString()} left. Your first original upload can claim a seat (${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB allowance). Not equity.`}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Upload Form */}
