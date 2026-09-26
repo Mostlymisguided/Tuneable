@@ -254,7 +254,7 @@ const About: React.FC = () => {
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">Legal Mission</h2>
             <p className="mt-3 text-balance text-gray-600">
-              Objects of Tuneable Community Interest Company.
+              As a CIC, Tuneable is legally bound to the following objectives.
             </p>
           </div>
           <ul className="space-y-3">
