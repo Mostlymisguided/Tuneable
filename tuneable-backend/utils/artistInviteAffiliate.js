@@ -2,6 +2,7 @@
  * Artist-invite affiliate: 3% of an invited artist's paid tip revenue
  * for 12 months, taken from Tuneable's platform share (artist still gets 70%).
  * Only original artist uploads qualify — not claimed library imports.
+ * Only founding creators (inviters) earn the commission.
  */
 
 const { isOriginalUploadOwner, isVerifiedOriginalUpload } = require('./mediaRights');
@@ -49,6 +50,7 @@ function isAffiliateEligible({
   now = new Date(),
 } = {}) {
   if (!media || !artistUser || !inviterUser) return false;
+  if (!inviterUser.isFoundingCreator) return false;
   if (!isVerifiedOriginalUpload(media)) return false;
   if (String(artistUser._id) === String(inviterUser._id)) return false;
   if (tipperUserId && String(tipperUserId) === String(inviterUser._id)) return false;
@@ -67,10 +69,14 @@ function isInvitedCreator(user) {
   return status === 'verified' || status === 'pending';
 }
 
-/** Sentence sent to the invited artist. The cut comes from Tuneable, not their 70%. */
-function inviteeAffiliateDisclosure(inviterName) {
+/**
+ * Sentence sent to the invited artist when the inviter is a founding creator.
+ * The cut comes from Tuneable, not their 70%. Returns null when no disclosure.
+ */
+function inviteeAffiliateDisclosure(inviterName, { inviterIsFounding = true } = {}) {
+  if (!inviterIsFounding) return null;
   const who = inviterName || 'Your inviter';
-  return `If you upload your own music, ${who} earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.`;
+  return `If you upload your own music, ${who} (a founding creator) earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.`;
 }
 
 /**

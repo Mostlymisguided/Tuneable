@@ -29,6 +29,7 @@ type Props = {
   visible: boolean;
   inviteCode?: string | null;
   username?: string;
+  isFoundingCreator?: boolean;
   canUpload?: boolean;
   deleting?: boolean;
   onClose: () => void;
@@ -43,6 +44,7 @@ export function ProfileSettingsSheet({
   visible,
   inviteCode,
   username,
+  isFoundingCreator = false,
   canUpload = false,
   deleting = false,
   onClose,
@@ -169,7 +171,11 @@ export function ProfileSettingsSheet({
             <Text style={styles.rowText}>Data deletion info</Text>
           </Pressable>
 
-          <InviteShareCard inviteCode={inviteCode} username={username} />
+          <InviteShareCard
+            inviteCode={inviteCode}
+            username={username}
+            isFoundingCreator={isFoundingCreator}
+          />
 
           <LegalLinks compact />
 

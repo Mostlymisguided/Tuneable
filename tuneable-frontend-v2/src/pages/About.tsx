@@ -296,6 +296,15 @@ const About: React.FC = () => {
               </p>
             </div>
           </div>
+          <div className="mt-6 bg-white/5 rounded-xl p-6 border border-white/10">
+            <h3 className="font-semibold text-white mb-2">Founding Creators</h3>
+            <p className="text-indigo-100 leading-relaxed text-sm">
+              The first 1,111 creators who upload their own music become founding creators: a
+              tuneable upload allowance and exclusive access to the 3% artist-invite commission
+              (from Tuneable&apos;s share). Founding status is a platform benefit — not equity or
+              ownership. Details are in the Terms.
+            </p>
+          </div>
           <p className="text-center text-sm text-indigo-200 mt-8">
             The current split and this direction are also in our{' '}
             <Link to="/terms-of-service" className="underline hover:text-white">

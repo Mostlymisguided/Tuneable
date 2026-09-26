@@ -10,6 +10,8 @@ export interface User {
   profilePic?: string;
   personalInviteCode?: string;
   primaryInviteCode?: string;
+  isFoundingCreator?: boolean;
+  foundingSeatNumber?: number | null;
   balance: number; // pence
   tuneBytes?: number;
   role: string[];

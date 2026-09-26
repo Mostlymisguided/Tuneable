@@ -17,6 +17,8 @@ type Props = {
   /** Compact header that expands to copy/share — used on home. */
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  /** Founding creators earn the 3% invite commission; others get growth-only invites. */
+  isFoundingCreator?: boolean;
 };
 
 function getInviteShareUrl(code: string): string {
@@ -28,6 +30,7 @@ export function InviteShareCard({
   username,
   collapsible = false,
   defaultCollapsed = true,
+  isFoundingCreator = false,
 }: Props) {
   const code = (inviteCode || '').trim().toUpperCase();
   const [copied, setCopied] = useState(false);
@@ -35,9 +38,9 @@ export function InviteShareCard({
 
   if (!code) return null;
 
-  const shareMessage = username
-    ? `Join Tuneable as a creator — use my invite code ${code}. Upload your music and keep 70% of paid tips; I earn 3% from Tuneable's share for your first year.\n${getInviteShareUrl(code)}`
-    : `Join Tuneable as a creator with invite code ${code}. Upload your music and keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
+  const shareMessage = isFoundingCreator
+    ? `Join Tuneable as a creator — use my invite code ${code}. Upload your music and keep 70% of paid tips; as a founding creator I earn 3% from Tuneable's share for your first year.\n${getInviteShareUrl(code)}`
+    : `Join Tuneable as a creator — use my invite code ${code}. Upload your music to claim a founding creator seat (first 1,111) and keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
 
   const onCopy = async () => {
     try {
@@ -64,7 +67,9 @@ export function InviteShareCard({
       ) : null}
       {!collapsible ? <Text style={styles.code}>{code}</Text> : null}
       <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
-        Invite an artist with this code and earn 3% of their paid tips for year one (from Tuneable's share, on music they upload).
+        {isFoundingCreator
+          ? "Invite an artist with this code and earn 3% of their paid tips for year one (from Tuneable's share, on music they upload)."
+          : 'Invite creators with this code. The 3% invite commission is exclusive to founding creators (first 1,111 who upload).'}
       </Text>
       <View style={styles.actions}>
         <Pressable style={styles.actionBtn} onPress={() => void onCopy()}>

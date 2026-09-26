@@ -388,7 +388,7 @@ class ArtistEscrowService {
   
   /**
    * 3% of an invited artist's paid tip share, taken from the platform cut.
-   * Original uploads only; first year after the artist signed up.
+   * Founding-creator inviters only; original uploads; first year after signup.
    * @private
    */
   async _allocateArtistInviteAffiliate({ media, bidId, paidArtistSharePence, tipperUserId }) {
@@ -404,7 +404,8 @@ class ArtistEscrowService {
 
     let inviter = null;
     if (artistUser.invitedByUserId) {
-      inviter = await User.findById(artistUser.invitedByUserId).select('_id');
+      inviter = await User.findById(artistUser.invitedByUserId)
+        .select('_id isFoundingCreator');
     } else if (artistUser.parentInviteCode) {
       inviter = await User.findByInviteCode(artistUser.parentInviteCode);
     }

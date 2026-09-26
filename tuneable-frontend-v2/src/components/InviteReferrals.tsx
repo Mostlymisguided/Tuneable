@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { authAPI } from '../lib/api';
-import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT } from '../constants';
+import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP } from '../constants';
 import type { InviteCode, Referral, ReferralsResponse } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const InviteReferrals: React.FC = () => {
+  const { user } = useAuth();
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [selectedCodeFilter, setSelectedCodeFilter] = useState<string>('');
@@ -19,6 +21,7 @@ const InviteReferrals: React.FC = () => {
   const [isCodesCollapsed, setIsCodesCollapsed] = useState(false);
   const [isReferralsCollapsed, setIsReferralsCollapsed] = useState(false);
   const [isInactiveCollapsed, setIsInactiveCollapsed] = useState(true);
+  const isFoundingCreator = Boolean(user?.isFoundingCreator);
 
   useEffect(() => {
     loadReferrals();
@@ -170,7 +173,9 @@ const InviteReferrals: React.FC = () => {
         {!isCodesCollapsed && (
           <>
             <p className="text-sm text-gray-300 mt-4 mb-4">
-              Invite an artist with your code and you earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tip revenue for their first year — taken from Tuneable&apos;s share, not theirs. It only applies to music they upload themselves.
+              {isFoundingCreator
+                ? `As a founding creator, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tip revenue for their first year — taken from Tuneable's share, not theirs. It only applies to music they upload themselves.`
+                : `Invite codes still grow Tuneable. The ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission is exclusive to founding creators (first ${FOUNDING_CREATOR_CAP.toLocaleString()} who upload their own music).`}
             </p>
             
             <p className="text-gray-300 mb-4">

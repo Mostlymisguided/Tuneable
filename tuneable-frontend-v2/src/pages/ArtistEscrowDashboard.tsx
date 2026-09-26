@@ -18,7 +18,7 @@ import {
   Globe
 } from 'lucide-react';
 import { artistEscrowAPI } from '../lib/api';
-import { ARTIST_INVITE_AFFILIATE_PERCENT, HOW_MONEY_WORKS_PATH } from '../constants';
+import { ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP, HOW_MONEY_WORKS_PATH } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 
@@ -432,12 +432,14 @@ const ArtistEscrowDashboard: React.FC = () => {
                 {escrowInfo.history.length} allocation{escrowInfo.history.length !== 1 ? 's' : ''} in history
               </p>
               <p className="text-sm text-indigo-200 mt-2">
-                Invite an artist with your code and you earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of
-                their paid tips for year one, taken from Tuneable&apos;s share on music they upload
-                themselves.
+                {user?.isFoundingCreator
+                  ? `As a founding creator, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one, taken from Tuneable's share on music they upload themselves.`
+                  : `Artist-invite commission (${ARTIST_INVITE_AFFILIATE_PERCENT}%) is exclusive to founding creators — the first ${FOUNDING_CREATOR_CAP.toLocaleString()} who upload their own music.`}
                 {(escrowInfo.affiliateEarned || 0) > 0
                   ? ` You've earned ${penceToPounds(escrowInfo.affiliateEarned)} so far.`
-                  : ' Nothing earned yet — share your invite from the dashboard.'}
+                  : user?.isFoundingCreator
+                    ? ' Nothing earned yet — share your invite from the dashboard.'
+                    : ''}
               </p>
               {escrowInfo.totalEscrowEarned !== undefined && (
                 <p className="text-sm text-gray-400 mt-1">

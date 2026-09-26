@@ -823,9 +823,19 @@ async function sendInviteRejectionEmail(request, reason) {
 }
 
 // Send invite email to recipients
-async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, inviteLink) {
+async function sendInviteEmail(
+  recipientEmail,
+  inviterUsername,
+  inviteCode,
+  inviteLink,
+  { inviterIsFounding = false } = {}
+) {
   const { inviteeAffiliateDisclosure } = require('./artistInviteAffiliate');
   try {
+    const affiliateLine = inviteeAffiliateDisclosure(inviterUsername, { inviterIsFounding });
+    const foundingLine = inviterIsFounding
+      ? ''
+      : `<p>Be among the first founding creators: upload your own music to claim a founding seat (limited), with upload allowance and founding creator invite benefits. See Terms for details.</p>`;
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: recipientEmail,
@@ -837,7 +847,7 @@ async function sendInviteEmail(recipientEmail, inviterUsername, inviteCode, invi
           <p>Hi there,</p>
           
           <p><strong>${inviterUsername}</strong> has invited you to join Tuneable as a creator — upload your music, claim your tracks, and receive 70% of paid tips.</p>
-          <p>${inviteeAffiliateDisclosure(inviterUsername)}</p>
+          ${affiliateLine ? `<p>${affiliateLine}</p>` : foundingLine}
 
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">What is Tuneable?</h3>

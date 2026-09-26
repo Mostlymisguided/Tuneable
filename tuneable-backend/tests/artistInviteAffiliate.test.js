@@ -29,10 +29,14 @@ const originalMedia = {
 };
 
 describe('inviteeAffiliateDisclosure', () => {
-  it('tells the artist the 3% comes from Tuneable', () => {
+  it('tells the artist the 3% comes from Tuneable when inviter is founding', () => {
     expect(inviteeAffiliateDisclosure('Ada')).toBe(
-      "If you upload your own music, Ada earns 3% of your paid tips for your first year — taken from Tuneable's share, not yours."
+      "If you upload your own music, Ada (a founding creator) earns 3% of your paid tips for your first year — taken from Tuneable's share, not yours."
     );
+  });
+
+  it('omits disclosure when inviter is not founding', () => {
+    expect(inviteeAffiliateDisclosure('Ada', { inviterIsFounding: false })).toBeNull();
   });
 });
 
@@ -49,14 +53,26 @@ describe('computeAffiliateSharePence', () => {
 
 describe('isAffiliateEligible', () => {
   const artistUser = { _id: 'artist1', createdAt: new Date() };
-  const inviterUser = { _id: 'inviter1', createdAt: new Date('2020-01-01') };
+  const inviterUser = {
+    _id: 'inviter1',
+    createdAt: new Date('2020-01-01'),
+    isFoundingCreator: true,
+  };
 
-  it('pays on original uploads inside the first year', () => {
+  it('pays on original uploads inside the first year for founding inviters', () => {
     expect(isAffiliateEligible({
       media: originalMedia,
       artistUser,
       inviterUser,
     })).toBe(true);
+  });
+
+  it('skips when the inviter is not a founding creator', () => {
+    expect(isAffiliateEligible({
+      media: originalMedia,
+      artistUser,
+      inviterUser: { ...inviterUser, isFoundingCreator: false },
+    })).toBe(false);
   });
 
   it('skips claimed library imports', () => {
