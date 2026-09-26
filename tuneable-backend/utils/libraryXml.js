@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const xml2js = require('xml2js');
+const { roundBpm } = require('./bpm');
+const { normalizeKey } = require('./keyNormalizer');
 
 function asArray(value) {
   if (!value) return [];
@@ -23,15 +25,23 @@ function escapeRegex(str) {
 
 /**
  * Decode Rekordbox Location URI to local filesystem path.
+ * Handles file://localhost/…, file:///…, Windows drive letters, and stray %.
  */
 function decodeRekordboxLocation(location) {
   if (!location || typeof location !== 'string') return null;
-  let decoded = decodeURIComponent(location.trim());
+  let decoded = location.trim();
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    // Pioneer sometimes leaves a literal % that is not a URI escape
+  }
   decoded = decoded.replace(/^file:\/\/localhost/i, '');
+  decoded = decoded.replace(/^file:\/\//i, '');
   if (/^\/[A-Za-z]:/.test(decoded)) {
     decoded = decoded.slice(1);
   }
-  return path.normalize(decoded);
+  decoded = decoded.replace(/^\/Macintosh HD(?=\/)/i, '');
+  return decoded ? path.normalize(decoded) : null;
 }
 
 function decodeItunesLocation(location) {
@@ -77,8 +87,8 @@ async function parseRekordboxXmlContent(xmlContent) {
       artist: track.Artist || '',
       album: track.Album || '',
       genre: track.Genre || '',
-      bpm: track.AverageBpm ? parseFloat(track.AverageBpm) : null,
-      key: track.Tonality || track.Key || null,
+      bpm: roundBpm(track.AverageBpm),
+      key: normalizeKey(track.Tonality || track.Key || null),
       rating: track.Rating ? parseInt(track.Rating, 10) : 0,
       playCount: track.PlayCount ? parseInt(track.PlayCount, 10) : 0,
       comments: track.Comments || '',
@@ -144,7 +154,7 @@ function parseItunesLibraryXmlContent(xmlContent) {
     const location = extractPlistString(block, 'Location');
     const filePath = decodeItunesLocation(location);
     const totalTimeMs = extractPlistNumber(block, 'Total Time');
-    const bpm = extractPlistNumber(block, 'BPM');
+    const bpm = roundBpm(extractPlistNumber(block, 'BPM'));
     const genre = extractPlistString(block, 'Genre');
     const year = extractPlistNumber(block, 'Year');
 
@@ -247,7 +257,7 @@ function pickLibraryMetadata(match) {
   return {
     source: match.source,
     bpm: match.bpm ?? null,
-    key: match.key ?? null,
+    key: parseOptionalKey(match.key),
     title: match.title || null,
     artist: match.artist || null,
     album: match.album || null,
@@ -258,15 +268,11 @@ function pickLibraryMetadata(match) {
 }
 
 function parseOptionalBpm(value) {
-  if (value === undefined || value === null || value === '') return null;
-  const num = parseFloat(String(value));
-  return Number.isFinite(num) && num > 0 ? num : null;
+  return roundBpm(value);
 }
 
 function parseOptionalKey(value) {
-  if (value === undefined || value === null) return null;
-  const str = String(value).trim();
-  return str || null;
+  return normalizeKey(value);
 }
 
 /**
@@ -275,11 +281,11 @@ function parseOptionalKey(value) {
 function resolveBpmKey({ bodyBpm, bodyKey, libraryMatch, extracted } = {}) {
   const lib = pickLibraryMetadata(libraryMatch);
   const bpm = parseOptionalBpm(bodyBpm)
-    ?? (lib?.bpm != null ? lib.bpm : null)
-    ?? (extracted?.bpm != null ? extracted.bpm : null);
+    ?? parseOptionalBpm(lib?.bpm)
+    ?? parseOptionalBpm(extracted?.bpm);
   const key = parseOptionalKey(bodyKey)
-    || lib?.key
-    || extracted?.key
+    || parseOptionalKey(lib?.key)
+    || parseOptionalKey(extracted?.key)
     || null;
   return { bpm, key, libraryMeta: lib };
 }

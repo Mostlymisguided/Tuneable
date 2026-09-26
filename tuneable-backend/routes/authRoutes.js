@@ -1208,7 +1208,7 @@ router.post('/apple', async (req, res) => {
     const { verifyAppleIdentityToken } = require('../services/appleSignInService');
     const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
-    const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
+    const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 
     const { identityToken, invite, fullName, email: clientEmail } = req.body || {};
     const verified = await verifyAppleIdentityToken(identityToken);
@@ -1324,6 +1324,7 @@ router.post('/apple', async (req, res) => {
       parentInviteCode: inviteCode || undefined,
       parentInviteCodeId:
         inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : undefined,
+      ...inviteAttributionFields(inviteResult),
       oauthVerified: {
         apple: true,
         google: false,

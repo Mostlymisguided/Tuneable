@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { 
   Coins, 
   Clock, 
@@ -18,9 +18,9 @@ import {
   Globe
 } from 'lucide-react';
 import { artistEscrowAPI } from '../lib/api';
+import { ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP, HOW_MONEY_WORKS_PATH } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
-import { HOW_MONEY_WORKS_PATH } from '../constants';
 
 const ESCROW_TAKE_RATE_NOTE_KEY = 'tuneable.escrowTakeRateNote.dismissed';
 
@@ -29,6 +29,8 @@ interface EscrowInfo {
   balancePounds: number;
   promoBalance?: number;
   promoBalancePounds?: number;
+  affiliateEarned?: number;
+  affiliateEarnedPounds?: number;
   totalEscrowEarned?: number;
   totalEscrowEarnedPounds?: number;
   lastPayoutTotalEarned?: number;
@@ -48,6 +50,7 @@ interface EscrowInfo {
     allocatedAt: string;
     claimedAt?: string;
     status: 'pending' | 'claimed';
+    source?: 'tip' | 'affiliate';
   }>;
   unclaimedAllocations: Array<{
     _id: string;
@@ -427,6 +430,16 @@ const ArtistEscrowDashboard: React.FC = () => {
               )}
               <p className="text-sm text-gray-300 mt-2">
                 {escrowInfo.history.length} allocation{escrowInfo.history.length !== 1 ? 's' : ''} in history
+              </p>
+              <p className="text-sm text-indigo-200 mt-2">
+                {user?.isFoundingCreator
+                  ? `As a founding creator, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one, taken from Tuneable's share on music they upload themselves.`
+                  : `Artist-invite commission (${ARTIST_INVITE_AFFILIATE_PERCENT}%) is exclusive to founding creators — the first ${FOUNDING_CREATOR_CAP.toLocaleString()} who upload their own music.`}
+                {(escrowInfo.affiliateEarned || 0) > 0
+                  ? ` You've earned ${penceToPounds(escrowInfo.affiliateEarned)} so far.`
+                  : user?.isFoundingCreator
+                    ? ' Nothing earned yet — share your invite from the dashboard.'
+                    : ''}
               </p>
               {escrowInfo.totalEscrowEarned !== undefined && (
                 <p className="text-sm text-gray-400 mt-1">
@@ -957,7 +970,9 @@ const ArtistEscrowDashboard: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <h3 className="font-semibold text-white">
-                            {media?.title || 'Unknown Media'}
+                            {entry.source === 'affiliate'
+                              ? 'Artist invite commission'
+                              : (media?.title || 'Unknown Media')}
                           </h3>
                           <span className="text-lg font-bold text-yellow-400">
                             +{penceToPounds(entry.amount)}

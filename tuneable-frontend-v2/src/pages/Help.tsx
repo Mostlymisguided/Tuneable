@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Library, Wallet, MessagesSquare } from 'lucide-react';
-import { SUPPORT_EMAIL, HOW_MONEY_WORKS_PATH } from '../constants';
+import {
+  SUPPORT_EMAIL,
+  HOW_MONEY_WORKS_PATH,
+  ARTIST_INVITE_AFFILIATE_PERCENT,
+  FOUNDING_CREATOR_CAP,
+  FOUNDING_UPLOAD_QUOTA_MB,
+} from '../constants';
 import GeneralReportModal from '../components/GeneralReportModal';
 
 const Help: React.FC = () => {
@@ -30,7 +36,7 @@ const Help: React.FC = () => {
               If a friend shares their invite link, you&apos;ll be attributed to them automatically.
               New users can claim £11.11 in welcome credits.
               Welcome credit is promotional: tips using it are capped at £1.11 each, £3.33 / 3 songs per artist,
-              and cannot be used on media you own. Unused amounts expire after 12 months and may be revoked
+              and £1.11 per track on media you own. Unused amounts expire after 12 months and may be revoked
               at Tuneable&apos;s discretion. Spent tips stay on the charts; artist earnings from welcome credit
               stay pending until you top up with real money (within 90 days), otherwise those earnings expire.
             </p>
@@ -50,7 +56,7 @@ const Help: React.FC = () => {
               When you tip on a tune, you're voting for it to be moved up the charts. It is also added to your Library. Higher tips give tunes more weight 
               in the charts. The minimum tip is usually £0.01, but party hosts can set their own minimum.
               Tips funded by welcome credit are limited to £1.11 each, with a max of £3.33 and three songs per artist,
-              and cannot be used on your own releases. Artist earnings from welcome-credit tips stay pending until
+              and £1.11 per track on your own releases. Artist earnings from welcome-credit tips stay pending until
               you top up with real money (within 90 days).
             </p>
           </div>
@@ -174,8 +180,12 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Artist earnings</h3>
             <p className="text-gray-300">
               Verified creators receive 70% of each tip on their media via escrow. Tuneable keeps 30% today
-              and is committed to reducing that to 10% at scale. If the company reaches a £1 billion
-              valuation, we commit to community governance (a DAO for artists and users).{' '}
+              and is committed to reducing that to 10% at scale. The first {FOUNDING_CREATOR_CAP.toLocaleString()}{' '}
+              creators who upload their own music become founding creators ({FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB
+              upload allowance). Founding creators who invite an artist earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of
+              that artist&apos;s paid tips for a year, taken from Tuneable&apos;s share, on music they upload
+              themselves. Founding status is not equity. If the company reaches a £1 billion valuation, we commit
+              to community governance (a DAO for artists and users).{' '}
               <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">
                 How money works
               </Link>
@@ -191,8 +201,10 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Collectives</h3>
             <p className="text-gray-300">
-              Collectives are for bands, production companies, and creative groups. Founders can invite 
-              members and admins, manage the collective's presence, and collaborate on releases.
+              Collectives are for bands, production companies, creative groups, and claimed venues
+              (bars, hostels, clubs, cafes). Founders can invite members and admins and manage the
+              public profile. Venues must be bound to a Mapbox place so they appear on that city&apos;s
+              place page.
             </p>
           </div>
           <div>
@@ -260,7 +272,8 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">YouTube Playlists</h3>
             <p className="text-gray-300">
               Paste a public YouTube playlist URL. Confident matches are ready to import; weaker matches need a 
-              quick confirm. Nothing from YouTube is streamed or played on Tuneable.
+              quick confirm. Admins can correct artist and title when MusicBrainz is unsure, rematch, or confirm a 
+              new catalogue identity. Nothing from YouTube is streamed or played on Tuneable.
             </p>
           </div>
           <div>

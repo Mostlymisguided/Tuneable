@@ -5,16 +5,13 @@ const {
   parseYouTubePlaylistId,
   parseIso8601Duration,
   parseYouTubeTrackIdentity,
+  youtubeWatchUrl,
 } = require('../utils/youtubePlaylistUtils');
 
 const YOUTUBE_API = 'https://www.googleapis.com/youtube/v3';
 const PAGE_SIZE = 50;
 const MAX_PLAYLIST_ITEMS = 200;
 const LIKED_PLAYLIST_ID = 'LL';
-
-function youtubeWatchUrl(videoId) {
-  return `https://www.youtube.com/watch?v=${videoId}`;
-}
 
 function thumbnailFromSnippet(snippet, videoId) {
   const thumbs = snippet?.thumbnails || {};
@@ -111,6 +108,8 @@ function convertPlaylistRows(rawItems, durationMap, { importSource, sourceLabel 
         videoId: row.videoId,
         title: row.title,
         reason: 'unavailable',
+        channelTitle: row.channelTitle,
+        coverArt: row.coverArt,
       });
       continue;
     }
@@ -120,6 +119,8 @@ function convertPlaylistRows(rawItems, durationMap, { importSource, sourceLabel 
         title: row.title,
         reason: row.identity.reason || 'junk_channel',
         channelTitle: row.channelTitle,
+        coverArt: row.coverArt,
+        duration: details.duration || 0,
       });
       continue;
     }
@@ -129,6 +130,9 @@ function convertPlaylistRows(rawItems, durationMap, { importSource, sourceLabel 
         title: row.title,
         reason: row.identity.reason || 'unparsed',
         channelTitle: row.channelTitle,
+        coverArt: row.coverArt,
+        duration: details.duration || 0,
+        channelQuality: row.identity.channelQuality,
       });
       continue;
     }
@@ -278,6 +282,7 @@ module.exports = {
   fetchPublicPlaylist,
   fetchLikedVideos,
   parseYouTubePlaylistId,
+  convertPlaylistRows,
   MAX_PLAYLIST_ITEMS,
   LIKED_PLAYLIST_ID,
   YOUTUBE_LIKES_IMPORT_DISABLED_MESSAGE,

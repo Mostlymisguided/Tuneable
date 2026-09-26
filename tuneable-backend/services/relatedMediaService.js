@@ -3,6 +3,7 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { roundBpm } = require('../utils/bpm');
 
 const DEFAULT_OPTIONS = {
   candidatePoolSize: 120,
@@ -170,17 +171,18 @@ const limitPerPrimaryArtist = (records, limit, maxPerPrimaryArtist) => {
   return selected;
 };
 
-const formatMediaEntry = (record) => {
+const formatMediaEntry = (record, playabilityOptions = {}) => {
   const media = record.media;
-  const playability = enrichMediaWithPlayability(media);
+  const playability = enrichMediaWithPlayability(media, playabilityOptions);
   return {
     _id: media._id.toString(),
     uuid: media.uuid,
+    slug: media.slug || null,
     title: media.title,
     artist: getPrimaryArtistName(media) || 'Unknown Artist',
     coverArt: media.coverArt || null,
     duration: media.duration || 0,
-    bpm: typeof media.bpm === 'number' && media.bpm > 0 ? media.bpm : null,
+    bpm: roundBpm(media.bpm),
     releaseDate: media.releaseDate || null,
     releaseYear: typeof media.releaseYear === 'number' ? media.releaseYear : null,
     primaryLocation: media.primaryLocation || null,
@@ -265,9 +267,10 @@ const attachBidsToPlaylistEntries = async (relatedMedia, fansAlsoTip) => {
 
 const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   const settings = { ...DEFAULT_OPTIONS, ...options };
+  const playabilityOptions = { authenticated: settings.authenticated === true };
 
   const source = await Media.findById(mediaId)
-    .select('_id uuid title artist tags contentType contentForm relationships globalMediaAggregate')
+    .select('_id uuid slug title artist tags contentType contentForm relationships globalMediaAggregate')
     .lean();
 
   if (!source) {
@@ -299,7 +302,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
   }
 
   const candidateMedia = await Media.find(candidateQuery)
-    .select('_id uuid title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay rightsStatus rightsCleared')
+    .select('_id uuid slug title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser tags sources contentType contentForm relationships creatorDisplay rightsStatus rightsCleared')
     .populate('globalMediaAggregateTopUser', 'username uuid _id')
     .sort({ globalMediaAggregate: -1, playCount: -1, createdAt: -1 })
     .limit(settings.candidatePoolSize)
@@ -320,7 +323,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
     candidateRecords,
     settings.relatedLimit,
     settings.maxPerPrimaryArtist
-  ).map(formatMediaEntry);
+  ).map((record) => formatMediaEntry(record, playabilityOptions));
 
   if (candidateRecords.length === 0 || settings.fansAlsoTipLimit <= 0) {
     relatedMedia = await attachBidsToEntries(relatedMedia);
@@ -439,7 +442,7 @@ const getRelatedPlaylistsForMedia = async (mediaId, options = {}) => {
           sourceSupportTotal: fan.totalAmount,
           sourceSupportBidCount: fan.bidCount,
         },
-      }));
+      }, playabilityOptions));
       break;
     }
 

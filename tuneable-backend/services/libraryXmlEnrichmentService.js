@@ -6,6 +6,8 @@ const {
 } = require('../utils/libraryXml');
 const { buildMediaIndexes, findCatalogMatch } = require('../scripts/lib/catalogMatch');
 const { isAdmin, canEditMedia } = require('../utils/permissionHelpers');
+const { roundBpm } = require('../utils/bpm');
+const { normalizeKey } = require('../utils/keyNormalizer');
 
 function getExternalId(media, key) {
   if (!media?.externalIds) return null;
@@ -122,11 +124,12 @@ function matchMediaToXmlTrack(media, xmlIndexes) {
 
 function buildEnrichmentPatch(media, track) {
   const patch = {};
-  if (isMissingBpm(media.bpm) && track.bpm != null && track.bpm !== 0) {
-    patch.bpm = track.bpm;
-  }
+    const nextBpm = roundBpm(track.bpm);
+    if (isMissingBpm(media.bpm) && nextBpm != null) {
+      patch.bpm = nextBpm;
+    }
   if (isMissingKey(media.key) && track.key && String(track.key).trim()) {
-    patch.key = String(track.key).trim();
+    patch.key = normalizeKey(track.key);
   }
   return patch;
 }
@@ -200,7 +203,7 @@ async function previewLibraryXmlEnrichment(xmlContent, { user, scope = 'mine', l
       uuid: media.uuid,
       title: media.title,
       artist: media.artist?.[0]?.name || '',
-      currentBpm: isMissingBpm(media.bpm) ? null : media.bpm,
+      currentBpm: isMissingBpm(media.bpm) ? null : roundBpm(media.bpm),
       currentKey: isMissingKey(media.key) ? null : media.key,
       newBpm: patch.bpm ?? null,
       newKey: patch.key ?? null,
@@ -280,12 +283,13 @@ async function executeLibraryXmlEnrichment(updates, { user } = {}) {
       }
 
       let changed = false;
-      if (item.bpm != null && item.bpm !== 0 && isMissingBpm(media.bpm)) {
-        media.bpm = Number(item.bpm);
+      const nextBpm = roundBpm(item.bpm);
+      if (nextBpm != null && isMissingBpm(media.bpm)) {
+        media.bpm = nextBpm;
         changed = true;
       }
       if (item.key && String(item.key).trim() && isMissingKey(media.key)) {
-        media.key = String(item.key).trim();
+        media.key = normalizeKey(item.key);
         changed = true;
       }
       if (item.rekordboxTrackId && !getExternalId(media, 'rekordbox')) {

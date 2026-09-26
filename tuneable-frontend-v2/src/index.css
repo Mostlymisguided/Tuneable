@@ -85,6 +85,38 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   }
 
+  /* Monochrome player scrubber / volume thumbs */
+  .player-mono-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fafafa;
+    cursor: pointer;
+    border: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  .player-mono-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fafafa;
+    cursor: pointer;
+    border: 0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  .player-mono-slider:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+    background: #71717a;
+  }
+
+  .player-mono-slider:disabled::-moz-range-thumb {
+    cursor: not-allowed;
+    background: #71717a;
+  }
+
   /* Custom gradient backgrounds (if used) */
   .bg-gradient-purple {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -131,33 +163,6 @@
     animation: highlight 1s ease-in-out;
   }
 
-  /* Toast fade animations */
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes fadeOut {
-    from {
-      opacity: 1;
-    }
-    to {
-      opacity: 0;
-    }
-  }
-
-  .fadeIn {
-    animation: fadeIn 0.3s ease-in;
-  }
-
-  .fadeOut {
-    animation: fadeOut 0.2s ease-out;
-  }
-
   @keyframes shake {
     0%, 100% {
       transform: translateX(0);
@@ -173,4 +178,69 @@
   .animate-shake {
     animation: shake 0.5s ease-in-out;
   }
+
+  @keyframes loader-bar {
+    0%, 100% { transform: scaleY(0.28); opacity: 0.55; }
+    50% { transform: scaleY(1); opacity: 1; }
+  }
+
+  .entertaining-loader-bar {
+    animation: loader-bar 1.05s ease-in-out infinite;
+    transform-origin: bottom;
+  }
+
+  @keyframes loader-line-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .entertaining-loader-line {
+    animation: loader-line-in 0.35s ease-out;
+  }
+}
+
+/* Sonner toasts — dark glass to match .card, above the player dock */
+[data-sonner-toaster][data-sonner-theme='dark'] {
+  font-family: Inter, system-ui, sans-serif;
+  --border-radius: 12px;
+  --normal-bg: rgba(31, 41, 55, 0.92);
+  --normal-bg-hover: rgba(55, 65, 81, 0.95);
+  --normal-border: rgba(75, 85, 99, 0.55);
+  --normal-border-hover: rgba(168, 85, 247, 0.45);
+  --normal-text: #e5e7eb;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] [data-sonner-toast][data-styled='true'] {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] [data-sonner-toast][data-type='success'] {
+  border-color: rgba(52, 211, 153, 0.4) !important;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] [data-sonner-toast][data-type='error'] {
+  border-color: rgba(248, 113, 113, 0.45) !important;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] [data-sonner-toast][data-type='warning'] {
+  border-color: rgba(251, 191, 36, 0.4) !important;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] [data-sonner-toast][data-type='info'] {
+  border-color: rgba(196, 181, 253, 0.4) !important;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] .tuneable-toast-title {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+[data-sonner-toaster][data-sonner-theme='dark'] .tuneable-toast-action {
+  background: linear-gradient(90deg, #ec4899 0%, #a855f7 100%);
+  color: #fff;
+  font-weight: 500;
+  border-radius: 8px;
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Gift, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { emailAPI, userAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
@@ -106,7 +106,7 @@ const WelcomeCreditClaimCard: React.FC<{ variant?: Variant }> = ({ variant = 'de
                 {!compact && (
                   <>
                     <li>Spent tips stay on the charts. Artist earnings from welcome credit stay pending until you top up (within 90 days).</li>
-                    <li>Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and you can’t tip media you own.</li>
+                    <li>Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and £1.11 per track on media you own.</li>
                   </>
                 )}
               </ul>

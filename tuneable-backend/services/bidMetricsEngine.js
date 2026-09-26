@@ -23,6 +23,8 @@ const User = require('../models/User');
 const { BidMetricsSchema } = require('../utils/bidMetricsSchema');
 const { validatePenceAmount } = require('../utils/penceValidation');
 
+const MAX_CACHE_KEYS = 200;
+
 class BidMetricsEngine {
   constructor() {
     this.cache = new Map(); // Simple in-memory cache for computed metrics
@@ -216,13 +218,19 @@ class BidMetricsEngine {
 
   _getFromCache(key) {
     const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      return cached.value;
+    if (!cached) return null;
+    if (Date.now() - cached.timestamp >= this.cacheTimeout) {
+      this.cache.delete(key);
+      return null;
     }
-    return null;
+    return cached.value;
   }
 
   _setCache(key, value) {
+    if (this.cache.size >= MAX_CACHE_KEYS) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest !== undefined) this.cache.delete(oldest);
+    }
     this.cache.set(key, {
       value,
       timestamp: Date.now()

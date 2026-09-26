@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authAPI } from '@/src/api/auth';
@@ -10,50 +10,125 @@ import {
   hasHomeLocation,
   needsOnboarding,
 } from '@/src/lib/onboarding';
-import { maybePromptForPush } from '@/src/lib/pushNotifications';
+import {
+  getPushPermissionSnapshot,
+  requestAndRegisterPush,
+} from '@/src/lib/pushNotifications';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import { hasCustomProfilePic } from '@/src/types/user';
+
+type PushSnap = { status: string; canAskAgain: boolean } | null;
 
 export function DashboardPrompts() {
   const { user, refreshUser } = useAuth();
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
-  const pushAskStarted = useRef(false);
+  const [enablingPush, setEnablingPush] = useState(false);
+  const [pushSnap, setPushSnap] = useState<PushSnap>(null);
+  const [pushSnapReady, setPushSnapReady] = useState(Platform.OS === 'web');
+  const autoRegisterTried = useRef(false);
 
   useEffect(() => {
-    if (!user || pushAskStarted.current) return;
-    if (needsOnboarding(user)) return;
-    if (user.hasPushDevice || user.onboarding?.notificationsPromptSeenAt) return;
-    pushAskStarted.current = true;
+    if (Platform.OS === 'web') return;
     let cancelled = false;
+    const load = async () => {
+      try {
+        const snap = await getPushPermissionSnapshot();
+        if (cancelled) return;
+        setPushSnap(snap);
+      } finally {
+        if (!cancelled) setPushSnapReady(true);
+      }
+    };
+    void load();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void load();
+    });
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, []);
+
+  const homeReady = !!user && hasHomeLocation(user.homeLocation);
+  const showPushEligible =
+    Platform.OS !== 'web' &&
+    !!user &&
+    !needsOnboarding(user) &&
+    homeReady &&
+    pushSnapReady &&
+    !user.hasPushDevice &&
+    !user.onboarding?.notificationsPromptSeenAt &&
+    pushSnap?.status === 'granted';
+
+  useEffect(() => {
+    if (!showPushEligible || autoRegisterTried.current) return;
+    autoRegisterTried.current = true;
     void (async () => {
-      await maybePromptForPush();
-      if (cancelled) return;
+      const result = await requestAndRegisterPush();
+      if (result !== 'granted') {
+        autoRegisterTried.current = false;
+        return;
+      }
       try {
         await authAPI.updateProfile({
           onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
         });
         await refreshUser();
       } catch {
-        // Token sync still runs on later logins if they granted
+        // Device is registered; the card hides once hasPushDevice is refreshed
+        await refreshUser().catch(() => undefined);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, refreshUser]);
+  }, [showPushEligible, refreshUser]);
+
+  const markNotificationsSeen = async () => {
+    try {
+      await authAPI.updateProfile({
+        onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
+      });
+      await refreshUser();
+    } catch {
+      // Card can show again next visit if this save fails
+    }
+  };
+
+  const allowNotifications = async () => {
+    setEnablingPush(true);
+    try {
+      const result = await requestAndRegisterPush();
+      if (result === 'granted' || result === 'denied') {
+        await markNotificationsSeen();
+        return;
+      }
+      showToast('Could not register this device for notifications. Try again.', 'error');
+    } finally {
+      setEnablingPush(false);
+    }
+  };
 
   if (!user) return null;
 
   const showLocation = !hasHomeLocation(user.homeLocation);
+  const pushBlocked =
+    !!pushSnap && pushSnap.status !== 'granted' && pushSnap.canAskAgain === false;
+  const pushAlreadyAllowed = pushSnap?.status === 'granted';
+  const showPush =
+    Platform.OS !== 'web' &&
+    !needsOnboarding(user) &&
+    !showLocation &&
+    pushSnapReady &&
+    !user.hasPushDevice &&
+    !user.onboarding?.notificationsPromptSeenAt;
+
   const currentDefaultTip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
   const showDefaultTip =
     !user.onboarding?.defaultTipPromptSeenAt && !dismissed.has('defaultTip');
   const showEmail = !user.emailVerified && !dismissed.has('email');
   const showPic = !hasCustomProfilePic(user.profilePic) && !dismissed.has('pic');
 
-  if (!showLocation && !showDefaultTip && !showEmail && !showPic) return null;
+  if (!showLocation && !showPush && !showDefaultTip && !showEmail && !showPic) return null;
 
   const sendVerification = async () => {
     setSendingEmail(true);
@@ -84,10 +159,46 @@ export function DashboardPrompts() {
       {showLocation ? (
         <PromptCard
           icon="location-outline"
-          title="Enable location for local charts"
-          body="Tips influence charts where you are. Set home, or allow location while the app is open."
-          actionLabel="Set location"
+          title="Set a home place for local charts"
+          body="Tips on local charts use the home place you save. Use your current place once, or search. GPS is only used while Tuneable is open."
+          actionLabel="Set home place"
           onAction={() => router.push('/set-home-location')}
+        />
+      ) : null}
+      {showPush ? (
+        <PromptCard
+          icon="notifications-outline"
+          title={
+            pushBlocked
+              ? 'Notifications are off'
+              : pushAlreadyAllowed
+                ? 'Turn on notifications'
+                : 'Allow notifications'
+          }
+          body={
+            pushBlocked
+              ? 'Tuneable cannot ask again. Turn on notifications in Settings to hear about tips, replies, and outtips.'
+              : pushAlreadyAllowed
+                ? 'Notifications are allowed. Finish setup to get alerts for tips, replies, and outtips.'
+                : 'Get alerts for tips, replies, and when someone outtips you.'
+          }
+          actionLabel={
+            enablingPush
+              ? 'Turning on…'
+              : pushBlocked
+                ? 'Open Settings'
+                : pushAlreadyAllowed
+                  ? 'Turn on'
+                  : 'Allow notifications'
+          }
+          onAction={() => {
+            if (pushBlocked) {
+              void Linking.openSettings();
+              return;
+            }
+            void allowNotifications();
+          }}
+          onDismiss={() => void markNotificationsSeen()}
         />
       ) : null}
       {showDefaultTip ? (

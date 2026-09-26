@@ -9,18 +9,37 @@ const {
   FOLLOW_UP_STATUSES,
   PARTY_ROLES,
   CASE_SOURCES,
+  CONTACT_SOURCES,
+  CONTACT_CONFIDENCES,
   OUTREACH_TEMPLATES,
+  OUTREACH_FORMATS,
   normalizePartyKey,
   suggestedPartiesFromMedia,
   primaryEmailFromParty,
+  primaryInstagramFromParty,
+  normalizeInstagramHandle,
   statusAfterContactAdded,
   statusAfterOutboundEmail,
   statusAfterInboundReply,
   defaultFollowUpAt,
   buildOutreachContent,
+  escapeRegex,
 } = require('../utils/rightsCaseHelpers');
+const { findContactCandidates } = require('./rightsContactLookupService');
 
-const MEDIA_SELECT = 'title artist featuring songwriter composer producer creatorDisplay coverArt uuid rightsStatus rightsCleared importSource importedBy globalMediaAggregate isrc status';
+const MEDIA_SELECT = 'title artist featuring songwriter composer producer host guest narrator director cinematographer editor author label creatorDisplay coverArt uuid rightsStatus rightsCleared importSource importedBy globalMediaAggregate isrc status';
+
+function normalizeContact(contact) {
+  const source = CONTACT_SOURCES.includes(contact.source) ? contact.source : 'manual';
+  const confidence = CONTACT_CONFIDENCES.includes(contact.confidence) ? contact.confidence : 'manual';
+  return {
+    type: contact.type || 'email',
+    value: String(contact.value).trim(),
+    notes: contact.notes || '',
+    source,
+    confidence,
+  };
+}
 
 const CASE_POPULATE = [
   { path: 'mediaId', select: MEDIA_SELECT },
@@ -29,6 +48,8 @@ const CASE_POPULATE = [
   { path: 'linkedClaimId', select: 'intent status submittedAt userId' },
   { path: 'linkedReportId', select: 'category status contactEmail createdAt' },
   { path: 'party.userId', select: 'username email' },
+  { path: 'party.labelId', select: 'name email' },
+  { path: 'party.collectiveId', select: 'name email' },
   { path: 'outreach.sentBy', select: 'username' },
 ];
 
@@ -36,6 +57,39 @@ function parsePage(query) {
   const page = Math.max(1, parseInt(query.page, 10) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 25));
   return { page, limit, skip: (page - 1) * limit };
+}
+
+function searchRegex(query) {
+  const search = String(query || '').trim();
+  if (!search) return null;
+  return new RegExp(escapeRegex(search), 'i');
+}
+
+function mediaSearchClause(rx) {
+  return {
+    $or: [
+      { title: rx },
+      { creatorDisplay: rx },
+      { creatorNames: rx },
+      { isrc: rx },
+      { 'artist.name': rx },
+      { 'featuring.name': rx },
+      { 'songwriter.name': rx },
+      { 'composer.name': rx },
+      { 'producer.name': rx },
+      { 'host.name': rx },
+      { 'guest.name': rx },
+      { 'narrator.name': rx },
+      { 'director.name': rx },
+      { 'author.name': rx },
+      { 'label.name': rx },
+    ],
+  };
+}
+
+async function mediaIdsMatchingSearch(rx, cap = 200) {
+  const rows = await Media.find(mediaSearchClause(rx)).select('_id').limit(cap).lean();
+  return rows.map((row) => row._id);
 }
 
 async function findOpenCase(mediaId, displayName) {
@@ -112,19 +166,41 @@ async function createCase({
     throw error;
   }
 
+  const contacts = Array.isArray(party.contacts)
+    ? party.contacts.filter((c) => c?.value).map(normalizeContact)
+    : [];
+
   const existing = await findOpenCase(media._id, displayName);
   if (existing) {
+    let changed = false;
+    if (party.userId && !existing.party.userId) {
+      existing.party.userId = party.userId;
+      changed = true;
+    }
+    if (party.labelId && !existing.party.labelId) {
+      existing.party.labelId = party.labelId;
+      changed = true;
+    }
+    if (party.collectiveId && !existing.party.collectiveId) {
+      existing.party.collectiveId = party.collectiveId;
+      changed = true;
+    }
+    for (const contact of contacts) {
+      const already = (existing.party.contacts || []).some(
+        (c) => c.type === contact.type && String(c.value).toLowerCase() === contact.value.toLowerCase()
+      );
+      if (!already) {
+        existing.party.contacts.push(contact);
+        changed = true;
+      }
+    }
+    if (changed && primaryEmailFromParty(existing.party)) {
+      existing.status = statusAfterContactAdded(existing.status);
+    }
+    if (changed) await existing.save();
     await existing.populate(CASE_POPULATE);
     return { rightsCase: existing, created: false };
   }
-
-  const contacts = Array.isArray(party.contacts)
-    ? party.contacts.filter((c) => c?.value).map((c) => ({
-      type: c.type || 'email',
-      value: String(c.value).trim(),
-      notes: c.notes || '',
-    }))
-    : [];
 
   const hasEmail = contacts.some((c) => c.type === 'email');
   const initialStatus = status && CASE_STATUSES.includes(status)
@@ -192,14 +268,15 @@ async function listCases(query = {}) {
   }
   if (query.assignedTo) filter.assignedTo = query.assignedTo;
   if (query.mediaId) filter.mediaId = query.mediaId;
-  if (query.search) {
-    const search = String(query.search).trim();
-    if (search) {
-      filter.$or = [
-        { 'party.displayName': { $regex: search, $options: 'i' } },
-        { notes: { $regex: search, $options: 'i' } },
-      ];
-    }
+  const rx = searchRegex(query.search);
+  if (rx) {
+    const mediaIds = await mediaIdsMatchingSearch(rx);
+    filter.$or = [
+      { 'party.displayName': rx },
+      { 'party.contacts.value': rx },
+      { notes: rx },
+      ...(mediaIds.length ? [{ mediaId: { $in: mediaIds } }] : []),
+    ];
   }
 
   const sort = queue === 'follow_ups'
@@ -228,6 +305,8 @@ async function listLimbo(query = {}) {
     rightsCleared: { $ne: true },
     status: { $nin: ['deleted', 'vetoed'] },
   };
+  const rx = searchRegex(query.search);
+  if (rx) Object.assign(match, mediaSearchClause(rx));
 
   const pipeline = [{ $match: match }];
 
@@ -293,6 +372,14 @@ async function listLimbo(query = {}) {
               songwriter: 1,
               composer: 1,
               producer: 1,
+              host: 1,
+              guest: 1,
+              narrator: 1,
+              director: 1,
+              cinematographer: 1,
+              editor: 1,
+              author: 1,
+              label: 1,
               creatorDisplay: 1,
               coverArt: 1,
               uuid: 1,
@@ -401,11 +488,7 @@ async function updateCase(id, patch, actorId) {
     if (Array.isArray(patch.party.contacts)) {
       rightsCase.party.contacts = patch.party.contacts
         .filter((c) => c?.value)
-        .map((c) => ({
-          type: c.type || 'email',
-          value: String(c.value).trim(),
-          notes: c.notes || '',
-        }));
+        .map(normalizeContact);
       if (primaryEmailFromParty(rightsCase.party)) {
         rightsCase.status = statusAfterContactAdded(rightsCase.status);
       }
@@ -438,6 +521,8 @@ async function addOutreach(id, payload, actorId) {
   const channel = payload.channel || 'email';
   const direction = payload.direction || (channel === 'note' ? 'note' : 'outbound');
   const template = OUTREACH_TEMPLATES.includes(payload.template) ? payload.template : 'custom';
+  const frontendUrl = process.env.FRONTEND_URL || 'https://tuneable.stream';
+  const customMessage = payload.customMessage || payload.body || '';
 
   if (channel === 'email' && direction === 'outbound') {
     const to = (payload.to || primaryEmailFromParty(rightsCase.party) || '').trim();
@@ -451,8 +536,9 @@ async function addOutreach(id, payload, actorId) {
       template,
       media: rightsCase.mediaId,
       party: rightsCase.party,
-      customMessage: payload.customMessage || payload.body || '',
-      frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
+      customMessage,
+      frontendUrl,
+      format: 'email',
     });
     const subject = payload.subject || content.subject;
 
@@ -475,6 +561,49 @@ async function addOutreach(id, payload, actorId) {
       subject,
       body: content.text,
       resendId: sent?.id || null,
+      sentBy: actorId,
+      sentAt: new Date(),
+    });
+    rightsCase.status = statusAfterOutboundEmail(rightsCase.status);
+    rightsCase.nextFollowUpAt = payload.nextFollowUpAt
+      ? new Date(payload.nextFollowUpAt)
+      : defaultFollowUpAt();
+  } else if ((channel === 'instagram' || channel === 'link') && direction === 'outbound') {
+    const format = channel === 'instagram' ? 'instagram' : 'link';
+    const content = buildOutreachContent({
+      template,
+      media: rightsCase.mediaId,
+      party: rightsCase.party,
+      customMessage,
+      frontendUrl,
+      format,
+    });
+    const body = (payload.body || content.text || '').trim();
+    if (!body) {
+      const error = new Error('A message body is required');
+      error.status = 400;
+      throw error;
+    }
+    const to = channel === 'instagram'
+      ? (normalizeInstagramHandle(payload.to) || primaryInstagramFromParty(rightsCase.party))
+      : (payload.to || content.tuneUrl || '').trim();
+
+    if (channel === 'instagram' && to) {
+      const already = rightsCase.party.contacts.some(
+        (c) => c.type === 'instagram' && normalizeInstagramHandle(c.value).toLowerCase() === to.toLowerCase()
+      );
+      if (!already) {
+        rightsCase.party.contacts.push({ type: 'instagram', value: to });
+      }
+    }
+
+    rightsCase.outreach.push({
+      channel,
+      direction: 'outbound',
+      template,
+      to,
+      subject: payload.subject || content.subject || '',
+      body,
       sentBy: actorId,
       sentAt: new Date(),
     });
@@ -598,20 +727,25 @@ async function openFromCopyrightReport(report, media) {
   });
 }
 
-async function previewOutreach({ caseId, template, customMessage }) {
+async function previewOutreach({ caseId, template, customMessage, format = 'email' }) {
   const rightsCase = await RightsCase.findById(caseId).populate('mediaId', MEDIA_SELECT);
   if (!rightsCase) {
     const error = new Error('Rights case not found');
     error.status = 404;
     throw error;
   }
-  return buildOutreachContent({
-    template,
-    media: rightsCase.mediaId,
-    party: rightsCase.party,
-    customMessage,
-    frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
-  });
+  const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
+  return {
+    ...buildOutreachContent({
+      template,
+      media: rightsCase.mediaId,
+      party: rightsCase.party,
+      customMessage,
+      frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
+      format: chosenFormat,
+    }),
+    instagramHandle: primaryInstagramFromParty(rightsCase.party) || null,
+  };
 }
 
 module.exports = {
@@ -626,4 +760,5 @@ module.exports = {
   syncFromClaimReview,
   openFromCopyrightReport,
   previewOutreach,
+  findContactCandidates,
 };

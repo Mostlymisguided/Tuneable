@@ -22,6 +22,13 @@ const {
   splitOwnerShare,
   PROMO_ESCROW_STATUS,
 } = require('../utils/welcomePromoEscrow');
+const {
+  computeAffiliateSharePence,
+  originalUploaderOwner,
+  isAffiliateEligible,
+  ownerPaidSharePence,
+  AFFILIATE_SHARE_PERCENT,
+} = require('../utils/artistInviteAffiliate');
 
 // Revenue split constants
 const ARTIST_SHARE_PERCENTAGE = 0.70; // 70% to artists
@@ -72,7 +79,8 @@ class ArtistEscrowService {
       // Calculate artist share (70% of bid amount)
       const artistSharePence = bidSplit.artistSharePence;
 
-      const rightsPending = media.rightsStatus === 'pending' && !media.rightsCleared;
+      const { isEscrowUntilClaim } = require('../utils/mediaRights');
+      const rightsPending = isEscrowUntilClaim(media);
 
       // Pending library imports: full artist share goes to escrow until rights holder claims
       if (rightsPending) {
@@ -191,6 +199,16 @@ class ArtistEscrowService {
         }
       }
 
+      const affiliate = await this._allocateArtistInviteAffiliate({
+        media,
+        bidId,
+        paidArtistSharePence: bidSplit.paidArtistSharePence,
+        tipperUserId: bid?.userId,
+      });
+      if (affiliate) {
+        allocations.push(affiliate);
+      }
+
       const stampedSplit = {
         ...bidSplit,
         promoArtistSharePence: allocatedPromo,
@@ -270,7 +288,8 @@ class ArtistEscrowService {
           promoPence,
           promoStatus: promoPence > 0 ? PROMO_ESCROW_STATUS.PENDING : PROMO_ESCROW_STATUS.NONE,
           allocatedAt: new Date(),
-          status: 'pending'
+          status: 'pending',
+          source: 'tip',
         }
       }
     });
@@ -367,6 +386,93 @@ class ArtistEscrowService {
     console.log(`   ✅ Allocated £${(validatedAmount / 100).toFixed(2)} to unknown artist "${primaryArtistName}" (${percentage}%)`);
   }
   
+  /**
+   * 3% of an invited artist's paid tip share, taken from the platform cut.
+   * Founding-creator inviters only; original uploads; first year after signup.
+   * @private
+   */
+  async _allocateArtistInviteAffiliate({ media, bidId, paidArtistSharePence, tipperUserId }) {
+    const paid = Math.max(0, paidArtistSharePence || 0);
+    if (paid <= 0) return null;
+
+    const uploader = originalUploaderOwner(media);
+    if (!uploader?.userId) return null;
+
+    const artistUser = await User.findById(uploader.userId)
+      .select('_id createdAt invitedByUserId parentInviteCode');
+    if (!artistUser) return null;
+
+    let inviter = null;
+    if (artistUser.invitedByUserId) {
+      inviter = await User.findById(artistUser.invitedByUserId)
+        .select('_id isFoundingCreator');
+    } else if (artistUser.parentInviteCode) {
+      inviter = await User.findByInviteCode(artistUser.parentInviteCode);
+    }
+    if (!inviter) return null;
+
+    if (!isAffiliateEligible({
+      media,
+      artistUser,
+      inviterUser: inviter,
+      tipperUserId,
+    })) {
+      return null;
+    }
+
+    const ownerPaid = ownerPaidSharePence(paid, uploader.percentage);
+    const affiliatePence = computeAffiliateSharePence(ownerPaid);
+    if (affiliatePence <= 0) return null;
+
+    await User.findByIdAndUpdate(inviter._id, {
+      $inc: {
+        artistEscrowBalance: affiliatePence,
+        totalEscrowEarned: affiliatePence,
+        referralCommissionEarned: affiliatePence,
+      },
+      $push: {
+        artistEscrowHistory: {
+          mediaId: media._id,
+          bidId,
+          amount: affiliatePence,
+          paidPence: affiliatePence,
+          promoPence: 0,
+          promoStatus: PROMO_ESCROW_STATUS.NONE,
+          allocatedAt: new Date(),
+          status: 'pending',
+          source: 'affiliate',
+        },
+      },
+    });
+
+    try {
+      const Notification = require('../models/Notification');
+      const mediaTitle = media?.title || 'Unknown Media';
+      await new Notification({
+        userId: inviter._id,
+        type: 'escrow_allocated',
+        title: 'Artist invite commission',
+        message: `£${(affiliatePence / 100).toFixed(2)} from a tip on "${mediaTitle}" (${AFFILIATE_SHARE_PERCENT}% of that artist's paid share).`,
+        link: `/tune/${media._id}`,
+        linkText: 'View Media',
+        relatedMediaId: media._id,
+        relatedBidId: bidId,
+      }).save();
+    } catch (notifError) {
+      console.error('Failed to send affiliate commission notification:', notifError);
+    }
+
+    return {
+      type: 'affiliate',
+      userId: inviter._id.toString(),
+      amount: affiliatePence,
+      paidPence: affiliatePence,
+      promoPence: 0,
+      percentage: AFFILIATE_SHARE_PERCENT,
+      reason: 'artist_invite',
+    };
+  }
+
   /**
    * Match unknown artist allocations to a user
    * Called when an artist registers or verifies their identity
@@ -506,7 +612,7 @@ class ArtistEscrowService {
       await expireDuePromoEscrowForArtist(userId);
 
       const user = await User.findById(userId)
-        .select('artistEscrowBalance artistPromoEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory')
+        .select('artistEscrowBalance artistPromoEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory referralCommissionEarned')
         .populate('artistEscrowHistory.mediaId', 'title artist coverArt')
         .populate('artistEscrowHistory.bidId', 'amount createdAt promoEscrowStatus promoEscrowExpiresAt');
       
@@ -556,11 +662,18 @@ class ArtistEscrowService {
         }
       }
       
+      const history = user.artistEscrowHistory || [];
+      const affiliateEarned = history
+        .filter((entry) => entry.source === 'affiliate')
+        .reduce((sum, entry) => sum + (entry.paidPence || entry.amount || 0), 0);
+
       return {
         balance: user.artistEscrowBalance || 0, // In pence (withdrawable)
         balancePounds: (user.artistEscrowBalance || 0) / 100,
         promoBalance: user.artistPromoEscrowBalance || 0,
         promoBalancePounds: (user.artistPromoEscrowBalance || 0) / 100,
+        affiliateEarned: user.referralCommissionEarned || affiliateEarned,
+        affiliateEarnedPounds: (user.referralCommissionEarned || affiliateEarned) / 100,
         totalEscrowEarned: totalEscrowEarned, // In pence
         totalEscrowEarnedPounds: totalEscrowEarned / 100,
         lastPayoutTotalEarned: lastPayoutTotalEarned, // In pence

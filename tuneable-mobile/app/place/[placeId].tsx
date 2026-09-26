@@ -20,7 +20,7 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
-import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { getCreatorDisplay, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
 import {
@@ -58,6 +58,9 @@ export default function PlaceProfileScreen() {
   const [relatedTags, setRelatedTags] = useState<Array<{ name: string; slug: string }>>(
     []
   );
+  const [venues, setVenues] = useState<
+    Array<{ _id: string; name: string; slug: string; venueKind?: string | null }>
+  >([]);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,6 +95,7 @@ export default function PlaceProfileScreen() {
         setTotal(data.pagination?.total ?? data.media?.length ?? 0);
         setRelatedPlaces(data.relatedPlaces || []);
         setRelatedTags(data.relatedTags || []);
+        setVenues(data.venues || []);
         setMedia(data.media || []);
       } catch (err) {
         setError(
@@ -101,6 +105,7 @@ export default function PlaceProfileScreen() {
           setMedia([]);
           setRelatedPlaces([]);
           setRelatedTags([]);
+          setVenues([]);
         }
       } finally {
         setLoading(false);
@@ -136,6 +141,11 @@ export default function PlaceProfileScreen() {
 
   const hiddenPlayableCount = sortedMedia.length - displayedMedia.length;
 
+  const playableCount = useMemo(
+    () => displayedMedia.filter(isUploadPlayable).length,
+    [displayedMedia]
+  );
+
   const mosaicCovers = useMemo(
     () =>
       media.slice(0, 4).map((item, index) => ({
@@ -154,6 +164,10 @@ export default function PlaceProfileScreen() {
       return;
     }
     void setQueueAndPlay(playable, index);
+  };
+
+  const onPlayQueue = () => {
+    void setQueueAndPlay(displayedMedia, 0);
   };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
@@ -242,6 +256,17 @@ export default function PlaceProfileScreen() {
         </View>
       ) : null}
 
+      {!loading && venues.length > 0 ? (
+        <View style={styles.chipRow}>
+          {venues.map((venue) => (
+            <View key={venue._id || venue.slug} style={styles.venueChip}>
+              <Ionicons name="business-outline" size={12} color="#fbbf24" />
+              <Text style={styles.venueChipText}>{venue.name}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Top Tunes</Text>
         <View style={styles.headerActions}>
@@ -278,20 +303,17 @@ export default function PlaceProfileScreen() {
             onPress={() => setPlayableOnly(!playableOnly)}
             accessibilityRole="button"
             accessibilityLabel={
-              playableOnly ? 'Playable only, on' : 'Playable only, off'
+              playableOnly
+                ? 'Showing playable. Tap to show all.'
+                : 'Showing all. Tap to show playable only.'
             }
             style={[
               styles.timeTrigger,
               playableOnly && styles.timeTriggerActive,
             ]}>
             <Ionicons name="headset-outline" size={14} color={colors.accentLight} />
-            <Text style={styles.timeTriggerLabel}>Playable</Text>
-            <Text style={styles.timeTriggerDetail} numberOfLines={1}>
-              {playableOnly
-                ? hiddenPlayableCount > 0
-                  ? `(−${hiddenPlayableCount})`
-                  : ''
-                : '(All)'}
+            <Text style={styles.timeTriggerLabel}>
+              {playableOnly ? 'Playable' : 'All'}
             </Text>
           </Pressable>
         </View>
@@ -300,7 +322,10 @@ export default function PlaceProfileScreen() {
       {playableOnly && hiddenPlayableCount > 0 ? (
         <Pressable onPress={() => setPlayableOnly(false)} style={styles.hiddenHintBtn}>
           <Text style={styles.hiddenHint}>
-            Showing playable only · {catalogHiddenLabel(hiddenPlayableCount)}
+            Showing playable only ·{' '}
+            <Text style={styles.hiddenHintLink}>
+              {catalogHiddenLabel(hiddenPlayableCount)}
+            </Text>
           </Text>
         </Pressable>
       ) : null}
@@ -358,6 +383,16 @@ export default function PlaceProfileScreen() {
           </View>
           <Text style={styles.sortHint}>{CHART_ADDED_SORT_HINT}</Text>
         </View>
+      ) : null}
+
+      {playableCount > 0 ? (
+        <Pressable
+          style={styles.playBtn}
+          onPress={onPlayQueue}
+          accessibilityRole="button"
+          accessibilityLabel={`Play ${playableCount} upload${playableCount !== 1 ? 's' : ''}`}>
+          <Ionicons name="play" size={22} color="#fff" />
+        </Pressable>
       ) : null}
     </View>
   );
@@ -444,7 +479,7 @@ export default function PlaceProfileScreen() {
       <TipSheet
         visible={Boolean(tipTarget)}
         title={tipTarget?.title || 'Untitled'}
-        subtitle={tipTarget ? formatArtist(tipTarget.artist) : undefined}
+        subtitle={tipTarget ? getCreatorDisplay(tipTarget) : undefined}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={tipTarget}
@@ -585,6 +620,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  venueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  venueChipText: {
+    color: '#fde68a',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   sectionHeader: {
     alignItems: 'center',
     gap: 10,
@@ -683,6 +734,16 @@ const styles = StyleSheet.create({
   timeChipTextActive: {
     color: '#fff',
   },
+  playBtn: {
+    alignSelf: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   centered: {
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -725,6 +786,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
+  },
+  hiddenHintLink: {
+    color: '#d8b4fe',
+    textDecorationLine: 'underline',
   },
   showCatalogBtn: {
     marginTop: 12,

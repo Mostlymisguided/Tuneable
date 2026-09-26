@@ -25,15 +25,17 @@ import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { TagClaimSheet } from '@/src/components/TagClaimSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
+import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
-import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence, formatBpmLabel, roundBpm } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
 import {
-  formatArtist,
-  getPlayabilityBlockReason,
+  getBlockedCoverCopy,
+  getCoverOverlayKind,
+  getCreatorDisplay,
   isRightsPendingClaimable,
   isUploadPlayable,
   mediaId,
@@ -91,6 +93,7 @@ export default function TuneProfileScreen() {
   const [showAboutMore, setShowAboutMore] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [tagClaimOpen, setTagClaimOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [rankedTags, setRankedTags] = useState<
     Array<{ tag: string; aggregate?: number; tipperCount?: number }>
@@ -148,14 +151,11 @@ export default function TuneProfileScreen() {
   );
 
   const playable = isUploadPlayable(media);
-  const blockReason = getPlayabilityBlockReason(media);
-  const rightsBlocked = blockReason === 'rights';
-  const disputed = blockReason === 'disputed';
+  const coverOverlayKind = getCoverOverlayKind(media);
+  const blockedCover = getBlockedCoverCopy(coverOverlayKind);
   const showClaimCta = Boolean(media && isRightsPendingClaimable(media));
   const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
-  const artist =
-    media?.creatorDisplay ||
-    (media ? formatArtist(media.artist) : 'Unknown artist');
+  const artist = media ? getCreatorDisplay(media) : 'Unknown artist';
   const tipTotal = media?.globalMediaAggregate ?? 0;
   const tipCount = media?.tipCount ?? media?.bids?.length ?? 0;
   const durationLabel = formatDuration(media?.duration);
@@ -191,7 +191,7 @@ export default function TuneProfileScreen() {
     return [
       media.album || null,
       year,
-      media.bpm != null ? `${media.bpm} BPM` : null,
+      formatBpmLabel(media.bpm),
       media.key || null,
       durationLabel || null,
     ].filter((part): part is string => Boolean(part));
@@ -233,7 +233,8 @@ export default function TuneProfileScreen() {
           : String(new Date(media.releaseDate!).getFullYear()),
       });
     }
-    if (media.bpm != null) fields.push({ label: 'BPM', value: String(media.bpm) });
+    const bpm = roundBpm(media.bpm);
+    if (bpm != null) fields.push({ label: 'BPM', value: String(bpm) });
     if (media.key) fields.push({ label: 'Key', value: media.key });
     if (durationLabel) fields.push({ label: 'Duration', value: durationLabel });
     if (media.addedBy?.username) {
@@ -355,6 +356,9 @@ export default function TuneProfileScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
+        {media ? (
+          <ReportHeaderButton onPress={() => setReportOpen(true)} />
+        ) : null}
       </View>
 
       {loading && !media ? (
@@ -395,25 +399,17 @@ export default function TuneProfileScreen() {
                   <View style={styles.coverPlay}>
                     <Ionicons name="play" size={28} color="#fff" />
                   </View>
-                ) : (
+                ) : blockedCover ? (
                   <View style={styles.awaitingBox}>
                     <Ionicons
                       name="ribbon-outline"
                       size={28}
-                      color="#fbbf24"
+                      color={coverOverlayKind === 'disputed' ? '#f87171' : '#fbbf24'}
                     />
-                    <Text style={styles.awaitingTitle}>
-                      {disputed ? 'Rights disputed' : 'Awaiting Rights'}
-                    </Text>
-                    <Text style={styles.awaitingHint}>
-                      {disputed
-                        ? 'Playback is paused while ownership is resolved'
-                        : rightsBlocked
-                          ? 'Claim ownership to receive tips held in escrow'
-                          : 'Claim this media and upload audio if you are the rights holder'}
-                    </Text>
+                    <Text style={styles.awaitingTitle}>{blockedCover.title}</Text>
+                    <Text style={styles.awaitingHint}>{blockedCover.hint}</Text>
                     <View style={styles.awaitingActions}>
-                      {!disputed ? (
+                      {blockedCover.showClaim ? (
                         <Pressable
                           style={styles.claimOverlayBtn}
                           onPress={() => setClaimOpen(true)}>
@@ -436,8 +432,16 @@ export default function TuneProfileScreen() {
                       ) : null}
                     </View>
                   </View>
-                )}
+                ) : null}
               </View>
+              {coverOverlayKind === 'play_permitted' ? (
+                <Pressable
+                  style={styles.coverClaimBtn}
+                  onPress={() => setClaimOpen(true)}>
+                  <Ionicons name="ribbon-outline" size={12} color="#fff" />
+                  <Text style={styles.coverClaimText}>Claim</Text>
+                </Pressable>
+              ) : null}
             </Pressable>
 
             <Text style={styles.title}>{media.title || 'Untitled'}</Text>
@@ -678,7 +682,7 @@ export default function TuneProfileScreen() {
               <Text style={styles.supportSubtitle}>
                 {playable
                   ? 'Boost global ranking and support the artist'
-                  : 'Tip to help get this track fully added once audio is uploaded.'}
+                  : 'This track is not playable on Tuneable yet. Your tip still supports the listing.'}
               </Text>
               <Text style={styles.supportBalance}>
                 Balance {formatPoundsFromPence(user.balance)}
@@ -780,6 +784,7 @@ export default function TuneProfileScreen() {
             visible={claimOpen}
             mediaId={mediaId(media) || id || ''}
             mediaTitle={media.title || 'Untitled'}
+            rightsStatus={media.rightsStatus}
             onClose={() => setClaimOpen(false)}
             onSubmitted={() => {
               Alert.alert(
@@ -787,6 +792,13 @@ export default function TuneProfileScreen() {
                 "We'll notify you when it's reviewed. Approved claims receive tips held in escrow."
               );
             }}
+          />
+          <ReportSheet
+            visible={reportOpen}
+            reportType="media"
+            targetId={mediaId(media) || id || ''}
+            targetTitle={media.title || 'Untitled'}
+            onClose={() => setReportOpen(false)}
           />
         </>
       ) : null}
@@ -798,6 +810,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingTop: 8,
     marginBottom: 4,
@@ -839,6 +852,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingLeft: 3,
+  },
+  coverClaimBtn: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#f59e0b',
+  },
+  coverClaimText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
   awaitingBox: {
     alignItems: 'center',

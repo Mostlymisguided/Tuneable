@@ -5,8 +5,19 @@ import {
   MUSIC_NO_PLAYABLE,
   MUSIC_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
-import { getUploadUrl, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { getUploadUrl, isUploadPlayable, mediaId, getCreatorDisplay } from '@/src/lib/media';
+import {
+  clearNowPlaying,
+  ensureNowPlayingRemoteHandlers,
+  setNowPlaying,
+  updateNowPlayingElapsed,
+} from '@/src/lib/nowPlaying';
 import { showToast } from '@/src/stores/toastStore';
+import {
+  completeListeningHistory,
+  endListeningHistorySession,
+  syncListeningHistory,
+} from '@/src/lib/listeningHistoryTracker';
 
 type MusicPlayerState = {
   queue: ChartMediaItem[];
@@ -44,6 +55,7 @@ async function ensureAudioMode() {
     playThroughEarpieceAndroid: false,
   });
   audioModeReady = true;
+  ensureNowPlayingRemoteHandlers();
 }
 
 function getStore(): MusicPlayerState {
@@ -122,7 +134,28 @@ function onStatus(status: AVPlaybackStatus) {
     error: null,
   });
 
+  const item = getStore().queue[getStore().currentIndex];
+  if (item) {
+    syncListeningHistory({
+      mediaId: mediaId(item),
+      title: item.title,
+      artist: getCreatorDisplay(item),
+      coverArt: item.coverArt,
+      currentTime: (status.positionMillis ?? 0) / 1000,
+      duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
+      sourceType: 'direct',
+      isPlaying: status.isPlaying,
+    });
+    updateNowPlayingElapsed({
+      positionMs: status.positionMillis ?? 0,
+      durationMs: status.durationMillis ?? (item.duration ?? 0) * 1000,
+      playbackRate: 1,
+      isPlaying: status.isPlaying,
+    });
+  }
+
   if (status.didJustFinish && !status.isLooping) {
+    completeListeningHistory();
     void getStore().next();
   }
 }
@@ -145,6 +178,7 @@ async function loadAndPlay(item: ChartMediaItem) {
     return;
   }
 
+  endListeningHistorySession();
   await ensureAudioMode();
   await unloadSound();
 
@@ -162,6 +196,16 @@ async function loadAndPlay(item: ChartMediaItem) {
       onStatus
     );
     sound = created.sound;
+    setNowPlaying({
+      title: item.title,
+      artist: getCreatorDisplay(item),
+      artworkUrl: item.coverArt,
+      durationMs: getStore().durationMs,
+      positionMs: 0,
+      playbackRate: 1,
+      isPlaying: true,
+      mode: 'music',
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
@@ -294,7 +338,9 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   },
 
   clear: async () => {
+    endListeningHistorySession();
     await unloadSound();
+    clearNowPlaying();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
     set({

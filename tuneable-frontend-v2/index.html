@@ -10,30 +10,85 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Tuneable - Support your favourite creators, Tip your favourite tunes and Discover new music." />
-    <title>Tuneable - The Social Charting App</title>
-    
-    <!-- Open Graph / Facebook -->
+    <meta name="description" content="Tip the music, podcasts, and books you love. Your tips support creators and move them up public charts on Tuneable." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#A855F7" />
+    <link rel="canonical" href="https://tuneable.stream/party/global" id="tuneable-canonical" />
+    <title>Tuneable — Tip what you love</title>
+
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://tuneable.stream/" />
-    <meta property="og:title" content="Tuneable - The Social Charting App" />
-    <meta property="og:description" content="Join Tuneable - Support your favourite creators, Tip your favourite tunes and Discover new music." />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:url" content="https://tuneable.stream/party/global" />
+    <meta property="og:title" content="Global music chart | Tuneable" />
+    <meta property="og:description" content="The Tuneable global chart is ranked by listener tips. Tip a tune, support the artists, and move it up." />
     <meta property="og:image" content="https://tuneable.stream/android-chrome-512x512.png" />
-    <meta property="og:image:width" content="512" />
-    <meta property="og:image:height" content="512" />
     <meta property="og:site_name" content="Tuneable" />
-    <!-- Facebook App ID - Replace YOUR_FACEBOOK_APP_ID with your actual Facebook App ID -->
     <meta property="fb:app_id" content="2050833255363564" />
-    
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://tuneable.stream/" />
-    <meta name="twitter:title" content="Tuneable - The Social Charting App" />
-    <meta name="twitter:description" content="Join Tuneable - Support your favourite creators, Tip your favourite tunes and Discover new music." />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:url" content="https://tuneable.stream/party/global" />
+    <meta name="twitter:title" content="Global music chart | Tuneable" />
+    <meta name="twitter:description" content="The Tuneable global chart is ranked by listener tips. Tip a tune, support the artists, and move it up." />
     <meta name="twitter:image" content="https://tuneable.stream/android-chrome-512x512.png" />
+    <script type="application/ld+json" id="tuneable-jsonld">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "name": "Tuneable",
+            "url": "https://tuneable.stream/",
+            "logo": "https://tuneable.stream/android-chrome-512x512.png",
+            "email": "hi@tuneable.stream"
+          },
+          {
+            "@type": "WebSite",
+            "name": "Tuneable",
+            "url": "https://tuneable.stream/",
+            "description": "Tip the music, podcasts, and books you love. Your tips support creators and move them up public charts on Tuneable."
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main>
+        <h1>Tuneable — Tip what you love</h1>
+        <p>Tip the music, podcasts, and books you love. Your tips support creators and move them up public charts on Tuneable.</p>
+        <nav>
+          <a href="/party/global">Global chart</a>
+          <a href="/about">About</a>
+          <a href="/podcasts">Podcasts</a>
+          <a href="/books">Books</a>
+          <a href="/places">Places</a>
+          <a href="/parties">Parties</a>
+          <a href="/help">Help</a>
+        </nav>
+      </main>
+    </noscript>
+    <script>
+      (function () {
+        var RELOAD_KEY = 'tuneable-stale-asset-reload';
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) { reg.unregister(); });
+          });
+        }
+        window.addEventListener('error', function (event) {
+          var el = event.target;
+          if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK')) return;
+          var url = el.src || el.href;
+          if (!url || url.indexOf('/assets/') === -1) return;
+          if (sessionStorage.getItem(RELOAD_KEY)) return;
+          sessionStorage.setItem(RELOAD_KEY, '1');
+          fetch(url, { cache: 'reload', credentials: 'omit' }).finally(function () {
+            window.location.reload();
+          });
+        }, true);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

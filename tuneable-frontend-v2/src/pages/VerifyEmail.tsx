@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { emailAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 type VerificationStatus = 'idle' | 'verifying' | 'success' | 'error';
 

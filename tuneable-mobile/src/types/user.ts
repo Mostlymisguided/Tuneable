@@ -10,6 +10,8 @@ export interface User {
   profilePic?: string;
   personalInviteCode?: string;
   primaryInviteCode?: string;
+  isFoundingCreator?: boolean;
+  foundingSeatNumber?: number | null;
   balance: number; // pence
   tuneBytes?: number;
   role: string[];
@@ -32,6 +34,10 @@ export interface User {
     defaultTip?: number; // pounds
     anonymousMode?: boolean;
     favoriteTags?: string[];
+    notifications?: {
+      push?: boolean;
+      email?: boolean;
+    };
   };
   hasPushDevice?: boolean;
   onboarding?: {
@@ -62,7 +68,9 @@ export interface LocationAncestor {
   placeId?: string;
   placetype?: string;
   label?: string;
+  regionCode?: string;
   countryCode?: string;
+  wikidataId?: string;
 }
 
 export interface ResolvedLocation {
@@ -74,6 +82,11 @@ export interface ResolvedLocation {
   placeId?: string;
   featureType?: string;
   label?: string;
+  namePreferred?: string;
+  placeFormatted?: string;
+  fullAddress?: string;
+  postcode?: string;
+  ancestorIds?: string[];
   ancestors?: LocationAncestor[];
   detectedFromIP?: boolean;
   coordinates?: {
@@ -123,7 +136,7 @@ export interface UserLibraryItem {
   tags?: string[];
   contentForm?: string[];
   sources?: Record<string, string>;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   rightsCleared?: boolean;
   isPlayable?: boolean;
   hasHostedAudio?: boolean;
@@ -141,6 +154,7 @@ export interface UserLibraryItem {
 export interface UserProfileResponse {
   message?: string;
   user: User;
+  blockedByMe?: boolean;
   stats: UserStats;
   topBids?: Array<{
     _id?: string;

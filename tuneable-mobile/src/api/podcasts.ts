@@ -57,7 +57,7 @@ export const podcastsAPI = {
           sortBy: params?.sortBy ?? 'mostTipped',
           ...(q ? { q } : {}),
         },
-        timeout: autoImport ? 90000 : undefined,
+        timeout: autoImport || q ? 90000 : undefined,
       }
     );
     return response.data;

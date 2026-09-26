@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
 
 interface DeleteMediaSectionProps {

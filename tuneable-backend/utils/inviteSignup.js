@@ -53,6 +53,20 @@ async function resolveInviteForSignup(rawCode) {
 }
 
 /**
+ * Fields to stamp on a new User so affiliate attribution survives code edits.
+ */
+function inviteAttributionFields(invite) {
+  if (!invite || !invite.ok || !invite.inviter) return {};
+  return {
+    parentInviteCode: invite.code || undefined,
+    parentInviteCodeId: invite.inviteCodeObj && invite.inviteCodeObj._id
+      ? invite.inviteCodeObj._id
+      : undefined,
+    invitedByUserId: invite.inviter._id,
+  };
+}
+
+/**
  * Increment usageCount and decrement inviteCredits after a successful signup.
  * No-op when there was no inviter.
  */
@@ -101,4 +115,5 @@ async function applyInviteUsage({ inviter, inviteCodeObj, code, isInviterAdmin }
 module.exports = {
   resolveInviteForSignup,
   applyInviteUsage,
+  inviteAttributionFields,
 };

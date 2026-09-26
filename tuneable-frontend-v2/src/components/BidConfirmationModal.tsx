@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus, Navigation } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { isLocationMatch, formatLocation, formatLocationFilter } from '../utils/locationHelpers';
 import { partyAPI } from '../lib/api';
 import type { Party } from '../types';
 import type { User } from '../contexts/AuthContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
+import { isGeolocationSupported } from '../utils/currentLocationCache';
 import {
   isKnownElement,
   normalizeTipChipForDisplay,
@@ -77,6 +78,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const {
     currentLocation,
     status: currentLocationStatus,
+    locationChecked,
     enableCurrentLocation,
   } = useCurrentLocation();
 
@@ -85,8 +87,22 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const currentLabel = currentLocation ? formatLocation(currentLocation) : null;
   const samePlace =
     !!(homeLocation?.placeId && currentLocation?.placeId && homeLocation.placeId === currentLocation.placeId);
+  const geoSupported = isGeolocationSupported();
+  // Denied needs browser settings; missing geolocation can't retry. Timeouts and
+  // POSITION_UNAVAILABLE are transient — still offer Enable / Try again.
   const canOfferCurrentLocation =
-    currentLocationStatus !== 'denied' && currentLocationStatus !== 'unavailable';
+    geoSupported && currentLocationStatus !== 'denied';
+  const locationNeedsRetry =
+    currentLocationStatus === 'unavailable' || currentLocationStatus === 'error';
+  const currentStatusLabel =
+    currentLabel ||
+    (currentLocationStatus === 'denied'
+      ? 'Permission denied'
+      : !geoSupported || currentLocationStatus === 'unavailable' || currentLocationStatus === 'error'
+        ? 'Couldn’t detect'
+        : currentLocationStatus === 'loading' || isEnablingCurrentLocation
+          ? 'Detecting…'
+          : 'Not enabled');
 
   const handleEnableCurrentLocation = async () => {
     setIsEnablingCurrentLocation(true);
@@ -262,7 +278,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           )}
           {isNonPlayable && (
             <p className="text-amber-300/90 text-xs mt-2">
-              This track is not playable yet. Your tip adds support now — playback and download can follow once audio is uploaded.
+              This track is not playable yet. Your tip still adds support for this listing.
             </p>
           )}
         </div>
@@ -375,14 +391,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                     <p>
                       Current:{' '}
                       <span className="text-white">
-                        {currentLabel ||
-                          (currentLocationStatus === 'denied'
-                            ? 'Permission denied'
-                            : currentLocationStatus === 'unavailable'
-                              ? 'Unavailable'
-                              : currentLocationStatus === 'loading' || isEnablingCurrentLocation
-                                ? 'Detecting…'
-                                : 'Not enabled')}
+                        {currentStatusLabel}
                       </span>
                     </p>
                   </div>
@@ -400,10 +409,12 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                   </p>
                 )}
 
-                {!currentLocation && canOfferCurrentLocation && (
+                {!currentLocation && canOfferCurrentLocation && locationChecked && (
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-gray-400">
-                      Enable location to also influence charts where you are.
+                      {locationNeedsRetry
+                        ? 'We couldn’t detect your location. Try again, or tip with your home place only.'
+                        : 'Also count this tip where you are now. Location is only used while this site is open.'}
                     </p>
                     <button
                       type="button"
@@ -419,16 +430,22 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                       ) : (
                         <>
                           <Navigation className="h-3.5 w-3.5" />
-                          Enable
+                          {locationNeedsRetry ? 'Try again' : 'Also count this tip where I am'}
                         </>
                       )}
                     </button>
                   </div>
                 )}
 
-                {!currentLocation && currentLocationStatus === 'denied' && (
+                {!currentLocation && locationChecked && currentLocationStatus === 'denied' && (
                   <p className="text-xs text-amber-300/90 mt-2">
                     Location blocked in browser settings — tip will use home only.
+                  </p>
+                )}
+
+                {!currentLocation && !geoSupported && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Location isn’t available in this browser — tip will use home only.
                   </p>
                 )}
 

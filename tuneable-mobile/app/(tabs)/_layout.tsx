@@ -25,10 +25,12 @@ export default function TabLayout() {
           headerShadowVisible: false,
         }}>
         <Tabs.Screen name="index" options={{ title: 'Home', headerShown: false }} />
-        <Tabs.Screen name="music" options={{ title: 'Music', headerShown: false }} />
+        <Tabs.Screen name="charts" options={{ title: 'Charts', headerShown: false }} />
+        <Tabs.Screen name="places" options={{ title: 'Places', headerShown: false }} />
+        <Tabs.Screen name="music" options={{ href: null, headerShown: false }} />
         <Tabs.Screen
           name="podcasts"
-          options={{ title: 'Podcasts', headerShown: false }}
+          options={{ href: null, headerShown: false }}
         />
         <Tabs.Screen name="profile" options={{ title: 'Profile', headerShown: false }} />
       </Tabs>

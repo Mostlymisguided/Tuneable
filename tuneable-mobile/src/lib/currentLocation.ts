@@ -22,6 +22,7 @@ type Listener = () => void;
 let memoryCache: CachedCurrentLocation | null = null;
 let status: CurrentLocationStatus = 'idle';
 let lastError: string | null = null;
+let canAskAgain = true;
 const listeners = new Set<Listener>();
 
 function notify() {
@@ -55,6 +56,10 @@ export function getCurrentLocationError(): string | null {
   return lastError;
 }
 
+export function canRequestLocationPermission(): boolean {
+  return canAskAgain;
+}
+
 export async function getForegroundLocationPermission() {
   return Location.getForegroundPermissionsAsync();
 }
@@ -85,6 +90,7 @@ export async function refreshCurrentLocation(options?: {
 
   try {
     const permission = await Location.requestForegroundPermissionsAsync();
+    canAskAgain = permission.canAskAgain !== false;
     if (!permission.granted) {
       setStatus('denied', 'Location permission denied');
       return null;
@@ -118,17 +124,35 @@ export async function refreshCurrentLocation(options?: {
 }
 
 /**
- * Silently refresh if the OS already granted permission (no prompt).
+ * Re-read OS permission without prompting.
+ * If access was turned back on, refresh quietly.
  */
-export async function maybeRefreshCurrentLocationIfGranted(): Promise<void> {
+export async function recheckLocationPermission(): Promise<void> {
   try {
     const permission = await Location.getForegroundPermissionsAsync();
+    canAskAgain = permission.canAskAgain !== false;
     if (permission.granted) {
       await refreshCurrentLocation({ force: false });
-    } else if (permission.status === Location.PermissionStatus.DENIED) {
+      return;
+    }
+    if (
+      permission.status === Location.PermissionStatus.DENIED &&
+      permission.canAskAgain === false
+    ) {
       setStatus('denied', 'Location permission denied');
+      return;
+    }
+    if (status === 'denied') {
+      setStatus('idle');
     }
   } catch {
     // Leave idle until user opts in
   }
+}
+
+/**
+ * Silently refresh if the OS already granted permission (no prompt).
+ */
+export async function maybeRefreshCurrentLocationIfGranted(): Promise<void> {
+  await recheckLocationPermission();
 }

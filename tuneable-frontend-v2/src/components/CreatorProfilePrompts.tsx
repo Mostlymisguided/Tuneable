@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Facebook, Music2, Youtube, MapPin, X, CheckCircle } from 'lucide-react';
 import { emailAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 interface User {
   _id?: string;
   id?: string;
   uuid?: string;
+  username?: string;
   emailVerified?: boolean;
   oauthVerified?: {
     facebook?: boolean;
@@ -66,9 +68,8 @@ const CreatorProfilePrompts: React.FC<CreatorProfilePromptsProps> = ({ user, onD
 
   const handleAddLocation = () => {
     // Navigate to user profile page where they can edit location
-    const userId = user._id || user.id || user.uuid;
-    if (userId) {
-      navigate(`/user/${userId}`);
+    if (user.username || user._id || user.id || user.uuid) {
+      navigate(getUserProfileUrl(user));
     } else {
       toast.error('Unable to navigate to profile');
     }

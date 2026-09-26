@@ -1,7 +1,9 @@
 const express = require('express');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const mapboxGeocoding = require('../services/mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getLocationProfile } = require('../services/locationProfileService');
+const { getPlaceChart } = require('../services/placeChartService');
 
 const router = express.Router();
 
@@ -11,7 +13,7 @@ const router = express.Router();
  */
 router.get('/suggest', async (req, res) => {
   try {
-    const { q, country, worldview, language, limit, proximity } = req.query;
+    const { q, country, worldview, language, limit, proximity, mode, sessionToken, types } = req.query;
 
     if (!q || typeof q !== 'string' || !q.trim()) {
       return res.status(400).json({ error: 'Query parameter q is required' });
@@ -23,6 +25,9 @@ router.get('/suggest', async (req, res) => {
       language: typeof language === 'string' ? language : 'en',
       limit: limit ? parseInt(limit, 10) : 8,
       proximity: typeof proximity === 'string' ? proximity : undefined,
+      mode: mode === 'venue' ? 'venue' : undefined,
+      sessionToken: typeof sessionToken === 'string' ? sessionToken : undefined,
+      types: typeof types === 'string' ? types : undefined,
     });
 
     res.json({ suggestions });
@@ -43,13 +48,15 @@ router.get('/suggest', async (req, res) => {
  */
 router.post('/resolve', async (req, res) => {
   try {
-    const { mapboxId } = req.body || {};
+    const { mapboxId, sessionToken } = req.body || {};
 
     if (!mapboxId || typeof mapboxId !== 'string' || !mapboxId.trim()) {
       return res.status(400).json({ error: 'mapboxId is required' });
     }
 
-    const resolved = await mapboxGeocoding.resolveByMapboxId(mapboxId.trim());
+    const resolved = await mapboxGeocoding.resolveByMapboxId(mapboxId.trim(), {
+      sessionToken: typeof sessionToken === 'string' ? sessionToken : undefined,
+    });
     if (!resolved) {
       return res.status(404).json({ error: 'Place not found' });
     }
@@ -66,10 +73,33 @@ router.post('/resolve', async (req, res) => {
 });
 
 /**
+ * GET /api/locations/chart
+ * Ranked places (countries, or children under parentPlaceId) by support.
+ */
+router.get('/chart', optionalAuthMiddleware, async (req, res) => {
+  try {
+    const parentPlaceId =
+      typeof req.query.parentPlaceId === 'string' ? req.query.parentPlaceId.trim() : '';
+    const scope = typeof req.query.scope === 'string' ? req.query.scope : 'from';
+    const limit = req.query.limit;
+
+    const chart = await getPlaceChart({
+      parentPlaceId: parentPlaceId || null,
+      scope,
+      limit,
+    });
+    res.json(chart);
+  } catch (error) {
+    console.error('Error fetching place chart:', error);
+    res.status(500).json({ error: 'Failed to fetch place chart' });
+  }
+});
+
+/**
  * GET /api/locations/:placeId/profile
  * Place profile — media originating from this Mapbox place (or descendants).
  */
-router.get('/:placeId/profile', async (req, res) => {
+router.get('/:placeId/profile', optionalAuthMiddleware, async (req, res) => {
   try {
     const { placeId } = req.params;
     const { page = 1, limit = 50, timePeriod = 'all-time', sortBy } = req.query;
@@ -78,7 +108,13 @@ router.get('/:placeId/profile', async (req, res) => {
       return res.status(400).json({ error: 'Place id is required' });
     }
 
-    const profile = await getLocationProfile(placeId, { page, limit, timePeriod, sortBy });
+    const profile = await getLocationProfile(placeId, {
+      page,
+      limit,
+      timePeriod,
+      sortBy,
+      authenticated: Boolean(req.user),
+    });
     res.json(profile);
   } catch (error) {
     if (error.status === 404) {

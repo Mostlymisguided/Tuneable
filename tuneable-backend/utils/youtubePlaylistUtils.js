@@ -132,10 +132,49 @@ function parseYouTubeTrackIdentity({ title, channelTitle } = {}) {
   };
 }
 
+function youtubeWatchUrl(videoId) {
+  return videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
+}
+
+/**
+ * Promote an unparsed/skipped playlist row so an admin can type artist + title.
+ */
+function unparsedSkipToImportTrack(skip, {
+  importSource = 'youtube_playlist',
+  sourceLabel = 'YouTube Playlist',
+} = {}) {
+  const videoId = skip?.videoId || null;
+  const originalTitle = String(skip?.title || '').trim();
+  const channelTitle = String(skip?.channelTitle || '').trim();
+  const cleaned = stripVideoDecorations(originalTitle) || originalTitle;
+  return {
+    id: videoId,
+    title: cleaned,
+    artist: '',
+    coverArt: skip?.coverArt || null,
+    duration: skip?.duration || 0,
+    album: null,
+    sourceLabel,
+    category: 'Music',
+    importSource,
+    channelQuality: skip?.channelQuality || 'unknown',
+    originalTitle,
+    originalArtist: channelTitle,
+    parseStatus: 'unparsed',
+    needsIdentity: true,
+    externalIds: videoId ? { youtube: videoId } : {},
+    sources: videoId ? { youtube: youtubeWatchUrl(videoId) } : {},
+    tags: [],
+    genres: [],
+  };
+}
+
 module.exports = {
   parseIso8601Duration,
   parseYouTubePlaylistId,
   stripVideoDecorations,
   classifyYouTubeChannel,
   parseYouTubeTrackIdentity,
+  youtubeWatchUrl,
+  unparsedSkipToImportTrack,
 };

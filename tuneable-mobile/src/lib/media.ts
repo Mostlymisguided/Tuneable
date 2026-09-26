@@ -28,7 +28,7 @@ export function normalizeSources(sources: MediaSources): Record<string, string> 
 export function getUploadUrl(media: ChartMediaItem | null | undefined): string | null {
   if (!media) return null;
   if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') return null;
-  if (media.rightsCleared === false) return null;
+  if (media.rightsStatus !== 'permitted' && media.rightsCleared === false) return null;
   const sources = normalizeSources(media.sources);
   const url = sources.upload || sources.audio_direct || sources.audio || null;
   return url || null;
@@ -45,21 +45,28 @@ export function isWrittenMedia(
 export function isUploadPlayable(media: ChartMediaItem | null | undefined): boolean {
   if (!media) return false;
   if (isWrittenMedia(media)) return false;
+  // API may strip stream URLs for guests while still marking the track playable.
+  if (media.isPlayable === true) return true;
+  if (media.isPlayable === false) return false;
   if (media.rightsStatus === 'disputed' || media.rightsStatus === 'pending') {
     return false;
   }
-  if (media.isPlayable === false) return false;
-  const url = getUploadUrl(media);
-  if (!url) return false;
-  if (media.isPlayable === true) return true;
-  return media.rightsCleared === true;
+  const sources = normalizeSources(media.sources);
+  const hasAudio = Boolean(
+    sources.upload || sources.audio_direct || sources.audio || sources.enclosure
+  );
+  if (media.rightsStatus === 'permitted') return hasAudio;
+  // Match web: a remaining hosted URL is enough unless rights were explicitly denied.
+  return hasAudio && media.rightsCleared !== false;
 }
 
 export function isRightsPendingClaimable(
   media: ChartMediaItem | null | undefined
 ): boolean {
   if (!media) return false;
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
+  return media.rightsStatus === 'pending' || media.rightsStatus === 'permitted'
+    ? !media.rightsCleared
+    : false;
 }
 
 /** Why a track cannot play on mobile (null when playable). */
@@ -68,31 +75,132 @@ export function getPlayabilityBlockReason(
 ): 'rights' | 'audio' | 'disputed' | null {
   if (!media || isUploadPlayable(media)) return null;
   if (media.rightsStatus === 'disputed') return 'disputed';
-  if (
-    isRightsPendingClaimable(media) ||
-    media.rightsStatus === 'pending'
-  ) {
-    return 'rights';
-  }
+  if (media.rightsStatus === 'pending') return 'rights';
   if (media.hasHostedAudio && media.rightsCleared === false) return 'rights';
   return 'audio';
+}
+
+export type CoverOverlayKind =
+  | 'play'
+  | 'play_permitted'
+  | 'pending'
+  | 'disputed'
+  | 'audio';
+
+export function getCoverOverlayKind(
+  media: ChartMediaItem | null | undefined
+): CoverOverlayKind {
+  if (isUploadPlayable(media)) {
+    return media?.rightsStatus === 'permitted' ? 'play_permitted' : 'play';
+  }
+  if (media?.rightsStatus === 'disputed') return 'disputed';
+  if (media?.rightsStatus === 'pending') return 'pending';
+  return 'audio';
+}
+
+export function getBlockedCoverCopy(kind: CoverOverlayKind): {
+  title: string;
+  hint: string;
+  showClaim: boolean;
+} | null {
+  if (kind === 'play' || kind === 'play_permitted') return null;
+  if (kind === 'disputed') {
+    return {
+      title: 'Rights disputed',
+      hint: 'Playback is paused while ownership is resolved',
+      showClaim: false,
+    };
+  }
+  if (kind === 'pending') {
+    return {
+      title: 'Awaiting Rights',
+      hint: 'Claim ownership to receive tips held in escrow',
+      showClaim: true,
+    };
+  }
+  return {
+    title: 'Awaiting audio',
+    hint: 'This tune does not have audio on Tuneable yet',
+    showClaim: true,
+  };
 }
 
 export function mediaId(media: ChartMediaItem): string {
   return media.id || media._id || media.uuid || '';
 }
 
+const PLACEHOLDER_CREATOR = /^unknown(\s+(artist|author|podcast))?$/i;
+
+function isPlaceholderCreatorLabel(value?: string | null): boolean {
+  if (!value) return true;
+  return PLACEHOLDER_CREATOR.test(value.trim());
+}
+
+function namesFromCreators(creators: unknown): string[] {
+  if (!creators) return [];
+  if (typeof creators === 'string') {
+    const name = creators.trim();
+    return name && !isPlaceholderCreatorLabel(name) ? [name] : [];
+  }
+  if (!Array.isArray(creators)) return [];
+  return creators
+    .map((entry) => (typeof entry === 'string' ? entry : (entry as { name?: string })?.name))
+    .map((name) => (typeof name === 'string' ? name.trim() : ''))
+    .filter((name) => name && !isPlaceholderCreatorLabel(name));
+}
+
 export function formatArtist(
   artist: ChartMediaItem['artist'] | undefined
 ): string {
   if (!artist) return 'Unknown artist';
-  if (typeof artist === 'string') return artist || 'Unknown artist';
+  if (typeof artist === 'string') {
+    return isPlaceholderCreatorLabel(artist) ? 'Unknown artist' : artist;
+  }
   if (Array.isArray(artist)) {
-    const names = artist
-      .map((a) => (typeof a === 'string' ? a : a?.name))
-      .filter(Boolean) as string[];
+    const names = namesFromCreators(artist);
     return names.length ? names.join(', ') : 'Unknown artist';
   }
+  return 'Unknown artist';
+}
+
+function seriesTitleFromMedia(media: ChartMediaItem): string {
+  const series = media.podcastSeries;
+  if (series && typeof series === 'object' && series.title?.trim()) {
+    return series.title.trim();
+  }
+  if (media.podcastTitle?.trim()) return media.podcastTitle.trim();
+  return '';
+}
+
+function isPodcastEpisode(media: ChartMediaItem): boolean {
+  return (media.contentForm || []).some((form) =>
+    ['podcastepisode', 'episode', 'podcast'].includes(form)
+  );
+}
+
+/** Subtitle for mixed lists: artist, show title, or author. */
+export function getCreatorDisplay(
+  media: ChartMediaItem | null | undefined
+): string {
+  if (!media) return 'Unknown artist';
+  if (!isPlaceholderCreatorLabel(media.creatorDisplay)) {
+    return media.creatorDisplay!.trim();
+  }
+
+  const fromArtist = formatArtist(media.artist);
+  if (!isPlaceholderCreatorLabel(fromArtist)) return fromArtist;
+
+  if (isPodcastEpisode(media)) {
+    const showTitle = seriesTitleFromMedia(media);
+    if (showTitle) return showTitle;
+  }
+
+  const hosts = namesFromCreators(media.host);
+  if (hosts.length) return hosts.join(', ');
+
+  const authors = namesFromCreators(media.author);
+  if (authors.length) return authors.join(', ');
+
   return 'Unknown artist';
 }
 

@@ -1,5 +1,5 @@
 import type { ChartMediaItem, TimePeriodKey } from '@/src/types/media';
-import { formatArtist, getChartTipPence } from '@/src/lib/media';
+import { getChartTipPence, getCreatorDisplay } from '@/src/lib/media';
 import { getCanonicalTag } from '@/src/lib/tagNormalizer';
 
 export const BPM_FILTER_OPTIONS = [
@@ -109,7 +109,7 @@ export function filterChartMedia(
         regularTerms.some((term) => {
           const lowerTerm = term.toLowerCase();
           const title = (item.title || '').toLowerCase();
-          const artist = formatArtist(item.artist).toLowerCase();
+          const artist = getCreatorDisplay(item).toLowerCase();
           const category = (item.category || '').toLowerCase();
           const tagHaystack = (item.tags ?? [])
             .join(' ')

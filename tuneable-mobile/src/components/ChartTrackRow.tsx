@@ -9,12 +9,12 @@ import {
 import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
-import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence, roundBpm } from '@/src/lib/format';
 import {
   getCountryLabelFromLocation,
   getCountryPlaceProfileHref,
 } from '@/src/lib/location';
-import { formatArtist, isUploadPlayable } from '@/src/lib/media';
+import { getCreatorDisplay, isUploadPlayable } from '@/src/lib/media';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
@@ -33,9 +33,7 @@ function getReleaseYear(item: ChartMediaItem): number | null {
 }
 
 function getBpm(item: ChartMediaItem): number | null {
-  const bpm = item.bpm;
-  if (typeof bpm !== 'number' || !Number.isFinite(bpm) || bpm <= 0) return null;
-  return Math.round(bpm);
+  return roundBpm(item.bpm);
 }
 
 type Props = {
@@ -128,7 +126,7 @@ export function ChartTrackRow({
             {item.title || 'Untitled'}
           </Text>
           <Text style={styles.artist} numberOfLines={1}>
-            {formatArtist(item.artist)}
+            {getCreatorDisplay(item)}
           </Text>
           {showHint ? (
             <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>
@@ -231,7 +229,7 @@ export function ChartTrackRow({
           <View style={styles.artistRow}>
             <Pressable style={styles.artistPress} onPress={onOpen}>
               <Text style={styles.artist} numberOfLines={1}>
-                {formatArtist(item.artist)}
+                {getCreatorDisplay(item)}
               </Text>
               {showHint ? (
                 <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>

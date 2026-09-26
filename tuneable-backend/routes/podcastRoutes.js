@@ -18,14 +18,21 @@ const spotifyService = require('../services/spotifyService');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const {
-  extractRssItemImage,
   getSeriesEpisodeSort,
   withSeriesCoverArt,
 } = require('../utils/podcastCoverArt');
 const {
+  parseRSSFeed,
+  getAllRSSFeeds,
+  fetchFromAllRSSFeeds,
+} = require('../utils/podcastRss');
+const {
   buildSeriesEpisodeMatch,
   seriesEpisodeMatch,
 } = require('../utils/podcastSeriesQuery');
+const {
+  importMatchingSeriesCatalogueEpisodes,
+} = require('../services/seriesCatalogueSearchService');
 const {
   normalizeLocationScope,
   locationScopeIncludesOrigin,
@@ -48,192 +55,6 @@ setInterval(() => {
     }
   }
 }, 60000); // Run cleanup every minute
-
-// RSS Feed Parser - Enhanced to return channel metadata
-async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
-  try {
-    console.log(`📡 Fetching RSS feed: ${rssUrl}`);
-    const response = await axios.get(rssUrl, {
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'Tuneable Podcast Importer'
-      }
-    });
-    
-    const parser = new xml2js.Parser({
-      explicitArray: false,
-      mergeAttrs: true,
-      explicitRoot: false
-    });
-    
-    const result = await parser.parseStringPromise(response.data);
-    const channel = result.channel || result;
-    const items = Array.isArray(channel.item) ? channel.item : (channel.item ? [channel.item] : []);
-    
-    // Extract channel-level metadata (for podcast series)
-    // Parse iTunes keywords (can be string or array)
-    let keywords = [];
-    if (channel['itunes:keywords']) {
-      if (typeof channel['itunes:keywords'] === 'string') {
-        keywords = channel['itunes:keywords'].split(',').map(k => k.trim()).filter(k => k);
-      } else if (Array.isArray(channel['itunes:keywords'])) {
-        keywords = channel['itunes:keywords'].map(k => typeof k === 'string' ? k.trim() : String(k).trim()).filter(k => k);
-      }
-    }
-    
-    // Parse explicit flag (can be 'yes', 'true', 'explicit', 'clean', 'no', 'false', boolean)
-    const explicitValue = channel['itunes:explicit'];
-    let isExplicit = false;
-    if (explicitValue !== undefined && explicitValue !== null) {
-      if (typeof explicitValue === 'boolean') {
-        isExplicit = explicitValue;
-      } else if (typeof explicitValue === 'string') {
-        const lowerVal = explicitValue.toLowerCase();
-        isExplicit = lowerVal === 'yes' || lowerVal === 'true' || lowerVal === 'explicit';
-      }
-    }
-    
-    const channelMetadata = {
-      title: channel.title || '',
-      description: channel.description || channel['itunes:summary'] || channel['itunes:description'] || '',
-      summary: channel['itunes:summary'] || channel.description || '',
-      author: channel['itunes:author'] || channel.managingEditor || channel.author || '',
-      language: channel.language || channel['itunes:language'] || 'en',
-      link: channel.link || '',
-      image: channel['itunes:image']?.href || channel['itunes:image'] || (channel.image?.url || channel.image || null),
-      categories: channel['itunes:category'] ? 
-        (Array.isArray(channel['itunes:category']) ? 
-          channel['itunes:category'].map(cat => typeof cat === 'object' ? (cat._ || cat.text || cat) : cat) : 
-          [typeof channel['itunes:category'] === 'object' ? (channel['itunes:category']._ || channel['itunes:category'].text || channel['itunes:category']) : channel['itunes:category']]
-        ) : [],
-      keywords: keywords,
-      explicit: isExplicit,
-      copyright: channel.copyright || '',
-      pubDate: channel.pubDate || null
-    };
-    
-    const episodes = items.slice(0, maxEpisodes).map(item => {
-      const enclosure = item.enclosure || {};
-      const episodeImage = extractRssItemImage(item);
-      const itunes = {
-        episode: item['itunes:episode'],
-        season: item['itunes:season'],
-        duration: item['itunes:duration'],
-        image: episodeImage,
-        explicit: item['itunes:explicit']
-      };
-      
-      // Parse pubDate
-      let pubDate = null;
-      if (item.pubDate) {
-        pubDate = new Date(item.pubDate);
-        if (isNaN(pubDate.getTime())) {
-          pubDate = null;
-        }
-      }
-      
-      return {
-        title: item.title || 'Untitled Episode',
-        description: item.description || item['content:encoded'] || '',
-        content: item['content:encoded'] || item.description || '',
-        contentSnippet: item.description || '',
-        author: item['itunes:author'] || item.author || channel['itunes:author'] || channel.managingEditor || '',
-        pubDate: pubDate,
-        guid: item.guid?._ || item.guid || item.link || '',
-        link: item.link || '',
-        enclosure: {
-          url: enclosure.url || enclosure.$.url || '',
-          type: enclosure.type || enclosure.$.type || 'audio/mpeg',
-          length: enclosure.length || enclosure.$.length || null
-        },
-        image: episodeImage ? { url: episodeImage } : null,
-        itunes: itunes,
-        categories: item.category ? (Array.isArray(item.category) ? item.category : [item.category]) : [],
-        episodeNumber: itunes.episode ? parseInt(itunes.episode, 10) : null,
-        seasonNumber: itunes.season ? parseInt(itunes.season, 10) : null,
-        duration: parseDuration(itunes.duration) || 0,
-        explicit: itunes.explicit === 'yes' || itunes.explicit === true,
-        feedUrl: rssUrl
-      };
-    });
-    
-    console.log(`📡 Parsed ${episodes.length} episodes from RSS feed`);
-    return {
-      episodes,
-      channel: channelMetadata
-    };
-  } catch (error) {
-    console.error(`❌ Error parsing RSS feed ${rssUrl}:`, error.message);
-    throw error;
-  }
-}
-
-// Get all RSS feeds from series sources
-function getAllRSSFeeds(series) {
-  const feeds = [];
-  if (!series.sources) return feeds;
-  
-  const sources = series.sources instanceof Map ? 
-    Array.from(series.sources.entries()) : 
-    Object.entries(series.sources);
-  
-  sources.forEach(([key, url]) => {
-    if ((key.startsWith('rss_') || key === 'rss') && url) {
-      feeds.push({
-        source: key.replace('rss_', '') || 'primary',
-        url: url
-      });
-    }
-  });
-  
-  return feeds;
-}
-
-// Try all RSS feeds and return results sorted by episode count
-async function fetchFromAllRSSFeeds(rssFeeds, maxEpisodes = 100) {
-  const results = [];
-  
-  for (const feed of rssFeeds) {
-    try {
-      console.log(`📡 Trying RSS feed from ${feed.source}: ${feed.url}`);
-      const rssResult = await parseRSSFeed(feed.url, maxEpisodes);
-      const episodes = rssResult.episodes || [];
-      results.push({
-        source: feed.source,
-        url: feed.url,
-        episodes: episodes,
-        channel: rssResult.channel || null,
-        count: episodes.length
-      });
-      console.log(`✅ ${feed.source} RSS feed returned ${episodes.length} episodes`);
-    } catch (error) {
-      console.error(`❌ Failed to fetch from ${feed.source} RSS feed:`, error.message);
-    }
-  }
-  
-  // Sort by episode count (most episodes first)
-  results.sort((a, b) => b.count - a.count);
-  
-  return results;
-}
-
-// Helper to parse duration string (e.g., "01:23:45" or "1234")
-function parseDuration(durationStr) {
-  if (!durationStr) return 0;
-  if (typeof durationStr === 'number') return durationStr;
-  
-  // Try parsing as "HH:MM:SS" or "MM:SS"
-  const parts = durationStr.split(':').map(Number);
-  if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  } else if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
-  }
-  
-  // Try parsing as seconds
-  const seconds = parseInt(durationStr);
-  return isNaN(seconds) ? 0 : seconds;
-}
 
 // ============================================================================
 // CORE PODCAST FUNCTIONALITY
@@ -2414,11 +2235,11 @@ router.post('/discovery/create-or-find-series', authMiddleware, async (req, res)
 // Get podcast series info only (without episodes - for fast initial load)
 router.get('/series/:seriesId/info', async (req, res) => {
   try {
-    const { seriesId } = req.params;
-    
-    if (!isValidObjectId(seriesId)) {
-      return res.status(400).json({ error: 'Invalid series ID' });
+    const resolved = await Media.findByIdentifier(req.params.seriesId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Podcast series not found' });
     }
+    const seriesId = resolved._id;
 
     // Get series only (no episodes, no import)
     const series = await Media.findById(seriesId)
@@ -2433,6 +2254,8 @@ router.get('/series/:seriesId/info', async (req, res) => {
     if (!series.contentForm?.includes('podcastseries')) {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
+
+    await Media.ensureSlug(series);
 
     // Get basic stats (count only, no full episode list)
     const episodeCount = await Media.countDocuments({
@@ -2741,7 +2564,11 @@ function serializeSeriesEpisodes(episodes, seriesCoverArt) {
 // Get podcast series with episodes
 router.get('/series/:seriesId', async (req, res) => {
   try {
-    const { seriesId } = req.params;
+    const resolved = await Media.findByIdentifier(req.params.seriesId, { select: '_id' });
+    if (!resolved) {
+      return res.status(404).json({ error: 'Podcast series not found' });
+    }
+    const seriesId = resolved._id.toString();
     const { autoImport = 'true', refresh = 'false', loadMore = 'false', offset = '0' } = req.query;
     const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : 'mostTipped';
     const { match: episodeMatch, query: searchQuery } = buildSeriesEpisodeMatch(
@@ -2753,10 +2580,6 @@ router.get('/series/:seriesId', async (req, res) => {
     const applyLimit = Object.prototype.hasOwnProperty.call(req.query, 'limit');
     const requestedLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
     const episodeOffset = Math.max(parseInt(offset, 10) || 0, 0);
-    
-    if (!isValidObjectId(seriesId)) {
-      return res.status(400).json({ error: 'Invalid series ID' });
-    }
 
     // Get series (need non-lean for potential updates)
     let series = await Media.findById(seriesId)
@@ -2771,13 +2594,15 @@ router.get('/series/:seriesId', async (req, res) => {
       return res.status(400).json({ error: 'Media item is not a podcast series' });
     }
 
+    await Media.ensureSlug(series);
+
     const existingEpisodeCount = await Media.countDocuments(seriesEpisodeMatch(seriesId));
 
     // Auto-import episodes from external source if series has external IDs
     let importedCount = 0;
     let importErrors = [];
     const maxEpisodesToImport = applyLimit ? requestedLimit : 20;
-    // Searching the catalog should never kick off RSS/API import.
+    // Bulk RSS/API import stays off during search; matching catalogue hits are imported below.
     const shouldImport = !searching && (autoImport === 'true' || loadMore === 'true');
     
     // Don't block the show page on RSS/API import when episodes already exist.
@@ -3771,6 +3596,21 @@ router.get('/series/:seriesId', async (req, res) => {
     } else if (existingEpisodeCount > 0) {
       console.log(`✅ Using ${existingEpisodeCount} existing episodes (skipping import)`);
     } // Close if (needsImport && series.externalIds)
+
+    if (searching && episodeOffset === 0) {
+      try {
+        const catalogueImport = await importMatchingSeriesCatalogueEpisodes({
+          series,
+          query: searchQuery,
+          addedBy: series.addedBy || new mongoose.Types.ObjectId(),
+        });
+        if (catalogueImport.imported > 0) {
+          importedCount += catalogueImport.imported;
+        }
+      } catch (catalogueError) {
+        console.error('Show catalogue search failed:', catalogueError.message);
+      }
+    }
 
     const seriesObj = series.toObject ? series.toObject() : series;
     const seriesCoverArt = seriesObj.coverArt || null;

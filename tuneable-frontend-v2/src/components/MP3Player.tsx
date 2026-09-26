@@ -10,7 +10,7 @@ import { resolveUploadAudioUrl } from '../utils/audioUrls';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import {
   isNativeAudioPlatform,
   loadNativeTrack,
@@ -81,6 +81,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     duration,
     sourceType: (media?.sourceType || (currentPartyId ? 'party' : 'direct')) as any,
     enabled: !!user && !!media,
+    isPlaying,
   });
 
 
@@ -558,10 +559,10 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       <audio ref={audioRef} className="hidden" />
       
       {/* MP3 Player UI */}
-      <div className="bg-gray-800/95 backdrop-blur-xl border border-gray-600/50 shadow-2xl rounded-t-lg">
+      <div className="bg-zinc-950/85 backdrop-blur-xl border-t border-white/10 shadow-2xl">
         {/* Progress Bar Row */}
         <div 
-          className="w-full bg-gray-800/50 h-1 group cursor-pointer" 
+          className="w-full bg-white/10 h-1 group cursor-pointer" 
           onClick={(e) => {
             if (duration && isPlayerReady) {
               const rect = e.currentTarget.getBoundingClientRect();
@@ -573,7 +574,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           }}
         >
           <div 
-            className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-100 relative"
+            className="h-full bg-white transition-all duration-100 relative"
             style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
           >
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" />
@@ -587,7 +588,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
               <img
                 src={media.coverArt}
                 alt={`${media.artist} - ${media.title}`}
-                className="w-12 h-12 rounded-lg object-cover"
+                className="w-12 h-12 rounded-lg object-cover bg-zinc-800"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = '/placeholder-album.png';
                 }}
@@ -599,13 +600,13 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
               <h3 className="text-sm font-medium text-white truncate">
                 {media.title}
               </h3>
-              <p className="text-xs text-gray-400 truncate">
+              <p className="text-xs text-zinc-400 truncate">
                 <ClickableArtistDisplay media={media} />
               </p>
             </div>
 
             {/* Elapsed Time */}
-            <div className="text-xs text-gray-400 font-mono w-12 text-right">
+            <div className="text-xs text-zinc-500 font-mono w-12 text-right">
               {formatTime(currentTime)}
             </div>
 
@@ -618,54 +619,44 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
                 value={currentTime}
                 onChange={handleScrubberChange}
                 disabled={!isPlayerReady}
-                className="w-full h-2 bg-gray-600/50 rounded-full appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer player-mono-slider disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: duration && isPlayerReady
-                    ? `linear-gradient(to right, #9333ea 0%, #9333ea ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) ${(currentTime / duration) * 100}%, rgba(75, 85, 99, 0.5) 100%)`
-                    : 'rgba(75, 85, 99, 0.5)'
+                    ? `linear-gradient(to right, #fafafa 0%, #fafafa ${(currentTime / duration) * 100}%, rgba(255, 255, 255, 0.12) ${(currentTime / duration) * 100}%, rgba(255, 255, 255, 0.12) 100%)`
+                    : 'rgba(255, 255, 255, 0.12)'
                 }}
               />
             </div>
 
             {/* Duration */}
-            <div className="text-xs text-gray-400 font-mono w-12 text-left">
+            <div className="text-xs text-zinc-500 font-mono w-12 text-left">
               {formatTime(duration)}
             </div>
 
             {/* Controls */}
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={handleOpenTipModal}
-                disabled={!media}
-                className="p-2 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title={media ? 'Send a tip' : 'No media playing'}
-                aria-label="Send a tip"
-              >
-                <Heart className="w-4 h-4" />
-              </button>
-
+            <div className="flex items-center">
               {/* Previous Button */}
               <button
                 onClick={previous}
                 disabled={currentMediaIndex <= 0}
-                className="p-2 rounded-full bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title="Previous Song"
               >
-                <SkipBack className="w-4 h-4 text-white" />
+                <SkipBack className="w-4 h-4" />
               </button>
 
               {/* Play/Pause Button */}
               <button
                 onClick={togglePlayPause}
                 disabled={!isPlayerReady || isLoading}
-                className="p-2 rounded-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-white text-zinc-950 hover:bg-zinc-200 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
                 ) : isPlaying ? (
-                  <Pause className="w-4 h-4 text-white" />
+                  <Pause className="w-4 h-4 fill-current" />
                 ) : (
-                  <Play className="w-4 h-4 text-white" />
+                  <Play className="w-4 h-4 ml-0.5 fill-current" />
                 )}
               </button>
 
@@ -673,22 +664,22 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
               <button
                 onClick={next}
                 disabled={currentMediaIndex >= queue.length - 1}
-                className="p-2 rounded-full bg-gray-600 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title="Next Song"
               >
-                <SkipForward className="w-4 h-4 text-white" />
+                <SkipForward className="w-4 h-4" />
               </button>
 
               {/* Volume Control */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center group">
                 <button
                   onClick={toggleMute}
-                  className="p-1 rounded hover:bg-gray-700 transition-colors"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
                 >
                   {isMuted ? (
-                    <VolumeX className="w-4 h-4 text-gray-400" />
+                    <VolumeX className="w-4 h-4" />
                   ) : (
-                    <Volume2 className="w-4 h-4 text-gray-400" />
+                    <Volume2 className="w-4 h-4" />
                   )}
                 </button>
                 
@@ -696,11 +687,24 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
                   type="range"
                   min="0"
                   max="100"
-                  value={volume}
+                  value={isMuted ? 0 : volume}
                   onChange={(e) => setVolume(parseInt(e.target.value))}
-                  className="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                  className="w-16 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer player-mono-slider hidden sm:block"
+                  style={{
+                    background: `linear-gradient(to right, #fafafa 0%, #fafafa ${isMuted ? 0 : volume}%, rgba(255, 255, 255, 0.12) ${isMuted ? 0 : volume}%, rgba(255, 255, 255, 0.12) 100%)`
+                  }}
                 />
               </div>
+
+              <button
+                onClick={handleOpenTipModal}
+                disabled={!media}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-rose-400 bg-rose-500/10 hover:text-rose-300 hover:bg-rose-500/25 hover:scale-110 disabled:opacity-40 disabled:hover:bg-rose-500/10 disabled:hover:scale-100 disabled:cursor-not-allowed transition-all duration-200"
+                title={media ? 'Send a tip' : 'No media playing'}
+                aria-label="Send a tip"
+              >
+                <Heart className="w-5 h-5 fill-current drop-shadow-[0_0_8px_rgba(251,113,133,0.65)]" />
+              </button>
             </div>
           </div>
         </div>

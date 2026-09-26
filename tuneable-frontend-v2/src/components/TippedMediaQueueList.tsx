@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Play } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlayability';
+import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
@@ -20,11 +21,6 @@ import {
   PlayableFilterHint,
   PlayableFilterTrigger,
 } from './PlayableFilterControl';
-import { getMediaProfileUrl } from '../utils/mediaNavigation';
-import { getCreatorDisplay } from '../utils/creatorDisplay';
-import { penceToPoundsNumber } from '../utils/currency';
-import { resolveTipStatInputs } from '../utils/tipStats';
-import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import BidConfirmationModal from './BidConfirmationModal';
 
@@ -32,6 +28,7 @@ import BidConfirmationModal from './BidConfirmationModal';
 export interface TippedQueueItem {
   _id: string;
   uuid?: string;
+  slug?: string | null;
   title: string;
   artist?: unknown;
   featuring?: unknown;
@@ -77,7 +74,7 @@ export interface TippedQueueItem {
   sources?: Record<string, string>;
   contentType?: string[] | string;
   contentForm?: string[] | string;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   rightsCleared?: boolean;
   isPlayable?: boolean;
   hasHostedAudio?: boolean;
@@ -178,6 +175,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     _id: item._id,
     id: item.uuid || item._id,
     uuid: item.uuid || item._id,
+    slug: item.slug || undefined,
     title: item.title,
     artist: item.artist,
     featuring: item.featuring,
@@ -206,9 +204,11 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    ...playerPlayabilityFields(item),
   });
 
   const startQueue = (startItem?: TippedQueueItem) => {
+    if (!requireAuthToPlay()) return;
     const playableItems = visibleItems.filter(isQueueItemPlayable);
 
     if (playableItems.length === 0) {
@@ -299,7 +299,6 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
             <PlayableFilterTrigger
               playableOnly={playableOnly}
               onToggle={() => setPlayableOnly(!playableOnly)}
-              hiddenCount={hiddenPlayableCount}
             />
           ) : null}
           {showPlayAll && hasPlayable ? (

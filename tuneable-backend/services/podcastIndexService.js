@@ -128,6 +128,26 @@ class PodcastIndexService {
     }
   }
 
+  // Search episode titles, then caller can scope to a feed.
+  async searchEpisodesByTitle(query, maxResults = 50) {
+    try {
+      const endpoint = `/search/episodesbytitle?q=${encodeURIComponent(query)}&max=${maxResults}`;
+      const headers = this.generateAuthHeaders(endpoint);
+      const response = await axios.get(`${this.baseUrl}${endpoint}`, { headers });
+      return {
+        success: true,
+        episodes: response.data.items || [],
+        count: response.data.count || (response.data.items || []).length
+      };
+    } catch (error) {
+      console.error('PodcastIndex episodes-by-title error:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.description || 'Failed to search episode titles'
+      };
+    }
+  }
+
   // Search for episodes across all podcasts
   async searchEpisodes(query, maxResults = 20) {
     try {

@@ -7,14 +7,12 @@ import type {
   UserProfileResponse,
 } from '@/src/types/user';
 
-export type ImportJobStatus = {
+export type BlockedUser = {
   id: string;
-  status: 'queued' | 'running' | 'complete' | 'error' | string;
-  message?: string | null;
-  error?: string | null;
-  errorCode?: string | null;
-  details?: unknown;
-  result?: unknown;
+  uuid?: string;
+  _id?: string;
+  username?: string;
+  profilePic?: string;
 };
 
 export type SpotifyImportAccess = {
@@ -27,18 +25,6 @@ export type SpotifyImportAccess = {
     spotifyAccount?: string | null;
     createdAt?: string | null;
   } | null;
-};
-
-export type ImportPreviewItem = {
-  key: string;
-  title?: string;
-  mediaId?: string;
-  matchStatus?: string;
-  useSuggestedMatch?: boolean;
-  crossRefStatus?: string;
-  identityConfidence?: string;
-  selected?: boolean;
-  externalMedia?: Record<string, unknown>;
 };
 
 export const userAPI = {
@@ -91,6 +77,25 @@ export const userAPI = {
     return response.data;
   },
 
+  getBlockedUsers: async (): Promise<{ blocked: BlockedUser[] }> => {
+    const response = await api.get<{ blocked: BlockedUser[] }>('/users/me/blocked');
+    return response.data;
+  },
+
+  blockUser: async (userId: string): Promise<{ blocked: boolean; userId?: string }> => {
+    const response = await api.post<{ blocked: boolean; userId?: string }>(
+      `/users/${userId}/block`
+    );
+    return response.data;
+  },
+
+  unblockUser: async (userId: string): Promise<{ blocked: boolean; userId?: string }> => {
+    const response = await api.delete<{ blocked: boolean; userId?: string }>(
+      `/users/${userId}/block`
+    );
+    return response.data;
+  },
+
   claimWelcomeCredit: async (): Promise<{
     message?: string;
     alreadyClaimed?: boolean;
@@ -124,72 +129,12 @@ export const userAPI = {
     return response.data;
   },
 
-  getSoundCloudStatus: async (): Promise<{ connected: boolean }> => {
-    const response = await api.get<{ connected: boolean }>(
-      '/users/me/soundcloud-status'
-    );
-    return response.data;
-  },
-
-  getYouTubeStatus: async (): Promise<{ connected: boolean }> => {
-    const response = await api.get<{ connected: boolean }>(
-      '/users/me/youtube-status'
-    );
-    return response.data;
-  },
-
-  getImportStats: async (): Promise<{
-    spotify: {
-      connected: boolean;
-      imported: number;
-      oauthAvailable?: boolean;
-      publicImport?: boolean;
-      request?: SpotifyImportAccess['request'];
-    };
-    soundcloud: { connected: boolean; imported: number };
-    youtube?: {
-      connected?: boolean;
-      imported: number;
-      playlistImport?: boolean;
-      likesImport?: boolean;
-    };
-  }> => {
-    const response = await api.get<{
-      spotify: {
-        connected: boolean;
-        imported: number;
-        oauthAvailable?: boolean;
-        publicImport?: boolean;
-        request?: SpotifyImportAccess['request'];
-      };
-      soundcloud: { connected: boolean; imported: number };
-      youtube?: {
-        connected?: boolean;
-        imported: number;
-        playlistImport?: boolean;
-        likesImport?: boolean;
-      };
-    }>('/users/me/import-stats');
-    return response.data;
-  },
-
   startSpotifyImportPreview: async (
     limit = 50
   ): Promise<{ jobId: string; status: string }> => {
     const response = await api.post<{ jobId: string; status: string }>(
       '/users/me/import/spotify/preview/start',
       { limit }
-    );
-    return response.data;
-  },
-
-  startSoundCloudImportPreview: async (
-    limit = 50,
-    crossRefMode: 'spotify_only' | 'full' | 'none' = 'spotify_only'
-  ): Promise<{ jobId: string; status: string }> => {
-    const response = await api.post<{ jobId: string; status: string }>(
-      '/users/me/import/soundcloud/preview/start',
-      { limit, crossRefMode }
     );
     return response.data;
   },
@@ -205,17 +150,6 @@ export const userAPI = {
     return response.data;
   },
 
-  startSoundCloudImportExecute: async (
-    items: Array<Record<string, unknown>>,
-    defaultTip?: number
-  ): Promise<{ jobId: string; status: string }> => {
-    const response = await api.post<{ jobId: string; status: string }>(
-      '/users/me/import/soundcloud/execute/start',
-      { items, defaultTip }
-    );
-    return response.data;
-  },
-
   requestSpotifyImport: async (
     spotifyAccount: string,
     note?: string
@@ -225,64 +159,6 @@ export const userAPI = {
       { spotifyAccount, note }
     );
     return response.data;
-  },
-
-  startYouTubeImportPreview: async (
-    playlistUrl?: string,
-    limit = 50,
-    mode: 'playlist' | 'likes' = 'playlist'
-  ): Promise<{ jobId: string; status: string }> => {
-    const response = await api.post<{ jobId: string; status: string }>(
-      '/users/me/import/youtube/preview/start',
-      { playlistUrl, limit, mode }
-    );
-    return response.data;
-  },
-
-  startYouTubeImportExecute: async (
-    items: Array<Record<string, unknown>>,
-    defaultTip?: number
-  ): Promise<{ jobId: string; status: string }> => {
-    const response = await api.post<{ jobId: string; status: string }>(
-      '/users/me/import/youtube/execute/start',
-      { items, defaultTip }
-    );
-    return response.data;
-  },
-
-  getImportJob: async (jobId: string): Promise<ImportJobStatus> => {
-    const response = await api.get<ImportJobStatus>(
-      `/users/me/import/jobs/${jobId}`
-    );
-    return response.data;
-  },
-
-  waitForImportJob: async <T = unknown>(
-    jobId: string,
-    onProgress?: (job: ImportJobStatus) => void,
-    options?: { intervalMs?: number; timeoutMs?: number }
-  ): Promise<T> => {
-    const intervalMs = options?.intervalMs ?? 500;
-    const timeoutMs = options?.timeoutMs ?? 10 * 60 * 1000;
-    const started = Date.now();
-
-    while (Date.now() - started < timeoutMs) {
-      const job = await userAPI.getImportJob(jobId);
-      onProgress?.(job);
-      if (job.status === 'complete') {
-        return job.result as T;
-      }
-      if (job.status === 'error') {
-        const err = new Error(job.error || 'Import job failed') as Error & {
-          response?: { data: { error?: string } };
-        };
-        err.response = { data: { error: job.error || 'Import job failed' } };
-        throw err;
-      }
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-    }
-
-    throw new Error('Import job timed out — please try again with fewer tracks');
   },
 
   registerPushDevice: async (body: {
@@ -303,6 +179,36 @@ export const userAPI = {
       '/users/me/push-devices',
       { data: token ? { token } : {} }
     );
+    return response.data;
+  },
+
+  updateNotificationPreferences: async (preferences: {
+    push?: boolean;
+  }): Promise<{ success: boolean }> => {
+    const response = await api.put<{ success: boolean }>(
+      '/users/notification-preferences',
+      preferences
+    );
+    return response.data;
+  },
+
+  trackListeningHistory: async (payload: {
+    mediaId: string;
+    sessionId: string;
+    sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+    startedAt?: string;
+    currentTime?: number;
+    duration?: number;
+    completed?: boolean;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string;
+    client?: 'web' | 'mobile' | 'ios';
+  }) => {
+    const response = await api.post('/users/me/listening-history/track', {
+      ...payload,
+      client: payload.client || 'mobile',
+    });
     return response.data;
   },
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Flag, ExternalLink, CheckCircle, XCircle, Clock, User as UserIcon, Music, Building, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 

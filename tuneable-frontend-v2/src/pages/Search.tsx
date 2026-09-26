@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link as RouterLink, useSearchParams, useNavigate } from 'react-router-dom';
 import { searchAPI, partyAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Search, Music, Clock, Plus, ArrowLeft, ExternalLink, Link } from 'lucide-react';
 import EpisodeCard from '../components/EpisodeCard';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import EntertainingLoader from '../components/EntertainingLoader';
 import { useAuth } from '../contexts/AuthContext';
 
 // Define types directly to avoid import issues
@@ -675,7 +676,7 @@ const SearchPage: React.FC = () => {
             <div className="flex items-center space-x-2 text-xs text-gray-500 bg-purple-50 dark:bg-purple-900/20 p-2 rounded">
               <Link className="h-3 w-3 text-purple-600 dark:text-purple-400" />
               <span>
-                <strong>Tip:</strong> Results not already in Tuneable can still be tipped and added now, then played later once audio is uploaded.
+                <strong>Tip:</strong> Results not already in Tuneable can still be tipped and added to the catalog. Playback is available when the track has audio hosted on Tuneable.
               </span>
             </div>
           )}
@@ -684,6 +685,15 @@ const SearchPage: React.FC = () => {
       </div>
 
       {/* Results */}
+      {isLoading && results.length === 0 && (
+        <EntertainingLoader
+          flavor="music"
+          size="section"
+          headline="Searching the catalogue…"
+          detail="Checking Tuneable first, then MusicBrainz if we need a wider net."
+        />
+      )}
+
       {results.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">

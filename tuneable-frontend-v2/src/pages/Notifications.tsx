@@ -4,7 +4,7 @@ import { Bell, Check, CheckCheck, Trash2, ArrowLeft, CheckCircle, XCircle } from
 import { notificationAPI, labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 interface Notification {
   _id: string;

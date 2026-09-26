@@ -35,8 +35,34 @@ export type LocationProfileResponse = {
   stats?: { mediaCount?: number; globalPlaceAggregate?: number };
   relatedPlaces?: LocationPlaceChip[];
   relatedTags?: LocationRelatedTag[];
+  venues?: Array<{
+    _id: string;
+    name: string;
+    slug: string;
+    profilePicture?: string | null;
+    venueKind?: string | null;
+    display?: string;
+  }>;
   media?: ChartMediaItem[];
   pagination?: { page: number; limit: number; total: number; pages: number };
+};
+
+export type PlaceChartItem = {
+  placeId: string;
+  name: string;
+  featureType?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  supportPence: number;
+  mediaCount?: number;
+  bidCount?: number;
+};
+
+export type PlaceChartResponse = {
+  places: PlaceChartItem[];
+  count: number;
+  parentPlaceId: string | null;
+  scope: string;
 };
 
 export const locationAPI = {
@@ -69,6 +95,17 @@ export const locationAPI = {
       '/locations/reverse',
       { longitude, latitude }
     );
+    return response.data;
+  },
+
+  getChart: async (params?: {
+    parentPlaceId?: string;
+    scope?: string;
+    limit?: number;
+  }): Promise<PlaceChartResponse> => {
+    const response = await api.get<PlaceChartResponse>('/locations/chart', {
+      params,
+    });
     return response.data;
   },
 

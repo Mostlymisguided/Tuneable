@@ -231,6 +231,7 @@ export default function ProfileScreen() {
         visible={settingsOpen}
         inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
         username={user?.username}
+        isFoundingCreator={Boolean(user?.isFoundingCreator)}
         canUpload={canUpload}
         onClose={() => setSettingsOpen(false)}
         onWallet={() => {

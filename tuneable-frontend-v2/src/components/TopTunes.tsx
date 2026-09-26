@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Music, Play } from 'lucide-react';
 import { topTunesAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
-import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { requireAuthToPlay } from '../utils/playAuth';
 
 interface TopTunesSong {
   id: string;
@@ -103,6 +105,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
   };
 
   const handlePlay = (song: TopTunesSong) => {
+    if (!requireAuthToPlay()) return;
     const mediaId = song._id || song.id;
     
     if (!mediaId) {
@@ -118,7 +121,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
 
     if (!isMediaPlayable(enriched)) {
       toast.info('This track is not playable yet — visit the tune page to tip support.');
-      navigate(`/tune/${mediaId}`);
+      navigate(getMediaProfileUrl(song));
       return;
     }
 
@@ -135,6 +138,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
       bids: song.bids || [],
       addedBy: null,
       totalBidValue: song.globalMediaAggregate,
+      ...playerPlayabilityFields(song as any),
     };
     
     // Clear podcast player so PlayerRenderer switches to web player
@@ -248,7 +252,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
 
               {/* Cover Art with Play Button Overlay */}
               <div className="flex-shrink-0 relative w-12 h-12">
-                <Link to={`/tune/${song._id || song.id}`} className="block w-full h-full">
+                <Link to={getMediaProfileUrl(song)} className="block w-full h-full">
                   <img
                     src={song.coverArt || DEFAULT_COVER_ART}
                     alt={song.title}
@@ -273,7 +277,7 @@ const TopTunes: React.FC<TopTunesProps> = ({ limit = 10, showHeader = true }) =>
               <div className="flex-1 min-w-0">
                 <h3 className="text-white font-medium truncate">
                   <Link
-                    to={`/tune/${song._id || song.id}`}
+                    to={getMediaProfileUrl(song)}
                     className="cursor-pointer hover:text-purple-300 transition-colors"
                   >
                     {song.title}

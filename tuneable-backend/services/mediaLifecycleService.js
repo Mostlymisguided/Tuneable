@@ -7,16 +7,11 @@ const Comment = require('../models/Comment');
 const tuneableLedgerService = require('./tuneableLedgerService');
 const notificationService = require('./notificationService');
 const bidMetricsEngine = require('./bidMetricsEngine');
+const { handoffDeletedSlug, releaseDeletedSlug } = require('./mediaSlugHandoff');
 
 async function resolveMediaByIdentifier(mediaId) {
   if (!mediaId) return null;
-  if (mongoose.isValidObjectId(mediaId)) {
-    return Media.findById(mediaId);
-  }
-  if (typeof mediaId === 'string' && mediaId.includes('-')) {
-    return Media.findOne({ uuid: mediaId });
-  }
-  return null;
+  return Media.findByIdentifier(mediaId);
 }
 
 async function reverseEscrowForBid(bid, refundAmount) {
@@ -170,6 +165,15 @@ async function softDeleteMedia(media, actor, reason = null) {
   media.deletedReason = reason || null;
   media.globalMediaAggregate = 0;
   await media.save();
+
+  try {
+    const handedOff = await handoffDeletedSlug(Media, media);
+    if (!handedOff) {
+      await releaseDeletedSlug(Media, media);
+    }
+  } catch (slugError) {
+    console.error('Failed to release slug after media delete:', slugError);
+  }
 
   await removeMediaFromQueues(media._id);
 

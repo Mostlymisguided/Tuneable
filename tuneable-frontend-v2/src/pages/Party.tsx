@@ -6,12 +6,15 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { usePlayerWarning } from '../hooks/usePlayerWarning';
 import { partyAPI, searchAPI, locationAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import BidModal from '../components/BidModal';
 import PlayerWarningModal from '../components/PlayerWarningModal';
 import TagInputModal from '../components/TagInputModal';
 import MediaValidationModal from '../components/MediaValidationModal';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import EntertainingLoader from '../components/EntertainingLoader';
+import { usePageMeta } from '../seo/usePageMeta';
+import { clipText } from '../seo/pageMeta';
 import TipCtaLabel from '../components/TipCtaLabel';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
@@ -43,8 +46,10 @@ import {
   type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
-import { getCanonicalTag, generateTagSlug } from '../utils/tagNormalizer';
-import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import { getCanonicalTag, generateTagSlug, tagsMatch } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { isMediaPlayable, enrichMediaWithPlayability, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { hasAuthToken, requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
@@ -191,10 +196,7 @@ function toPlayerQueueItem(item: any) {
     addedBy: typeof mediaData?.addedBy === 'object'
       ? mediaData.addedBy?.username || 'Unknown'
       : mediaData?.addedBy,
-    rightsCleared: mediaData?.rightsCleared,
-    rightsStatus: mediaData?.rightsStatus,
-    isPlayable: mediaData?.isPlayable,
-    contentForm: mediaData?.contentForm,
+    ...playerPlayabilityFields(mediaData),
   };
 }
 
@@ -234,6 +236,65 @@ function getPeriodStartDate(period: string): Date | null {
   }
 }
 
+function collectItemTags(item: any): string[] {
+  const nested = item?.mediaId && typeof item.mediaId === 'object' ? item.mediaId.tags : null;
+  const lists = [item?.tags, nested];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const raw of list) {
+      if (typeof raw !== 'string') continue;
+      const trimmed = raw.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(trimmed);
+    }
+  }
+  return out;
+}
+
+/** Live chart search: title/artist/category, plus tags (with or without a # prefix). */
+function chartItemMatchesSearch(item: any, allTerms: string[]): boolean {
+  if (allTerms.length === 0) return true;
+  const mediaItem = item?.mediaId && typeof item.mediaId === 'object' ? item.mediaId : item;
+  const tags = collectItemTags(item);
+
+  const regularTerms = allTerms.filter((term) => !term.startsWith('#'));
+  const tagTerms = allTerms
+    .filter((term) => term.startsWith('#'))
+    .map((term) => term.slice(1).trim())
+    .filter(Boolean);
+
+  const matchesRegularSearch =
+    regularTerms.length === 0 ||
+    regularTerms.some((term) => {
+      const lowerTerm = term.toLowerCase();
+      const title = (mediaItem.title || '').toLowerCase();
+      const artist = Array.isArray(mediaItem.artist)
+        ? mediaItem.artist.map((a: any) => (a && typeof a === 'object' ? a.name : a) || '').join(' ').toLowerCase()
+        : (mediaItem.artist || '').toLowerCase();
+      const category = (mediaItem.category || '').toLowerCase();
+      const tagHaystack = tags.join(' ').toLowerCase();
+
+      return (
+        title.includes(lowerTerm) ||
+        artist.includes(lowerTerm) ||
+        category.includes(lowerTerm) ||
+        tagHaystack.includes(lowerTerm) ||
+        tags.some((tag) => tagsMatch(tag, term))
+      );
+    });
+
+  const matchesTagSearch =
+    tagTerms.length === 0 ||
+    tagTerms.some((tagTerm) => tags.some((tag) => tagsMatch(tag, tagTerm)));
+
+  return matchesRegularSearch && matchesTagSearch;
+}
+
 /** Parse ?tag= or ?tags= from URL into #canonical tag terms for queueSearchTerms (global party only). */
 function getTagTermsFromSearchParams(params: URLSearchParams, isGlobal: boolean): string[] {
   if (!isGlobal) return [];
@@ -264,6 +325,13 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const periodParam = searchParams.get('period');
   const initialPeriod = periodParam && VALID_TIME_PERIODS.includes(periodParam as any) ? periodParam : 'today';
   const isGlobalParty = partyId === 'global';
+
+  usePageMeta(!isGlobalParty && party?.name ? {
+    title: party.name,
+    description: clipText(party.description) || `Join ${party.name} on Tuneable and tip tunes into the queue.`,
+    path: `/party/${encodeURIComponent(party.uuid || partyId || '')}`,
+    robots: party.privacy === 'private' ? 'noindex, nofollow' : 'index, follow',
+  } : null);
   
   // Helper function to get effective minimum bid
   const getEffectiveMinimumBid = (media?: any): number => {
@@ -291,6 +359,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [selectedTimePeriod, setSelectedTimePeriod] = useState(initialPeriod);
   const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
+  const [sortedHiddenCount, setSortedHiddenCount] = useState<number | null>(null);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
@@ -527,7 +596,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     if (partyId) {
       fetchPartyDetails();
     }
-  }, [partyId]);
+  }, [partyId, playableOnly]);
 
   useEffect(() => {
     if (!partyId) return;
@@ -536,7 +605,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     } else {
       setSortedMedia([]);
     }
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope, playableOnly]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
@@ -686,7 +755,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     // Only seed the player with a track the player itself considers playable.
     // Dropping rightsCleared on mapped items used to ping-pong with ensureCurrentPlayable
     // (React error #185 / blank screen on all-time global).
-    if (cleanedQueue.length > 0 && !store.currentMedia) {
+    if (cleanedQueue.length > 0 && !store.currentMedia && hasAuthToken()) {
       const firstPlayableIndex = cleanedQueue.findIndex((m) => isMediaPlayable(m));
       if (firstPlayableIndex >= 0) {
         setCurrentMedia(cleanedQueue[firstPlayableIndex], firstPlayableIndex);
@@ -702,7 +771,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       }
       
       // Then fetch the updated party details
-      const response = await partyAPI.getPartyDetails(partyId!);
+      const response = await partyAPI.getPartyDetails(partyId!, { playableOnly });
       setParty(response.party);
       
       // Check if current user is the host (use UUID)
@@ -749,9 +818,13 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         {
           ...(locationPlaceId ? { locationPlaceId, locationScope } : {}),
           sortBy: chartSort,
+          playableOnly,
         }
       );
       setSortedMedia(response.media || []);
+      setSortedHiddenCount(
+        typeof (response as any).hiddenCount === 'number' ? (response as any).hiddenCount : null
+      );
       if (Array.isArray((response as any).topLocations)) {
         setParty((prev: any) => prev ? { ...prev, topLocations: (response as any).topLocations } : prev);
       }
@@ -1607,36 +1680,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     const allTerms = liveTerm ? [...queueSearchTerms, liveTerm] : queueSearchTerms;
 
     if (allTerms.length > 0) {
-      media = media.filter((item: any) => {
-        const mediaItem = item.mediaId || item;
-
-        const regularTerms = allTerms.filter(term => !term.startsWith('#'));
-        const tagTerms = allTerms.filter(term => term.startsWith('#')).map(term => term.substring(1));
-
-        const matchesRegularSearch = regularTerms.length === 0 || regularTerms.some(term => {
-          const lowerTerm = term.toLowerCase();
-          const title = (mediaItem.title || '').toLowerCase();
-          const artist = Array.isArray(mediaItem.artist)
-            ? mediaItem.artist.map((a: any) => a.name || a).join(' ').toLowerCase()
-            : (mediaItem.artist || '').toLowerCase();
-          const category = (mediaItem.category || '').toLowerCase();
-
-          return title.includes(lowerTerm) ||
-                 artist.includes(lowerTerm) ||
-                 category.includes(lowerTerm);
-        });
-
-        const matchesTagSearch = tagTerms.length === 0 || tagTerms.some(tagTerm => {
-          const canonicalSearchTag = getCanonicalTag(tagTerm);
-          const tags = Array.isArray(mediaItem.tags)
-            ? mediaItem.tags.map((tag: any) => tag && typeof tag === 'string' ? getCanonicalTag(tag) : '').filter((t: string) => t)
-            : [];
-
-          return tags.some((tag: string) => tag === canonicalSearchTag);
-        });
-
-        return matchesRegularSearch && matchesTagSearch;
-      });
+      media = media.filter((item: any) => chartItemMatchesSearch(item, allTerms));
     }
 
     if (bpmFilterRange !== 'all') {
@@ -1647,7 +1691,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       getDate: (item: any) => {
         const mediaItem = item.mediaId || item;
         return isGlobalParty
-          ? mediaItem.createdAt || item.createdAt || item.queuedAt
+          ? mediaItem.createdAt || mediaItem.uploadedAt || item.createdAt || item.queuedAt
           : item.queuedAt || mediaItem.createdAt || item.createdAt;
       },
       getTip: (item: any) => {
@@ -1665,12 +1709,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     [displayMedia]
   );
 
-  const chartMedia = useMemo(
-    () => (playableOnly ? displayMedia.filter(isPartyItemPlayable) : displayMedia),
-    [displayMedia, playableOnly]
-  );
+  const serverHiddenCount = useSortedQueue
+    ? sortedHiddenCount
+    : (typeof (party as any)?.hiddenCount === 'number' ? (party as any).hiddenCount : null);
 
-  const hiddenPlayableCount = displayMedia.length - chartMedia.length;
+  const chartMedia = useMemo(() => {
+    if (!playableOnly) return displayMedia;
+    if (serverHiddenCount !== null) return displayMedia;
+    return displayMedia.filter(isPartyItemPlayable);
+  }, [displayMedia, playableOnly, serverHiddenCount]);
+
+  const hiddenPlayableCount = playableOnly
+    ? (serverHiddenCount ?? (displayMedia.length - displayMedia.filter(isPartyItemPlayable).length))
+    : 0;
 
   const getDisplayMedia = () => chartMedia;
 
@@ -2147,6 +2198,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Handle clicking play button on media in the queue
   const handlePlayMedia = (item: any, index: number) => {
+    if (!requireAuthToPlay()) return;
     const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
 
     if (cleanedQueue.length === 0) {
@@ -2175,6 +2227,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Handle playing the entire displayed queue from the top
   const handlePlayQueue = () => {
+    if (!requireAuthToPlay()) return;
     const cleanedQueue = buildPlayablePlayerQueue(getDisplayMedia());
 
     if (cleanedQueue.length === 0) {
@@ -2350,11 +2403,16 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </div>
+      <EntertainingLoader
+        flavor={isGlobalParty ? 'generic' : 'party'}
+        size="page"
+        headline={isGlobalParty ? 'Loading Global media…' : 'Loading this party…'}
+        detail={
+          isGlobalParty
+            ? 'Pulling the chart, tips, and what’s playing.'
+            : 'Pulling the queue, tips, and who’s in the room.'
+        }
+      />
     );
   }
 
@@ -2411,7 +2469,11 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       {/* Party Header — Variant 2: editorial, quick-picks always visible */}
       {isGlobalParty && headerVariant === 2 && (
       <GlobalChartLocationHero
-        chartLabel="The World's Best Music"
+        chartKind="music"
+        onChartKindChange={(kind) => {
+          if (kind === 'music') return;
+          navigate(kind === 'podcasts' ? '/podcasts' : '/books');
+        }}
         contentNoun="Music"
         selectedLocation={selectedLocation}
         locationScope={locationScope}
@@ -2725,7 +2787,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                       <PlayableFilterTrigger
                         playableOnly={playableOnly}
                         onToggle={togglePlayableOnly}
-                        hiddenCount={hiddenPlayableCount}
                       />
                     </div>
                     <PlayableFilterHint
@@ -2776,7 +2837,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           <div className="flex flex-wrap gap-2">
                             {(topTagsExpanded ? topTags : topTags.slice(0, isMobile ? 6 : 10)).map(({ tag, total }) => {
                               const hash = `#${tag}`;
-                              const selected = queueSearchTerms.some((t) => t.toLowerCase() === hash);
+                              const selected = queueSearchTerms.some(
+                                (t) => t.startsWith('#') && tagsMatch(t.slice(1), tag)
+                              );
                               const weight = Math.max(0.75, Math.min(1.25, total / 50));
                               const sizeClass = weight > 1.1 ? 'text-sm' : weight > 0.95 ? 'text-xs' : 'text-[10px]';
 
@@ -2785,7 +2848,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                   key={tag}
                                   onClick={() =>
                                     setQueueSearchTerms((prev) =>
-                                      selected ? prev.filter((t) => t.toLowerCase() !== hash) : [...prev, hash]
+                                      selected
+                                        ? prev.filter((t) => !(t.startsWith('#') && tagsMatch(t.slice(1), tag)))
+                                        : [...prev, hash]
                                     )
                                   }
                                   className={`rounded-full px-3 py-1 transition-colors ${sizeClass} ${
@@ -2984,7 +3049,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                       )}
                       {searchQuery.trim() && displayMedia.length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
                         <p className="text-xs text-gray-400 mt-2 text-center">
-                          No matches in this chart — add it from MusicBrainz
+                          No matches in this chart — sort by Newest, or add it from MusicBrainz
                         </p>
                       )}
                       {queueSearchTerms.length > 0 && (
@@ -3052,7 +3117,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                                     <div className="flex-1 min-w-0">
                                       <p className="text-white font-medium truncate text-sm md:text-base">
                                         <Link
-                                          to={`/tune/${media._id || media.id}`}
+                                          to={getMediaProfileUrl(media)}
                                           className="cursor-pointer hover:text-purple-300 transition-colors"
                                           title="View tune profile"
                                         >
@@ -3318,12 +3383,23 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                 </div>
 
                 {/* Media Queue - Show when NOT viewing vetoed */}
+                {!showVetoed && isLoadingSortedMedia && selectedTimePeriod !== 'all-time' && getDisplayMedia().length === 0 && (
+                  <EntertainingLoader
+                    flavor="party"
+                    size="section"
+                    headline="Sorting the queue…"
+                    detail="Ranking by tips for this time period."
+                  />
+                )}
                 {!showVetoed && getDisplayMedia().length > 0 && (
                   <div className="space-y-3">
                     {isLoadingSortedMedia && selectedTimePeriod !== 'all-time' ? (
-                      <div className="text-center py-8">
-                        <div className="text-gray-400">Loading sorted media...</div>
-                      </div>
+                      <EntertainingLoader
+                        flavor="party"
+                        size="section"
+                        headline="Sorting the queue…"
+                        detail="Ranking by tips for this time period."
+                      />
                     ) : (
                       getDisplayMedia().slice(0, visibleMediaCount).map((item: any, index: number) => {
                         const rawMediaData = selectedTimePeriod === 'all-time' ? (item.mediaId || item) : item;
@@ -3426,7 +3502,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                     <p className="text-gray-600 text-sm mt-2">Can't find it? Add New Media above to search MusicBrainz and tip it in</p>
                   </div>
                 )}
-                {!showVetoed && getPartyMedia().length > 0 && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
+                {!showVetoed && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
                   <PlayableEmptyState
                     hiddenCount={hiddenPlayableCount}
                     onShowAll={() => setPlayableOnly(false)}

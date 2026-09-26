@@ -118,7 +118,7 @@ const getExistingTagParty = async (tag) => {
       for (const partyTag of legacyParty.tags) {
         if (getCanonicalTag(partyTag) === canonicalTag) {
           // Found a match, return full party
-          return await Party.findById(legacyParty._id);
+          return await Party.findById(legacyParty._id).select('-media');
         }
       }
     }

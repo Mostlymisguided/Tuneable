@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { partyAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Music, Calendar, Shield, ArrowLeft } from 'lucide-react';
 import { normalizeTagForStorage } from '../utils/tagNormalizer';
 

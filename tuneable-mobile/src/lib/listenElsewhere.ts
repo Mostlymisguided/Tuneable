@@ -4,7 +4,7 @@
  */
 
 import {
-  formatArtist,
+  getCreatorDisplay,
   getPlayabilityBlockReason,
   isUploadPlayable,
   normalizeSources,
@@ -63,7 +63,7 @@ export function getListenElsewhereTarget(
     };
   }
 
-  const artist = media.creatorDisplay || formatArtist(media.artist);
+  const artist = getCreatorDisplay(media);
   const artistForQuery =
     artist && artist !== 'Unknown artist' && artist !== 'Unknown Artist'
       ? artist

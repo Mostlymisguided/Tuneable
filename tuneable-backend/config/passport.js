@@ -7,7 +7,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
-const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
+const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
@@ -258,6 +258,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
         }],
         parentInviteCode: parentInviteCode,
         parentInviteCodeId: inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : null,
+        ...inviteAttributionFields(invite),
         // Mark Facebook OAuth as verified
         oauthVerified: {
           facebook: true,
@@ -535,6 +536,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           }],
           parentInviteCode: parentInviteCode,
           parentInviteCodeId: inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : null,
+          ...inviteAttributionFields(invite),
           // Mark Google OAuth as verified
           oauthVerified: {
             google: true,
@@ -898,6 +900,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           }],
           parentInviteCode: parentInviteCode,
           parentInviteCodeId: inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : null,
+          ...inviteAttributionFields(invite),
           // Mark SoundCloud OAuth as verified
           oauthVerified: {
             soundcloud: true,
@@ -1152,6 +1155,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           }],
           parentInviteCode: parentInviteCode,
           parentInviteCodeId: inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : null,
+          ...inviteAttributionFields(invite),
           // Mark Instagram OAuth as verified
           oauthVerified: {
             instagram: true,

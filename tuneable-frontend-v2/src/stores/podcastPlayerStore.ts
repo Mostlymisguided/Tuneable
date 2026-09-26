@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { requireAuthToPlay } from '../utils/playAuth';
 
 /** Minimal episode shape for podcast player (from profile, chart, or search). */
 export interface PodcastPlayerEpisode {
@@ -17,6 +18,7 @@ export interface PodcastPlayerEpisode {
   /** Fallbacks for search/external results */
   audioUrl?: string;
   enclosure?: { url?: string };
+  isPlayable?: boolean;
   sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
 }
 
@@ -76,11 +78,22 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
         });
       },
 
-      play: () => set({ isPlaying: true }),
+      play: () => {
+        if (!requireAuthToPlay()) return;
+        set({ isPlaying: true });
+      },
       pause: () => set({ isPlaying: false }),
-      togglePlayPause: () => set((s) => ({ isPlaying: !s.isPlaying })),
+      togglePlayPause: () => {
+        const { isPlaying, play, pause } = get();
+        if (isPlaying) {
+          pause();
+        } else {
+          play();
+        }
+      },
 
       next: () => {
+        if (!requireAuthToPlay()) return;
         const { queue, currentEpisodeIndex } = get();
         if (queue.length === 0) {
           set({ isPlaying: false });
@@ -161,4 +174,11 @@ export function getEpisodeAudioUrl(episode: PodcastPlayerEpisode | null): string
   }
   const o = s as Record<string, string>;
   return o.audio_direct || o.audio || null;
+}
+
+/** True when the episode can stream now, or after login (API stripped URLs). */
+export function isEpisodePlayable(episode: PodcastPlayerEpisode | null | undefined): boolean {
+  if (!episode) return false;
+  if (episode.isPlayable === true) return true;
+  return Boolean(getEpisodeAudioUrl(episode));
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { 
   Search, 
   Link as LinkIcon, 
@@ -17,6 +17,8 @@ import { DEFAULT_COVER_ART } from '../constants';
 import { stripHtml } from '../utils/stripHtml';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { requireAuthToPlay } from '../utils/playAuth';
+import EntertainingLoader from '../components/EntertainingLoader';
 
 interface PodcastEpisode {
   _id: string;
@@ -208,6 +210,7 @@ const PodcastSearch: React.FC = () => {
 
   const handlePlayEpisode = (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireAuthToPlay()) return;
     const ep = {
       _id: episode._id,
       id: episode.id,
@@ -482,9 +485,12 @@ const PodcastSearch: React.FC = () => {
 
         {/* Results */}
         {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-          </div>
+          <EntertainingLoader
+            flavor="podcast"
+            size="section"
+            headline="Searching episodes…"
+            detail="Looking through Tuneable’s catalogue."
+          />
         ) : hasSearched && episodes.length === 0 ? (
           <div className="text-center py-20">
             <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />

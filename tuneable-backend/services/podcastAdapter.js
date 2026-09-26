@@ -6,6 +6,21 @@
 const Media = require('../models/Media');
 const { normalizeCoverArtUrl } = require('../utils/podcastCoverArt');
 
+function episodeShowTitle(episodeData, seriesData) {
+  const candidates = [
+    seriesData?.title,
+    episodeData?.podcastSeries?.name,
+    episodeData?.podcastSeries?.title,
+    episodeData?.feedTitle,
+    episodeData?.collectionName,
+    episodeData?.show?.name,
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
 class PodcastAdapter {
   /**
    * Import episode from any source into Media model
@@ -204,6 +219,7 @@ class PodcastAdapter {
       // Creators
       host: taddyEpisode.podcastSeries?.author ? 
         [{ name: taddyEpisode.podcastSeries.author, userId: null, verified: false }] : [],
+      creatorDisplay: episodeShowTitle(taddyEpisode, seriesData),
       
       // Episode metadata
       episodeNumber: taddyEpisode.episodeNumber || null,
@@ -305,6 +321,7 @@ class PodcastAdapter {
       // Creators
       host: piEpisode.feedAuthor ? 
         [{ name: piEpisode.feedAuthor, userId: null, verified: false }] : [],
+      creatorDisplay: episodeShowTitle(piEpisode, seriesData),
       
       // Episode metadata
       episodeNumber: piEpisode.episode || null,
@@ -365,6 +382,7 @@ class PodcastAdapter {
       // Creators (may need manual parsing from author field)
       host: rssItem.author ? 
         [{ name: rssItem.author, userId: null, verified: false }] : [],
+      creatorDisplay: episodeShowTitle(rssItem, seriesData),
       
       // Episode metadata
       episodeNumber: rssItem.episodeNumber || null,
@@ -425,6 +443,7 @@ class PodcastAdapter {
       // Creators
       host: appleEpisode.artistName ? 
         [{ name: appleEpisode.artistName, userId: null, verified: false }] : [],
+      creatorDisplay: episodeShowTitle(appleEpisode, seriesData) || appleEpisode.artistName || null,
       
       // Episode metadata
       duration: appleEpisode.trackTimeMillis ? Math.floor(appleEpisode.trackTimeMillis / 1000) : 0,
@@ -481,6 +500,7 @@ class PodcastAdapter {
       host: (show?.publisher || seriesData?.author)
         ? [{ name: show.publisher || seriesData.author, userId: null, verified: false }]
         : [],
+      creatorDisplay: episodeShowTitle(spotifyEpisode, seriesData),
 
       episodeNumber: null,
       seasonNumber: null,
@@ -587,6 +607,7 @@ class PodcastAdapter {
       
       author: seriesData.author ? 
         [{ name: seriesData.author, userId: null, verified: false }] : [],
+      creatorDisplay: seriesData.author || null,
       
       label: seriesData.copyright ? 
         [{ name: seriesData.copyright, verified: false }] : [],
@@ -656,8 +677,10 @@ class PodcastAdapter {
     const episode = await this.importEpisode(source, episodeData, addedBy, seriesData);
     
     // Link episode to series
+    let dirty = false;
     if (!episode.podcastSeries) {
       episode.podcastSeries = series._id;
+      dirty = true;
       
       // Also add relationship
       if (!episode.relationships) {
@@ -675,7 +698,14 @@ class PodcastAdapter {
           description: `Part of ${series.title}`
         });
       }
-      
+    }
+
+    if (!episode.creatorDisplay && series.title) {
+      episode.creatorDisplay = series.title;
+      dirty = true;
+    }
+
+    if (dirty) {
       await episode.save();
       console.log(`🔗 Linked episode to series: ${series.title}`);
     }

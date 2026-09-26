@@ -221,20 +221,42 @@ const InviteRequest = require('../models/InviteRequest');
 const SpotifyImportRequest = require('../models/SpotifyImportRequest');
 const Media = require('../models/Media');
 const ListeningHistory = require('../models/ListeningHistory');
+const {
+  ListeningHistoryError,
+  formatMediaArtist,
+  resolveMediaByIdentifier,
+  trackListeningSession,
+} = require('../services/listeningHistoryService');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const userPurgeService = require('../services/userPurgeService');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
-const { resolveInviteForSignup, applyInviteUsage } = require('../utils/inviteSignup');
-const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
+const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
+const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
 
 // Configure upload using R2 or local fallback
 const upload = createProfilePictureUpload();
+
+const rekordboxMp3Upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    if (ext === '.mp3' || mime === 'audio/mpeg' || mime === 'audio/mp3') {
+      return cb(null, true);
+    }
+    return cb(new Error('Only MP3 files are allowed'));
+  },
+});
 
 const rekordboxXmlUpload = multer({
   storage: multer.memoryStorage(),
@@ -456,6 +478,7 @@ router.post(
         }],
         parentInviteCode: resolvedParentCode || undefined,
         parentInviteCodeId: parentInviteCodeId || undefined, // Track which specific code was used
+        ...inviteAttributionFields(invite),
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
@@ -564,7 +587,7 @@ router.post(
       const user = await User.findByLoginIdentifier(identifier);
       if (!user) {
         console.log(`Login attempt failed: User not found for identifier: ${identifier}`);
-        return res.status(401).json({ error: 'Invalid email or password' });
+        return res.status(401).json({ error: 'Invalid email, password or username' });
       }
 
       // Check if user is active
@@ -625,7 +648,7 @@ router.post(
         // Return error with remaining attempts
         const remainingAttempts = 6 - user.failedLoginAttempts;
         return res.status(401).json({ 
-          error: 'Invalid email or password',
+          error: 'Invalid email, password or username',
           failedAttempts: user.failedLoginAttempts,
           remainingAttempts: remainingAttempts
         });
@@ -668,24 +691,24 @@ router.get('/profile', authMiddleware, async (req, res) => {
     
     // Calculate user statistics
     const Bid = require('../models/Bid');
-    const userBids = await Bid.find({ userId: user._id });
+    const userBids = await Bid.find({ userId: user._id }).select('amount').lean();
     
     const globalUserBids = userBids.length;
     const totalAmountBid = userBids.reduce((sum, bid) => sum + bid.amount, 0);
     const globalUserBidAvg = globalUserBids > 0 ? totalAmountBid / globalUserBids : 0;
     
     // Calculate global user aggregate rank (simplified)
-    const allUsers = await User.find({}).select('_id');
-    const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
+    const userAggregateRank = await User.countDocuments();
     
     // Add statistics to user object
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
-    const userWithStats = withWelcomeCreditOffer({
+    const { attachFoundingProfileFields } = require('../utils/foundingCreators');
+    const userWithStats = withWelcomeCreditOffer(await attachFoundingProfileFields({
       ...user.toObject(),
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
-    });
+    }));
     
     res.json({ message: 'User profile', user: userWithStats });
   } catch (error) {
@@ -758,17 +781,29 @@ router.get('/invited', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
-    // Find all users who used this user's personalInviteCode
-    const invitedUsers = await User.find({ 
-      parentInviteCode: user.personalInviteCode 
-    })
+    const codes = user.getActiveInviteCodes().map((ic) => ic.code);
+    if (user.personalInviteCode && !codes.includes(user.personalInviteCode)) {
+      codes.push(user.personalInviteCode);
+    }
+
+    const invitedQuery = {
+      $or: [
+        { invitedByUserId: user._id },
+        ...(codes.length ? [{ parentInviteCode: { $in: codes } }] : []),
+      ],
+    };
+
+    const invitedUsers = await User.find(invitedQuery)
     .select('-password -passwordResetToken -passwordResetExpires -emailVerificationToken -emailVerificationExpires')
     .sort({ createdAt: -1 })
     .lean();
+
+    const { attachAffiliateInviteStats } = require('../utils/artistInviteAffiliate');
+    const enriched = await attachAffiliateInviteStats(user, invitedUsers);
     
     res.json({ 
-      invitedUsers,
-      count: invitedUsers.length 
+      invitedUsers: enriched,
+      count: enriched.length 
     });
   } catch (error) {
     console.error('Error fetching invited users:', error);
@@ -776,8 +811,76 @@ router.get('/invited', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/founding-creators
+// @desc    Public Founding Creators program status (cap, claimed, remaining)
+// @access  Public
+router.get('/founding-creators', async (req, res) => {
+  try {
+    const {
+      getProgramStatus,
+      FOUNDING_CREATOR_CAP,
+      FOUNDING_UPLOAD_QUOTA_MB,
+    } = require('../utils/foundingCreators');
+    const { AFFILIATE_SHARE_PERCENT } = require('../utils/artistInviteAffiliate');
+    const status = await getProgramStatus();
+    res.json({
+      ...status,
+      affiliatePercent: AFFILIATE_SHARE_PERCENT,
+      affiliateExclusiveToFounding: true,
+      description:
+        `First ${FOUNDING_CREATOR_CAP} creators who upload their own music become founding creators. `
+        + `Perks: ${FOUNDING_UPLOAD_QUOTA_MB} MB upload allowance and exclusive ${AFFILIATE_SHARE_PERCENT}% artist-invite commission `
+        + `(from Tuneable's share). Founding status is not equity or ownership.`,
+    });
+  } catch (error) {
+    console.error('Error fetching founding creators status:', error);
+    res.status(500).json({ error: 'Failed to fetch founding creators status' });
+  }
+});
+
+// @route   GET /api/users/me/founding-creator
+// @desc    Current user's founding status + upload allowance usage
+// @access  Private
+router.get('/me/founding-creator', authMiddleware, async (req, res) => {
+  try {
+    const { attachFoundingProfileFields, getProgramStatus } = require('../utils/foundingCreators');
+    const user = await User.findById(req.user._id).select(
+      'username isFoundingCreator foundingSeatNumber foundingSeatAssignedAt foundingUploadQuotaBytes'
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const enriched = await attachFoundingProfileFields(user);
+    const program = await getProgramStatus();
+    res.json({
+      isFoundingCreator: enriched.isFoundingCreator,
+      foundingSeatNumber: enriched.foundingSeatNumber,
+      foundingSeatAssignedAt: enriched.foundingSeatAssignedAt,
+      uploadQuotaBytes: enriched.foundingUploadQuotaBytes,
+      uploadUsedBytes: enriched.foundingUploadUsedBytes,
+      uploadRemainingBytes: enriched.foundingUploadRemainingBytes,
+      program,
+    });
+  } catch (error) {
+    console.error('Error fetching founding creator profile:', error);
+    res.status(500).json({ error: 'Failed to fetch founding creator profile' });
+  }
+});
+
+// @route   POST /api/users/admin/backfill-founding-creators
+// @desc    Assign founding seats to earliest original uploaders (admin)
+// @access  Private (Admin)
+router.post('/admin/backfill-founding-creators', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { backfillFoundingSeats } = require('../utils/foundingCreators');
+    const result = await backfillFoundingSeats();
+    res.json({ message: 'Founding creator backfill complete', ...result });
+  } catch (error) {
+    console.error('Error backfilling founding creators:', error);
+    res.status(500).json({ error: 'Failed to backfill founding creators' });
+  }
+});
+
 // Shared helper to fetch tune library for a user by their MongoDB _id
-async function fetchTuneLibraryForUser(user) {
+async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
     
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
@@ -847,7 +950,8 @@ async function fetchTuneLibraryForUser(user) {
     
     // Fetch media details (include contentForm + sources for instant library playback)
     const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid _id tags contentForm sources rightsStatus rightsCleared')
+      .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
+      .populate('podcastSeries', 'title')
       .populate('globalMediaAggregateTopUser', 'username uuid _id')
       .lean();
     
@@ -962,18 +1066,12 @@ async function fetchTuneLibraryForUser(user) {
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, contentForm, sources;
+        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, slug, contentForm, sources;
         let playability = {};
 
         if (media) {
-          let artistName = 'Unknown Artist';
-          if (Array.isArray(media.artist) && media.artist.length > 0) {
-            artistName = media.artist[0].name || media.artist[0] || 'Unknown Artist';
-          } else if (typeof media.artist === 'string') {
-            artistName = media.artist;
-          }
           title = media.title || 'Unknown Title';
-          artist = artistName;
+          artist = resolveCreatorDisplay(media);
           coverArt = media.coverArt || null;
           duration = media.duration || null;
           bpm = media.bpm || null;
@@ -983,8 +1081,9 @@ async function fetchTuneLibraryForUser(user) {
           tags = media.tags || [];
           globalMediaAggregate = media.globalMediaAggregate || 0;
           mediaUuid = media.uuid || media._id?.toString() || media._id;
+          slug = media.slug || null;
           contentForm = media.contentForm || [];
-          playability = enrichMediaWithPlayability(media);
+          playability = enrichMediaWithPlayability(media, { authenticated });
           sources = playability.sources || {};
         } else {
           // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
@@ -1000,6 +1099,7 @@ async function fetchTuneLibraryForUser(user) {
           tags = [];
           globalMediaAggregate = aggregate.userBidTotal || 0; // Best we have without Media
           mediaUuid = aggregate.mediaId;
+          slug = null;
           contentForm = [];
           sources = {};
         }
@@ -1013,6 +1113,7 @@ async function fetchTuneLibraryForUser(user) {
           return {
             mediaId: aggregate.mediaId,
             mediaUuid,
+            slug,
             title,
             artist,
             coverArt,
@@ -1057,30 +1158,6 @@ async function fetchTuneLibraryForUser(user) {
     return { library, total: library.length };
 }
 
-function formatMediaArtist(media) {
-  if (!media) return 'Unknown Artist';
-  if (media.creatorDisplay) return media.creatorDisplay;
-  if (Array.isArray(media.artist) && media.artist.length > 0) {
-    return media.artist
-      .map((artist) => (typeof artist === 'string' ? artist : artist?.name))
-      .filter(Boolean)
-      .join(', ');
-  }
-  if (typeof media.artist === 'string' && media.artist.trim()) {
-    return media.artist;
-  }
-  return 'Unknown Artist';
-}
-
-async function resolveMediaByIdentifier(identifier) {
-  if (!identifier) return null;
-  if (mongoose.Types.ObjectId.isValid(identifier)) {
-    const byId = await Media.findById(identifier);
-    if (byId) return byId;
-  }
-  return Media.findOne({ uuid: identifier });
-}
-
 async function buildPlaybackQueueResponse(user) {
   const queueEntries = Array.isArray(user?.playbackQueue) ? user.playbackQueue : [];
   if (queueEntries.length === 0) {
@@ -1093,7 +1170,7 @@ async function buildPlaybackQueueResponse(user) {
     .map((mediaId) => mediaId.toString());
 
   const mediaDocs = await Media.find({ _id: { $in: mediaIds } })
-    .select('title artist creatorDisplay coverArt duration uuid _id tags contentForm sources rightsStatus rightsCleared')
+    .select('title artist creatorDisplay coverArt duration uuid slug _id tags contentForm sources rightsStatus rightsCleared')
     .lean();
 
   const mediaLookup = new Map(mediaDocs.map((media) => [media._id.toString(), media]));
@@ -1103,7 +1180,7 @@ async function buildPlaybackQueueResponse(user) {
       const media = mediaLookup.get(entry.mediaId?.toString());
       if (!media) return null;
 
-      const playability = enrichMediaWithPlayability(media);
+      const playability = enrichMediaWithPlayability(media, { authenticated: true });
       return {
         index,
         addedAt: entry.addedAt,
@@ -1111,6 +1188,7 @@ async function buildPlaybackQueueResponse(user) {
         note: entry.note || '',
         mediaId: media._id.toString(),
         mediaUuid: media.uuid || media._id.toString(),
+        slug: media.slug || null,
         title: media.title || 'Unknown Title',
         artist: formatMediaArtist(media),
         coverArt: media.coverArt || null,
@@ -1170,11 +1248,40 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await fetchTuneLibraryForUser(user);
+    const result = await fetchTuneLibraryForUser(user, { authenticated: true });
     res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);
     res.status(500).json({ error: 'Error fetching tune library', details: error.message });
+  }
+});
+
+/**
+ * @route   GET /api/users/me/blocked
+ * @desc    List users the authenticated account has blocked
+ * @access  Private
+ */
+router.get('/me/blocked', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('blockedUsers')
+      .populate('blockedUsers', 'uuid username profilePic');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const blocked = (user.blockedUsers || [])
+      .filter((entry) => entry && (entry._id || entry.uuid))
+      .map((entry) => ({
+        id: entry.uuid || String(entry._id),
+        uuid: entry.uuid,
+        _id: entry._id,
+        username: entry.username,
+        profilePic: entry.profilePic,
+      }));
+
+    return res.json({ blocked });
+  } catch (error) {
+    console.error('Error listing blocked users:', error);
+    return res.status(500).json({ error: 'Failed to list blocked users' });
   }
 });
 
@@ -1411,78 +1518,19 @@ router.delete('/me/queue', authMiddleware, async (req, res) => {
   }
 });
 
-// Track a listening history session
+// Track a listening history session (and count a qualified play once per session)
 router.post('/me/listening-history/track', authMiddleware, async (req, res) => {
   try {
-    const {
-      mediaId,
-      sessionId,
-      sourceType = 'unknown',
-      startedAt,
-      currentTime = 0,
-      duration = 0,
-      completed = false,
-      mediaTitle,
-      mediaArtist,
-      mediaCoverArt,
-    } = req.body || {};
+    const { history, playCounted } = await trackListeningSession({
+      userId: req.user._id,
+      ...(req.body || {}),
+    });
 
-    if (!mediaId || !sessionId) {
-      return res.status(400).json({ error: 'mediaId and sessionId are required' });
-    }
-
-    const media = await resolveMediaByIdentifier(mediaId);
-    if (!media) {
-      return res.status(404).json({ error: 'Media not found' });
-    }
-
-    const now = new Date();
-    const numericPosition = Math.max(0, Number(currentTime) || 0);
-    const numericDuration = Math.max(0, Number(duration) || Number(media.duration) || 0);
-    const completionPercent = numericDuration > 0
-      ? Math.min(100, Math.round((numericPosition / numericDuration) * 1000) / 10)
-      : 0;
-
-    const existing = await ListeningHistory.findOne({ userId: req.user._id, sessionId });
-    const derivedCompleted = completed === true || completionPercent >= 90;
-    const listenDurationSeconds = Math.max(
-      numericPosition,
-      existing?.listenDurationSeconds || 0
-    );
-
-    const history = await ListeningHistory.findOneAndUpdate(
-      { userId: req.user._id, sessionId },
-      {
-        $setOnInsert: {
-          userId: req.user._id,
-          mediaId: media._id,
-          sessionId,
-          startedAt: startedAt ? new Date(startedAt) : now,
-        },
-        $set: {
-          mediaId: media._id,
-          sourceType,
-          mediaTitle: mediaTitle || media.title || '',
-          mediaArtist: mediaArtist || formatMediaArtist(media),
-          mediaCoverArt: mediaCoverArt || media.coverArt || '',
-          mediaDuration: numericDuration,
-          lastPlayedAt: now,
-          lastPositionSeconds: numericPosition,
-          listenDurationSeconds,
-          completionPercent,
-          status: derivedCompleted ? 'completed' : (listenDurationSeconds > 0 ? 'partial' : 'in_progress'),
-          completedAt: derivedCompleted ? (existing?.completedAt || now) : null,
-        },
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true,
-      }
-    );
-
-    res.json({ success: true, history });
+    res.json({ success: true, history, playCounted });
   } catch (error) {
+    if (error instanceof ListeningHistoryError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error tracking listening history:', error);
     res.status(500).json({ error: 'Error tracking listening history', details: error.message });
   }
@@ -1503,7 +1551,7 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
 
     const total = await ListeningHistory.countDocuments(query);
     const items = await ListeningHistory.find(query)
-      .populate('mediaId', 'title artist creatorDisplay coverArt duration uuid _id tags contentForm')
+      .populate('mediaId', 'title artist creatorDisplay coverArt duration uuid slug _id tags contentForm')
       .sort({ lastPlayedAt: -1 })
       .skip(skip)
       .limit(limitNumber)
@@ -1522,10 +1570,14 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
         lastPositionSeconds: entry.lastPositionSeconds || 0,
         listenDurationSeconds: entry.listenDurationSeconds || 0,
         completionPercent: entry.completionPercent || 0,
+        countedAsPlay: Boolean(entry.countedAsPlay),
+        qualifiedAt: entry.qualifiedAt || null,
+        client: entry.client || 'web',
         status: entry.status,
         media: media ? {
           _id: media._id,
           uuid: media.uuid,
+          slug: media.slug || null,
           title: media.title,
           artist: formatMediaArtist(media),
           coverArt: media.coverArt,
@@ -1969,6 +2021,20 @@ router.post('/me/import/youtube/execute/start', authMiddleware, async (req, res)
   }
 });
 
+// @route   POST /api/users/me/import/youtube/rematch
+// @desc    Admin: re-run MusicBrainz after correcting artist/title
+// @access  Private (admin)
+router.post('/me/import/youtube/rematch', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const libraryImportService = require('../services/libraryImportService');
+    const result = await libraryImportService.rematchYouTubeImportItem(req.user._id, req.body || {});
+    res.json(result);
+  } catch (error) {
+    console.error('YouTube import rematch error:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to rematch YouTube track' });
+  }
+});
+
 function parseRekordboxPlaylistsField(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
@@ -2049,6 +2115,105 @@ router.post('/me/import/rekordbox/execute/start', authMiddleware, adminMiddlewar
   }
 });
 
+// @route   POST /api/users/me/import/rekordbox/ingest/preview/start
+// @desc    Preview Rekordbox playlist MP3 ingest (local files → catalog attach/create)
+// @access  Private (admin)
+router.post(
+  '/me/import/rekordbox/ingest/preview/start',
+  authMiddleware,
+  adminMiddleware,
+  rekordboxXmlUpload.single('libraryXmlFile'),
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: 'libraryXmlFile is required' });
+      }
+      const playlists = parseRekordboxPlaylistsField(req.body?.playlists);
+      if (!playlists.length) {
+        return res.status(400).json({ error: 'Select at least one Rekordbox playlist' });
+      }
+      const minBitrate = req.body?.minBitrate ? parseInt(req.body.minBitrate, 10) : 0;
+      const createUnmatched = req.body?.createUnmatched !== 'false' && req.body?.createUnmatched !== false;
+      const limit = req.body?.limit ? parseInt(req.body.limit, 10) : null;
+      const musicRoot = typeof req.body?.musicRoot === 'string' ? req.body.musicRoot.trim() : '';
+      const libraryImportJobService = require('../services/libraryImportJobService');
+      const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'rekordbox_ingest', {
+        xmlContent: req.file.buffer.toString('utf8'),
+        playlists,
+        minBitrate: Number.isFinite(minBitrate) ? minBitrate : 0,
+        createUnmatched,
+        limit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        musicRoot: musicRoot || null,
+      });
+      res.status(202).json({ jobId, status: 'queued' });
+    } catch (error) {
+      console.error('Rekordbox ingest preview start error:', error);
+      res.status(error.status || 500).json({ error: error.message || 'Failed to start Rekordbox ingest preview' });
+    }
+  }
+);
+
+// @route   POST /api/users/me/import/rekordbox/ingest/execute/start
+// @desc    Execute Rekordbox playlist MP3 ingest (uploads local files to R2)
+// @access  Private (admin)
+router.post('/me/import/rekordbox/ingest/execute/start', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { items, createParties = true, partyLocation } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'No tracks selected to ingest' });
+    }
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const started = libraryImportJobService.startExecuteJob(req.user._id, 'rekordbox_ingest', {
+      items,
+      createParties: createParties !== false,
+      partyLocation: partyLocation || 'Library Import',
+    });
+    res.status(202).json({ jobId: started.jobId, status: started.alreadyRunning ? 'running' : 'queued' });
+  } catch (error) {
+    console.error('Rekordbox ingest execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start Rekordbox ingest' });
+  }
+});
+
+// @route   POST /api/users/me/import/rekordbox/ingest/file
+// @desc    Ingest one Rekordbox playlist track from an uploaded MP3
+// @access  Private (admin)
+router.post(
+  '/me/import/rekordbox/ingest/file',
+  authMiddleware,
+  adminMiddleware,
+  rekordboxMp3Upload.single('audioFile'),
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer?.length) {
+        return res.status(400).json({ error: 'audioFile is required' });
+      }
+      let item = req.body?.item;
+      if (typeof item === 'string') {
+        try {
+          item = JSON.parse(item);
+        } catch {
+          return res.status(400).json({ error: 'item must be JSON' });
+        }
+      }
+      const createParties = req.body?.createParties !== 'false' && req.body?.createParties !== false;
+      const partyLocation = req.body?.partyLocation || 'Library Import';
+      const rekordboxPlaylistIngestService = require('../services/rekordboxPlaylistIngestService');
+      const result = await rekordboxPlaylistIngestService.ingestUploadedAudio(req.user._id, {
+        item,
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        createParties,
+        partyLocation,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('Rekordbox ingest file error:', error);
+      res.status(error.status || 500).json({ error: error.message || 'Failed to ingest MP3' });
+    }
+  }
+);
+
 // @route   GET /api/users/me/import/jobs/:jobId
 // @desc    Poll library import preview/execute job progress
 // @access  Private
@@ -2070,19 +2235,12 @@ router.get('/me/import/jobs/:jobId', authMiddleware, async (req, res) => {
 // @route   GET /api/users/:userId/tune-library
 // @desc    Get a user's tune library (public profile data)
 // @access  Public
-router.get('/:userId/tune-library', async (req, res) => {
+router.get('/:userId/tune-library', optionalAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
-    let user;
-    if (userId.includes('-')) {
-      user = await User.findOne({ uuid: userId });
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId);
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
+    const user = await User.findByIdentifier(userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await fetchTuneLibraryForUser(user);
+    const result = await fetchTuneLibraryForUser(user, { authenticated: Boolean(req.user) });
     res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);
@@ -2809,7 +2967,8 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit))
-      .select('_id uuid title artist coverArt globalMediaAggregate createdAt uploadedAt mediaOwners');
+      .select('_id uuid title artist featuring creatorDisplay host author coverArt globalMediaAggregate createdAt uploadedAt mediaOwners contentForm contentType podcastSeries')
+      .populate('podcastSeries', 'title');
 
     const total = await Media.countDocuments(query);
 
@@ -2862,13 +3021,7 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
         owner.userId.toString() === userId.toString()
       );
 
-      // Extract artist name
-      let artistName = 'Unknown Artist';
-      if (Array.isArray(m.artist) && m.artist.length > 0) {
-        artistName = m.artist[0].name || m.artist[0] || 'Unknown Artist';
-      } else if (typeof m.artist === 'string') {
-        artistName = m.artist;
-      }
+      const artistName = resolveCreatorDisplay(m);
 
       // Calculate total bid amount from actual bids (fallback to stored value if bids not found)
       const mediaIdStr = m._id.toString();
@@ -3412,7 +3565,45 @@ router.post('/make-admin/:userId', async (req, res) => {
   }
 });
 
-// @route   GET /api/users/:userId/profile
+async function setUserBlocked(req, res, shouldBlock) {
+  try {
+    const target = await User.findByIdentifier(req.params.userId);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target._id.toString() === req.user._id.toString()) {
+      return res.status(400).json({ error: 'You cannot block yourself' });
+    }
+
+    const update = shouldBlock
+      ? { $addToSet: { blockedUsers: target._id } }
+      : { $pull: { blockedUsers: target._id } };
+    await User.updateOne({ _id: req.user._id }, update);
+
+    return res.json({
+      blocked: shouldBlock,
+      userId: target.uuid || String(target._id),
+    });
+  } catch (error) {
+    console.error(`Error ${shouldBlock ? 'blocking' : 'unblocking'} user:`, error);
+    return res.status(500).json({
+      error: shouldBlock ? 'Failed to block user' : 'Failed to unblock user',
+    });
+  }
+}
+
+/**
+ * @route   POST /api/users/:userId/block
+ * @desc    Block a user so their profile and activity can be hidden
+ * @access  Private
+ */
+router.post('/:userId/block', authMiddleware, (req, res) => setUserBlocked(req, res, true));
+
+/**
+ * @route   DELETE /api/users/:userId/block
+ * @desc    Unblock a previously blocked user
+ * @access  Private
+ */
+router.delete('/:userId/block', authMiddleware, (req, res) => setUserBlocked(req, res, false));
+
 // @desc    Get comprehensive user profile with bidding history
 // @access  Public (for viewing user profiles), but authenticated users see their own data
 router.get('/:userId/profile', async (req, res) => {
@@ -3431,9 +3622,9 @@ router.get('/:userId/profile', async (req, res) => {
           const decoded = jwt.verify(token, SECRET_KEY);
           // Fetch user by UUID or ObjectId
           if (decoded.userId && decoded.userId.includes('-')) {
-            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role');
+            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role blockedUsers');
           } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
-            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role');
+            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role blockedUsers');
           }
         }
       } catch (tokenError) {
@@ -3450,19 +3641,8 @@ router.get('/:userId/profile', async (req, res) => {
     
     const { userId } = req.params;
 
-    // Find user by UUID or ObjectId
-    // First try without lean() to get full Mongoose document
-    let user;
-    if (userId.includes('-')) {
-      // UUID format
-      user = await User.findOne({ uuid: userId });
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      // ObjectId format
-      user = await User.findById(userId);
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
-
+    // Find user by username, UUID, or ObjectId
+    let user = await User.findByIdentifier(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -3479,7 +3659,7 @@ router.get('/:userId/profile', async (req, res) => {
       .populate({
         path: 'mediaId',
         model: 'Media',
-        select: 'title artist coverArt duration globalMediaAggregate uuid _id contentType contentForm tags', // Updated to schema grammar - added tags
+        select: 'title artist coverArt duration globalMediaAggregate uuid slug _id contentType contentForm tags', // Updated to schema grammar - added tags
       })
       .populate({
         path: 'partyId',
@@ -3502,8 +3682,7 @@ router.get('/:userId/profile', async (req, res) => {
     
     // Calculate global user aggregate rank
     // This is a simplified calculation - in production, this would be more complex
-    const allUsers = await User.find({}).select('_id');
-    const userAggregateRank = allUsers.length; // Placeholder - would need proper ranking calculation
+    const userAggregateRank = await User.countDocuments();
     
     // Get unique media items bid on - from ACTIVE bids only (matches tune library which only shows active bids)
     const activeBidsForStats = allUserBidsForStats.filter(bid => bid.status === 'active');
@@ -3674,9 +3853,16 @@ router.get('/:userId/profile', async (req, res) => {
       userResponseKeys: Object.keys(userResponse)
     });
     
+    const blockedByMe = Boolean(
+      req.user?.blockedUsers?.some(
+        (blockedId) => blockedId?.toString() === userObj._id.toString()
+      )
+    );
+
     res.json({
       message: 'User profile fetched successfully',
       user: userResponse,
+      blockedByMe,
       stats: {
         totalBids,
         totalAmountBid,
@@ -3776,10 +3962,13 @@ router.get('/referrals', authMiddleware, async (req, res) => {
     }
     
     const referrals = await User.find(query)
-      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId')
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId creatorProfile.verificationStatus')
       .sort({ createdAt: -1 })
       .lean();
-    
+
+    const { attachAffiliateInviteStats } = require('../utils/artistInviteAffiliate');
+    const enrichedReferrals = await attachAffiliateInviteStats(user, referrals);
+
     // Get invite codes with stats
     const inviteCodes = user.getActiveInviteCodes().map(ic => ({
       code: ic.code,
@@ -3807,13 +3996,21 @@ router.get('/referrals', authMiddleware, async (req, res) => {
       personalInviteCodes: inviteCodes,
       primaryInviteCode: user.getPrimaryInviteCode(),
       referralCount: referrals.length,
-      referrals: referrals.map(r => ({
+      referrals: enrichedReferrals.map(r => ({
         username: r.username,
         profilePic: r.profilePic,
         joinedAt: r.createdAt,
         location: r.homeLocation || null,
         uuid: r.uuid,
-        usedCode: r.parentInviteCode
+        usedCode: r.parentInviteCode,
+        isCreator: r.isCreator,
+        creatorVerificationStatus: r.creatorVerificationStatus,
+        hasOriginalUpload: r.hasOriginalUpload,
+        originalUploadCount: r.originalUploadCount,
+        affiliateWindowEndsAt: r.affiliateWindowEndsAt,
+        affiliateWindowActive: r.affiliateWindowActive,
+        affiliateDaysRemaining: r.affiliateDaysRemaining,
+        commissionPence: r.commissionPence,
       }))
     });
   } catch (error) {
@@ -4702,27 +4899,11 @@ router.get('/:userId/tag-rankings', async (req, res) => {
     const mongoose = require('mongoose');
     const tagRankingsService = require('../services/tagRankingsService');
     
-    // Find user by UUID or ObjectId
-    let actualUserId;
-    let user;
-    
-    if (userId.includes('-')) {
-      // UUID format
-      user = await User.findOne({ uuid: userId }).select('_id tagRankings tagRankingsUpdatedAt');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      actualUserId = user._id;
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      // ObjectId format
-      actualUserId = new mongoose.Types.ObjectId(userId);
-      user = await User.findById(actualUserId).select('_id tagRankings tagRankingsUpdatedAt');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
+    const user = await User.findByIdentifier(userId, { select: '_id tagRankings tagRankingsUpdatedAt' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
+    const actualUserId = user._id;
 
     // Check if we have cached rankings and they're recent (unless forcing refresh)
     const hasCachedRankings = user.tagRankings && user.tagRankings.length > 0;
@@ -4802,15 +4983,7 @@ router.get('/:userId/tunebytes-tag-rankings', async (req, res) => {
     const mongoose = require('mongoose');
     const tuneBytesTagRankingsService = require('../services/tuneBytesTagRankingsService');
 
-    let user;
-    if (typeof userId === 'string' && userId.includes('-')) {
-      user = await User.findOne({ uuid: userId }).select('_id');
-    } else if (mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId).select('_id');
-    } else {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
-
+    const user = await User.findByIdentifier(userId, { select: '_id' });
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -4845,13 +5018,18 @@ router.get('/:userId/tunebytes', authMiddleware, async (req, res) => {
     const { userId } = req.params;
     const requestingUserId = req.user._id;
 
+    const targetUser = await User.findByIdentifier(userId, { select: '_id' });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     // Users can only view their own TuneBytes data
-    if (userId !== requestingUserId.toString()) {
+    if (targetUser._id.toString() !== requestingUserId.toString()) {
       return res.status(403).json({ error: 'You can only view your own TuneBytes data' });
     }
 
     const tuneBytesService = require('../services/tuneBytesService');
-    const stats = await tuneBytesService.getUserTuneBytesStats(userId);
+    const stats = await tuneBytesService.getUserTuneBytesStats(targetUser._id);
 
     res.json({
       success: true,
@@ -4873,14 +5051,19 @@ router.get('/:userId/tunebytes/history', authMiddleware, async (req, res) => {
     const requestingUserId = req.user._id;
     const { limit = 50, offset = 0 } = req.query;
 
+    const targetUser = await User.findByIdentifier(userId, { select: '_id' });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     // Users can only view their own TuneBytes data
-    if (userId !== requestingUserId.toString()) {
+    if (targetUser._id.toString() !== requestingUserId.toString()) {
       return res.status(403).json({ error: 'You can only view your own TuneBytes data' });
     }
 
     const TuneBytesTransaction = require('../models/TuneBytesTransaction');
     const transactions = await TuneBytesTransaction.find({ 
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: targetUser._id,
       status: 'confirmed'
     })
     .populate('mediaId', 'title artist coverArt')
@@ -4890,7 +5073,7 @@ router.get('/:userId/tunebytes/history', authMiddleware, async (req, res) => {
     .limit(parseInt(limit));
 
     const totalCount = await TuneBytesTransaction.countDocuments({ 
-      userId: new mongoose.Types.ObjectId(userId),
+      userId: targetUser._id,
       status: 'confirmed'
     });
 
@@ -5522,7 +5705,7 @@ router.post('/admin/bids/:bidId/veto', authMiddleware, async (req, res) => {
     const Media = require('../models/Media');
     const Party = require('../models/Party');
     const media = await Media.findById(bid.mediaId);
-    const party = bid.partyId ? await Party.findById(bid.partyId) : null;
+    const party = bid.partyId ? await Party.findById(bid.partyId).select('name type') : null;
 
     if (!media) {
       return res.status(404).json({ error: 'Media associated with bid not found' });
@@ -5934,6 +6117,66 @@ router.post('/admin/warnings', authMiddleware, adminMiddleware, async (req, res)
   } catch (error) {
     console.error('Error issuing warning:', error);
     res.status(500).json({ error: 'Failed to issue warning', details: error.message });
+  }
+});
+
+function sendPurgeError(res, error, fallback) {
+  const status = Number(error.status) || 500;
+  if (status >= 500) {
+    console.error(fallback, error);
+    return res.status(500).json({ error: fallback });
+  }
+  return res.status(status).json({ error: error.message || fallback });
+}
+
+// Admin: Create a flagged test user (password account, joined to Global Party)
+router.post('/admin/test-users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { username, password, balance } = req.body || {};
+    const result = await userPurgeService.createTestUser({
+      username,
+      password,
+      balancePounds: balance,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to create test user');
+  }
+});
+
+// Admin: Preview what a permanent delete would unwind
+router.get('/admin/users/:userId/purge-preview', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const preview = await userPurgeService.previewPurge(req.params.userId);
+    return res.json(preview);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to preview user deletion');
+  }
+});
+
+// Admin: Flag an existing non-admin account as a test user so it can be purged
+router.post('/admin/users/:userId/mark-test', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await userPurgeService.markTestUser(req.params.userId, {
+      actor: req.user,
+      confirmUsername: req.body?.confirmUsername,
+    });
+    return res.json(result);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to flag test user');
+  }
+});
+
+// Admin: Permanently delete a test user and unwind their tips
+router.delete('/admin/users/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await userPurgeService.purgeUser(req.params.userId, {
+      actor: req.user,
+      confirmUsername: req.body?.confirmUsername,
+    });
+    return res.json(result);
+  } catch (error) {
+    return sendPurgeError(res, error, 'Failed to delete user');
   }
 });
 

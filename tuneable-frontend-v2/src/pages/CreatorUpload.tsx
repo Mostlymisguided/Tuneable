@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Upload, Music, Image, FileText, Calendar, Clock, Tag, Loader2, CheckCircle, Zap, AlertTriangle, Building, Bot, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useMetadataExtraction } from '../hooks/useMetadataExtraction';
-import { labelAPI, emailAPI, mediaAPI } from '../lib/api';
+import { labelAPI, emailAPI, mediaAPI, userAPI } from '../lib/api';
 import axios from 'axios';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -13,6 +13,8 @@ import AiToolsEditor from '../components/AiToolsEditor';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
+import { roundBpm } from '../utils/bpm';
+import { FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -94,6 +96,7 @@ const CreatorUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [adminRightsMode, setAdminRightsMode] = useState<'cleared' | 'permitted'>('cleared');
   const [labelSuggestions, setLabelSuggestions] = useState<any[]>([]);
   const [isSearchingLabels, setIsSearchingLabels] = useState(false);
   const [showLabelSuggestions, setShowLabelSuggestions] = useState(false);
@@ -139,10 +142,57 @@ const CreatorUpload: React.FC = () => {
   ]);
   const [coverArtFile, setCoverArtFile] = useState<File | null>(null);
   const coverArtFileInputRef = useRef<HTMLInputElement>(null);
+  const [foundingBanner, setFoundingBanner] = useState<{
+    claimed: number;
+    cap: number;
+    remaining: number;
+    isFoundingCreator?: boolean;
+    seatNumber?: number | null;
+    usedMb?: number;
+    quotaMb?: number;
+  } | null>(null);
   
   // Check if user is verified creator or admin
   const isAdmin = user && (user as any).role?.includes('admin');
   const isCreator = user && (user as any).role?.includes('creator');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await userAPI.getFoundingCreatorsStatus();
+        let me: any = null;
+        try {
+          me = await userAPI.getMyFoundingCreator();
+        } catch {
+          me = null;
+        }
+        if (cancelled) return;
+        setFoundingBanner({
+          claimed: status.claimed,
+          cap: status.cap,
+          remaining: status.remaining,
+          isFoundingCreator: me?.isFoundingCreator,
+          seatNumber: me?.foundingSeatNumber,
+          usedMb: me?.uploadUsedBytes != null
+            ? Math.round((me.uploadUsedBytes / (1024 * 1024)) * 10) / 10
+            : undefined,
+          quotaMb: me?.uploadQuotaBytes != null
+            ? Math.round(me.uploadQuotaBytes / (1024 * 1024))
+            : FOUNDING_UPLOAD_QUOTA_MB,
+        });
+      } catch {
+        if (!cancelled) {
+          setFoundingBanner({
+            claimed: 0,
+            cap: FOUNDING_CREATOR_CAP,
+            remaining: FOUNDING_CREATOR_CAP,
+          });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?._id]);
 
   if (!isCreator && !isAdmin) {
     return (
@@ -224,6 +274,7 @@ const CreatorUpload: React.FC = () => {
       return null;
     }
 
+    const matchBpm = roundBpm(match.bpm);
     setFormData((prev) => ({
       ...prev,
       title: prev.title || match.title || prev.title,
@@ -231,10 +282,10 @@ const CreatorUpload: React.FC = () => {
       album: prev.album || match.album || prev.album,
       genre: prev.genre || match.genre || prev.genre,
       duration: prev.duration || (match.duration ? secondsToMMSS(match.duration) : prev.duration),
-      bpm: prev.bpm || (match.bpm != null ? String(match.bpm) : prev.bpm),
+      bpm: prev.bpm || (matchBpm != null ? String(matchBpm) : prev.bpm),
       key: prev.key || match.key || prev.key,
     }));
-    setLibraryMatchLabel(`${match.title || selectedFile.name}${match.bpm ? ` · ${match.bpm} BPM` : ''}${match.key ? ` · ${match.key}` : ''}`);
+    setLibraryMatchLabel(`${match.title || selectedFile.name}${matchBpm ? ` · ${matchBpm} BPM` : ''}${match.key ? ` · ${match.key}` : ''}`);
     return match;
   }, [libraryTracks]);
 
@@ -296,7 +347,7 @@ const CreatorUpload: React.FC = () => {
         genre: extractedMetadata.genre?.[0] || prev.genre,
         duration: extractedMetadata.duration ? secondsToMMSS(extractedMetadata.duration) : prev.duration,
         explicit: extractedMetadata.explicit || prev.explicit,
-        bpm: extractedMetadata.bpm?.toString() || prev.bpm,
+        bpm: roundBpm(extractedMetadata.bpm)?.toString() || prev.bpm,
         key: extractedMetadata.key || prev.key,
         isrc: extractedMetadata.isrc || prev.isrc,
         upc: extractedMetadata.upc || prev.upc,
@@ -496,6 +547,7 @@ const CreatorUpload: React.FC = () => {
       const uploadData = new FormData();
       uploadData.append('audioFile', file);
       uploadData.append('title', formData.title.trim());
+      uploadData.append('rightsConfirmed', 'true');
 
       const cleanedArtists = artistEntries
         .map((artist, idx) => ({
@@ -580,6 +632,9 @@ const CreatorUpload: React.FC = () => {
       if (formData.label) uploadData.append('label', formData.label);
       if (formData.language) uploadData.append('language', formData.language);
       if (libraryXmlFile) uploadData.append('libraryXmlFile', libraryXmlFile);
+      if (isAdmin && adminRightsMode === 'permitted') {
+        uploadData.append('rightsStatus', 'permitted');
+      }
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const token = localStorage.getItem('token');
@@ -597,7 +652,16 @@ const CreatorUpload: React.FC = () => {
         }
       });
 
-      toast.success('Upload successful!');
+      const founding = response.data.foundingCreator;
+      if (founding?.status === 'assigned' && founding.seatNumber) {
+        toast.success(`Upload successful — you're Founding Creator #${founding.seatNumber}!`);
+      } else if (founding?.status === 'already') {
+        toast.success('Upload successful!');
+      } else if (founding?.status === 'full') {
+        toast.success('Upload successful! Founding creator seats are full.');
+      } else {
+        toast.success('Upload successful!');
+      }
       
       // Redirect to the new tune's profile
       if (response.data.media?._id) {
@@ -638,6 +702,20 @@ const CreatorUpload: React.FC = () => {
           <p className="text-gray-300">
             Share your music with the Tuneable community
           </p>
+          {foundingBanner && (
+            <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3">
+              <p className="text-sm text-amber-100 font-medium">
+                {foundingBanner.isFoundingCreator
+                  ? `Founding Creator #${foundingBanner.seatNumber ?? '—'}`
+                  : 'Founding Creators'}
+              </p>
+              <p className="text-xs text-gray-300 mt-1">
+                {foundingBanner.isFoundingCreator
+                  ? `Your allowance: ${foundingBanner.usedMb ?? 0} / ${foundingBanner.quotaMb ?? FOUNDING_UPLOAD_QUOTA_MB} MB used. Affiliate invite commission unlocked.`
+                  : `${foundingBanner.claimed.toLocaleString()} / ${foundingBanner.cap.toLocaleString()} seats claimed — ${foundingBanner.remaining.toLocaleString()} left. Your first original upload can claim a seat (${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB allowance). Not equity.`}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Upload Form */}
@@ -801,7 +879,7 @@ const CreatorUpload: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-gray-400">BPM:</span>
-                      <span className="text-white ml-2">{extractedMetadata.bpm || 'N/A'}</span>
+                      <span className="text-white ml-2">{roundBpm(extractedMetadata.bpm) ?? 'N/A'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Artwork:</span>
@@ -1201,6 +1279,7 @@ const CreatorUpload: React.FC = () => {
                   </label>
                   <input
                     type="number"
+                    step="1"
                     name="bpm"
                     value={formData.bpm}
                     onChange={handleChange}
@@ -1487,6 +1566,36 @@ const CreatorUpload: React.FC = () => {
 
           {/* Rights Confirmation */}
           <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-lg p-6">
+            {isAdmin && (
+              <fieldset className="mb-5 space-y-3">
+                <legend className="text-sm font-semibold text-white mb-2">Rights category</legend>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="admin-rights-mode"
+                    checked={adminRightsMode === 'cleared'}
+                    onChange={() => setAdminRightsMode('cleared')}
+                    className="mt-1 h-4 w-4 text-purple-600"
+                  />
+                  <span className="text-sm text-gray-300">
+                    <strong className="text-white">I am the rights holder.</strong> Playable, tips go to this account.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="admin-rights-mode"
+                    checked={adminRightsMode === 'permitted'}
+                    onChange={() => setAdminRightsMode('permitted')}
+                    className="mt-1 h-4 w-4 text-purple-600"
+                  />
+                  <span className="text-sm text-gray-300">
+                    <strong className="text-white">Artist gave permission but isn&apos;t on Tuneable yet.</strong>{' '}
+                    Playable now. Tips are held until they join and claim the listing.
+                  </span>
+                </label>
+              </fieldset>
+            )}
             <div className="flex items-start space-x-3">
               <input
                 type="checkbox"
@@ -1503,8 +1612,8 @@ const CreatorUpload: React.FC = () => {
                 <br /><br />
                 <strong className="text-white">✨Your Rights✨ You retain full rights over your works. You may 
                 revoke any rights granted to Tuneable at any time by removing your works from the platform.</strong>
-                <Link to="/terms-of-service" className="text-purple-400 underline ml-1 hover:text-purple-300">
-                  View Terms
+                <Link to="/terms-of-service#copyright" className="text-purple-400 underline ml-1 hover:text-purple-300">
+                  Copyright and takedown terms
                 </Link>
               </label>
             </div>

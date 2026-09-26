@@ -12,6 +12,8 @@ const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+const Collective = require('../models/Collective');
+const { venuesAtPlaceQuery, serializeVenueForPlace } = require('../utils/collectiveVenue');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const WRITTEN_FORMS = ['book', 'article'];
@@ -315,7 +317,7 @@ async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
 /**
  * Place profile: origin-scoped media ranked by tip aggregate.
  */
-async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped' } = {}) {
+async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped', authenticated = false } = {}) {
   const placeId = normalizePlaceId(rawPlaceId);
   if (!placeId) {
     const err = new Error('Place not found');
@@ -347,6 +349,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   // Related chips stay all-time; Top Tunes re-rank by period
   const relatedPlaces = computeRelatedPlaces(matched, placeId, place.featureType, { limit: 8 });
   const relatedTags = computeRelatedTags(matched, { limit: 8 });
+  const venues = await getVenuesForPlace(placeId);
 
   const chartSort = normalizeChartSort(sortBy);
   const ranked = startDate
@@ -365,7 +368,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
   const media = pageSlice.map((m) => ({
     ...m,
-    ...enrichMediaWithPlayability(m),
+    ...enrichMediaWithPlayability(m, { authenticated }),
     bids: bidsByMediaId.get(m._id.toString()) || [],
   }));
 
@@ -379,6 +382,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
     },
     relatedPlaces,
     relatedTags,
+    venues,
     media,
     pagination: {
       page: pageNum,
@@ -387,6 +391,16 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
       pages: Math.ceil(total / limitNum) || 0,
     },
   };
+}
+
+async function getVenuesForPlace(placeId, { limit = 24 } = {}) {
+  if (!placeId) return [];
+  const docs = await Collective.find(venuesAtPlaceQuery(placeId))
+    .select('name slug profilePicture type venueKind location.display location.label location.city verificationStatus')
+    .sort({ name: 1 })
+    .limit(Math.min(Math.max(limit, 1), 50))
+    .lean();
+  return docs.map(serializeVenueForPlace).filter(Boolean);
 }
 
 const SKIP_RANKING_FEATURE_TYPES = new Set(['continent', 'world']);
@@ -625,6 +639,7 @@ module.exports = {
   mediaOriginQuery,
   resolveLocationMediaIds,
   getLocationProfile,
+  getVenuesForPlace,
   computeRelatedPlaces,
   computeRelatedTags,
   pickLocationRankingCandidates,

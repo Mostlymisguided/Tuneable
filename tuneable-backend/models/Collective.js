@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const { uuidv7 } = require('uuidv7');
+const { mapboxLocationFields } = require('./mapboxLocationFields');
+const { COLLECTIVE_TYPES, VENUE_KINDS } = require('../utils/collectiveVenue');
 
 const collectiveSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -14,23 +16,18 @@ const collectiveSchema = new mongoose.Schema({
   // Type/Category
   type: {
     type: String,
-    enum: ['band', 'collective', 'production_company', 'other'],
+    enum: COLLECTIVE_TYPES,
     default: 'collective'
+  },
+  venueKind: {
+    type: String,
+    enum: VENUE_KINDS,
   },
   
   // Contact & Location
   email: { type: String, required: true },
   website: { type: String },
-  location: {
-    city: { type: String },
-    region: { type: String }, // State, province, or region
-    country: { type: String },
-    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number }
-    }
-  },
+  location: mapboxLocationFields(),
   
   // Social Media
   socialMedia: {
@@ -142,6 +139,8 @@ const collectiveSchema = new mongoose.Schema({
 // Note: name and slug fields already have unique: true which automatically creates indexes
 collectiveSchema.index({ email: 1 });
 collectiveSchema.index({ type: 1 });
+collectiveSchema.index({ 'location.placeId': 1, type: 1 });
+collectiveSchema.index({ 'location.ancestorIds': 1, type: 1 });
 collectiveSchema.index({ 'stats.globalCollectiveAggregate': -1 });
 collectiveSchema.index({ 'stats.globalRank': 1 });
 collectiveSchema.index({ 'stats.genreRank': 1 });

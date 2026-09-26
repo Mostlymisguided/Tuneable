@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { ActivityIndicator, AppState, View } from 'react-native';
 import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
@@ -11,6 +11,7 @@ import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
 import { subscribeNotificationResponses } from '@/src/lib/pushNotifications';
+import { recheckLocationPermission } from '@/src/lib/currentLocation';
 import { colors } from '@/src/theme/colors';
 
 export { ErrorBoundary } from 'expo-router';
@@ -26,28 +27,26 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      SplashScreen.hideAsync();
-    }, 4000);
-    return () => clearTimeout(t);
+  const hideSplash = useCallback(() => {
+    void SplashScreen.hideAsync();
   }, []);
 
-  if (!loaded && !error) {
-    return null;
-  }
+  useEffect(() => {
+    if (loaded || error) hideSplash();
+  }, [loaded, error, hideSplash]);
+
+  useEffect(() => {
+    const t = setTimeout(hideSplash, 2500);
+    return () => clearTimeout(t);
+  }, [hideSplash]);
 
   return (
-    <AuthProvider>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </AuthProvider>
+    <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={hideSplash}>
+      <AuthProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </AuthProvider>
+    </View>
   );
 }
 
@@ -56,6 +55,13 @@ function RootNavigator() {
 
   useEffect(() => {
     return subscribeNotificationResponses();
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void recheckLocationPermission();
+    });
+    return () => sub.remove();
   }, []);
 
   if (isLoading) {
@@ -95,7 +101,6 @@ function RootNavigator() {
         <Stack.Screen name="books" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="book-search" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="book/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="import-library" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="upload" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tune/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="podcast/[id]" options={{ animation: 'slide_from_right' }} />

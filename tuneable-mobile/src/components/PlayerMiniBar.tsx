@@ -15,7 +15,7 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
-import { formatArtist, mediaId } from '@/src/lib/media';
+import { getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { episodeId, seriesTitle } from '@/src/lib/podcast';
 import {
   useCurrentTrack,
@@ -49,7 +49,7 @@ export function PlayerMiniBar() {
   const tipSubtitle = episode
     ? seriesTitle(episode)
     : track
-      ? formatArtist(track.artist)
+      ? getCreatorDisplay(track)
       : undefined;
   const tipMedia = episode ?? track ?? undefined;
   const defaultTip = user?.preferences?.defaultTip ?? 1.11;
@@ -88,7 +88,7 @@ export function PlayerMiniBar() {
     <MiniBarChrome
       coverUri={track.coverArt || DEFAULT_COVER_ART}
       title={track.title || 'Untitled'}
-      subtitle={formatArtist(track.artist)}
+      subtitle={getCreatorDisplay(track)}
       isPlaying={musicPlaying}
       isLoading={musicLoading}
       onToggle={() => void musicToggle()}

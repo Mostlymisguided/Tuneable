@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Media = require('../models/Media');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { getTagProfile } = require('../services/tagProfileService');
 const {
   normalizeTagForStorage,
@@ -81,7 +82,7 @@ router.get('/popular', async (req, res) => {
 // @route   GET /api/tags/:slug/profile
 // @desc    Tag profile with top tipped media + related party
 // @access  Public
-router.get('/:slug/profile', async (req, res) => {
+router.get('/:slug/profile', optionalAuthMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
     const { page = 1, limit = 50, timePeriod = 'all-time', type, sortBy } = req.query;
@@ -90,7 +91,14 @@ router.get('/:slug/profile', async (req, res) => {
       return res.status(400).json({ error: 'Tag slug is required' });
     }
 
-    const profile = await getTagProfile(slug, { page, limit, timePeriod, type, sortBy });
+    const profile = await getTagProfile(slug, {
+      page,
+      limit,
+      timePeriod,
+      type,
+      sortBy,
+      authenticated: Boolean(req.user),
+    });
     res.json(profile);
   } catch (error) {
     if (error.status === 404) {

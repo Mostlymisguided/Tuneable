@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, UserPlus, Copy, Check } from 'lucide-react';
 import { userAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 interface CreateTestUserModalProps {
   isOpen: boolean;

@@ -103,7 +103,7 @@ private struct MusicPlayerWebViewRepresentable: UIViewRepresentable {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "ended" {
                 Task { @MainActor in
-                    store?.next()
+                    store?.next(completed: true)
                 }
             } else if message.name == "playerReady" {
                 Task { @MainActor in

@@ -12,6 +12,7 @@ const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
 const { softDeleteMedia } = require('../services/mediaLifecycleService');
 const artistEscrowService = require('../services/artistEscrowService');
 const { isRightsPendingClaimable: isRightsPendingLimbo } = require('../utils/mediaPlayability');
+const { isClaimApprovedOwner } = require('../utils/mediaRights');
 
 // Configure upload using R2 or local fallback
 const upload = createClaimUpload();
@@ -265,12 +266,10 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
           // Still allow if somehow already partially processed, but prefer limbo
         }
 
-        const hasExistingOwners = media.mediaOwners && media.mediaOwners.some(
-          (o) => o.percentage && o.percentage > 0
-        );
+        const hasClaimApprovedOwners = (media.mediaOwners || []).some(isClaimApprovedOwner);
         const ownershipPercentage = req.body.ownershipPercentage
           ? Number(req.body.ownershipPercentage)
-          : (hasExistingOwners ? 50 : 100);
+          : (hasClaimApprovedOwners ? 50 : 100);
 
         try {
           media.addMediaOwner(

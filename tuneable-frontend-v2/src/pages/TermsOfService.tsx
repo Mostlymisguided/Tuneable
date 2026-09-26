@@ -1,7 +1,15 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const TermsOfService: React.FC = () => {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) el.scrollIntoView({ block: 'start' });
+  }, [hash]);
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -116,7 +124,7 @@ const TermsOfService: React.FC = () => {
                   <li>Wallet balances are non-refundable except as required by law</li>
                   <li>Unused wallet funds remain in your account for future use</li>
                   <li>Promotional welcome credit may be offered to new users at Tuneable's discretion. Welcome credit is not cash, has no monetary value outside the platform, and any unused welcome credit may be revoked by Tuneable at any time (including automatic expiry after 12 months from grant). Tips placed with welcome credit remain on charts and in your history. Artist earnings from the welcome-credit portion of a tip stay pending until you add funds with a real payment (card or in-app purchase). If you do not top up within 90 days of that tip, those pending artist earnings expire. Tuneable may also reverse that conversion if the converting payment is refunded or charged back. Spent tips themselves are not deleted from charts.</li>
-                  <li>Welcome credit is subject to use limits designed to prevent abuse, including a maximum of £1.11 per tip, a maximum of £3.33 and three songs per artist, and a prohibition on using welcome credit to tip media you own or control.</li>
+                  <li>Welcome credit is subject to use limits designed to prevent abuse, including a maximum of £1.11 per tip, a maximum of £3.33 and three songs per artist, and a maximum of £1.11 of welcome credit per media item you own or control.</li>
                   <li>Tuneable may freeze wallets or place payout holds at its sole discretion where tipping or promotional-credit activity appears abusive, fraudulent, or otherwise harmful to the Service. Frozen wallets cannot tip, pledge, or request payouts until the hold is lifted.</li>
                 </ul>
 
@@ -128,7 +136,7 @@ const TermsOfService: React.FC = () => {
                   <li>Hosts may set minimum tip amounts for their parties</li>
                   <li>Tips are final when confirmed and deducted from your wallet</li>
                   <li>70% of each tip is allocated to the artist(s) via our escrow system</li>
-                  <li>30% of each tip goes to Tuneable as a platform fee</li>
+                  <li>30% of each tip goes to Tuneable as a platform fee, except where an artist-invite commission applies as described in section 4.5</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">4.3 Artist Escrow System</h3>
@@ -141,6 +149,31 @@ const TermsOfService: React.FC = () => {
                   <li>Payouts are processed manually by Tuneable staff</li>
                   <li>Revenue is accrued and reserved for creators until claimed, but not held in trust</li>
                   <li>Unclaimed allocations remain claimable indefinitely</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4.4 Founding Creators</h2>
+              <div className="space-y-4 text-gray-700">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>The first 1,111 creators who sign up and upload their own music (verified original upload) may receive Founding Creator status, assigned in order of qualifying upload until the cap is reached</li>
+                  <li>Founding Creator status is a platform benefit only. It is not equity, share capital, ownership of Tuneable, or a right to dividends or residual assets. Tuneable is a Community Interest Company</li>
+                  <li>Founding Creators receive a tuneable upload allowance (default 2,048 MB of original audio uploads). Tuneable may adjust allowances and will display your used and remaining allowance in the product</li>
+                  <li>Tuneable may revoke Founding Creator status for Terms violations, fraud, or abuse. Unused seats are not transferable</li>
+                </ul>
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4.5 Artist Invite Commission (Founding Creators)</h2>
+              <div className="space-y-4 text-gray-700">
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Only Founding Creators may earn artist-invite commission. If you are a Founding Creator and an artist signs up with your invite code and then uploads their own work, you may receive a commission of 3% of that artist&apos;s paid tip revenue for 12 months from the artist&apos;s account creation</li>
+                  <li>The commission is taken from Tuneable&apos;s platform share, not from the artist&apos;s 70% share</li>
+                  <li>Commission applies only to media the invited artist uploaded themselves. It does not apply to claimed library imports, catalog-only listings, or welcome-credit-only tips</li>
+                  <li>Commission is added to your escrow balance and paid out under the same payout rules as artist earnings. Tuneable may withhold or reverse commission in cases of abuse (including self-invite or circular tipping)</li>
+                  <li>Users who are not Founding Creators may still invite others; those invites do not earn commission under this section</li>
                 </ul>
               </div>
             </section>
@@ -203,7 +236,7 @@ const TermsOfService: React.FC = () => {
                   obtained from that platform, or remove specific content, Tuneable will comply and remove related metadata.
                 </p>
 
-                <h3 className="text-xl font-medium text-gray-900">5.4.3 Copyright Takedown (DMCA-Style)</h3>
+                <h3 id="copyright" className="text-xl font-medium text-gray-900 scroll-mt-24">5.4.3 Copyright Takedown (DMCA-Style)</h3>
                 <p className="mb-2">
                   Tuneable respects intellectual property rights and will process valid copyright takedown requests. 
                   To submit a copyright takedown request, send an email to <strong>hi@tuneable.stream</strong> with:
@@ -324,6 +357,11 @@ const TermsOfService: React.FC = () => {
                   governance — a DAO owned and steered by artists and users — consistent with our Community
                   Interest Company purpose. Tuneable CIC is not designed to produce billionaire outcomes from
                   artist tips.
+                </p>
+                <p className="mb-2">
+                  We pledge that no billionaire will be created from Tuneable. If a person&apos;s net worth
+                  exceeds £1 billion, they must sell their shares in Tuneable and cease to be involved with
+                  the organisation.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.4 Future Features</h3>

@@ -50,7 +50,7 @@ struct PodcastSeriesProfileView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         if !appliedSearch.isEmpty && !isLoading && episodes.isEmpty {
-                            Text("No episodes in this show match “\(appliedSearch)”.")
+                            Text("No episodes in this show’s catalogue match “\(appliedSearch)”.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppTheme.textSecondary)
                                 .padding(.horizontal)
@@ -80,7 +80,7 @@ struct PodcastSeriesProfileView: View {
         .navigationTitle(series?.title ?? "Series")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .searchable(text: $searchText, prompt: "Search episodes in this show")
+        .searchable(text: $searchText, prompt: "Search this show’s catalogue")
         .refreshable { await load() }
         .task(id: appliedSearch) {
             if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -12,6 +12,7 @@ import {
 } from '../utils/locationHelpers';
 import LocationAutocomplete from './LocationAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 export type ChampionMedal = 'gold' | 'silver' | 'bronze';
 
@@ -218,8 +219,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   }, [mediaId, tagSlug, originPlaceId, artistUserId, artistName, selectedLocation?.placeId, maxDisplay]);
 
   const profilePath = (ranking: MediaChampionRanking) => {
-    const id = ranking.user.uuid || ranking.user._id;
-    return id ? `/user/${id}` : undefined;
+    return ranking.user ? getUserProfileUrl(ranking.user) : undefined;
   };
 
   const podiumChampions = useMemo(() => {

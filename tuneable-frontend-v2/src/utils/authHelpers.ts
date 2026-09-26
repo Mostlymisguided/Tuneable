@@ -61,21 +61,28 @@ export function needsOnboarding(user: OnboardingUser | null | undefined): boolea
   return true;
 }
 
-/** Map an /import return into the onboarding import step so OAuth does not restart the wizard. */
-function importReturnToOnboarding(returnUrl: string): string {
+/**
+ * First login used to end on an import step. Send those returns to the import page
+ * so an in-flight Spotify or SoundCloud connect is not stuck on a removed step.
+ */
+export function importPathFromLegacyOnboarding(returnUrl?: string | null): string | null {
+  if (!returnUrl) return null;
   try {
     const parsed = new URL(returnUrl, 'http://local.invalid');
-    const params = new URLSearchParams({ step: 'import' });
+    if (!parsed.pathname.startsWith('/onboarding')) return null;
+    if (parsed.searchParams.get('step') !== 'import') return null;
+    const params = new URLSearchParams();
     const source = parsed.searchParams.get('source');
-    if (source === 'spotify' || source === 'soundcloud') {
+    if (source === 'spotify' || source === 'soundcloud' || source === 'youtube') {
       params.set('source', source);
     }
     if (parsed.searchParams.get('requestAccess') === '1') {
       params.set('requestAccess', '1');
     }
-    return `${ONBOARDING_PATH}?${params.toString()}`;
+    const qs = params.toString();
+    return qs ? `/import?${qs}` : '/import';
   } catch {
-    return `${ONBOARDING_PATH}?step=import`;
+    return null;
   }
 }
 
@@ -86,10 +93,7 @@ export function buildSpotifyRequestAccessPath(returnUrl?: string | null): string
   try {
     const parsed = new URL(returnUrl, 'http://local.invalid');
     if (parsed.pathname.startsWith('/onboarding')) {
-      parsed.searchParams.set('step', 'import');
-      parsed.searchParams.set('source', 'spotify');
-      parsed.searchParams.set('requestAccess', '1');
-      return `${parsed.pathname}?${parsed.searchParams.toString()}`;
+      return fallback;
     }
     if (parsed.pathname.startsWith('/import')) {
       parsed.searchParams.set('source', 'spotify');
@@ -108,11 +112,13 @@ export function getPostAuthPath(
   returnUrl?: string | null
 ): string {
   if (needsOnboarding(user)) {
+    const legacyImport = importPathFromLegacyOnboarding(returnUrl);
+    if (legacyImport) return legacyImport;
+    if (returnUrl && returnUrl.startsWith('/import')) {
+      return sanitizeReturnUrl(returnUrl, '/import');
+    }
     if (returnUrl && returnUrl.startsWith('/onboarding')) {
       return sanitizeReturnUrl(returnUrl, ONBOARDING_PATH);
-    }
-    if (returnUrl && returnUrl.startsWith('/import')) {
-      return importReturnToOnboarding(returnUrl);
     }
     return ONBOARDING_PATH;
   }

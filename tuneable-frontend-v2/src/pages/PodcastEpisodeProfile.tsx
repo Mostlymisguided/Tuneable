@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import DOMPurify from 'dompurify';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
 import { 
@@ -46,18 +46,22 @@ import {
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import MiniSupportersBar from '../components/MiniSupportersBar';
+import EntertainingLoader from '../components/EntertainingLoader';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { roundBpm } from '../utils/bpm';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { computeChampionTipContext } from '../utils/tipStats';
+import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -65,6 +69,10 @@ import DeleteMediaSection from '../components/DeleteMediaSection';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
+import { stripHtml } from '../utils/stripHtml';
 import { getEpisodeDisplayTags } from '../utils/podcastTags';
 
 interface Media {
@@ -116,7 +124,7 @@ interface Media {
   sources?: { [key: string]: string };
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   tipCount?: number;
   bids?: Bid[];
   comments?: Comment[];
@@ -277,6 +285,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     elements: [] as string[],
     coverArt: '',
     minimumBid: null as number | null,
+    copySharePercent: 50,
     primaryLocation: null as ResolvedLocation | null,
     secondaryLocation: null as ResolvedLocation | null
   });
@@ -291,6 +300,12 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   // Global bidding state
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
+  const [copyAccess, setCopyAccess] = useState<{
+    sharePercent?: number;
+    thresholdPence: number | null;
+    unlocked: boolean;
+    grandfathered: boolean;
+  } | null>(null);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -361,6 +376,17 @@ const PodcastEpisodeProfile: React.FC = () => {
     }
   }, [mediaId]);
 
+  useEffect(() => {
+    if (!media) return;
+    const canonical = getMediaProfileUrl(media);
+    if (!canonical || canonical.endsWith('/')) return;
+    const qs = searchParams.toString();
+    const target = qs ? `${canonical}?${qs}` : canonical;
+    if (window.location.pathname !== canonical) {
+      navigate(target, { replace: true });
+    }
+  }, [media, navigate, searchParams]);
+
   // Fetch global party minimum bid
   useEffect(() => {
     const fetchGlobalPartyMinimumBid = async () => {
@@ -399,6 +425,11 @@ const PodcastEpisodeProfile: React.FC = () => {
       console.log('📥 Podcast episode profile response:', response);
       setMedia(response.media);
       setComments(response.media.comments || []);
+      try {
+        setCopyAccess(await mediaAPI.getCopyAccess(mediaId!));
+      } catch {
+        setCopyAccess(null);
+      }
       console.log('✅ Podcast episode profile loaded successfully');
       return response.media;
     } catch (err: any) {
@@ -472,8 +503,11 @@ const PodcastEpisodeProfile: React.FC = () => {
   };
 
   const getEpisodeDeleteRedirect = () => {
-    if (media?.podcastSeries && typeof media.podcastSeries === 'object' && media.podcastSeries._id) {
-      return `/podcast/${media.podcastSeries._id}`;
+    if (media?.podcastSeries && typeof media.podcastSeries === 'object') {
+      return getMediaProfileUrl({
+        ...media.podcastSeries,
+        contentForm: ['podcastseries'],
+      });
     }
     return '/podcasts';
   };
@@ -866,7 +900,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         explicit: media.explicit || false,
         isrc: media.isrc || '',
         upc: media.upc || '',
-        bpm: (media as any).bpm || 0,
+        bpm: roundBpm((media as any).bpm) || 0,
         key: (media as any).key || '',
         tags: media.tags || [],
         lyrics: (media as any).lyrics || '',
@@ -883,6 +917,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         elements: (media as any).elements || [],
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
+        copySharePercent: normalizeCopySharePercent((media as any).copySharePercent),
         primaryLocation: (() => {
           const loc = (media as any).primaryLocation || null;
           if (loc && loc.country && !loc.countryCode) {
@@ -1529,6 +1564,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   // Handle play button click – use podcast player (not music web player)
   const handlePlaySong = () => {
     if (!media) return;
+    if (!requireAuthToPlay()) return;
 
     const episode = {
       _id: media._id,
@@ -1552,7 +1588,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const handleOpenTipModal = () => {
     if (!user) {
       toast.info('Please log in to support this episode');
-      const returnUrl = `/podcasts/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId, contentForm: ['podcastepisode'] });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1563,7 +1599,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this episode');
-      const returnUrl = `/podcasts/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId, contentForm: ['podcastepisode'] });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1613,80 +1649,37 @@ const PodcastEpisodeProfile: React.FC = () => {
   // Use frontend URL for sharing (canonical URL that users will see)
   // Backend route /api/media/share/:id is for Facebook's crawler to get meta tags
   // Use _id instead of uuid for shorter URLs
-  const shareUrl = media?._id 
-    ? `${window.location.origin}/podcasts/${media._id}`
+  const shareUrl = media
+    ? `${window.location.origin}${getMediaProfileUrl(media)}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this episode'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
+  const episodePath = media ? getMediaProfileUrl(media) : '';
+  const episodeBlurb = media
+    ? clipText(stripHtml(media.description)) || clipText(`Tip “${media.title}”${creatorDisplay ? ` by ${creatorDisplay}` : ''} on Tuneable and move it up the podcast chart.`)
+    : '';
 
-  // Update Open Graph meta tags for better Facebook sharing
-  useEffect(() => {
-    if (!media) return;
-
-    // Helper function to get absolute image URL
-    const getAbsoluteImageUrl = (imageUrl: string | undefined): string => {
-      if (!imageUrl) return `${window.location.origin}${DEFAULT_COVER_ART}`;
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        return imageUrl;
-      }
-      if (imageUrl.startsWith('/')) {
-        return `${window.location.origin}${imageUrl}`;
-      }
-      return `${window.location.origin}/${imageUrl}`;
-    };
-
-    const ogImage = media._id
-      ? getStoryCardUrl(media._id, 'og')
-      : getAbsoluteImageUrl(media.coverArt);
-    const artistDisplay = Array.isArray(media.artist) 
-      ? media.artist.map((a: any) => a.name || a).join(', ')
-      : media.artist || '';
-    const ogTitle = `${media.title}${artistDisplay ? ` by ${artistDisplay}` : ''} | Tuneable`;
-    const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media?._id 
-      ? `${window.location.origin}/podcasts/${media._id}`
-      : window.location.href;
-
-    // Create or update meta tags
-    const updateMetaTag = (property: string, content: string) => {
-      let meta = document.querySelector(`meta[property="${property}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('property', property);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    // Update Open Graph tags
-    updateMetaTag('og:title', ogTitle);
-    updateMetaTag('og:description', ogDescription);
-    updateMetaTag('og:image', ogImage);
-    updateMetaTag('og:url', ogUrl);
-    updateMetaTag('og:type', 'music.song');
-    updateMetaTag('og:site_name', 'Tuneable');
-
-    // Update Twitter Card tags for better cross-platform sharing
-    const updateTwitterTag = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name="${name}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    updateTwitterTag('twitter:card', 'summary_large_image');
-    updateTwitterTag('twitter:title', ogTitle);
-    updateTwitterTag('twitter:description', ogDescription);
-    updateTwitterTag('twitter:image', ogImage);
-
-    // Cleanup function to restore default meta tags when component unmounts
-    return () => {
-      // Optionally restore default tags here if needed
-    };
-  }, [media, shareUrl, shareText]);
+  usePageMeta(media ? {
+    title: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    description: episodeBlurb,
+    path: episodePath,
+    image: media._id ? getStoryCardUrl(media._id, 'og') : media.coverArt,
+    imageAlt: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    imageWidth: media._id ? 1200 : undefined,
+    imageHeight: media._id ? 630 : undefined,
+    twitterCard: 'summary_large_image',
+    type: 'article',
+    robots: searchParams.get('edit') === 'true' ? 'noindex, nofollow' : 'index, follow',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'PodcastEpisode',
+      name: media.title,
+      description: episodeBlurb,
+      ...(creatorDisplay ? { author: { '@type': 'Person', name: creatorDisplay } } : {}),
+      url: `${SITE_ORIGIN}${episodePath}`,
+      ...(media.coverArt ? { image: media.coverArt } : {}),
+    },
+  } : null);
 
   const handleNativeShare = async () => {
     if (!media?._id) {
@@ -1843,9 +1836,11 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading Podcast Episode Profile...</div>
-      </div>
+      <EntertainingLoader
+        flavor="podcast"
+        size="page"
+        headline="Loading this episode…"
+      />
     );
   }
 
@@ -2047,9 +2042,9 @@ const PodcastEpisodeProfile: React.FC = () => {
     media.podcastSeries && typeof media.podcastSeries === 'object'
       ? media.podcastSeries.title
       : null;
-  const seriesId =
+  const seriesPath =
     media.podcastSeries && typeof media.podcastSeries === 'object'
-      ? media.podcastSeries._id
+      ? getMediaProfileUrl({ ...media.podcastSeries, contentForm: ['podcastseries'] })
       : null;
 
   const externalLinks = (() => {
@@ -2140,6 +2135,9 @@ const PodcastEpisodeProfile: React.FC = () => {
               <p className="text-gray-300 text-sm mt-1">
                 Boost global ranking and support the creators
               </p>
+              {copyAccess && (
+                <p className="text-purple-200 text-xs mt-1">{copyAccessSentence(copyAccess)}</p>
+              )}
             </div>
             {user && (
               <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
@@ -2211,6 +2209,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   );
 
   const handlePlaySeriesEpisode = (episode: any) => {
+    if (!requireAuthToPlay()) return;
     const playable = {
       _id: episode._id,
       id: episode.uuid,
@@ -2238,7 +2237,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         >
           <div className="relative mb-2">
             <Link
-              to={`/podcasts/${episode._id || episode.uuid}`}
+              to={getMediaProfileUrl(episode)}
               className="block w-full"
             >
               <img
@@ -2257,7 +2256,7 @@ const PodcastEpisodeProfile: React.FC = () => {
             </button>
           </div>
           <Link
-            to={`/podcasts/${episode._id || episode.uuid}`}
+            to={getMediaProfileUrl(episode)}
             className="block w-full text-left"
           >
             <div className="text-sm font-semibold text-white truncate hover:text-purple-300 transition-colors">{episode.title}</div>
@@ -2357,9 +2356,9 @@ const PodcastEpisodeProfile: React.FC = () => {
             <div className="flex-1 w-full text-white">
               <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left px-2">{media.title}</h1>
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
-                {seriesId ? (
+                {seriesPath ? (
                   <a
-                    href={`/podcast/${seriesId}`}
+                    href={seriesPath}
                     className="hover:text-purple-200 hover:underline transition-colors"
                   >
                     {seriesTitle}
@@ -2586,9 +2585,9 @@ const PodcastEpisodeProfile: React.FC = () => {
                 <Mic className="h-5 w-5 text-cyan-300" />
                 More from this series
               </h2>
-              {seriesId && (
+              {seriesPath && (
                 <Link
-                  to={`/podcast/${seriesId}`}
+                  to={seriesPath}
                   className="text-sm text-purple-300 hover:text-purple-200 transition-colors"
                 >
                   View series
@@ -2933,6 +2932,9 @@ const PodcastEpisodeProfile: React.FC = () => {
                       <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
                         Boost this episode's global ranking and support the creators
                       </p>
+                      {copyAccess && (
+                        <p className="text-purple-200 text-xs md:text-sm mb-4">{copyAccessSentence(copyAccess)}</p>
+                      )}
                       
                       <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                         <button
@@ -3595,6 +3597,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                   <label className="block text-white font-medium mb-2">BPM</label>
                   <input
                     type="number"
+                    step="1"
                     value={editForm.bpm}
                     onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
                     className="input"
@@ -3764,6 +3767,27 @@ const PodcastEpisodeProfile: React.FC = () => {
                 </p>
               </div>
 
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Who can keep a copy
+                </label>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={editForm.copySharePercent}
+                  onChange={(e) => setEditForm({
+                    ...editForm,
+                    copySharePercent: normalizeCopySharePercent(e.target.value),
+                  })}
+                  className="w-full accent-purple-500"
+                />
+                <p className="text-sm text-white mt-2">{copyShareLabel(editForm.copySharePercent)}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  100% is everyone who tips. 1% is only the most generous. People who already cleared the line keep the copy if you raise it.
+                </p>
+              </div>
+
                 {/* Cover Art URL */}
                 <div>
                   <label className="block text-white font-medium mb-2">Cover Art URL</label>
@@ -3887,6 +3911,7 @@ const PodcastEpisodeProfile: React.FC = () => {
           mediaId={media._id}
           mediaTitle={media.title}
           contentLabel="Episode"
+          rightsStatus={media.rightsStatus}
           onClose={() => setShowClaimModal(false)}
         />
       )}

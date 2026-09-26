@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, Info, AlertCircle, Ban } from 'lucide-react';
 import { userAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 
 interface IssueWarningModalProps {
   isOpen: boolean;

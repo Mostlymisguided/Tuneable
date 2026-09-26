@@ -10,46 +10,60 @@ import {
   type LocationQuickPick,
   type LocationScope,
 } from '@/src/lib/location';
+import {
+  CHART_KIND_OPTIONS,
+  chartKindLabel,
+  type ChartHeroKind,
+  type ChartMediaKind,
+} from '@/src/lib/chartKind';
 import type { ResolvedLocation } from '@/src/types/user';
 
+type OpenPicker = 'kind' | 'scope' | null;
+
 type Props = {
-  chartLabel?: string;
+  chartKind?: ChartHeroKind;
+  onChartKindChange?: (kind: ChartMediaKind) => void;
   contentNoun?: string;
   selectedLocation: ResolvedLocation | null;
   locationScope?: LocationScope;
   onLocationScopeChange?: (scope: LocationScope) => void;
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
+  showRankedBySupport?: boolean;
 };
 
 export function GlobalChartHero({
-  chartLabel = "The World's Best Music",
-  contentNoun = 'Music',
+  chartKind = 'music',
+  onChartKindChange,
+  contentNoun,
   selectedLocation,
   locationScope = 'in',
   onLocationScopeChange,
   onLocationChange,
   locationQuickPicks,
+  showRankedBySupport = true,
 }: Props) {
-  const [scopeOpen, setScopeOpen] = useState(false);
+  const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const locationLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
     : 'Earth';
+  const kindLabel = chartKindLabel(chartKind);
+  const noun = contentNoun || kindLabel;
+  const kindToggleable = Boolean(onChartKindChange) && chartKind !== 'places';
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.eyebrow}>{chartLabel}</Text>
-      {onLocationScopeChange ? (
-        scopeOpen ? (
+      {kindToggleable ? (
+        openPicker === 'kind' ? (
           <View style={styles.scopeRow} accessibilityRole="tablist">
-            {LOCATION_SCOPE_OPTIONS.map((option) => {
-              const selected = option.id === locationScope;
+            {CHART_KIND_OPTIONS.map((option) => {
+              const selected = option.id === chartKind;
               return (
                 <Pressable
                   key={option.id}
                   onPress={() => {
-                    onLocationScopeChange(option.id);
-                    setScopeOpen(false);
+                    onChartKindChange?.(option.id);
+                    setOpenPicker(null);
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
@@ -71,7 +85,56 @@ export function GlobalChartHero({
           </View>
         ) : (
           <Pressable
-            onPress={() => setScopeOpen(true)}
+            onPress={() => setOpenPicker('kind')}
+            style={styles.scopeButton}
+            accessibilityRole="button"
+            accessibilityLabel={`${kindLabel}. Change to Music, Podcasts, or Books.`}
+          >
+            <Text style={styles.scopeButtonLabel}>{kindLabel}</Text>
+            <Ionicons
+              name="chevron-down"
+              size={12}
+              color="rgba(196, 181, 253, 0.6)"
+            />
+          </Pressable>
+        )
+      ) : (
+        <Text style={styles.eyebrow}>{kindLabel}</Text>
+      )}
+
+      {onLocationScopeChange ? (
+        openPicker === 'scope' ? (
+          <View style={styles.scopeRow} accessibilityRole="tablist">
+            {LOCATION_SCOPE_OPTIONS.map((option) => {
+              const selected = option.id === locationScope;
+              return (
+                <Pressable
+                  key={option.id}
+                  onPress={() => {
+                    onLocationScopeChange(option.id);
+                    setOpenPicker(null);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={option.label}
+                  style={styles.scopeOption}
+                >
+                  <Text
+                    style={[
+                      styles.votedFrom,
+                      styles.scopeOptionText,
+                      selected && styles.scopeOptionTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => setOpenPicker('scope')}
             style={styles.scopeButton}
             accessibilityRole="button"
             accessibilityLabel={`Chart scope ${locationScopeLabel(locationScope)}. Change to In, From, or Supported by.`}
@@ -123,10 +186,14 @@ export function GlobalChartHero({
         </View>
       ) : null}
 
+      {showRankedBySupport ? (
+        <Text style={styles.rankedNote}>Ranked by support</Text>
+      ) : null}
+
       {selectedLocation?.placeId ? (
         <Text style={styles.filterNote}>
           {locationScopeFilterNote(
-            contentNoun,
+            noun,
             formatLocation(selectedLocation),
             locationScope
           )}
@@ -247,6 +314,15 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#fff',
+  },
+  rankedNote: {
+    marginTop: 10,
+    color: 'rgba(196, 181, 253, 0.55)',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    textAlign: 'center',
   },
   filterNote: {
     marginTop: 10,

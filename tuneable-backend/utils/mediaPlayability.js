@@ -1,10 +1,12 @@
 /**
  * Media playability helpers for the metadata/import → upload transition.
  *
- * Playable music requires an uploaded file (sources.upload) AND cleared rights.
+ * Playable music requires an uploaded file (sources.upload) plus a playable
+ * rights status (cleared, or permitted with off-platform permission).
  * Pending library-import audio stays hosted for a later claim, but is not
  * streamed and direct audio URLs are stripped from public API responses.
- * Podcast/spoken content may use other direct audio source keys.
+ * Stream URLs for playable tracks are also omitted unless the requester is
+ * authenticated. Podcast/spoken content may use other direct audio source keys.
  */
 
 const { isWrittenMedia } = require('./mediaKinds');
@@ -84,7 +86,42 @@ function isMediaPlayable(media) {
     return false;
   }
 
+  if (media.rightsStatus === 'permitted') {
+    return !!sources.upload;
+  }
+
   return !!(sources.upload && media.rightsCleared === true);
+}
+
+/**
+ * Mongo filter matching isMediaPlayable() for hosted music/tunes.
+ * Combine with $and when the parent query already uses $or.
+ */
+function playableHostedMusicMongoFilter() {
+  return {
+    'sources.upload': { $exists: true, $nin: [null, ''] },
+    $or: [
+      { rightsStatus: 'permitted' },
+      { rightsStatus: 'cleared', rightsCleared: true },
+      {
+        rightsStatus: { $nin: ['pending', 'disputed', 'permitted'] },
+        rightsCleared: true,
+      },
+    ],
+  };
+}
+
+/**
+ * Chart query param. Default true so Global ranks among playable tracks.
+ * `all` / `false` / `0` keeps the unfiltered (All) chart.
+ */
+function parsePlayableOnlyQuery(value, defaultValue = true) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  const s = String(value).trim().toLowerCase();
+  if (['0', 'false', 'all', 'no', 'off'].includes(s)) return false;
+  if (['1', 'true', 'playable', 'yes', 'on'].includes(s)) return true;
+  return defaultValue;
 }
 
 function getSupportMode(media) {
@@ -101,6 +138,7 @@ function getPlayabilityBlockReason(media) {
 
   if (media.rightsStatus === 'disputed') return 'disputed';
   if (media.rightsStatus === 'pending') return 'rights';
+  // permitted is playable when a file exists; missing audio falls through below
 
   const sources = normalizeSources(media.sources);
   if (!hasDirectAudioSource(sources)) return 'audio';
@@ -111,13 +149,23 @@ function getPlayabilityBlockReason(media) {
 
 function isRightsPendingClaimable(media) {
   if (!media) return false;
-  return media.rightsStatus === 'pending' && !media.rightsCleared;
+  return (media.rightsStatus === 'pending' || media.rightsStatus === 'permitted')
+    && !media.rightsCleared;
+}
+
+/**
+ * Options for public media payloads.
+ * Stream URLs are only included when the requester is authenticated,
+ * unless exposeDirectAudio is set for trusted admin/import responses.
+ */
+function playabilityOptionsFromRequest(req, extra = {}) {
+  return { authenticated: Boolean(req && req.user), ...extra };
 }
 
 /**
  * Playability fields plus public-safe sources.
- * Direct audio URLs are omitted unless the track is actually playable
- * (or options.exposeDirectAudio is set for trusted admin responses).
+ * isPlayable stays true for guests so play UI still shows; direct audio URLs
+ * are omitted unless authenticated (or options.exposeDirectAudio).
  */
 function enrichMediaWithPlayability(media, options = {}) {
   const originalSources = normalizeSources(media?.sources);
@@ -127,7 +175,10 @@ function enrichMediaWithPlayability(media, options = {}) {
   const hasHostedAudio = typeof media?.hasHostedAudio === 'boolean'
     ? media.hasHostedAudio
     : (!podcast && !written && hasDirectAudioSource(originalSources));
-  const exposeDirectAudio = options.exposeDirectAudio === true || playable || podcast;
+  const authenticated = options.authenticated === true;
+  const exposeDirectAudio =
+    options.exposeDirectAudio === true ||
+    (authenticated && (playable || podcast));
   const clientSources = exposeDirectAudio
     ? originalSources
     : stripDirectAudioSources(originalSources);
@@ -167,9 +218,12 @@ module.exports = {
   stripDirectAudioSources,
   isYouTubeOnly,
   isMediaPlayable,
+  playableHostedMusicMongoFilter,
+  parsePlayableOnlyQuery,
   getSupportMode,
   getPlayabilityBlockReason,
   isRightsPendingClaimable,
+  playabilityOptionsFromRequest,
   enrichMediaWithPlayability,
   availablePlatformsFromSources,
   toClientMedia,

@@ -1,6 +1,6 @@
 /**
- * Mark library-imported / operator-seeded uploads as rights pending
- * so they are not playable until a verified claim.
+ * Mark hosted music that is not a verified original upload as rights pending
+ * so it is not playable until a verified claim.
  *
  * Dry run by default. Pass --execute to write.
  *
@@ -10,23 +10,15 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Media = require('../models/Media');
-
-const LIBRARY_SOURCES = [
-  'library_import',
-  'library_import_curator',
-  'bulk_library_import',
-  'rekordbox',
-  'itunes_library',
-  'itunes',
-];
-
-const LIBRARY_METHODS = [
-  'library_import_curator',
-  'bulk_library_import',
-];
+const { shouldGateHostedMusic, pendingRightsFields } = require('../utils/mediaRights');
 
 function isExecute() {
   return process.argv.includes('--execute');
+}
+
+function ownerMethod(media) {
+  const owner = (media.mediaOwners || [])[0];
+  return owner?.verificationMethod || 'none';
 }
 
 async function run() {
@@ -38,31 +30,30 @@ async function run() {
   await mongoose.connect(uri);
   console.log('Connected to MongoDB');
 
-  const query = {
+  const matches = await Media.find({
+    status: { $ne: 'deleted' },
     'sources.upload': { $exists: true, $nin: [null, ''] },
-    $or: [
-      { importSource: { $in: LIBRARY_SOURCES } },
-      { importedBy: { $ne: null } },
-      { 'mediaOwners.verificationSource': { $in: LIBRARY_SOURCES } },
-      { 'mediaOwners.verificationMethod': { $in: LIBRARY_METHODS } },
-    ],
-  };
-
-  const matches = await Media.find(query)
-    .select('title artist rightsStatus rightsCleared importSource importedBy sources.upload')
+  })
+    .select('title artist rightsStatus rightsCleared importSource importedBy contentForm contentType mediaOwners sources.upload')
     .lean();
 
-  const toUpdate = matches.filter(
-    (m) => m.rightsStatus !== 'pending' || m.rightsCleared === true
-  );
+  const toUpdate = matches.filter(shouldGateHostedMusic);
+  const leaveUnchanged = matches.length - toUpdate.length;
 
-  console.log(`Library-imported uploads: ${matches.length}`);
-  console.log(`Need rightsStatus=pending / rightsCleared=false: ${toUpdate.length}`);
-  toUpdate.slice(0, 25).forEach((m) => {
-    const artist = Array.isArray(m.artist) && m.artist[0]?.name ? m.artist[0].name : m.artist;
-    console.log(`  - ${artist} – ${m.title} [${m.rightsStatus}/${m.rightsCleared}] import=${m.importSource || ''}`);
-  });
-  if (toUpdate.length > 25) console.log(`  …and ${toUpdate.length - 25} more`);
+  const byImport = {};
+  const byMethod = {};
+  for (const m of toUpdate) {
+    const src = m.importSource || '(none)';
+    const method = ownerMethod(m);
+    byImport[src] = (byImport[src] || 0) + 1;
+    byMethod[method] = (byMethod[method] || 0) + 1;
+  }
+
+  console.log(`Hosted uploads: ${matches.length}`);
+  console.log(`Leave unchanged: ${leaveUnchanged}`);
+  console.log(`Gate to pending: ${toUpdate.length}`);
+  console.log('By importSource:', byImport);
+  console.log('By verificationMethod:', byMethod);
 
   if (!isExecute()) {
     console.log('\nDry run. Re-run with --execute to write.');
@@ -79,12 +70,7 @@ async function run() {
 
   const result = await Media.updateMany(
     { _id: { $in: ids } },
-    {
-      $set: {
-        rightsStatus: 'pending',
-        rightsCleared: false,
-      },
-    }
+    { $set: pendingRightsFields() }
   );
 
   console.log(`Updated ${result.modifiedCount} media documents.`);

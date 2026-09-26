@@ -48,10 +48,12 @@ describe('chartSort', () => {
   it('maps mongo sort for all-time charts', () => {
     expect(mediaChartMongoSort('newest')).toEqual({
       createdAt: -1,
+      uploadedAt: -1,
       globalMediaAggregate: -1,
     });
     expect(mediaChartMongoSort('oldest')).toEqual({
       createdAt: 1,
+      uploadedAt: 1,
       globalMediaAggregate: -1,
     });
   });

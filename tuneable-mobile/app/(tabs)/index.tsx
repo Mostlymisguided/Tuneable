@@ -29,7 +29,7 @@ import {
   getPlaceProfileHref,
 } from '@/src/lib/location';
 import {
-  formatArtist,
+  getCreatorDisplay,
   getChartTipPence,
   mediaId,
 } from '@/src/lib/media';
@@ -94,7 +94,7 @@ export default function HomeScreen() {
       rising.map((item, index) => ({
         key: mediaId(item) || String(index),
         title: item.title || 'Untitled',
-        subtitle: formatArtist(item.artist),
+        subtitle: getCreatorDisplay(item),
         coverArt: item.coverArt,
         meta: formatPoundsFromPence(getChartTipPence(item, 'today')),
         badge: String(index + 1),
@@ -326,12 +326,36 @@ export default function HomeScreen() {
           <View style={styles.catalogLinks}>
             <Pressable
               style={styles.catalogChip}
-              onPress={() => router.push('/(tabs)/podcasts')}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/charts', params: { kind: 'music' } })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Open music"
+            >
+              <Ionicons name="musical-notes-outline" size={16} color={colors.accentLight} />
+              <Text style={styles.catalogChipText}>Music</Text>
+            </Pressable>
+            <Pressable
+              style={styles.catalogChip}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/charts', params: { kind: 'podcasts' } })
+              }
               accessibilityRole="button"
               accessibilityLabel="Open podcasts"
             >
               <Ionicons name="mic-outline" size={16} color={colors.accentLight} />
               <Text style={styles.catalogChipText}>Podcasts</Text>
+            </Pressable>
+            <Pressable
+              style={styles.catalogChip}
+              onPress={() =>
+                router.push({ pathname: '/(tabs)/charts', params: { kind: 'books' } })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Open books"
+            >
+              <Ionicons name="book-outline" size={16} color={colors.accentLight} />
+              <Text style={styles.catalogChipText}>Books</Text>
             </Pressable>
           </View>
 
@@ -407,7 +431,9 @@ export default function HomeScreen() {
         <CoverRail
           title="Rising today"
           actionLabel="Full chart"
-          onAction={() => router.push('/(tabs)/music')}
+          onAction={() =>
+            router.push({ pathname: '/(tabs)/charts', params: { kind: 'music' } })
+          }
           items={risingRail}
           emptyTitle="Nothing rising yet"
           emptyBody="Be the first to tip the global chart today."
@@ -423,6 +449,7 @@ export default function HomeScreen() {
           <InviteShareCard
             inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
             username={user?.username}
+            isFoundingCreator={Boolean(user?.isFoundingCreator)}
             collapsible
             defaultCollapsed
           />
@@ -602,10 +629,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   catalogChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: colors.card,

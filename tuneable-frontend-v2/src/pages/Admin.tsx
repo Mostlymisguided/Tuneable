@@ -23,7 +23,9 @@ import {
   Gift,
   Sparkles,
   Undo2,
-  Scale
+  Scale,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
 import SpotifyImportRequestsAdmin from '../components/SpotifyImportRequestsAdmin';
@@ -32,17 +34,22 @@ import RightsAdmin from '../components/RightsAdmin';
 import NotificationsManager from '../components/NotificationsManager';
 import LedgerAdmin from '../components/LedgerAdmin';
 import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
+import RekordboxPlaylistIngest from '../components/RekordboxPlaylistIngest';
 import MediaMergePanel from '../components/MediaMergePanel';
 import MetadataEnrichmentAdmin from '../components/MetadataEnrichmentAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
+import CreateTestUserModal from '../components/CreateTestUserModal';
+import DeleteUserModal from '../components/DeleteUserModal';
 import InviteReferrals from '../components/InviteReferrals';
 import UserTopUpModal from '../components/UserTopUpModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import TagList from '../components/TagList';
+import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
+import { RIGHTS_STATUS_LABELS } from '../utils/rightsStatus';
 
 interface MediaEditDraft {
   title: string;
@@ -55,6 +62,7 @@ interface User {
   username: string;
   email?: string;
   role: string[];
+  isTestUser?: boolean;
   balance: number;
   inviteCredits?: number;
   tuneBytes?: number;
@@ -170,6 +178,10 @@ const Admin: React.FC = () => {
   // Warning modal state
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [selectedUserForWarning, setSelectedUserForWarning] = useState<{ id: string; username: string } | null>(null);
+  const [createTestUserOpen, setCreateTestUserOpen] = useState(false);
+  const [selectedUserForDelete, setSelectedUserForDelete] = useState<{ id: string; username: string; isTestUser?: boolean } | null>(null);
+
+  const [isInviteManagementCollapsed, setIsInviteManagementCollapsed] = useState(true);
 
   // Top-up modal state
   const [topUpModalOpen, setTopUpModalOpen] = useState(false);
@@ -841,7 +853,7 @@ const Admin: React.FC = () => {
         params.search = mediaSearchQuery;
       }
       if (mediaRightsFilter !== '') {
-        params.rightsCleared = mediaRightsFilter === 'true';
+        params.rightsStatus = mediaRightsFilter;
       }
       const data = await mediaAPI.getAllMedia(params);
       setMediaList(data.media || []);
@@ -1444,11 +1456,49 @@ const Admin: React.FC = () => {
 
             {/* Invite Codes Management - Admin Only */}
             <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                <Gift className="h-5 w-5 mr-2" />
-                Invite Codes Management
-              </h3>
-              <InviteReferrals />
+              <button
+                type="button"
+                onClick={() => setIsInviteManagementCollapsed((prev) => !prev)}
+                className="w-full flex items-center justify-between text-left hover:opacity-90 transition-opacity"
+                aria-expanded={!isInviteManagementCollapsed}
+              >
+                <h3 className="text-lg font-semibold text-white flex items-center">
+                  <Gift className="h-5 w-5 mr-2" />
+                  Invite Codes Management
+                </h3>
+                {isInviteManagementCollapsed ? (
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <ChevronUp className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
+              {!isInviteManagementCollapsed && (
+                <div className="mt-4">
+                  <InviteReferrals />
+                  <div className="mt-6 pt-4 border-t border-gray-700">
+                    <h4 className="text-sm font-semibold text-white mb-2">Founding Creators</h4>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Assign founding seats to the earliest users who already have verified original uploads (up to the cap).
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const result = await userAPI.backfillFoundingCreators();
+                          toast.success(
+                            `Backfill done: ${result.assigned ?? 0} assigned, ${result.claimed ?? 0}/${result.cap ?? 1111} claimed`
+                          );
+                        } catch (error: any) {
+                          toast.error(error.response?.data?.error || 'Founding backfill failed');
+                        }
+                      }}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm"
+                    >
+                      Backfill founding seats
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-gray-800 rounded-lg p-6">
@@ -1576,12 +1626,20 @@ const Admin: React.FC = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-white">User Management</h2>
-                  <button
-                    onClick={() => loadUsers()}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                  >
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCreateTestUserOpen(true)}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                    >
+                      Create test user
+                    </button>
+                    <button
+                      onClick={() => loadUsers()}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-gray-800 rounded-lg p-4">
@@ -1706,13 +1764,20 @@ const Admin: React.FC = () => {
                     {getSortedUsers().map((user) => (
                       <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <Link
-                            to={`/user/${user._id}`}
-                            className="text-sm font-medium text-white hover:text-purple-300 underline"
-                            title="View profile"
-                          >
-                            {user.username}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link
+                              to={`/user/${user._id}`}
+                              className="text-sm font-medium text-white hover:text-purple-300 underline"
+                              title="View profile"
+                            >
+                              {user.username}
+                            </Link>
+                            {user.isTestUser && (
+                              <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-900 text-amber-200">
+                                Test
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">{user.email}</div>
@@ -1898,6 +1963,41 @@ const Admin: React.FC = () => {
                                 >
                                   Make Admin
                                 </button>
+                                {user.isTestUser ? (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedUserForDelete({
+                                        id: user._id,
+                                        username: user.username,
+                                        isTestUser: true,
+                                      });
+                                    }}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                                    title="Permanently delete this test account and unwind its tips"
+                                  >
+                                    Delete
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={async () => {
+                                      const confirmed = window.confirm(
+                                        `Flag ${user.username} as a test account? Only do this for accounts you created for testing. You can then permanently delete them and unwind their tips.`
+                                      );
+                                      if (!confirmed) return;
+                                      try {
+                                        await userAPI.markTestUser(user._id, user.username);
+                                        toast.success(`Flagged ${user.username} as a test account`);
+                                        loadUsers();
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.error || 'Failed to flag test account');
+                                      }
+                                    }}
+                                    className="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm transition-colors"
+                                    title="Flag as a test account so it can be permanently deleted"
+                                  >
+                                    Flag test
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -2813,7 +2913,7 @@ const Admin: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Rights Cleared
+                        Rights
                       </label>
                       <select
                         value={mediaRightsFilter}
@@ -2825,8 +2925,10 @@ const Admin: React.FC = () => {
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
                       >
                         <option value="">All</option>
-                        <option value="true">Cleared</option>
-                        <option value="false">Not Cleared</option>
+                        <option value="cleared">Cleared</option>
+                        <option value="permitted">Permitted</option>
+                        <option value="pending">Pending</option>
+                        <option value="disputed">Disputed</option>
                       </select>
                     </div>
                   </div>
@@ -3076,10 +3178,27 @@ const Admin: React.FC = () => {
                                 <div className="flex flex-col gap-1">
                                   {item.status === 'vetoed' ? (
                                     <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-medium">Vetoed</span>
-                                  ) : item.rightsCleared ? (
-                                    <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium">Rights Cleared</span>
                                   ) : (
-                                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-medium">Pending</span>
+                                    <AdminRightsStatusSelect
+                                      value={item.rightsStatus || (item.rightsCleared ? 'cleared' : 'pending')}
+                                      onChange={async (status) => {
+                                        try {
+                                          await mediaAPI.updateMedia(item._id, { rightsStatus: status });
+                                          setMediaList((current) => current.map((row) => (
+                                            row._id === item._id
+                                              ? {
+                                                  ...row,
+                                                  rightsStatus: status,
+                                                  rightsCleared: status === 'cleared',
+                                                }
+                                              : row
+                                          )));
+                                          toast.success(`Rights set to ${RIGHTS_STATUS_LABELS[status]}`);
+                                        } catch (error: any) {
+                                          toast.error(error.response?.data?.error || 'Failed to update rights');
+                                        }
+                                      }}
+                                    />
                                   )}
                                   {item.label && item.label.length > 0 && (
                                     <div className="text-xs text-gray-400">
@@ -4389,6 +4508,8 @@ const Admin: React.FC = () => {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white">System Settings</h2>
 
+            <RekordboxPlaylistIngest />
+
             <LibraryXmlEnrich
               scope="all"
               allowScopeToggle
@@ -4396,6 +4517,23 @@ const Admin: React.FC = () => {
               description="Cross-check Rekordbox or iTunes Library.xml against the production catalog and fill in missing BPM and key fields. Existing values are never overwritten."
             />
           </div>
+        )}
+
+        <CreateTestUserModal
+          isOpen={createTestUserOpen}
+          onClose={() => setCreateTestUserOpen(false)}
+          onCreated={() => loadUsers()}
+        />
+
+        {selectedUserForDelete && (
+          <DeleteUserModal
+            isOpen
+            onClose={() => setSelectedUserForDelete(null)}
+            userId={selectedUserForDelete.id}
+            username={selectedUserForDelete.username}
+            isTestUser={selectedUserForDelete.isTestUser}
+            onDeleted={() => loadUsers()}
+          />
         )}
 
         {/* Warning Modal */}

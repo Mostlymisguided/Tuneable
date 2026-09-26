@@ -7,6 +7,7 @@ const Comment = require('../models/Comment');
 const Claim = require('../models/Claim');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
@@ -30,7 +31,21 @@ const {
   applyTipChipsToMedia,
   normalizeElementList,
 } = require('../utils/elementNormalizer');
-const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
+const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
+const { roundBpm } = require('../utils/bpm');
+const {
+  shouldClearRightsOnAttach,
+  pendingRightsFields,
+  clearedRightsFields,
+  permittedRightsFields,
+  applyRightsStatus,
+  isValidRightsStatus,
+  isVerifiedOriginalUpload,
+} = require('../utils/mediaRights');
+const {
+  assertWithinUploadQuota,
+  tryClaimFoundingSeat,
+} = require('../utils/foundingCreators');
 const {
   attachGearIdsToProductionStack,
   refreshGearStats,
@@ -40,6 +55,42 @@ const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const Gear = require('../models/Gear');
+const { resolveDeletedSuccessor } = require('../services/mediaSlugHandoff');
+
+function excludeDeletedMedia(query) {
+  if (query.status?.$nin) {
+    if (!query.status.$nin.includes('deleted')) query.status.$nin.push('deleted');
+    return query;
+  }
+  if (query.status?.$ne && query.status.$ne !== 'deleted') {
+    query.status = { $nin: [query.status.$ne, 'deleted'] };
+    return query;
+  }
+  if (!query.status) query.status = { $ne: 'deleted' };
+  return query;
+}
+
+router.use(optionalAuthMiddleware);
+
+async function findMediaByParam(mediaId, options = {}) {
+  return Media.findByIdentifier(mediaId, options);
+}
+
+/** Public reads: a deleted duplicate's uuid/slug opens the live recording. */
+async function findPlayableMedia(mediaId) {
+  let media = await findMediaByParam(mediaId);
+  if (media?.status === 'deleted') {
+    const successor = await resolveDeletedSuccessor(Media, media);
+    if (successor?._id) media = await Media.findById(successor._id);
+  }
+  if (!media || media.status === 'deleted') return null;
+  return media;
+}
+
+async function resolveMediaIdFromParam(mediaId) {
+  const media = await Media.findByIdentifier(mediaId, { select: '_id' });
+  return media?._id || null;
+}
 
 /**
  * Extract release year from releaseDate or use provided releaseYear
@@ -382,7 +433,7 @@ const attachAudioUpload = multer({
 
 const libraryXmlUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext === '.xml' || file.mimetype === 'text/xml' || file.mimetype === 'application/xml') {
@@ -532,6 +583,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     if (!canUploadMedia(user)) {
       return res.status(403).json({ error: 'Only verified creators and admins can upload media' });
     }
+
+    const { rightsConfirmed } = req.body;
+    if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
+      return res.status(400).json({ error: 'Rights confirmation is required' });
+    }
     
     if (!req.files || !req.files.audioFile || req.files.audioFile.length === 0) {
       return res.status(400).json({ error: 'No audio file uploaded' });
@@ -543,6 +599,21 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     console.log(`🎵 Processing upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
     if (coverArtFile) {
       console.log(`🖼️ Cover art file: ${coverArtFile.originalname} (${coverArtFile.size} bytes)`);
+    }
+
+    // Founding creators have a cumulative upload allowance (tuneable via env).
+    const isAdminPermittedUpload = isAdmin(user) && (
+      req.body.rightsStatus === 'permitted'
+    );
+    if (!isAdminPermittedUpload) {
+      const quotaCheck = await assertWithinUploadQuota(user, audioFile.size);
+      if (!quotaCheck.ok) {
+        return res.status(quotaCheck.status).json({
+          error: quotaCheck.error,
+          usedBytes: quotaCheck.usedBytes,
+          quotaBytes: quotaCheck.quotaBytes,
+        });
+      }
     }
     
     // Extract metadata from uploaded file
@@ -589,6 +660,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       composer,
       producer,
       label,
+      rightsStatus: requestedRightsStatus,
     } = req.body;
 
     // Resolve display metadata before upload so R2 keys are human-readable
@@ -795,32 +867,51 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       // Production equipment / gear (structured)
       productionStack: stackWithGear,
 
-      // Rights confirmation (assumed true when uploaded via checkbox)
-      rightsCleared: true,
-      rightsStatus: 'cleared',
-      rightsConfirmedBy: userId,
-      rightsConfirmedAt: new Date(),
+      // Rights attestation from the upload form (rightsConfirmed) is stored as
+      // rightsConfirmedBy / rightsConfirmedAt. Creator self-upload is cleared.
+      // Admins can mark permitted (off-platform permission, artist not on
+      // Tuneable yet) — playable, but not stamped as the admin's own work.
+      ...(isAdmin(user) && requestedRightsStatus === 'permitted'
+        ? permittedRightsFields(userId)
+        : {
+            rightsCleared: true,
+            rightsStatus: 'cleared',
+            rightsConfirmedBy: userId,
+            rightsConfirmedAt: new Date(),
+          }),
       
-      // Auto-assign ownership to uploader
-      mediaOwners: [{
-        userId: userId,
-        percentage: 100,
-        role: 'creator',
-        verified: true,
-        verifiedAt: new Date(),
-        verifiedBy: userId,
-        verificationMethod: 'Self-upload',
-        verificationNotes: null,
-        verificationSource: 'upload',
-        addedBy: userId,
-        addedAt: new Date(),
-        lastUpdatedAt: new Date(),
-        lastUpdatedBy: userId
-      }]
+      // Auto-assign ownership to uploader unless this is an admin permitted upload
+      mediaOwners: (isAdmin(user) && requestedRightsStatus === 'permitted')
+        ? []
+        : [{
+            userId: userId,
+            percentage: 100,
+            role: 'creator',
+            verified: true,
+            verifiedAt: new Date(),
+            verifiedBy: userId,
+            verificationMethod: 'Self-upload',
+            verificationNotes: null,
+            verificationSource: 'upload',
+            addedBy: userId,
+            addedAt: new Date(),
+            lastUpdatedAt: new Date(),
+            lastUpdatedBy: userId
+          }]
     });
     
     await media.save();
     await refreshGearStatsForStack(media.productionStack);
+
+    // First qualifying original upload claims a Founding Creator seat (cap 1111).
+    let foundingClaim = null;
+    if (isVerifiedOriginalUpload(media)) {
+      try {
+        foundingClaim = await tryClaimFoundingSeat(userId, { reason: 'original_upload' });
+      } catch (foundingErr) {
+        console.error('Founding seat claim failed (upload still saved):', foundingErr.message);
+      }
+    }
     
     // Process cover art file if provided
     if (coverArtFile) {
@@ -902,7 +993,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         artist: media.artist,
         coverArt: media.coverArt,
         sources: media.sources
-      }
+      },
+      foundingCreator: foundingClaim ? {
+        status: foundingClaim.status,
+        seatNumber: foundingClaim.seatNumber || null,
+      } : null,
     });
     
   } catch (error) {
@@ -912,8 +1007,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 });
 
 // @route   POST /api/media/:mediaId/attach-upload
-// @desc    Attach an MP3 to existing media (e.g. YouTube catalog entry) and enable playback
-// @access  Private (admin, media editor, or uploader with rights confirmation)
+// @desc    Replace the MP3 on media that already has hosted audio
+// @access  Private (admin or media editor, with rights confirmation)
 router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields([
   { name: 'audioFile', maxCount: 1 },
   { name: 'libraryXmlFile', maxCount: 1 },
@@ -929,6 +1024,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       replaceExisting,
       bpm,
       key,
+      rightsStatus: requestedRightsStatus,
     } = req.body;
 
     if (rightsConfirmed !== 'true' && rightsConfirmed !== true) {
@@ -943,30 +1039,36 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       return res.status(400).json({ error: 'Uploaded audio file is empty' });
     }
 
-    console.log(`🎵 attach-upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
-
-    let media;
-    if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-    } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
+    const fullUser = await User.findById(userId);
+    if (fullUser) {
+      const quotaCheck = await assertWithinUploadQuota(fullUser, audioFile.size);
+      if (!quotaCheck.ok) {
+        return res.status(quotaCheck.status).json({
+          error: quotaCheck.error,
+          usedBytes: quotaCheck.usedBytes,
+          quotaBytes: quotaCheck.quotaBytes,
+        });
+      }
     }
 
+    console.log(`🎵 attach-upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
+
+    let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    const canAttach = isAdmin(user) || canEditMedia(user, media) || canUploadMedia(user);
-    if (!canAttach) {
-      return res.status(403).json({ error: 'Not authorized to attach audio to this media' });
-    }
-
     const hasExistingUpload = !!(media.sources?.get?.('upload') || media.sources?.upload);
     const allowReplace = replaceExisting === 'true' || replaceExisting === true;
-    if (hasExistingUpload && !(allowReplace && canAttach)) {
-      return res.status(409).json({ error: 'This media already has an uploaded audio file' });
+    if (!hasExistingUpload || !allowReplace) {
+      return res.status(403).json({
+        error: 'Audio cannot be attached to an existing catalog entry. Upload a new track if you have the rights.',
+      });
+    }
+
+    const canReplace = isAdmin(user) || canEditMedia(user, media);
+    if (!canReplace) {
+      return res.status(403).json({ error: 'Not authorized to replace audio on this media' });
     }
 
     let fileUrl;
@@ -1006,19 +1108,36 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
 
     const isThirdParty = uploaderRole === 'third_party';
+    const adminPermitted = isAdmin(user) && requestedRightsStatus === 'permitted';
+    const clearRights = adminPermitted
+      ? false
+      : shouldClearRightsOnAttach({
+          uploaderRole,
+          isAdminUser: isAdmin(user),
+          existingOwner: media.mediaOwners?.find(
+            (o) => o.userId && o.userId.toString() === userId.toString()
+          ) || null,
+        });
     const verificationMethod = isThirdParty ? 'third_party_claim' : 'attach_upload';
     const verificationNotes = isThirdParty
       ? (rightsDisclaimer || 'Third-party upload with rights disclaimer')
-      : 'Audio attached to existing catalog entry';
+      : (adminPermitted
+        ? 'Admin attach with off-platform permission — awaiting artist claim'
+        : (clearRights
+          ? 'Audio attached to existing catalog entry'
+          : 'Operator attach — rights pending artist claim'));
 
     if (!media.sources || typeof media.sources.set !== 'function') {
       media.sources = new Map(Object.entries(media.sources || {}));
     }
     media.sources.set('upload', fileUrl);
-    media.rightsCleared = true;
-    media.rightsStatus = 'cleared';
-    media.rightsConfirmedBy = userId;
-    media.rightsConfirmedAt = new Date();
+    media.fileSize = audioFile.size;
+    Object.assign(
+      media,
+      adminPermitted
+        ? permittedRightsFields(userId)
+        : (clearRights ? clearedRightsFields(userId) : pendingRightsFields(userId, isAdmin(user) ? 'operator_attach' : null))
+    );
     if (!media.mediaType?.includes('mp3')) {
       media.mediaType = [...(media.mediaType || []), 'mp3'];
     }
@@ -1030,19 +1149,30 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       media.mediaOwners = media.mediaOwners || [];
       media.mediaOwners.push({
         userId,
-        percentage: isThirdParty ? 0 : 100,
-        role: isThirdParty ? 'contributor' : 'creator',
-        verified: !isThirdParty,
-        verifiedAt: isThirdParty ? null : new Date(),
-        verifiedBy: isThirdParty ? null : userId,
-        verificationMethod,
+        percentage: clearRights && !isThirdParty ? 100 : 0,
+        role: clearRights && !isThirdParty ? 'creator' : (isThirdParty ? 'contributor' : 'aux'),
+        verified: Boolean(clearRights && !isThirdParty),
+        verifiedAt: clearRights && !isThirdParty ? new Date() : null,
+        verifiedBy: clearRights && !isThirdParty ? userId : null,
+        verificationMethod: clearRights ? 'Self-upload' : verificationMethod,
         verificationNotes,
-        verificationSource: 'attach_upload',
+        verificationSource: clearRights ? 'upload' : 'operator_attach',
         addedBy: userId,
         addedAt: new Date(),
         lastUpdatedAt: new Date(),
         lastUpdatedBy: userId,
       });
+    } else if (clearRights && !isThirdParty) {
+      existingOwner.verified = true;
+      existingOwner.verifiedAt = new Date();
+      existingOwner.verifiedBy = userId;
+      existingOwner.verificationMethod = 'Self-upload';
+      existingOwner.verificationSource = 'upload';
+      if (!existingOwner.percentage || existingOwner.percentage <= 0) {
+        existingOwner.percentage = 100;
+      }
+      existingOwner.lastUpdatedAt = new Date();
+      existingOwner.lastUpdatedBy = userId;
     }
 
     if (audioFile.buffer) {
@@ -1083,6 +1213,15 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
 
     await media.save();
 
+    let foundingClaim = null;
+    if (isVerifiedOriginalUpload(media)) {
+      try {
+        foundingClaim = await tryClaimFoundingSeat(userId, { reason: 'attach_upload' });
+      } catch (foundingErr) {
+        console.error('Founding seat claim failed (attach still saved):', foundingErr.message);
+      }
+    }
+
     const sourcesObj = {};
     media.sources.forEach((value, key) => {
       sourcesObj[key] = value;
@@ -1091,15 +1230,21 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     console.log(`✅ Attached upload to media "${media.title}" (${media.uuid}) by ${user.username}`);
 
     res.json({
-      message: 'Audio attached successfully — media is now playable',
+      message: clearRights
+        ? 'Audio attached successfully — media is now playable'
+        : 'Audio attached — listing stays catalog-only until a rights holder claims it',
       media: {
         _id: media._id,
         uuid: media.uuid,
         title: media.title,
         sources: sourcesObj,
         rightsCleared: media.rightsCleared,
-        ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }),
+        ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }, playabilityOptionsFromRequest(req)),
       },
+      foundingCreator: foundingClaim ? {
+        status: foundingClaim.status,
+        seatNumber: foundingClaim.seatNumber || null,
+      } : null,
     });
   } catch (error) {
     console.error('Error attaching upload:', error);
@@ -1189,6 +1334,8 @@ router.get('/', async (req, res) => {
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
     sortObj.createdAt = -1; // Secondary sort by creation date
 
+    excludeDeletedMedia(query);
+
     const media = await Media.find(query)
       .sort(sortObj)
       .skip(skip)
@@ -1201,7 +1348,7 @@ router.get('/', async (req, res) => {
     res.json({
       media: media.map((item) => ({
         ...item,
-        ...enrichMediaWithPlayability(item),
+        ...enrichMediaWithPlayability(item, playabilityOptionsFromRequest(req)),
       })),
       pagination: {
         page: parseInt(page),
@@ -1260,6 +1407,8 @@ router.get('/public', async (req, res) => {
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
     sortObj.createdAt = -1; // Secondary sort by creation date
 
+    excludeDeletedMedia(query);
+
     const media = await Media.find(query)
       .sort(sortObj)
       .skip(skip)
@@ -1272,7 +1421,7 @@ router.get('/public', async (req, res) => {
     res.json({
       media: media.map((item) => ({
         ...item,
-        ...enrichMediaWithPlayability(item),
+        ...enrichMediaWithPlayability(item, playabilityOptionsFromRequest(req)),
       })),
       pagination: {
         page: parseInt(page),
@@ -1325,7 +1474,8 @@ router.get('/top-tunes', async (req, res) => {
     // Build query object
     let query = { 
       globalMediaAggregate: { $gt: 0 }, // Updated to schema grammar
-      contentType: { $in: ['music'] } // Only music content for now
+      contentType: { $in: ['music'] }, // Only music content for now
+      status: { $ne: 'deleted' },
     };
     
     // Ensure proper population by manually checking and populating if needed
@@ -1382,7 +1532,7 @@ router.get('/top-tunes', async (req, res) => {
           select: 'username profilePic uuid',
         },
       })
-      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid contentType contentForm genres category tags'); // Updated to schema grammar
+      .select('title artist producer featuring creatorNames duration coverArt globalMediaAggregate uploadedAt bids uuid slug contentType contentForm genres category tags'); // Updated to schema grammar
 
     // Apply fuzzy tag matching on results if tags are specified
     if (tags && Array.isArray(tags) && tags.length > 0) {
@@ -1464,6 +1614,44 @@ router.get('/top-tunes', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/:mediaId/copy-access
+// @desc    Whether the viewer is in the most generous half, or still holds a copy from when they were
+// @access  Public (user fields only when a valid token is sent)
+router.get('/:mediaId/copy-access', async (req, res) => {
+  try {
+    const media = await findPlayableMedia(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const User = require('../models/User');
+        const decoded = jwt.verify(
+          authHeader.slice(7),
+          process.env.JWT_SECRET || 'defaultsecretkey'
+        );
+        const user = decoded.userId && String(decoded.userId).includes('-')
+          ? await User.findOne({ uuid: decoded.userId }).select('_id')
+          : await User.findById(decoded.userId).select('_id');
+        userId = user?._id || null;
+      } catch (_error) {
+        userId = null;
+      }
+    }
+
+    const copyAccessService = require('../services/copyAccessService');
+    const status = await copyAccessService.getStatus(media._id, userId);
+    return res.json(status);
+  } catch (error) {
+    console.error('Error loading copy access:', error);
+    return res.status(500).json({ error: 'Failed to load copy access' });
+  }
+});
+
 // @route   GET /api/media/:mediaId/profile
 // @desc    Get comprehensive media details for Tune Profile page
 // @access  Public (for viewing media details)
@@ -1472,29 +1660,14 @@ router.get('/:mediaId/profile', async (req, res) => {
     const { mediaId } = req.params;
     console.log('🔍 Media profile request for mediaId:', mediaId);
 
-    // Find media by UUID or ObjectId
-    let media;
-    if (mediaId.includes('-')) {
-      // UUID format
-      console.log('🔍 Searching by UUID:', mediaId);
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      // ObjectId format
-      console.log('🔍 Searching by ObjectId:', mediaId);
-      media = await Media.findById(mediaId);
-    } else {
-      console.log('❌ Invalid media ID format:', mediaId);
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
+    const media = await findPlayableMedia(mediaId);
 
     if (!media) {
       console.log('❌ Media not found for ID:', mediaId);
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    if (media.status === 'deleted') {
-      return res.status(404).json({ error: 'Media not found' });
-    }
+    await Media.ensureSlug(media);
     
     console.log('✅ Media found:', media.title);
 
@@ -1538,7 +1711,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       .populate({
         path: 'podcastSeries',
         model: 'Media',
-        select: '_id title coverArt description frequency genres tags'
+        select: '_id uuid slug title coverArt description frequency genres tags'
       });
 
     // Fetch recent comments
@@ -1644,7 +1817,7 @@ router.get('/:mediaId/profile', async (req, res) => {
       creatorDisplay: populatedMedia.creatorDisplay || formatCreatorDisplay(populatedMedia.artist || [], populatedMedia.featuring || []), // Display string for UI
       globalMediaAggregateTopRank: rank, // Add computed rank
       globalMediaAggregate: calculatedGlobalMediaAggregate, // Override with calculated value from all bids
-      ...enrichMediaWithPlayability({ ...mediaObj, sources: sourcesObj }),
+      ...enrichMediaWithPlayability({ ...mediaObj, sources: sourcesObj }, playabilityOptionsFromRequest(req)),
       // Tip count/supporters must match Bid collection (Media.bids can be stale)
       bids: allBids.map((bid) => (typeof bid.toObject === 'function' ? bid.toObject() : bid)),
       tipCount: allBids.length,
@@ -1683,14 +1856,11 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
     const { mediaId } = req.params;
     const { relatedLimit = 12, fansLimit = 8 } = req.query;
 
-    let resolvedMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!mediaByUuid) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      resolvedMediaId = mediaByUuid._id;
+    const resolved = await findPlayableMedia(mediaId);
+    if (!resolved) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const resolvedMediaId = resolved._id;
 
     const playlists = await getRelatedPlaylistsForMedia(resolvedMediaId, {
       relatedLimit: Math.min(Math.max(parseInt(relatedLimit, 10) || 12, 1), 24),
@@ -1699,6 +1869,7 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
         if (!Number.isFinite(parsed)) return 8;
         return Math.min(Math.max(parsed, 0), 16);
       })(),
+      authenticated: Boolean(req.user),
     });
 
     res.json({
@@ -1886,16 +2057,24 @@ router.put('/:id', authMiddleware, async (req, res) => {
       'title', 'producer', 'album', 'genre',
       'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'description', 'language', 'minimumBid'
+      'lyrics', 'description', 'language', 'minimumBid', 'copySharePercent'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
+
+    if (req.body.copySharePercent !== undefined && req.body.copySharePercent !== null && req.body.copySharePercent !== '') {
+      const share = Math.round(Number(req.body.copySharePercent));
+      if (!Number.isFinite(share) || share < 1 || share > 100) {
+        return res.status(400).json({ error: 'Copy share must be between 1 and 100' });
+      }
+      req.body.copySharePercent = share;
+    }
     
     allowedUpdates.forEach(field => {
       if (req.body[field] !== undefined) {
         let value = req.body[field];
         
         // Convert numeric fields from string to number if needed
-        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear', 'minimumBid'];
+        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear', 'minimumBid', 'copySharePercent'];
         if (numericFields.includes(field) && typeof value === 'string' && value.trim() !== '') {
           const numValue = field === 'releaseYear' ? parseInt(value) : parseFloat(value);
           if (!isNaN(numValue)) {
@@ -1904,6 +2083,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
         }
         
         // Validate minimumBid (must be at least 0.01 or null to clear override)
+        if (field === 'copySharePercent') {
+          const { normalizeCopySharePercent } = require('../utils/generousHalf');
+          value = normalizeCopySharePercent(value);
+        }
+
         if (field === 'minimumBid') {
           if (value !== null && value !== undefined && value !== '') {
             const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -1980,6 +2164,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
         if (field === 'elements') {
           value = normalizeElementList(value);
+        }
+
+        if (field === 'bpm') {
+          value = roundBpm(value);
         }
         
         // Check if value actually changed
@@ -2499,6 +2687,29 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
 
+    if (req.body.rightsStatus !== undefined && isAdmin(req.user)) {
+      const previousStatus = media.rightsStatus;
+      const previousCleared = media.rightsCleared;
+      const applied = applyRightsStatus(media, req.body.rightsStatus, userId);
+      if (applied.error) {
+        return res.status(400).json({ error: applied.error });
+      }
+      if (applied.changed) {
+        changes.push({
+          field: 'rightsStatus',
+          oldValue: previousStatus,
+          newValue: req.body.rightsStatus,
+        });
+        if (previousCleared !== media.rightsCleared) {
+          changes.push({
+            field: 'rightsCleared',
+            oldValue: previousCleared,
+            newValue: media.rightsCleared,
+          });
+        }
+      }
+    }
+
     // Add to edit history if there are changes
     if (changes.length > 0) {
       // Ensure editHistory array exists
@@ -2694,16 +2905,7 @@ router.get('/:mediaId/comments', async (req, res) => {
     const { mediaId } = req.params;
     const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
-    // Find media
-    let media;
-    if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-    } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
-
+    let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -2768,16 +2970,7 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Comment must be less than 1000 characters' });
     }
 
-    // Validate media exists
-    let media;
-    if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId });
-    } else if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-    } else {
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
-
+    let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -2915,13 +3108,7 @@ router.post('/:mediaId/tag-claims', authMiddleware, async (req, res) => {
     const { tags, agreeTop, agreeLimit } = req.body || {};
     const userId = req.user._id;
 
-    let media;
-    if (isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId).select('_id');
-    } else if (mediaId.includes('-')) {
-      media = await Media.findOne({ uuid: mediaId }).select('_id');
-    }
-
+    const media = await findMediaByParam(mediaId, { select: '_id' });
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -3018,22 +3205,11 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       });
     }
 
-    // Find media by ObjectId (preferred) or UUID (fallback)
-    // Note: ObjectId is preferred for consistency with other routes, UUID is fallback for compatibility
-    let media;
-    const isObjectId = isValidObjectId(mediaId);
-    const isUuid = !isObjectId && mediaId.includes('-');
-    const isExternalRequest = !isObjectId && !isUuid;
-
-    if (isObjectId) {
-      // ObjectId format (preferred)
-      media = await Media.findById(mediaId);
-    } else if (isUuid) {
-      // UUID format (fallback)
-      media = await Media.findOne({ uuid: mediaId });
-    } else {
-      media = null; // Treat as external creation request
-    }
+    const { isUuidString, isMongoObjectIdString } = require('../utils/identifierFormat');
+    let media = (mediaId && mediaId !== 'external')
+      ? await findMediaByParam(mediaId)
+      : null;
+    const isExternalRequest = !media && Boolean(externalMedia) && !isUuidString(mediaId) && !isMongoObjectIdString(mediaId);
 
     if (!media && isExternalRequest) {
       if (!externalMedia) {
@@ -3104,7 +3280,9 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           globalMediaAggregate: 0,
           contentType: ['music'],
           contentForm: ['tune'],
-          mediaType: ['mp3']
+          mediaType: ['mp3'],
+          rightsStatus: 'pending',
+          rightsCleared: false,
         });
 
         await media.save();
@@ -3437,16 +3615,11 @@ router.get('/:mediaId/top-parties', async (req, res) => {
 
     console.log('🎪 Top parties request for media:', mediaId);
 
-    // Handle both ObjectIds and UUIDs
-    let actualMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      // If it's not an ObjectId, try to find by UUID
-      const media = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!media) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      actualMediaId = media._id;
+    const media = await findMediaByParam(mediaId, { select: '_id' });
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const actualMediaId = media._id;
 
     console.log('✅ Using media ID:', actualMediaId);
 
@@ -3503,16 +3676,11 @@ router.get('/:mediaId/tag-rankings', async (req, res) => {
 
     console.log('🏷️ Tag rankings request for media:', mediaId);
 
-    // Handle both ObjectIds and UUIDs
-    let actualMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      // If it's not an ObjectId, try to find by UUID
-      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!mediaByUuid) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      actualMediaId = mediaByUuid._id;
+    const resolved = await findPlayableMedia(mediaId);
+    if (!resolved) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const actualMediaId = resolved._id;
 
     const media = await Media.findById(actualMediaId)
       .populate('podcastSeries', 'title coverArt genres tags')
@@ -3546,14 +3714,11 @@ router.get('/:mediaId/location-rankings', async (req, res) => {
 
     console.log('📍 Location rankings request for media:', mediaId);
 
-    let actualMediaId = mediaId;
-    if (!isValidObjectId(mediaId)) {
-      const mediaByUuid = await Media.findOne({ uuid: mediaId }).select('_id');
-      if (!mediaByUuid) {
-        return res.status(404).json({ error: 'Media not found' });
-      }
-      actualMediaId = mediaByUuid._id;
+    const resolved = await findPlayableMedia(mediaId);
+    if (!resolved) {
+      return res.status(404).json({ error: 'Media not found' });
     }
+    const actualMediaId = resolved._id;
 
     const media = await Media.findById(actualMediaId)
       .select('_id primaryLocation globalMediaAggregate contentType contentForm status')
@@ -4012,6 +4177,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       addedBy,
       labelId,
       rightsCleared,
+      rightsStatus,
       dateFrom,
       dateTo
     } = req.query;
@@ -4047,8 +4213,10 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       query['label.labelId'] = labelId;
     }
 
-    // Rights cleared filter
-    if (rightsCleared !== undefined) {
+    // Rights filter
+    if (rightsStatus && isValidRightsStatus(rightsStatus)) {
+      query.rightsStatus = rightsStatus;
+    } else if (rightsCleared !== undefined) {
       query.rightsCleared = rightsCleared === 'true';
     }
 
@@ -4142,6 +4310,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
         genres: item.genres || [],
         explicit: item.explicit || false,
         rightsCleared: item.rightsCleared || false,
+        rightsStatus: item.rightsStatus || 'pending',
         uploadedAt: item.uploadedAt || item.createdAt,
         createdAt: item.createdAt,
         addedBy: item.addedBy ? {
@@ -4338,6 +4507,15 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
 
     await media.save();
 
+    if (req.body.copySharePercent !== undefined) {
+      try {
+        const copyAccessService = require('../services/copyAccessService');
+        await copyAccessService.grantCurrentHalf(media._id);
+      } catch (copyError) {
+        console.error('Error granting copy access after share change:', copyError);
+      }
+    }
+
     // Format response
     const artistNames = media.artist && media.artist.length > 0
       ? media.artist.map(a => a.name).join(', ')
@@ -4449,16 +4627,8 @@ router.get('/share/:id', async (req, res) => {
     // For debugging - log what we detect
     const shouldServeMetaTags = isCrawler; // Serve meta tags without redirect for crawlers
 
-    // Find media by _id (ObjectId) or UUID (for backward compatibility)
-    let media;
-    if (id.includes('-') && id.length > 20) {
-      // UUID format (has dashes and is longer)
-      media = await Media.findOne({ uuid: id });
-    } else if (isValidObjectId(id)) {
-      // ObjectId format (shorter, 24 characters)
-      media = await Media.findById(id);
-    } else {
-      // For share route, always return error page with meta tags (never redirect)
+    let media = await findMediaByParam(cleanId);
+    if (!media) {
       console.error('❌ Invalid media ID in share route:', cleanId);
       return res.status(400).send(`
         <!DOCTYPE html>
@@ -4474,20 +4644,6 @@ router.get('/share/:id', async (req, res) => {
         </head>
         <body>
           <p>Invalid media ID.</p>
-        </body>
-        </html>
-      `);
-      // For regular browsers, redirect
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta http-equiv="refresh" content="0;url=${frontendUrl}">
-          <title>Tuneable - Invalid ID</title>
-        </head>
-        <body>
-          <p>Invalid media ID. Redirecting to <a href="${frontendUrl}">Tuneable</a>...</p>
         </body>
         </html>
       `);
@@ -4580,7 +4736,7 @@ router.get('/share/:id', async (req, res) => {
     const artistText = creatorDisplay ? ` by ${creatorDisplay}` : '';
     const mediaTitle = (media.title && media.title.trim()) || 'Untitled Tune';
     const mediaKind = detectMediaKind(media);
-    const sharePath = canonicalMediaPath(mediaKind, media._id);
+    const sharePath = canonicalMediaPath(mediaKind, media.slug || media.uuid || media._id);
     
     // Ensure we have a valid cover art URL
     const ogImage = publicStoryCardUrl(req, media._id, 'og');
@@ -4775,17 +4931,9 @@ router.post('/:mediaId/veto', authMiddleware, adminMiddleware, async (req, res) 
     const notificationService = require('../services/notificationService');
 
     // Handle both ObjectId and UUID formats
-    let actualMediaId = mediaId;
-    let media = null;
-    
-    if (mongoose.isValidObjectId(mediaId)) {
-      media = await Media.findById(mediaId);
-      actualMediaId = mediaId;
-    } else {
-      media = await Media.findOne({ uuid: mediaId });
-      if (media) {
-        actualMediaId = media._id.toString();
-      }
+    let media = await findMediaByParam(mediaId);
+    if (media) {
+      actualMediaId = media._id.toString();
     }
 
     if (!media) {

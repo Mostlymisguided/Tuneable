@@ -60,7 +60,7 @@ const DataDeletion: React.FC = () => {
                   If you cannot access your account or prefer to request deletion via email:
                 </p>
                 <ol className="list-decimal pl-6 space-y-3 text-gray-700">
-                  <li>Send an email to <strong>privacy@tuneable.com</strong></li>
+                  <li>Send an email to <strong>hi@tuneable.stream</strong></li>
                   <li>Use the subject line: "Account Deletion Request"</li>
                   <li>Include the following information:
                     <ul className="list-disc pl-6 mt-2 space-y-1">
@@ -163,7 +163,7 @@ const DataDeletion: React.FC = () => {
               </p>
               <div className="bg-gray-100 p-4 rounded-lg">
                 <p className="text-gray-700">
-                  <strong>Email:</strong>mostlymisguided@icloud.com<br />
+                  <strong>Email:</strong> hi@tuneable.stream<br />
                   <strong>Subject:</strong> Data Deletion Request<br />
                   <strong>Response Time:</strong> Within 7 business days<br />
                   <strong>Note:</strong> Please include your username or email address for faster processing

@@ -4,6 +4,8 @@ import { BookOpen, Search, Coins } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
+import EntertainingLoader from '../components/EntertainingLoader';
+import ChartKindToggle from '../components/ChartKindToggle';
 
 type ChartBook = {
   _id: string;
@@ -53,6 +55,18 @@ const Books: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white pt-20 pb-24 px-4">
       <div className="max-w-4xl mx-auto">
+        <div className="text-center mb-6">
+          <ChartKindToggle
+            value="books"
+            onChange={(kind) => {
+              if (kind === 'books') return;
+              navigate(kind === 'podcasts' ? '/podcasts' : '/party/global?period=all-time');
+            }}
+          />
+          <p className="mt-2 text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-purple-300/50">
+            Ranked by support
+          </p>
+        </div>
         <div className="flex items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -86,7 +100,13 @@ const Books: React.FC = () => {
           ))}
         </div>
 
-        {loading && <p className="text-gray-400">Loading chart…</p>}
+        {loading && (
+          <EntertainingLoader
+            flavor="books"
+            size="section"
+            headline="Loading the books chart…"
+          />
+        )}
         {error && <p className="text-red-400">{error}</p>}
         {!loading && !error && books.length === 0 && (
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-gray-400">

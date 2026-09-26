@@ -1,4 +1,5 @@
 const { parseFile } = require('music-metadata');
+const { roundBpm } = require('../../utils/bpm');
 const {
   normalize,
   primaryArtist,
@@ -30,7 +31,7 @@ async function readId3(filePath) {
       artist: meta.common.artist || meta.common.artists?.[0] || '',
       title: meta.common.title || '',
       duration: Math.floor(meta.format.duration || 0),
-      bpm: meta.common.bpm || null,
+      bpm: roundBpm(meta.common.bpm),
       key: meta.common.key || null,
       bitrate: meta.format.bitrate ? Math.round(meta.format.bitrate / 1000) : null,
     };

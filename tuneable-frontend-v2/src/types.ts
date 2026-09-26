@@ -24,9 +24,14 @@ export interface MapboxLocationFields {
     placetype: string;
     regionCode?: string;
     countryCode?: string;
+    wikidataId?: string;
   }[];
   label?: string;
+  namePreferred?: string;
   display?: string;
+  placeFormatted?: string;
+  fullAddress?: string;
+  postcode?: string;
   resolvedAt?: string;
 }
 
@@ -140,6 +145,32 @@ export interface User {
     website?: string;
     label?: string;
   };
+  /** Founding Creators — status/benefits only, not equity */
+  isFoundingCreator?: boolean;
+  foundingSeatNumber?: number | null;
+  foundingSeatAssignedAt?: string | null;
+  foundingUploadQuotaBytes?: number | null;
+  foundingUploadUsedBytes?: number | null;
+  foundingUploadRemainingBytes?: number | null;
+  foundingProgram?: {
+    cap: number;
+    claimed: number;
+    remaining: number;
+    open: boolean;
+    uploadQuotaMb: number;
+  };
+}
+
+export interface FoundingCreatorsStatus {
+  cap: number;
+  claimed: number;
+  remaining: number;
+  open: boolean;
+  uploadQuotaMb: number;
+  uploadQuotaBytes: number;
+  affiliatePercent: number;
+  affiliateExclusiveToFounding: boolean;
+  description?: string;
 }
 
 export interface RegisterData {
@@ -184,6 +215,7 @@ export interface MediaRelationship {
 export interface Media {
   id: string;
   uuid: string;
+  slug?: string;
   title: string;
   
   // Content classification
@@ -279,7 +311,7 @@ export interface Media {
   
   // Rights clearance (library import limbo vs cleared ownership)
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   isPlayable?: boolean;
   hasHostedAudio?: boolean;
   playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
@@ -506,4 +538,12 @@ export interface Referral {
   } | null;
   uuid: string;
   usedCode?: string;
+  isCreator?: boolean;
+  creatorVerificationStatus?: string;
+  hasOriginalUpload?: boolean;
+  originalUploadCount?: number;
+  affiliateWindowEndsAt?: string | null;
+  affiliateWindowActive?: boolean;
+  affiliateDaysRemaining?: number;
+  commissionPence?: number;
 }

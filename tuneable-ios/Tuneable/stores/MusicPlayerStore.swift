@@ -24,32 +24,42 @@ final class MusicPlayerStore: ObservableObject {
 
     /// Set queue and start from the given index (default 0). Same logic as web: play the displayed queue.
     func setQueueAndPlay(_ items: [GlobalPartyMediaItem], startIndex: Int = 0) {
+        ListeningHistoryTracker.shared.endSession()
         let safeIndex = min(max(0, startIndex), max(0, items.count - 1))
         queue = items
         currentIndex = safeIndex
         currentTime = 0
         duration = currentItem?.duration ?? 0
         isPlaying = true
+        syncListeningHistory()
     }
 
     func play() {
         isPlaying = true
+        syncListeningHistory()
     }
 
     func pause() {
         isPlaying = false
+        syncListeningHistory()
     }
 
     func togglePlayPause() {
-        isPlaying.toggle()
+        if isPlaying { pause() } else { play() }
     }
 
-    func next() {
+    func next(completed: Bool = false) {
+        if completed {
+            ListeningHistoryTracker.shared.complete()
+        } else {
+            ListeningHistoryTracker.shared.endSession()
+        }
         guard hasNext else { return }
         currentIndex += 1
         currentTime = 0
         duration = currentItem?.duration ?? 0
         isPlaying = true
+        syncListeningHistory()
     }
 
     func previous() {
@@ -58,10 +68,12 @@ final class MusicPlayerStore: ObservableObject {
             return
         }
         guard hasPrevious else { return }
+        ListeningHistoryTracker.shared.endSession()
         currentIndex -= 1
         currentTime = 0
         duration = currentItem?.duration ?? 0
         isPlaying = true
+        syncListeningHistory()
     }
 
     func seek(to time: TimeInterval) {
@@ -74,18 +86,35 @@ final class MusicPlayerStore: ObservableObject {
     func setPlaybackTime(current: TimeInterval, duration: TimeInterval) {
         currentTime = current
         if duration > 0 { self.duration = duration }
+        syncListeningHistory()
     }
 
     /// Called by the playback view when play state changes (e.g. video ended).
     func setPlaying(_ playing: Bool) {
         isPlaying = playing
+        syncListeningHistory()
     }
 
     func clear() {
+        ListeningHistoryTracker.shared.endSession()
         queue = []
         currentIndex = 0
         isPlaying = false
         currentTime = 0
         duration = 0
+    }
+
+    private func syncListeningHistory() {
+        guard let item = currentItem else { return }
+        ListeningHistoryTracker.shared.sync(
+            mediaId: item.id,
+            title: item.title ?? "",
+            artist: item.artist ?? "",
+            coverArt: item.coverArt ?? "",
+            currentTime: currentTime,
+            duration: self.duration,
+            sourceType: "direct",
+            isPlaying: isPlaying
+        )
     }
 }

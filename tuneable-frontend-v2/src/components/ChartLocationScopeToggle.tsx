@@ -9,13 +9,24 @@ import {
 interface ChartLocationScopeToggleProps {
   value: LocationScope;
   onChange: (scope: LocationScope) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const ChartLocationScopeToggle: React.FC<ChartLocationScopeToggleProps> = ({
   value,
   onChange,
+  open: openProp,
+  onOpenChange,
 }) => {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = typeof openProp === 'boolean';
+  const open = isControlled ? openProp : uncontrolledOpen;
+
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
 
   useEffect(() => {
     if (!open) return;

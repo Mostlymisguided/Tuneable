@@ -1,14 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2, UserPlus, Search, Mail } from 'lucide-react';
 import { collectiveAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
-import { DEFAULT_PROFILE_PIC, COUNTRIES } from '../constants';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getUserProfileUrl } from '../utils/profileNavigation';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
+import LocationAutocomplete from '../components/LocationAutocomplete';
+import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
+import {
+  COLLECTIVE_TYPE_OPTIONS,
+  VENUE_KIND_OPTIONS,
+  collectiveTypeLabel,
+  getCollectivePlaceProfilePath,
+  isVenueCollective,
+  venueKindLabel,
+  type CollectiveType,
+  type VenueKind,
+} from '../utils/collectiveTypes';
+import { usePageMeta } from '../seo/usePageMeta';
+import { clipText } from '../seo/pageMeta';
 
 interface Collective {
   _id: string;
@@ -19,13 +35,9 @@ interface Collective {
   coverImage: string;
   email: string;
   website: string;
-  type: 'band' | 'collective' | 'production_company' | 'other';
-  location?: {
-    city?: string;
-    region?: string;
-    country?: string;
-    countryCode?: string;
-  };
+  type: CollectiveType;
+  venueKind?: VenueKind;
+  location?: ResolvedLocation;
   socialMedia?: {
     instagram?: string;
     facebook?: string;
@@ -75,6 +87,13 @@ const CollectiveProfile: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [collective, setCollective] = useState<Collective | null>(null);
+  usePageMeta(collective ? {
+    title: collective.name,
+    description: clipText(collective.description) || `${collective.name} on Tuneable. See their music and listener support.`,
+    path: `/collective/${encodeURIComponent(collective.slug)}`,
+    image: collective.profilePicture || collective.coverImage,
+    imageAlt: collective.name,
+  } : null);
   const [recentReleases, setRecentReleases] = useState<Media[]>([]);
   const [topMedia, setTopMedia] = useState<Media[]>([]);
   const [members, setMembers] = useState<Collective['members']>([]);
@@ -104,14 +123,10 @@ const CollectiveProfile: React.FC = () => {
     email: '',
     website: '',
     foundedYear: '',
-    type: 'collective' as 'band' | 'collective' | 'production_company' | 'other',
+    type: 'collective' as CollectiveType,
+    venueKind: 'other' as VenueKind,
     genres: [] as string[],
-    location: {
-      city: '',
-      region: '',
-      country: '',
-      countryCode: ''
-    },
+    location: null as ResolvedLocation | null,
     socialMedia: {
       instagram: '',
       facebook: '',
@@ -122,23 +137,6 @@ const CollectiveProfile: React.FC = () => {
       tiktok: ''
     }
   });
-
-  // Helper function to get country code from country name
-  const getCountryCode = (countryName: string): string => {
-    const countryMap: Record<string, string> = {
-      'United Kingdom': 'GB',
-      'United States': 'US',
-      'Canada': 'CA',
-      'Australia': 'AU',
-      'Germany': 'DE',
-      'France': 'FR',
-      'Spain': 'ES',
-      'Italy': 'IT',
-      'Netherlands': 'NL',
-      'Belgium': 'BE'
-    };
-    return countryMap[countryName] || '';
-  };
 
   const fetchCollectiveTeam = async (collectiveSlug: string) => {
     if (!collectiveSlug) return;
@@ -320,13 +318,9 @@ useEffect(() => {
           website: data.collective.website || '',
           foundedYear: data.collective.foundedYear?.toString() || '',
           type: data.collective.type || 'collective',
+          venueKind: data.collective.venueKind || 'other',
           genres: data.collective.genres || [],
-            location: {
-              city: data.collective.location?.city || '',
-              region: data.collective.location?.region || '',
-              country: data.collective.location?.country || '',
-              countryCode: data.collective.location?.countryCode || ''
-            },
+          location: data.collective.location || null,
           socialMedia: {
             instagram: data.collective.socialMedia?.instagram || '',
             facebook: data.collective.socialMedia?.facebook || '',
@@ -401,6 +395,11 @@ useEffect(() => {
     if (!collective) return;
 
     try {
+      if (isVenueCollective(editForm.type) && !editForm.location?.placeId) {
+        toast.error('Venues must be bound to a Mapbox place');
+        return;
+      }
+
       const updates: any = {
         name: editForm.name,
         description: editForm.description || undefined,
@@ -408,13 +407,11 @@ useEffect(() => {
         website: editForm.website || undefined,
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
         type: editForm.type,
+        venueKind: isVenueCollective(editForm.type) ? editForm.venueKind : undefined,
         genres: editForm.genres.length > 0 ? editForm.genres : undefined,
-        location: (editForm.location.city || editForm.location.region || editForm.location.country) ? {
-          city: editForm.location.city || undefined,
-          region: editForm.location.region || undefined,
-          country: editForm.location.country || undefined,
-          countryCode: editForm.location.countryCode || undefined
-        } : undefined,
+        ...(editForm.location || isVenueCollective(editForm.type)
+          ? { location: editForm.location || null }
+          : {}),
         socialMedia: {
           instagram: editForm.socialMedia.instagram || undefined,
           facebook: editForm.socialMedia.facebook || undefined,
@@ -580,20 +577,35 @@ useEffect(() => {
               <div className="">
                 <div className="flex items-center space-x-3 mb-2">
                   <h1 className="text-4xl font-bold">{collective.name}</h1>
+                  <span className="px-3 py-1 rounded-full bg-purple-600/40 border border-purple-400/30 text-purple-100 text-sm font-medium">
+                    {collectiveTypeLabel(collective.type)}
+                    {isVenueCollective(collective.type) && venueKindLabel(collective.venueKind)
+                      ? ` · ${venueKindLabel(collective.venueKind)}`
+                      : ''}
+                  </span>
                 </div>
                 {collective.description && (
                   <p className="text-xl text-gray-300 mb-2 max-w-2xl">{collective.description}</p>
                 )}
                 
                 {/* Location */}
-                {collective.location && (collective.location.city || collective.location.region || collective.location.country) && (
+                {collective.location && (collective.location.display || collective.location.city || collective.location.country || collective.location.label) && (
                   <div className="mb-2">
+                    {(() => {
+                      const placePath = getCollectivePlaceProfilePath(collective.location);
+                      const label = formatLocation(collective.location);
+                      const chip = (
                     <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
                       <MapPin className="h-3.5 w-3.5" />
-                      <span>
-                        {[collective.location.city, collective.location.region, collective.location.country].filter(Boolean).join(', ')}
-                      </span>
+                      <span>{label}</span>
                     </div>
+                      );
+                      return placePath ? (
+                        <Link to={placePath} className="inline-flex no-underline hover:opacity-80">
+                          {chip}
+                        </Link>
+                      ) : chip;
+                    })()}
                   </div>
                 )}
 
@@ -683,7 +695,9 @@ useEffect(() => {
         {/* Stats */}
         {(collectiveStats || memberDisplayCount > 0) && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-center text-white mb-4">Collective Statistics</h2>
+            <h2 className="text-2xl font-bold text-center text-white mb-4">
+              {isVenueCollective(collective.type) ? 'Venue Statistics' : 'Collective Statistics'}
+            </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
               {(collectiveStats?.memberCount !== undefined || memberDisplayCount > 0) && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
@@ -723,8 +737,8 @@ useEffect(() => {
             <nav className="flex space-x-8">
               {[
                 { id: 'overview', label: 'Overview' },
-                { id: 'members', label: 'Members' },
-                { id: 'media', label: 'Releases' }
+                { id: 'members', label: isVenueCollective(collective.type) ? 'Staff' : 'Members' },
+                { id: 'media', label: isVenueCollective(collective.type) ? 'Library' : 'Releases' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -748,7 +762,9 @@ useEffect(() => {
             <div className="space-y-8">
               {/* Collective Information */}
               <div className="card bg-black/20 rounded-lg p-6">
-                <h3 className="text-xl font-semibold text-white mb-4">Collective Information</h3>
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  {isVenueCollective(collective.type) ? 'Venue Information' : 'Collective Information'}
+                </h3>
                 <div className="space-y-3">
                   {collective.foundedYear && (
                     <div className="flex items-center space-x-2 text-gray-300">
@@ -757,10 +773,20 @@ useEffect(() => {
                     </div>
                   )}
                   
-                  {collective.location && (collective.location.city || collective.location.region || collective.location.country) && (
+                  {collective.location && (collective.location.display || collective.location.city || collective.location.country || collective.location.label) && (
                     <div className="flex items-center space-x-2 text-gray-300">
                       <MapPin className="w-4 h-4" />
-                      <span>{[collective.location.city, collective.location.region, collective.location.country].filter(Boolean).join(', ')}</span>
+                      {(() => {
+                        const placePath = getCollectivePlaceProfilePath(collective.location);
+                        const label = formatLocation(collective.location);
+                        return placePath ? (
+                          <Link to={placePath} className="text-purple-300 hover:text-purple-200">
+                            {label}
+                          </Link>
+                        ) : (
+                          <span>{label}</span>
+                        );
+                      })()}
                     </div>
                   )}
                   
@@ -789,7 +815,7 @@ useEffect(() => {
                         />
                         <div className="flex-1 min-w-0">
                           <Link 
-                            to={`/tune/${release._id || release.uuid}`}
+                            to={getMediaProfileUrl(release)}
                             className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
                           >
                             {release.title}
@@ -822,7 +848,7 @@ useEffect(() => {
                         />
                         <div className="flex-1 min-w-0">
                           <Link 
-                            to={`/tune/${media._id || media.uuid}`}
+                            to={getMediaProfileUrl(media)}
                             className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
                           >
                             {media.title}
@@ -852,17 +878,17 @@ useEffect(() => {
                     const memberUser = typeof member.userId === 'string' 
                       ? null 
                       : member.userId;
-                    const memberId = typeof member.userId === 'string' 
+                    const memberKey = typeof member.userId === 'string' 
                       ? member.userId 
-                      : (member.userId._id || member.userId.uuid || member.userId);
+                      : (member.userId._id || member.userId.uuid || String(index));
                     
                     return (
                       <div
-                        key={index}
+                        key={memberKey}
                         className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
                       >
                         {memberUser ? (
-                          <Link to={`/profile/${memberUser.username || memberId}`}>
+                          <Link to={getUserProfileUrl(memberUser)}>
                             <div className="flex items-center space-x-4">
                               <img
                                 src={memberUser.profilePic || DEFAULT_PROFILE_PIC}
@@ -911,7 +937,9 @@ useEffect(() => {
 
           {activeTab === 'media' && (
             <div>
-              <h3 className="text-2xl font-bold text-white mb-4">All Releases</h3>
+              <h3 className="text-2xl font-bold text-white mb-4">
+                {isVenueCollective(collective.type) ? 'Library' : 'All Releases'}
+              </h3>
               {recentReleases.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {recentReleases.map((release) => (
@@ -922,7 +950,7 @@ useEffect(() => {
                         className="w-full h-48 rounded-lg object-cover mb-4"
                       />
                       <Link 
-                        to={`/tune/${release._id || release.uuid}`}
+                        to={getMediaProfileUrl(release)}
                         className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block mb-1"
                       >
                         {release.title}
@@ -940,7 +968,11 @@ useEffect(() => {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-400">No releases found.</p>
+                <p className="text-gray-400">
+                  {isVenueCollective(collective.type)
+                    ? 'House library and hosted-party charts will live here. Claimed venues can already have a public profile and place on the city page.'
+                    : 'No releases found.'}
+                </p>
               )}
             </div>
           )}
@@ -955,7 +987,9 @@ useEffect(() => {
                 {/* Stats */}
                 {(collectiveStats || memberDisplayCount > 0) && (
                   <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-center text-white mb-4">Collective Statistics</h2>
+                    <h2 className="text-2xl font-bold text-center text-white mb-4">
+              {isVenueCollective(collective.type) ? 'Venue Statistics' : 'Collective Statistics'}
+            </h2>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
                       {(collectiveStats?.memberCount !== undefined || memberDisplayCount > 0) && (
                         <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
@@ -1028,15 +1062,28 @@ useEffect(() => {
                   <div>
                   <select
                     value={editForm.type}
-                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value as any })}
+                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value as CollectiveType })}
                     className="input"
                   >
-                    <option value="collective">Collective</option>
-                    <option value="band">Band</option>
-                    <option value="production_company">Production Company</option>
-                    <option value="other">Other</option>
+                    {COLLECTIVE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
+                {isVenueCollective(editForm.type) && (
+                  <div>
+                    <label className="block text-white font-medium mb-2">Venue kind</label>
+                    <select
+                      value={editForm.venueKind}
+                      onChange={(e) => setEditForm({ ...editForm, venueKind: e.target.value as VenueKind })}
+                      className="input"
+                    >
+                      {VENUE_KIND_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-white font-medium mb-2">Founded Year</label>
                   <input
@@ -1063,51 +1110,23 @@ useEffect(() => {
               </div>
 
               {/* Location */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-white font-medium mb-2">City</label>
-                  <input
-                    type="text"
-                    value={editForm.location.city}
-                    onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, city: e.target.value } })}
-                    className="input"
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Region/State</label>
-                  <input
-                    type="text"
-                    value={editForm.location.region}
-                    onChange={(e) => setEditForm({ ...editForm, location: { ...editForm.location, region: e.target.value } })}
-                    className="input"
-                    placeholder="Region/State"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white font-medium mb-2">Country</label>
-                  <select
-                    value={editForm.location.country}
-                    onChange={(e) => {
-                      const country = e.target.value;
-                      const countryCode = getCountryCode(country);
-                      setEditForm({ 
-                        ...editForm, 
-                        location: { 
-                          ...editForm.location, 
-                          country: country,
-                          countryCode: countryCode
-                        } 
-                      });
-                    }}
-                    className="input"
-                  >
-                    <option value="">Select Country</option>
-                    {COUNTRIES.map(country => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <LocationAutocomplete
+                  label={isVenueCollective(editForm.type) ? 'Place *' : 'Location'}
+                  description={
+                    isVenueCollective(editForm.type)
+                      ? 'Bind this venue to a Mapbox place so it appears on the parent city profile.'
+                      : undefined
+                  }
+                  value={editForm.location}
+                  onChange={(next) => setEditForm({ ...editForm, location: next })}
+                  searchMode={isVenueCollective(editForm.type) ? 'venue' : 'place'}
+                  placeholder={
+                    isVenueCollective(editForm.type)
+                      ? 'Search venue, address, or neighbourhood…'
+                      : 'Search city, town, or region…'
+                  }
+                />
               </div>
 
               {/* Genres */}
@@ -1193,7 +1212,7 @@ useEffect(() => {
                 <div className="flex space-x-3 mt-6">
                   <button
                     onClick={handleSaveCollective}
-                    disabled={!editForm.name || !editForm.email}
+                    disabled={!editForm.name || !editForm.email || (isVenueCollective(editForm.type) && !editForm.location?.placeId)}
                     className="btn-primary flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save className="h-4 w-4" />

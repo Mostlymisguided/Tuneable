@@ -1,15 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { BookOpen, Coins, ExternalLink, Loader2 } from 'lucide-react';
+import { toast } from '../utils/toast';
+import { BookOpen, Coins, ExternalLink } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import EntertainingLoader from '../components/EntertainingLoader';
 import MediaChampions from '../components/MediaChampions';
 import { getReadElsewhereTarget } from '../utils/listenElsewhere';
 import { getTipCurrentLocation } from '../utils/currentLocationCache';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
 const BookProfile: React.FC = () => {
   const { mediaId } = useParams();
@@ -39,6 +43,15 @@ const BookProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaId]);
 
+  useEffect(() => {
+    if (!book) return;
+    const canonical = getMediaProfileUrl(book);
+    if (!canonical || canonical.endsWith('/')) return;
+    if (window.location.pathname !== canonical) {
+      navigate(canonical, { replace: true });
+    }
+  }, [book, navigate]);
+
   const authors = useMemo(() => {
     if (!book) return '';
     if (book.creatorDisplay) return book.creatorDisplay;
@@ -47,15 +60,32 @@ const BookProfile: React.FC = () => {
     return 'Unknown author';
   }, [book]);
 
+  const bookPath = book ? getMediaProfileUrl(book) : '';
+  usePageMeta(book ? {
+    title: authors && authors !== 'Unknown author' ? `${book.title} by ${authors}` : book.title,
+    description: clipText(book.description) || `Tip “${book.title}”${authors && authors !== 'Unknown author' ? ` by ${authors}` : ''} on Tuneable and move it up the book chart.`,
+    path: bookPath,
+    image: book.coverArt,
+    imageAlt: book.title,
+    type: 'book',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'Book',
+      name: book.title,
+      ...(authors && authors !== 'Unknown author' ? { author: { '@type': 'Person', name: authors } } : {}),
+      url: `${SITE_ORIGIN}${bookPath}`,
+    },
+  } : null);
+
   const elsewhere = book ? getReadElsewhereTarget(book) : null;
   const defaultTip = user?.preferences?.defaultTip || 1.11;
 
   const handleConfirmTip = async (_tags: string[], amount: number) => {
-    if (!mediaId) return;
+    if (!book?._id) return;
     setTipping(true);
     try {
       const currentLocation = getTipCurrentLocation();
-      const result = await booksAPI.boost(mediaId, amount, currentLocation);
+      const result = await booksAPI.boost(book._id, amount, currentLocation);
       setBook(result.book);
       setShowTipModal(false);
       toast.success('Tip placed');
@@ -69,9 +99,11 @@ const BookProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 text-white pt-24 flex justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
-      </div>
+      <EntertainingLoader
+        flavor="books"
+        size="page"
+        headline="Loading this book…"
+      />
     );
   }
 
@@ -83,7 +115,7 @@ const BookProfile: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-6">
           <img
             src={book.coverArt || DEFAULT_COVER_ART}
-            alt=""
+            alt={book.title}
             className="w-40 h-56 object-cover rounded-xl shadow-lg"
           />
           <div className="flex-1">
@@ -106,7 +138,7 @@ const BookProfile: React.FC = () => {
               <button
                 onClick={() => {
                   if (!user) {
-                    navigate(`/login?returnUrl=${encodeURIComponent(`/book/${mediaId}`)}`);
+                    navigate(`/login?returnUrl=${encodeURIComponent(getMediaProfileUrl(book || { _id: mediaId, contentForm: ['book'] }))}`);
                     return;
                   }
                   setShowTipModal(true);

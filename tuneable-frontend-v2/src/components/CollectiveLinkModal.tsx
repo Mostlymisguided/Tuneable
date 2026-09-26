@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { X, Loader2, Search, Users, CheckCircle } from 'lucide-react';
 import { collectiveAPI, userAPI } from '../lib/api';
 import { DEFAULT_PROFILE_PIC } from '../constants';

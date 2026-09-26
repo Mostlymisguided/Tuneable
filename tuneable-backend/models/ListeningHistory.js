@@ -11,6 +11,11 @@ const listeningHistorySchema = new mongoose.Schema({
     enum: ['user_queue', 'library', 'party', 'search', 'profile', 'direct', 'unknown'],
     default: 'unknown',
   },
+  client: {
+    type: String,
+    enum: ['web', 'mobile', 'ios'],
+    default: 'web',
+  },
   mediaTitle: { type: String, default: '' },
   mediaArtist: { type: String, default: '' },
   mediaCoverArt: { type: String, default: '' },
@@ -21,6 +26,8 @@ const listeningHistorySchema = new mongoose.Schema({
   lastPositionSeconds: { type: Number, default: 0 },
   listenDurationSeconds: { type: Number, default: 0 },
   completionPercent: { type: Number, default: 0 },
+  countedAsPlay: { type: Boolean, default: false, index: true },
+  qualifiedAt: { type: Date, default: null },
   status: {
     type: String,
     enum: ['in_progress', 'partial', 'completed'],

@@ -1,4 +1,5 @@
 const express = require('express');
+const v8 = require('v8');
 const db = require('./db'); // Import the database connection module
 const { initializeSocketIO } = require('./utils/socketIO'); // Import Socket.IO setup for notifications and party updates
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
@@ -163,10 +164,14 @@ app.set('trust proxy', 1);
 
 // Session configuration for OAuth
 // For OAuth redirects that cross domains (app → Google → app), we need SameSite: 'none' with Secure: true
-app.use(session({
+// MemoryStore is process-local. saveUninitialized:false so health checks / anonymous
+// API traffic do not accumulate sessions until RSS exceeds the Render cap.
+const sessionStore = new session.MemoryStore();
+const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'your-session-secret-key',
   resave: false,
-  saveUninitialized: true, // Changed to true to ensure session is created for OAuth state
+  saveUninitialized: false,
+  store: sessionStore,
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Must be true for SameSite: 'none'
     httpOnly: true,
@@ -174,7 +179,23 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   },
   name: 'tuneable.sid' // Custom session name
-}));
+});
+app.use((req, res, next) => {
+  if (req.path === '/health') return next();
+  return sessionMiddleware(req, res, next);
+});
+setInterval(() => {
+  sessionStore.all((err, sessions) => {
+    if (err || !sessions) return;
+    const now = Date.now();
+    for (const [sid, sess] of Object.entries(sessions)) {
+      const expires = sess?.cookie?.expires;
+      if (expires && new Date(expires).getTime() < now) {
+        sessionStore.destroy(sid);
+      }
+    }
+  });
+}, 5 * 60 * 1000).unref();
 
 // Initialize Passport
 app.use(passport.initialize());
@@ -189,8 +210,18 @@ app.get('/', (req, res) => {
 
 // Health check route
 app.get('/health', (req, res) => {
-  console.log('GET /health');
-  res.json({ status: 'ok', uptime: process.uptime() });
+  const mem = process.memoryUsage();
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    memory: {
+      rssMb: +(mem.rss / 1048576).toFixed(1),
+      heapUsedMb: +(mem.heapUsed / 1048576).toFixed(1),
+      heapTotalMb: +(mem.heapTotal / 1048576).toFixed(1),
+      externalMb: +(mem.external / 1048576).toFixed(1),
+      heapLimitMb: Math.round(v8.getHeapStatistics().heap_size_limit / 1048576),
+    },
+  });
 });
 
 // Test route
@@ -453,6 +484,7 @@ process.on('SIGTERM', () => {
 // Start the server only if this file is run directly
 if (require.main === module) {
   console.log(`Node.js version: ${process.version}`);
+  console.log(`V8 heap limit: ${Math.round(v8.getHeapStatistics().heap_size_limit / 1048576)}MB`);
   logMemory('boot');
   server = app.listen(PORT, () => {
     console.log(`Server running on PORT ${PORT}`);
@@ -461,6 +493,7 @@ if (require.main === module) {
     // Set up Socket.IO server for real-time notifications and party updates
     initializeSocketIO(server);
     console.log('✅ Socket.IO server initialized (for notifications and party updates).');
+    setInterval(() => logMemory('heartbeat'), 60 * 1000).unref();
   });
 }
 

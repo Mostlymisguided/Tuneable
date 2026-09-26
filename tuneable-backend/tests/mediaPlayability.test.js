@@ -8,6 +8,9 @@ const {
   getPlayabilityBlockReason,
   enrichMediaWithPlayability,
   stripDirectAudioSources,
+  isRightsPendingClaimable,
+  parsePlayableOnlyQuery,
+  playableHostedMusicMongoFilter,
 } = require('../utils/mediaPlayability');
 
 const UPLOAD = 'https://uploads.tuneable.stream/media-uploads/daft-punk-around-the-world-a1b2c3d4.mp3';
@@ -21,6 +24,31 @@ describe('isMediaPlayable', () => {
       rightsCleared: true,
       contentForm: ['tune'],
     })).toBe(true);
+  });
+
+  it('plays permitted admin uploads without rightsCleared', () => {
+    expect(isMediaPlayable({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    })).toBe(true);
+  });
+
+  it('does not play permitted tracks with no hosted file', () => {
+    expect(isMediaPlayable({
+      sources: { youtube: YT },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    })).toBe(false);
+  });
+
+  it('does not play hosted audio without a playable rights status', () => {
+    expect(isMediaPlayable({
+      sources: { upload: UPLOAD },
+      contentForm: ['tune'],
+    })).toBe(false);
   });
 
   it('does not play pending library-import uploads', () => {
@@ -80,6 +108,15 @@ describe('getPlayabilityBlockReason', () => {
     })).toBe('rights');
   });
 
+  it('returns audio for permitted tracks with no file', () => {
+    expect(getPlayabilityBlockReason({
+      sources: { youtube: YT },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    })).toBe('audio');
+  });
+
   it('returns audio for YouTube catalog with uncleared rights and no file', () => {
     expect(getPlayabilityBlockReason({
       sources: { youtube: YT },
@@ -116,13 +153,37 @@ describe('enrichMediaWithPlayability', () => {
     expect(presented.playabilityBlockReason).toBe('rights');
   });
 
-  it('keeps upload URLs for cleared playable tracks', () => {
+  it('strips upload URLs for guests even when the track is playable', () => {
     const presented = enrichMediaWithPlayability({
       sources: { upload: UPLOAD },
       rightsStatus: 'cleared',
       rightsCleared: true,
       contentForm: ['tune'],
     });
+    expect(presented.isPlayable).toBe(true);
+    expect(presented.sources.upload).toBeUndefined();
+    expect(presented.hasHostedAudio).toBe(true);
+  });
+
+  it('keeps upload URLs for permitted tracks when authenticated', () => {
+    const presented = enrichMediaWithPlayability({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+      contentForm: ['tune'],
+    }, { authenticated: true });
+    expect(presented.isPlayable).toBe(true);
+    expect(presented.sources.upload).toBe(UPLOAD);
+    expect(presented.playabilityBlockReason).toBeNull();
+  });
+
+  it('keeps upload URLs for authenticated listeners', () => {
+    const presented = enrichMediaWithPlayability({
+      sources: { upload: UPLOAD },
+      rightsStatus: 'cleared',
+      rightsCleared: true,
+      contentForm: ['tune'],
+    }, { authenticated: true });
     expect(presented.isPlayable).toBe(true);
     expect(presented.sources.upload).toBe(UPLOAD);
     expect(presented.hasHostedAudio).toBe(true);
@@ -139,13 +200,24 @@ describe('enrichMediaWithPlayability', () => {
     expect(presented.sources.upload).toBe(UPLOAD);
   });
 
-  it('keeps podcast enclosure URLs', () => {
+  it('strips podcast enclosure URLs for guests', () => {
     const enclosure = 'https://cdn.example/ep.mp3';
     const presented = enrichMediaWithPlayability({
       sources: { enclosure },
       rightsStatus: 'pending',
       contentForm: ['podcastepisode'],
     });
+    expect(presented.isPlayable).toBe(true);
+    expect(presented.sources.enclosure).toBeUndefined();
+  });
+
+  it('keeps podcast enclosure URLs for authenticated listeners', () => {
+    const enclosure = 'https://cdn.example/ep.mp3';
+    const presented = enrichMediaWithPlayability({
+      sources: { enclosure },
+      rightsStatus: 'pending',
+      contentForm: ['podcastepisode'],
+    }, { authenticated: true });
     expect(presented.isPlayable).toBe(true);
     expect(presented.sources.enclosure).toBe(enclosure);
   });
@@ -174,5 +246,108 @@ describe('stripDirectAudioSources', () => {
       youtube: YT,
       spotify: 'https://open.spotify.com/track/1',
     });
+  });
+});
+
+describe('isRightsPendingClaimable', () => {
+  it('allows claims on pending and permitted listings', () => {
+    expect(isRightsPendingClaimable({
+      rightsStatus: 'pending',
+      rightsCleared: false,
+    })).toBe(true);
+    expect(isRightsPendingClaimable({
+      rightsStatus: 'permitted',
+      rightsCleared: false,
+    })).toBe(true);
+  });
+
+  it('does not allow claims on cleared listings', () => {
+    expect(isRightsPendingClaimable({
+      rightsStatus: 'cleared',
+      rightsCleared: true,
+    })).toBe(false);
+  });
+});
+
+describe('parsePlayableOnlyQuery', () => {
+  it('defaults to true so Global ranks among playable tracks', () => {
+    expect(parsePlayableOnlyQuery(undefined)).toBe(true);
+    expect(parsePlayableOnlyQuery(null)).toBe(true);
+    expect(parsePlayableOnlyQuery('')).toBe(true);
+  });
+
+  it('treats all/false/0 as the unfiltered chart', () => {
+    expect(parsePlayableOnlyQuery('all')).toBe(false);
+    expect(parsePlayableOnlyQuery('false')).toBe(false);
+    expect(parsePlayableOnlyQuery('0')).toBe(false);
+    expect(parsePlayableOnlyQuery(false)).toBe(false);
+  });
+
+  it('treats playable/true/1 as playable-only', () => {
+    expect(parsePlayableOnlyQuery('playable')).toBe(true);
+    expect(parsePlayableOnlyQuery('true')).toBe(true);
+    expect(parsePlayableOnlyQuery('1')).toBe(true);
+    expect(parsePlayableOnlyQuery(true)).toBe(true);
+  });
+});
+
+describe('playableHostedMusicMongoFilter', () => {
+  function matchesPlayableHostedMusicFilter(media) {
+    const upload = media?.sources?.upload;
+    if (upload == null || upload === '') return false;
+    const status = media.rightsStatus;
+    if (status === 'permitted') return true;
+    if (status === 'cleared' && media.rightsCleared === true) return true;
+    return status !== 'pending'
+      && status !== 'disputed'
+      && status !== 'permitted'
+      && media.rightsCleared === true;
+  }
+
+  const cases = [
+    {
+      name: 'permitted hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'permitted', rightsCleared: false },
+    },
+    {
+      name: 'cleared hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'cleared', rightsCleared: true },
+    },
+    {
+      name: 'legacy cleared without status',
+      media: { sources: { upload: UPLOAD }, rightsCleared: true },
+    },
+    {
+      name: 'pending hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'pending', rightsCleared: false },
+    },
+    {
+      name: 'permitted youtube-only',
+      media: { sources: { youtube: YT }, rightsStatus: 'permitted', rightsCleared: false },
+    },
+    {
+      name: 'cleared youtube-only',
+      media: { sources: { youtube: YT }, rightsStatus: 'cleared', rightsCleared: true },
+    },
+    {
+      name: 'disputed hosted upload',
+      media: { sources: { upload: UPLOAD }, rightsStatus: 'disputed', rightsCleared: false },
+    },
+  ];
+
+  it('mirrors isMediaPlayable for hosted music', () => {
+    const filter = playableHostedMusicMongoFilter();
+    expect(filter['sources.upload']).toEqual({ $exists: true, $nin: [null, ''] });
+    expect(filter.$or).toEqual(expect.arrayContaining([
+      { rightsStatus: 'permitted' },
+      { rightsStatus: 'cleared', rightsCleared: true },
+    ]));
+
+    for (const { media } of cases) {
+      expect(matchesPlayableHostedMusicFilter(media)).toBe(isMediaPlayable({
+        ...media,
+        contentForm: ['tune'],
+      }));
+    }
   });
 });

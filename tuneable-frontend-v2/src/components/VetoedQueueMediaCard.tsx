@@ -4,6 +4,7 @@ import { Clock } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { DEFAULT_COVER_ART } from '../constants';
 import { normalizeQueueMediaData } from './QueueMediaCard';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
 
 function formatDuration(duration: number | string | undefined) {
   if (!duration) return '3:00';
@@ -28,7 +29,9 @@ const VetoedQueueMediaCard: React.FC<VetoedQueueMediaCardProps> = ({
   showUnveto,
   onUnveto,
 }) => {
-  const tunePath = mediaData.uuid ? `/tune/${mediaData.uuid}` : undefined;
+  const tunePath = (mediaData.slug || mediaData.uuid || mediaData._id)
+    ? getMediaProfileUrl(mediaData)
+    : undefined;
 
   const coverArt = (
     <img

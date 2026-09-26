@@ -5,8 +5,14 @@ import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI, artistEscrowAPI } fro
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import { toast } from '../utils/toast';
+import {
+  DEFAULT_PROFILE_PIC,
+  ARTIST_INVITE_AFFILIATE_PERCENT,
+  FOUNDING_CREATOR_CAP,
+  FOUNDING_UPLOAD_QUOTA_MB,
+} from '../constants';
+import type { FoundingCreatorsStatus } from '../types';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -21,7 +27,10 @@ import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTab
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 import TipCtaLabel from '../components/TipCtaLabel';
-import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
+import { normalizeSources, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { requireAuthToPlay } from '../utils/playAuth';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 import { resolveTipStatInputs, averageTipPounds } from '../utils/tipStats';
 
 interface SearchResult {
@@ -55,6 +64,14 @@ const Dashboard: React.FC = () => {
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
   const [isInviteCodesCollapsed, setIsInviteCodesCollapsed] = useState(true);
   const [isInvitedUsersCollapsed, setIsInvitedUsersCollapsed] = useState(true);
+  const [foundingStatus, setFoundingStatus] = useState<FoundingCreatorsStatus | null>(null);
+  const [foundingMe, setFoundingMe] = useState<{
+    isFoundingCreator?: boolean;
+    foundingSeatNumber?: number | null;
+    uploadQuotaBytes?: number | null;
+    uploadUsedBytes?: number | null;
+    uploadRemainingBytes?: number | null;
+  } | null>(null);
   
   // Increase tip modal (Dashboard tune library)
   const [libraryItemToTip, setLibraryItemToTip] = useState<LibraryItem | null>(null);
@@ -149,18 +166,25 @@ const Dashboard: React.FC = () => {
     if (!inviteCode) {
       return window.location.origin;
     }
-    return `${window.location.origin}/register?invite=${inviteCode}`;
+    return `${window.location.origin}/creator/register?invite=${inviteCode}`;
   }, [user?.primaryInviteCode, user?.personalInviteCode]);
+
+  const isFoundingCreator = Boolean(
+    foundingMe?.isFoundingCreator ?? user?.isFoundingCreator
+  );
 
   const inviteMessage = useMemo(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
-    const codeLine = inviteCode ? `Use my invite code ${inviteCode} when you sign up.` : '';
-    return `Hey! I'm inviting you to try Tuneable, the social music app for supporting your favourite artists by tipping on tunes.
+    const affiliateBlurb = isFoundingCreator
+      ? `If you sign up with my invite code ${inviteCode || ''}, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours. I'm a founding creator.`
+      : `Upload your own music to claim a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}) — ${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB upload allowance and founding invite benefits. Use my invite code ${inviteCode || ''}.`;
 
-${codeLine}
+    return `Hey! I'm inviting you to join Tuneable as a creator. Upload your own music and you keep 70% of paid tips.
+
+${affiliateBlurb}
 
 Join here: ${inviteLink}`.trim();
-  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
+  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode, isFoundingCreator]);
 
 
   const handleCopyInvite = useCallback(async () => {
@@ -214,14 +238,16 @@ Join here: ${inviteLink}`.trim();
 
   const handleFacebookShare = useCallback(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
-    const quote = inviteCode 
-      ? `Support your favourite Creators on Tuneable! Join with this invite code: ${inviteCode}`
+    const quote = inviteCode
+      ? (isFoundingCreator
+        ? `Invite artists to Tuneable — they keep 70% of paid tips, and as a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
+        : `Join Tuneable as a creator — upload to claim a founding seat (first ${FOUNDING_CREATOR_CAP}). Code: ${inviteCode}`)
       : 'Support your favourite Creators on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
     const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}&quote=${encodeURIComponent(quote)}&hashtag=${encodeURIComponent(hashtag)}`;
     window.open(shareUrl, '_blank', 'noopener');
-  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode]);
+  }, [inviteLink, user?.primaryInviteCode, user?.personalInviteCode, isFoundingCreator]);
 
   const handleInstagramShare = useCallback(async () => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
@@ -231,7 +257,9 @@ Join here: ${inviteLink}`.trim();
     }
 
     // Create Instagram-friendly invite message
-    const instagramMessage = `Support your favourite Creators on Tuneable! 🎵\n\nJoin with this invite code: ${inviteCode}\n\n${inviteLink}`;
+    const instagramMessage = isFoundingCreator
+      ? `Invite artists to Tuneable 🎵\n\nThey keep 70% of paid tips. As a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`
+      : `Join Tuneable as a creator 🎵\n\nUpload your music to claim a founding seat (first ${FOUNDING_CREATOR_CAP}).\n\nCode: ${inviteCode}\n\n${inviteLink}`;
 
     try {
       // Copy message to clipboard first
@@ -293,7 +321,7 @@ Join here: ${inviteLink}`.trim();
       console.error('Failed to share to Instagram:', error);
       toast.error('Could not share to Instagram. Please try again.');
     }
-  }, [user?.primaryInviteCode, user?.personalInviteCode, inviteLink]);
+  }, [user?.primaryInviteCode, user?.personalInviteCode, inviteLink, isFoundingCreator]);
 
   const handleSystemShare = useCallback(() => {
     const sharePayload = {
@@ -390,6 +418,25 @@ Join here: ${inviteLink}`.trim();
     };
     loadInvitedUsers();
   }, []);
+
+  useEffect(() => {
+    const loadFounding = async () => {
+      try {
+        const status = await userAPI.getFoundingCreatorsStatus();
+        setFoundingStatus(status);
+      } catch (error) {
+        console.error('Failed to load founding creators status:', error);
+      }
+      if (!user) return;
+      try {
+        const me = await userAPI.getMyFoundingCreator();
+        setFoundingMe(me);
+      } catch (error) {
+        console.error('Failed to load founding creator profile:', error);
+      }
+    };
+    loadFounding();
+  }, [user?._id, user?.uuid]);
 
   useEffect(() => {
     const loadTuneLibrary = async () => {
@@ -548,6 +595,7 @@ Join here: ${inviteLink}`.trim();
   };
 
   const handlePlay = (item: LibraryItem, _index: number) => {
+    if (!requireAuthToPlay()) return;
     try {
       // Use sorted library to maintain the order the user sees.
       // Sources come from the library payload — no per-track profile fetches.
@@ -566,6 +614,7 @@ Join here: ${inviteLink}`.trim();
           bids: [],
           addedBy: null,
           totalBidValue: libItem.globalMediaAggregate,
+          ...playerPlayabilityFields(libItem),
         }))
         .filter((media) => isMediaPlayable(media)) as any[];
 
@@ -1133,7 +1182,7 @@ Join here: ${inviteLink}`.trim();
                                           </div>
                                         )}
                                         <Link
-                                          to={`/tune/${String(item._id || item.uuid)}`}
+                                          to={getMediaProfileUrl(item)}
                                           className="text-white font-medium hover:text-purple-400 transition-colors text-left"
                                         >
                                           {item.title}
@@ -1164,7 +1213,7 @@ Join here: ${inviteLink}`.trim();
                                     </td>
                                     <td className="px-4 py-3">
                                       <Link
-                                        to={`/tune/${String(item._id || item.uuid)}`}
+                                        to={getMediaProfileUrl(item)}
                                         className="inline-block px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
                                       >
                                         View
@@ -1905,7 +1954,7 @@ Join here: ${inviteLink}`.trim();
                               className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                             >
                               <Plus className="h-4 w-4 mr-2" />
-                              Create Collective
+                              Create Collective / Venue
                             </button>
                           )}
                         </div>
@@ -2321,7 +2370,7 @@ Join here: ${inviteLink}`.trim();
                                 onClick={() => setIsCollectiveModalOpen(true)}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                               >
-                                Create Collective
+                                Create Collective / Venue
                               </button>
                             )}
                           </div>
@@ -2487,7 +2536,7 @@ Join here: ${inviteLink}`.trim();
                   {React.createElement(
                     isClickable ? Link : 'div',
                     {
-                      ...(isClickable ? { to: `/tune/${mediaId}` } : {}),
+                      ...(isClickable ? { to: getMediaProfileUrl(result) } : {}),
                       className: `flex items-start md:items-center gap-3 flex-1 min-w-0 ${isClickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`,
                     } as any,
                     <>
@@ -2674,6 +2723,42 @@ Join here: ${inviteLink}`.trim();
 
       {/* Invite Codes Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        <div className="bg-black/30 border border-amber-500/25 rounded-lg p-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-200">
+                {isFoundingCreator
+                  ? `Founding Creator #${foundingMe?.foundingSeatNumber ?? user?.foundingSeatNumber ?? '—'}`
+                  : 'Founding Creators'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {foundingStatus
+                  ? `${foundingStatus.claimed.toLocaleString()} / ${foundingStatus.cap.toLocaleString()} seats claimed`
+                  : `First ${FOUNDING_CREATOR_CAP.toLocaleString()} creators who upload their own music`}
+                {isFoundingCreator
+                  ? ` · ${(FOUNDING_UPLOAD_QUOTA_MB).toLocaleString()} MB upload allowance`
+                  : ' · upload your music to claim a seat'}
+                . Not equity — see Terms.
+              </p>
+              {isFoundingCreator && foundingMe?.uploadQuotaBytes != null && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload space used:{' '}
+                  {((foundingMe.uploadUsedBytes || 0) / (1024 * 1024)).toFixed(1)} MB /{' '}
+                  {((foundingMe.uploadQuotaBytes || 0) / (1024 * 1024)).toFixed(0)} MB
+                </p>
+              )}
+            </div>
+            {foundingStatus && (
+              <div className="text-right">
+                <p className="text-2xl font-semibold text-white tabular-nums">
+                  {foundingStatus.remaining.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-400">seats left</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         <button
           onClick={() => setIsInviteCodesCollapsed(prev => !prev)}
           className="card w-full flex items-center justify-between mb-4 hover:bg-gray-800/50 transition-colors"
@@ -2698,7 +2783,16 @@ Join here: ${inviteLink}`.trim();
           <div className="bg-black/30 border border-purple-500/20 rounded-lg p-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
               <div>
-                <p className="text-sm text-gray-300">Share your invite link</p>
+                <p className="text-sm text-gray-300">
+                  {isFoundingCreator
+                    ? `Invite an artist — earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one`
+                    : 'Invite creators — founding seats include the invite commission perk'}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {isFoundingCreator
+                    ? "Taken from Tuneable's share, not theirs, and only on music they upload themselves."
+                    : `Upload your own music to join the first ${FOUNDING_CREATOR_CAP.toLocaleString()} founding creators and unlock the ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission.`}
+                </p>
                 <p className="text-xs text-gray-500 mt-1 break-all">
                   {inviteLink}
                 </p>
@@ -2801,11 +2895,25 @@ Join here: ${inviteLink}`.trim();
                         <div className="text-gray-400 text-sm">
                           {userName}
                         </div>
-                        {(invitedUser.givenName || invitedUser.familyName) && (
-                          <div className="text-gray-500 text-xs mt-1">
-                            Joined {new Date(invitedUser.createdAt).toLocaleDateString()}
-                          </div>
-                        )}
+                        <div className="text-gray-500 text-xs mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                          {(invitedUser.givenName || invitedUser.familyName) && (
+                            <span>Joined {new Date(invitedUser.createdAt).toLocaleDateString()}</span>
+                          )}
+                          <span>
+                            {invitedUser.isCreator ? 'Creator' : 'Listener'}
+                            {invitedUser.hasOriginalUpload
+                              ? ` · ${invitedUser.originalUploadCount} upload${invitedUser.originalUploadCount === 1 ? '' : 's'}`
+                              : ''}
+                          </span>
+                          {invitedUser.affiliateWindowActive ? (
+                            <span>{invitedUser.affiliateDaysRemaining}d left</span>
+                          ) : (
+                            <span>Window ended</span>
+                          )}
+                          <span>
+                            {penceToPounds(invitedUser.commissionPence || 0)} earned
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2843,7 +2951,7 @@ Join here: ${inviteLink}`.trim();
           </div>
           {user && (user._id || user.uuid) && (
             <Link
-              to={`/user/${user._id || user.uuid}?view=tip-history`}
+              to={getUserProfileUrl(user, 'view=tip-history')}
               className="flex items-center space-x-2 px-4 mx-4 md:mx-0 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
             >
               <History className="h-4 w-4" />
@@ -2872,6 +2980,7 @@ Join here: ${inviteLink}`.trim();
             onPlay={handlePlay}
             onTip={handleOpenTipModal}
             showTipButton
+            artistColumnLabel="Artist / Show / Author"
             initialVisibleCount={5}
           />
         )}
@@ -2960,6 +3069,7 @@ Join here: ${inviteLink}`.trim();
         onClose={() => setIsEmailInviteModalOpen(false)}
         inviteCode={user?.primaryInviteCode || user?.personalInviteCode || ''}
         inviterUsername={user?.username || ''}
+        inviterIsFounding={isFoundingCreator}
       />
     </React.Fragment>
   );

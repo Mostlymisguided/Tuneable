@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { getPostAuthPath, buildSpotifyRequestAccessPath } from '../utils/authHelpers';
 import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../utils/oauthErrorMessage';
 

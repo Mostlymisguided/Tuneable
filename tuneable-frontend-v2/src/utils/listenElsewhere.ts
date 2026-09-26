@@ -27,7 +27,7 @@ type MediaLike = PlayabilityFields & {
   featuring?: unknown;
   creatorDisplay?: string | null;
   sources?: Parameters<typeof normalizeSources>[0];
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   rightsCleared?: boolean;
   contentForm?: string | string[];
   isbn?: string | null;

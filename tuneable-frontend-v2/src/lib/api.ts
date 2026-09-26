@@ -256,6 +256,11 @@ export const authAPI = {
     return response.data;
   },
 
+  validateInvite: async (code: string) => {
+    const response = await api.get(`/users/validate-invite/${encodeURIComponent(code.trim())}`);
+    return response.data as { valid: boolean; inviterUsername?: string };
+  },
+
   // Invite code management
   createInviteCode: async (label?: string) => {
     const response = await api.post('/users/invite-codes', { label });
@@ -375,8 +380,12 @@ export const partyAPI = {
     return response.data;
   },
   
-  getPartyDetails: async (partyId: string): Promise<{ party: Party }> => {
-    const response = await api.get(`/parties/${partyId}/details`);
+  getPartyDetails: async (partyId: string, options?: { playableOnly?: boolean }): Promise<{ party: Party }> => {
+    const params: Record<string, string> = {};
+    if (typeof options?.playableOnly === 'boolean') {
+      params.playableOnly = String(options.playableOnly);
+    }
+    const response = await api.get(`/parties/${partyId}/details`, { params });
     return response.data;
   },
   
@@ -515,7 +524,7 @@ export const partyAPI = {
     return response.data;
   },
   
-  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string }) => {
+  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string; playableOnly?: boolean }) => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
@@ -525,6 +534,9 @@ export const partyAPI = {
     }
     if (options?.sortBy) {
       params.sortBy = options.sortBy;
+    }
+    if (typeof options?.playableOnly === 'boolean') {
+      params.playableOnly = String(options.playableOnly);
     }
     const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`, { params });
     return response.data;
@@ -580,6 +592,7 @@ export const mediaAPI = {
     addedBy?: string;
     labelId?: string;
     rightsCleared?: boolean;
+    rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
     dateFrom?: string;
     dateTo?: string;
   }) => {
@@ -589,9 +602,10 @@ export const mediaAPI = {
 
   uploadMedia: async (file: File, metadata: { title: string; artist: string }) => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('audioFile', file);
     formData.append('title', metadata.title);
-    formData.append('artist', metadata.artist);
+    formData.append('artistName', metadata.artist);
+    formData.append('rightsConfirmed', 'true');
     const response = await api.post('/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -599,8 +613,20 @@ export const mediaAPI = {
   },
 
   getProfile: async (mediaId: string) => {
-    const response = await api.get(`/media/${mediaId}/profile`);
+    const response = await api.get(`/media/${encodeURIComponent(mediaId)}/profile`);
     return response.data;
+  },
+
+  getCopyAccess: async (mediaId: string) => {
+    const response = await api.get(`/media/${encodeURIComponent(mediaId)}/copy-access`);
+    return response.data as {
+      sharePercent: number;
+      thresholdPence: number | null;
+      tipperCount: number;
+      userTotalPence: number | null;
+      unlocked: boolean;
+      grandfathered: boolean;
+    };
   },
   
   getComments: async (mediaId: string, page = 1, limit = 20) => {
@@ -647,6 +673,7 @@ export const mediaAPI = {
       bpm?: string | number;
       key?: string;
       libraryXmlFile?: File;
+      rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
     }
   ) => {
     const formData = new FormData();
@@ -669,6 +696,9 @@ export const mediaAPI = {
     }
     if (options?.libraryXmlFile) {
       formData.append('libraryXmlFile', options.libraryXmlFile);
+    }
+    if (options?.rightsStatus) {
+      formData.append('rightsStatus', options.rightsStatus);
     }
     const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -757,6 +787,7 @@ export const mediaAPI = {
     rightsHolderEmail?: string;
     description?: string;
     sources?: { [key: string]: string };
+    rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   }) => {
     // Use regular endpoint which supports all field updates (tags, genres, elements, etc.)
     // This endpoint checks permissions: admin OR media owner OR verified creator
@@ -1187,7 +1218,7 @@ export const topTunesAPI = {
 
 // Location API (Mapbox geocoding via backend + place profiles)
 export const locationAPI = {
-  suggest: async (q: string, options?: { country?: string; worldview?: string; limit?: number }) => {
+  suggest: async (q: string, options?: { country?: string; worldview?: string; limit?: number; mode?: 'venue' | 'place'; sessionToken?: string }) => {
     const response = await api.get('/locations/suggest', {
       params: { q, ...options },
     });
@@ -1201,14 +1232,37 @@ export const locationAPI = {
     };
   },
 
-  resolve: async (mapboxId: string) => {
-    const response = await api.post('/locations/resolve', { mapboxId });
+  resolve: async (mapboxId: string, options?: { sessionToken?: string }) => {
+    const response = await api.post('/locations/resolve', { mapboxId, ...options });
     return response.data as { location: Record<string, unknown> };
   },
 
   reverse: async (longitude: number, latitude: number) => {
     const response = await api.post('/locations/reverse', { longitude, latitude });
     return response.data as { location: Record<string, unknown> };
+  },
+
+  getChart: async (params?: {
+    parentPlaceId?: string;
+    scope?: string;
+    limit?: number;
+  }) => {
+    const response = await api.get('/locations/chart', { params });
+    return response.data as {
+      places: Array<{
+        placeId: string;
+        name: string;
+        featureType?: string | null;
+        country?: string | null;
+        countryCode?: string | null;
+        supportPence: number;
+        mediaCount?: number;
+        bidCount?: number;
+      }>;
+      count: number;
+      parentPlaceId: string | null;
+      scope: string;
+    };
   },
 
   getProfile: async (placeId: string, params?: { page?: number; limit?: number; timePeriod?: string; sortBy?: string }) => {
@@ -1255,7 +1309,7 @@ export type ImportJobStatus = {
 
 export const userAPI = {
   getProfile: async (userId: string) => {
-    const response = await api.get(`/users/${userId}/profile`);
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/profile`);
     return response.data;
   },
 
@@ -1373,10 +1427,18 @@ export const userAPI = {
     };
   },
 
-  // Admin: Permanently delete a user and unwind their tips
-  purgeUser: async (userId: string, confirmUsername: string, confirmNotTestUser = false) => {
+  // Admin: Flag an existing account as a test user (required before purge)
+  markTestUser: async (userId: string, confirmUsername: string) => {
+    const response = await api.post(`/users/admin/users/${userId}/mark-test`, {
+      confirmUsername,
+    });
+    return response.data as { message?: string; username?: string; isTestUser?: boolean };
+  },
+
+  // Admin: Permanently delete a test user and unwind their tips
+  purgeUser: async (userId: string, confirmUsername: string) => {
     const response = await api.delete(`/users/admin/users/${userId}`, {
-      data: { confirmUsername, confirmNotTestUser },
+      data: { confirmUsername },
     });
     return response.data as {
       message?: string;
@@ -1394,7 +1456,7 @@ export const userAPI = {
   // Get user's tag rankings
   getTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};
-    const response = await api.get(`/users/${userId}/tag-rankings`, { params });
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tag-rankings`, { params });
     return response.data;
   },
 
@@ -1410,14 +1472,14 @@ export const userAPI = {
       badgeLimit?: number;
     }
   ) => {
-    const response = await api.get(`/users/${userId}/champion-titles`, { params });
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/champion-titles`, { params });
     return response.data;
   },
 
   // TuneBytes discovery tag rankings (champion badges on profile)
   getTuneBytesTagRankings: async (userId: string, limit?: number) => {
     const params = limit ? { limit } : {};
-    const response = await api.get(`/users/${userId}/tunebytes-tag-rankings`, { params });
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tunebytes-tag-rankings`, { params });
     return response.data;
   },
 
@@ -1444,6 +1506,24 @@ export const userAPI = {
   // Get list of users invited by current user
   getInvitedUsers: async () => {
     const response = await api.get('/users/invited');
+    return response.data;
+  },
+
+  // Public Founding Creators program status
+  getFoundingCreatorsStatus: async () => {
+    const response = await api.get('/users/founding-creators');
+    return response.data;
+  },
+
+  // Current user's founding seat + upload allowance
+  getMyFoundingCreator: async () => {
+    const response = await api.get('/users/me/founding-creator');
+    return response.data;
+  },
+
+  // Admin: backfill founding seats for earliest original uploaders
+  backfillFoundingCreators: async () => {
+    const response = await api.post('/users/admin/backfill-founding-creators');
     return response.data;
   },
 
@@ -1552,9 +1632,36 @@ export const userAPI = {
     mediaTitle?: string;
     mediaArtist?: string;
     mediaCoverArt?: string;
+    client?: 'web' | 'mobile' | 'ios';
   }) => {
     const response = await api.post('/users/me/listening-history/track', payload);
     return response.data;
+  },
+
+  trackListeningHistoryKeepalive: (payload: {
+    mediaId: string;
+    sessionId: string;
+    sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
+    startedAt?: string;
+    currentTime?: number;
+    duration?: number;
+    completed?: boolean;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string;
+    client?: 'web' | 'mobile' | 'ios';
+  }) => {
+    const token = authTokenGetter?.() ?? localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/users/me/listening-history/track`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ ...payload, client: payload.client || 'web' }),
+    }).catch(() => {});
   },
 
   getListeningHistory: async (params?: {
@@ -1569,7 +1676,7 @@ export const userAPI = {
 
   // Get another user's tune library by userId (for viewing their profile)
   getTuneLibraryByUserId: async (userId: string) => {
-    const response = await api.get(`/users/${userId}/tune-library`);
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tune-library`);
     return response.data;
   },
 
@@ -1741,6 +1848,65 @@ export const userAPI = {
     return response.data as { jobId: string; status: string };
   },
 
+  startRekordboxIngestPreview: async (
+    libraryXmlFile: File,
+    playlists: string[],
+    options?: { minBitrate?: number; createUnmatched?: boolean; limit?: number; musicRoot?: string }
+  ) => {
+    const formData = new FormData();
+    formData.append('libraryXmlFile', libraryXmlFile);
+    formData.append('playlists', JSON.stringify(playlists));
+    if (options?.minBitrate != null) formData.append('minBitrate', String(options.minBitrate));
+    if (options?.createUnmatched === false) formData.append('createUnmatched', 'false');
+    if (options?.limit) formData.append('limit', String(options.limit));
+    if (options?.musicRoot) formData.append('musicRoot', options.musicRoot);
+    const response = await api.post('/users/me/import/rekordbox/ingest/preview/start', formData);
+    return response.data as { jobId: string; status: string };
+  },
+
+  startRekordboxIngestExecute: async (
+    items: Array<{
+      key: string;
+      action: 'attach' | 'create' | 'skip';
+      selected?: boolean;
+      title?: string;
+      artist?: string;
+      filePath?: string | null;
+      mediaId?: string | null;
+      playlistName?: string | null;
+    }>,
+    options?: { createParties?: boolean; partyLocation?: string }
+  ) => {
+    const response = await api.post('/users/me/import/rekordbox/ingest/execute/start', {
+      items,
+      createParties: options?.createParties !== false,
+      partyLocation: options?.partyLocation || 'Library Import',
+    });
+    return response.data as { jobId: string; status: string };
+  },
+
+  ingestRekordboxFile: async (
+    item: Record<string, unknown>,
+    audioFile: File,
+    options?: { createParties?: boolean; partyLocation?: string }
+  ) => {
+    const formData = new FormData();
+    formData.append('audioFile', audioFile);
+    formData.append('item', JSON.stringify(item));
+    formData.append('createParties', options?.createParties === false ? 'false' : 'true');
+    if (options?.partyLocation) formData.append('partyLocation', options.partyLocation);
+    const response = await api.post('/users/me/import/rekordbox/ingest/file', formData);
+    return response.data as {
+      key?: string;
+      title?: string;
+      status: string;
+      mediaId?: string | null;
+      uuid?: string | null;
+      reason?: string;
+      error?: string;
+    };
+  },
+
   requestSpotifyImport: async (spotifyAccount: string, note?: string) => {
     const response = await api.post('/users/me/import/spotify/request', { spotifyAccount, note });
     return response.data as {
@@ -1764,6 +1930,21 @@ export const userAPI = {
   ) => {
     const response = await api.post('/users/me/import/youtube/execute/start', { items, defaultTip });
     return response.data as { jobId: string; status: string };
+  },
+
+  rematchYouTubeImportItem: async (payload: {
+    key: string;
+    title: string;
+    artist: string;
+    duration?: number;
+    coverArt?: string | null;
+    originalTitle?: string | null;
+    originalArtist?: string | null;
+    album?: string | null;
+    externalMedia?: Record<string, unknown>;
+  }) => {
+    const response = await api.post('/users/me/import/youtube/rematch', payload);
+    return response.data as { item: Record<string, unknown>; stats?: { high?: number; medium?: number; none?: number } };
   },
 
   getSpotifyImportRequests: async (status?: string) => {
@@ -2154,7 +2335,8 @@ export const collectiveAPI = {
     page?: number;
     limit?: number;
     genre?: string;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    placeId?: string;
     sortBy?: 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'name';
     sortOrder?: 'asc' | 'desc';
     search?: string;
@@ -2225,7 +2407,8 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    venueKind?: string;
   }) => {
     // Handle both FormData (with file upload) and plain object
     const response = collectiveData instanceof FormData
@@ -2246,17 +2429,11 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    venueKind?: string;
+    location?: Record<string, unknown> | null;
     profilePicture?: string;
     coverImage?: string;
-    location?: {
-      city?: string;
-      country?: string;
-      coordinates?: {
-        lat: number;
-        lng: number;
-      };
-    };
     socialMedia?: {
       instagram?: string;
       facebook?: string;
@@ -2283,7 +2460,7 @@ export const collectiveAPI = {
   getAllCollectives: async (params?: {
     verificationStatus?: string;
     genre?: string;
-    type?: 'band' | 'collective' | 'production_company' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
     search?: string;
     sortBy?: 'name' | 'verificationStatus' | 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
     sortOrder?: 'asc' | 'desc';
@@ -2831,7 +3008,7 @@ export const rightsAPI = {
       };
     };
   },
-  getLimbo: async (params?: { page?: number; limit?: number; uncontacted?: boolean }) => {
+  getLimbo: async (params?: { page?: number; limit?: number; uncontacted?: boolean; search?: string }) => {
     const response = await api.get('/rights/admin/limbo', { params });
     return response.data as { media: any[]; total: number; page: number; limit: number };
   },
@@ -2857,7 +3034,15 @@ export const rightsAPI = {
       displayName: string;
       role?: string;
       userId?: string | null;
-      contacts?: Array<{ type: string; value: string; notes?: string }>;
+      labelId?: string | null;
+      collectiveId?: string | null;
+      contacts?: Array<{
+        type: string;
+        value: string;
+        notes?: string;
+        source?: string;
+        confidence?: string;
+      }>;
     };
     source?: string;
     notes?: string;
@@ -2873,10 +3058,42 @@ export const rightsAPI = {
     const response = await api.post(`/rights/admin/cases/${id}/outreach`, body);
     return response.data as { case: any };
   },
-  previewOutreach: async (id: string, body: { template?: string; customMessage?: string }) => {
+  previewOutreach: async (id: string, body: {
+    template?: string;
+    customMessage?: string;
+    format?: 'email' | 'instagram' | 'link';
+  }) => {
     const response = await api.post(`/rights/admin/cases/${id}/preview`, body);
-    return response.data as { template: string; subject: string; text: string };
+    return response.data as {
+      template: string;
+      subject: string;
+      text: string;
+      tuneUrl?: string;
+      registerUrl?: string;
+      format?: string;
+      instagramHandle?: string | null;
+    };
+  },
+  searchContacts: async (params: { name?: string; role?: string; mediaId?: string }) => {
+    const response = await api.get('/rights/admin/contacts', { params });
+    return response.data as { candidates: RightsContactCandidate[] };
   },
 };
+
+export interface RightsContactCandidate {
+  id: string;
+  displayName: string;
+  role?: string | null;
+  email?: string | null;
+  contacts?: Array<{ type: string; value: string }>;
+  userId?: string | null;
+  labelId?: string | null;
+  collectiveId?: string | null;
+  source: string;
+  confidence: 'verified' | 'reused' | 'likely' | 'weak' | 'manual' | string;
+  evidence?: string;
+  usedOnCases?: number;
+  allowSend?: boolean;
+}
 
 export default api;

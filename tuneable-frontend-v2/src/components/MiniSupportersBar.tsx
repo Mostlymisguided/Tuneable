@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import { Crown } from 'lucide-react';
+import { getUserProfileUrl } from '../utils/profileNavigation';
 
 interface Bid {
   userId?: {
@@ -124,7 +125,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
           return (
             <Link
               key={id}
-              to={`/user/${id}`}
+              to={getUserProfileUrl(s.user)}
               className="flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 hover:bg-purple-400 transition-colors flex-shrink-0"
               title={`${penceToPounds(s.total)} (${s.count} tips)`}
             >

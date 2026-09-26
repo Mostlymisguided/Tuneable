@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { authAPI, setAuthTokenGetter } from '../lib/api';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 import type { ResolvedLocation } from '../utils/locationHelpers';
 
 // Define types directly to avoid import issues
@@ -96,6 +98,13 @@ export interface User {
     verifiedAt?: Date;
     submittedAt?: Date;
   };
+  /** Founding Creators — status/benefits only, not equity */
+  isFoundingCreator?: boolean;
+  foundingSeatNumber?: number | null;
+  foundingSeatAssignedAt?: string | null;
+  foundingUploadQuotaBytes?: number | null;
+  foundingUploadUsedBytes?: number | null;
+  foundingUploadRemainingBytes?: number | null;
 }
 
 interface RegisterData {
@@ -164,30 +173,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      
-      if (storedToken && storedUser) {
-        try {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
-          
-          // Verify token is still valid by fetching profile
-          const response = await authAPI.getProfile();
-          setUser(response.user);
-        } catch (error) {
-          // Token is invalid, clear storage
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setToken(null);
-          setUser(null);
+      try {
+        const storedToken = localStorage.getItem('token');
+        const storedUser = localStorage.getItem('user');
+
+        if (storedToken && storedUser) {
+          try {
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+
+            // Verify token is still valid by fetching profile
+            const response = await authAPI.getProfile();
+            setUser(response.user);
+          } catch (error) {
+            // Token is invalid, clear storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setToken(null);
+            setUser(null);
+            clearPlayers();
+          }
+        } else {
+          clearPlayers();
         }
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     initAuth();
   }, []);
+
+  const clearPlayers = () => {
+    useWebPlayerStore.getState().setCurrentMedia(null);
+    useWebPlayerStore.getState().setGlobalPlayerActive(false);
+    useWebPlayerStore.getState().setQueue([]);
+    usePodcastPlayerStore.getState().clear();
+  };
 
   const login = async (identifier: string, password: string): Promise<User> => {
     try {
@@ -224,14 +246,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Clear web player state on logout
-    const { useWebPlayerStore } = require('../stores/webPlayerStore');
-    useWebPlayerStore.getState().setCurrentMedia(null);
-    useWebPlayerStore.getState().setGlobalPlayerActive(false);
-    useWebPlayerStore.getState().setQueue([]);
-    // Clear podcast player state on logout
-    const { usePodcastPlayerStore } = require('../stores/podcastPlayerStore');
-    usePodcastPlayerStore.getState().clear();
+    clearPlayers();
   };
 
   const handleOAuthCallback = useCallback(async (token: string): Promise<User> => {

@@ -1,3 +1,5 @@
+import { getMediaProfileUrl } from './mediaNavigation';
+
 export type ChampionBadgeLocation = {
   placeId: string;
   label?: string | null;
@@ -15,6 +17,7 @@ export type ChampionBadge = {
   tag?: string;
   mediaId?: string;
   uuid?: string;
+  slug?: string;
   title?: string;
   scope?: 'global' | 'place' | string;
   location?: ChampionBadgeLocation | null;
@@ -63,7 +66,7 @@ export function championBadgePath(
 ): string | null {
   if (badge.entityType === 'media') {
     const id = badge.uuid || badge.mediaId;
-    return id ? `/tune/${id}` : null;
+    return id ? getMediaProfileUrl({ uuid: badge.uuid, _id: badge.mediaId, slug: badge.slug }) : null;
   }
   if (badge.entityType === 'place') {
     return getPlacePath(badge.location?.placeId || null);

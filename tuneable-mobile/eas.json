@@ -33,6 +33,10 @@
         "ascApiKeyPath": "/Users/admin/Downloads/AuthKey_QHA3H9Q4HA.p8",
         "ascApiKeyId": "QHA3H9Q4HA",
         "ascApiKeyIssuerId": "c52eec72-b82b-482b-890f-67da2bbf9c41"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
       }
     }
   }

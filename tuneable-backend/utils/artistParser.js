@@ -188,8 +188,10 @@ function parseArtistString(artistString) {
  * @returns {string} Formatted display string
  */
 function formatCreatorDisplay(artists = [], featuring = []) {
+  const artistList = Array.isArray(artists) ? artists : (artists ? [artists] : []);
+  const featuringList = Array.isArray(featuring) ? featuring : (featuring ? [featuring] : []);
   // Normalize artist entries to include relation metadata
-  const normalizedArtists = artists
+  const normalizedArtists = artistList
     .map(a => {
       if (!a) return null;
       if (typeof a === 'string') {
@@ -203,7 +205,7 @@ function formatCreatorDisplay(artists = [], featuring = []) {
     })
     .filter(a => a && a.name);
 
-  const featNames = featuring
+  const featNames = featuringList
     .map(f => (typeof f === 'string' ? f : (f?.name || f)))
     .filter(Boolean);
 

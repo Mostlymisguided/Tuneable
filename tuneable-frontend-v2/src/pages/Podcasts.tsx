@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { mediaAPI, locationAPI } from '../lib/api';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -8,6 +8,7 @@ import MediaChampions from '../components/MediaChampions';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import PodcastQueueMediaCard from '../components/PodcastQueueMediaCard';
 import PodcastSeriesStrip from '../components/PodcastSeriesStrip';
+import EntertainingLoader from '../components/EntertainingLoader';
 import { 
   Clock, 
   Music,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { getCanonicalTag } from '../utils/tagNormalizer';
 import {
   ChartSortPanel,
@@ -142,6 +144,7 @@ interface PodcastEpisode {
   sources?: Record<string, string> | { get?(k: string): string };
   audioUrl?: string;
   enclosure?: { url?: string };
+  isPlayable?: boolean;
   minimumBid?: number;
   globalMediaBidTop?: number;
   globalMediaAggregateAvg?: number;
@@ -257,6 +260,7 @@ const Podcasts: React.FC = () => {
   const [episodesPerShow, setEpisodesPerShow] = useState(10);
   const [isImportingOpml, setIsImportingOpml] = useState(false);
   const [opmlFile, setOpmlFile] = useState<File | null>(null);
+  const [openingSeriesTitle, setOpeningSeriesTitle] = useState<string | null>(null);
   
   // Search pagination state
   const [searchOffset, setSearchOffset] = useState(0);
@@ -1165,6 +1169,7 @@ const Podcasts: React.FC = () => {
 
   const handleQueuePlay = async (episode: PodcastEpisode, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireAuthToPlay()) return;
     const ep = {
       _id: episode._id,
       id: episode.id,
@@ -1233,6 +1238,7 @@ const Podcasts: React.FC = () => {
 
     // Otherwise, create or find the series first
     try {
+      setOpeningSeriesTitle(episode.podcastTitle || 'this show');
       const token = localStorage.getItem('token');
       
       // Prepare series data based on episode source
@@ -1292,6 +1298,8 @@ const Podcasts: React.FC = () => {
     } catch (error: any) {
       console.error('Error creating/finding series:', error);
       toast.error(error.message || 'Failed to load podcast series');
+    } finally {
+      setOpeningSeriesTitle(null);
     }
   };
 
@@ -1458,7 +1466,7 @@ const Podcasts: React.FC = () => {
     : displayEpisodes.slice(0, visibleEpisodeCount);
 
   const canPlayEpisode = (episode: PodcastEpisode) => {
-    if (!user) return false;
+    if (episode.isPlayable === true) return true;
     if (
       getEpisodeAudioUrl({
         title: episode.title,
@@ -1477,7 +1485,11 @@ const Podcasts: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900/20 to-gray-900 text-white">
       <GlobalChartLocationHero
-        chartLabel="The World's Best Podcasts"
+        chartKind="podcasts"
+        onChartKindChange={(kind) => {
+          if (kind === 'podcasts') return;
+          navigate(kind === 'books' ? '/books' : '/party/global?period=all-time');
+        }}
         contentNoun="Podcasts"
         selectedLocation={selectedLocation}
         locationScope={locationScope}
@@ -1813,6 +1825,16 @@ const Podcasts: React.FC = () => {
                         {isImportingLink ? <><Loader className="h-5 w-5 animate-spin" /><span>Importing...</span></> : <><LinkIcon className="h-5 w-5" /><span>Import</span></>}
                       </button>
                     </div>
+                    {isImportingLink && (
+                      <div className="mt-3">
+                        <EntertainingLoader
+                          flavor="podcast"
+                          size="inline"
+                          headline="Importing this show…"
+                          detail="Resolving the URL and pulling episodes from the feed."
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Import from Spotify</h4>
@@ -1951,10 +1973,17 @@ const Podcasts: React.FC = () => {
           <p className="text-center text-sm text-purple-300 mb-3">Search results</p>
         )}
 
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" />
-          </div>
+        {isLoading || isSearching ? (
+          <EntertainingLoader
+            flavor="podcast"
+            size="section"
+            headline={isSearching ? 'Searching shows & episodes…' : 'Loading the podcast chart…'}
+            detail={
+              isSearching
+                ? 'Checking Tuneable, Taddy, and Apple Podcasts.'
+                : 'Ranking tipped episodes.'
+            }
+          />
         ) : displayEpisodes.length === 0 ? (
           <div className="text-center py-20">
             <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
@@ -2052,6 +2081,19 @@ const Podcasts: React.FC = () => {
           </div>
         )}
       </div>
+
+      {openingSeriesTitle && (
+        <div className="fixed inset-0 z-50 bg-gray-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg">
+            <EntertainingLoader
+              flavor="podcast"
+              size="section"
+              headline={`Opening ${openingSeriesTitle}…`}
+              detail="Finding or creating this show on Tuneable, then we’ll load episodes."
+            />
+          </div>
+        </div>
+      )}
 
       {/* Bid Confirmation Modal */}
       <BidConfirmationModal

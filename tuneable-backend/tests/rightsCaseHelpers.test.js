@@ -12,8 +12,12 @@ const {
   statusAfterInboundReply,
   defaultFollowUpAt,
   buildOutreachContent,
+  normalizeInstagramHandle,
+  instagramDmUrl,
   OPEN_STATUSES,
   TERMINAL_STATUSES,
+  PARTY_ROLES,
+  rankAndDedupeContactCandidates,
 } = require('../utils/rightsCaseHelpers');
 
 describe('normalizePartyKey', () => {
@@ -38,8 +42,24 @@ describe('suggestedPartiesFromMedia', () => {
 
   it('falls back to creatorDisplay', () => {
     expect(suggestedPartiesFromMedia({ creatorDisplay: 'A & B' })).toEqual([
-      { displayName: 'A & B', role: 'artist', userId: null, collectiveId: null },
+      { displayName: 'A & B', role: 'artist', userId: null, collectiveId: null, labelId: null },
     ]);
+  });
+
+  it('includes media credit roles and labels', () => {
+    const parties = suggestedPartiesFromMedia({
+      host: [{ name: 'Jane Host' }],
+      author: [{ name: 'Ada' }],
+      director: [{ name: 'Jane Host' }],
+      label: [{ name: 'Warp', labelId: 'lab1' }],
+    });
+    expect(parties.map((p) => `${p.role}:${p.displayName}`)).toEqual([
+      'host:Jane Host',
+      'director:Jane Host',
+      'author:Ada',
+      'label:Warp',
+    ]);
+    expect(parties.find((p) => p.role === 'label')?.labelId).toBe('lab1');
   });
 });
 
@@ -84,20 +104,69 @@ describe('defaultFollowUpAt', () => {
   });
 });
 
+describe('normalizeInstagramHandle', () => {
+  it('strips @ and profile/DM urls', () => {
+    expect(normalizeInstagramHandle('@foo')).toBe('foo');
+    expect(normalizeInstagramHandle('https://www.instagram.com/foo/')).toBe('foo');
+    expect(normalizeInstagramHandle('https://ig.me/m/foo')).toBe('foo');
+  });
+
+  it('builds an Instagram DM url', () => {
+    expect(instagramDmUrl('@foo')).toBe('https://ig.me/m/foo');
+  });
+});
+
 describe('buildOutreachContent', () => {
   const media = { title: 'Around the World', uuid: 'abc', artist: [{ name: 'Daft Punk' }] };
   const party = { displayName: 'Thomas' };
 
-  it('includes the tune URL in a keep invite', () => {
+  it('uses the tipped hook and two CTAs in a keep invite', () => {
     const content = buildOutreachContent({
       template: 'claim_keep_invite',
       media,
       party,
       frontendUrl: 'https://tuneable.stream',
     });
-    expect(content.subject).toContain('Around the World');
+    expect(content.subject).toMatch(/tipped on Tuneable/i);
+    expect(content.text).toContain('has been tipped on Tuneable');
+    expect(content.text).toContain('Reply YES to this email');
+    expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
+    expect(content.text).toContain('founding artist');
     expect(content.text).toContain('escrow');
+    expect(content.tuneUrl).toBe('https://tuneable.stream/tune/abc');
+    expect(content.registerUrl).toContain('/creator/register');
+  });
+
+  it('builds a short Instagram DM with both CTAs', () => {
+    const content = buildOutreachContent({
+      template: 'claim_keep_invite',
+      media,
+      party,
+      format: 'instagram',
+    });
+    expect(content.format).toBe('instagram');
+    expect(content.subject).toBe('');
+    expect(content.text).toContain('has been tipped on Tuneable');
+    expect(content.text).toContain('Reply YES');
+    expect(content.text).toContain('founding artist');
+    expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
+    expect(content.text).toContain('https://tuneable.stream/tune/abc');
+    expect(content.text.startsWith('Hey Thomas')).toBe(true);
+  });
+
+  it('builds a copy-link message with both CTAs', () => {
+    const content = buildOutreachContent({
+      template: 'claim_keep_invite',
+      media,
+      party,
+      format: 'link',
+    });
+    expect(content.format).toBe('link');
+    expect(content.text).toContain('Your tune "Around the World" has been tipped on Tuneable.');
+    expect(content.text).toContain('Reply YES');
+    expect(content.text).toContain('Become a founding artist: https://tuneable.stream/creator/register?from=rights&tune=abc');
+    expect(content.text).toContain('https://tuneable.stream/tune/abc');
   });
 
   it('appends a custom note', () => {
@@ -110,3 +179,46 @@ describe('buildOutreachContent', () => {
     expect(content.text).toContain('Tried IG last week.');
   });
 });
+
+describe('PARTY_ROLES', () => {
+  it('includes media credit roles without duplicates', () => {
+    const expected = [
+      'songwriter', 'composer', 'host', 'guest', 'narrator',
+      'director', 'cinematographer', 'editor', 'author',
+    ];
+    expect(new Set(PARTY_ROLES).size).toBe(PARTY_ROLES.length);
+    expected.forEach((role) => expect(PARTY_ROLES).toContain(role));
+  });
+});
+
+describe('rankAndDedupeContactCandidates', () => {
+  it('prefers verified over reused and merges same user', () => {
+    const ranked = rankAndDedupeContactCandidates([
+      {
+        id: 'prior_case:1',
+        displayName: 'Jane',
+        email: 'jane@example.com',
+        userId: 'u1',
+        source: 'prior_case',
+        confidence: 'reused',
+        usedOnCases: 2,
+        contacts: [{ type: 'email', value: 'jane@example.com' }],
+      },
+      {
+        id: 'user:u1',
+        displayName: 'Jane Doe',
+        email: 'jane@example.com',
+        userId: 'u1',
+        source: 'user',
+        confidence: 'verified',
+        usedOnCases: 0,
+        contacts: [{ type: 'website', value: 'https://jane.example' }],
+      },
+    ]);
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].confidence).toBe('verified');
+    expect(ranked[0].usedOnCases).toBe(2);
+    expect(ranked[0].contacts.map((c) => c.type).sort()).toEqual(['email', 'website']);
+  });
+});
+

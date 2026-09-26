@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART } from '../constants';
+import { toast } from '../utils/toast';
+import {
+  DEFAULT_PROFILE_PIC,
+  DEFAULT_COVER_ART,
+  ARTIST_INVITE_AFFILIATE_PERCENT,
+  FOUNDING_CREATOR_CAP,
+} from '../constants';
 import { 
   Music, 
   User, 
@@ -18,6 +23,7 @@ import {
   Headphones,
   Volume2,
   Award,
+  Gift,
   X,
   Save,
   Coins,
@@ -51,8 +57,9 @@ import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMe
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { canEditMedia, canDeleteMedia, isCreator, isAdminOrCreator } from '../utils/permissionHelpers';
+import { canEditMedia, canDeleteMedia, isAdmin } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { formatBpmLabel, roundBpm } from '../utils/bpm';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
@@ -60,6 +67,7 @@ import TagClaimModal from '../components/TagClaimModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import MiniSupportersBar from '../components/MiniSupportersBar';
+import EntertainingLoader from '../components/EntertainingLoader';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
@@ -68,13 +76,17 @@ import {
   enrichMediaWithPlayability,
   isYouTubeOnly,
   normalizeSources,
-  getPlayabilityBlockReason,
+  playerPlayabilityFields,
+  getCoverOverlayKind,
+  getBlockedCoverCopy,
 } from '../utils/mediaPlayability';
 import {
   getListenElsewhereTarget,
   openListenElsewhere,
 } from '../utils/listenElsewhere';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
+import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
@@ -86,8 +98,13 @@ import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMedi
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
+import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
+import { type RightsStatus } from '../utils/rightsStatus';
 
 interface Media {
   _id: string;
@@ -130,7 +147,7 @@ interface Media {
   sources?: { [key: string]: string };
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   hasHostedAudio?: boolean;
   tipCount?: number;
   bids?: Bid[];
@@ -223,6 +240,10 @@ interface RecommendedMediaItem {
   sources?: Record<string, string>;
   contentType?: string[];
   contentForm?: string[];
+  isPlayable?: boolean;
+  rightsStatus?: string;
+  rightsCleared?: boolean;
+  hasHostedAudio?: boolean;
   creatorDisplay?: string | null;
   bids?: Array<{
     amount?: number;
@@ -270,6 +291,7 @@ const TuneProfile: React.FC = () => {
   
   // Claim tune modal (rights-pending limbo only)
   const [showClaimModal, setShowClaimModal] = useState(false);
+  const [savingRightsStatus, setSavingRightsStatus] = useState(false);
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
   const isEditMode = searchParams.get('edit') === 'true';
@@ -335,6 +357,7 @@ const TuneProfile: React.FC = () => {
     aiUsage: { ...EMPTY_AI_USAGE } as AiUsage,
     coverArt: '',
     minimumBid: null as number | null,
+    copySharePercent: 50,
     primaryLocation: null as ResolvedLocation | null,
     secondaryLocation: null as ResolvedLocation | null
   });
@@ -349,6 +372,12 @@ const TuneProfile: React.FC = () => {
 
   // Global bidding state
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
+  const [copyAccess, setCopyAccess] = useState<{
+    sharePercent?: number;
+    thresholdPence: number | null;
+    unlocked: boolean;
+    grandfathered: boolean;
+  } | null>(null);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -387,13 +416,11 @@ const TuneProfile: React.FC = () => {
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
   const [isRemovingCoverArt, setIsRemovingCoverArt] = useState(false);
 
-  // Attach audio to catalog entry (awaiting rights/audio)
+  // Replace hosted audio on a tune the editor already owns
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [showAttachAudioModal, setShowAttachAudioModal] = useState(false);
-  const [attachAudioReplace, setAttachAudioReplace] = useState(false);
   const [attachAudioFile, setAttachAudioFile] = useState<File | null>(null);
   const [attachAudioRightsConfirmed, setAttachAudioRightsConfirmed] = useState(false);
-  const [attachAudioDisclaimer, setAttachAudioDisclaimer] = useState('');
   const [isAttachingAudio, setIsAttachingAudio] = useState(false);
 
   // WebPlayer integration
@@ -418,6 +445,17 @@ const TuneProfile: React.FC = () => {
       console.log('❌ No mediaId provided');
     }
   }, [mediaId]);
+
+  useEffect(() => {
+    if (!media) return;
+    const canonical = getMediaProfileUrl(media);
+    if (!canonical || canonical.endsWith('/')) return;
+    const qs = searchParams.toString();
+    const target = qs ? `${canonical}?${qs}` : canonical;
+    if (window.location.pathname !== canonical) {
+      navigate(target, { replace: true });
+    }
+  }, [media, navigate, searchParams]);
 
   // Fetch global party minimum bid
   useEffect(() => {
@@ -458,6 +496,11 @@ const TuneProfile: React.FC = () => {
       setMedia(enrichMediaWithPlayability(response.media));
       setComments(response.media.comments || []);
       setRankedTags(response.rankedTags || []);
+      try {
+        setCopyAccess(await mediaAPI.getCopyAccess(mediaId!));
+      } catch {
+        setCopyAccess(null);
+      }
       console.log('✅ Media profile loaded successfully');
     } catch (err: any) {
       console.error('❌ Error fetching media profile:', err);
@@ -501,20 +544,11 @@ const TuneProfile: React.FC = () => {
     return canDeleteMedia(user, media);
   };
 
-  const canAttachAudio = () => {
-    if (!user || !media || isMediaPlayable(media)) return false;
-    return canEditTune() || isAdminOrCreator(user);
-  };
-
   const canReplaceAudio = () => {
     if (!user || !media) return false;
     const sources = normalizeSources(media.sources);
     if (!sources.upload) return false;
-    return canEditTune() || isAdminOrCreator(user);
-  };
-
-  const isContributorAudioUpload = () => {
-    return canAttachAudio() && isCreator(user) && !canEditTune();
+    return canEditTune();
   };
 
   // Helper function to get country code from country name
@@ -905,7 +939,7 @@ const TuneProfile: React.FC = () => {
         explicit: media.explicit || false,
         isrc: media.isrc || '',
         upc: media.upc || '',
-        bpm: media.bpm || 0,
+        bpm: roundBpm(media.bpm) || 0,
         key: media.key || '',
         tags: media.tags || [],
         lyrics: media.lyrics || '',
@@ -934,6 +968,7 @@ const TuneProfile: React.FC = () => {
         },
         coverArt: media.coverArt || DEFAULT_COVER_ART, // Always show the URL that's actually stored (or default)
         minimumBid: (media as any).minimumBid ?? null,
+        copySharePercent: normalizeCopySharePercent((media as any).copySharePercent),
         primaryLocation: (() => {
           const loc = (media as any).primaryLocation || null;
           if (loc && loc.country && !loc.countryCode) {
@@ -1319,15 +1354,14 @@ const TuneProfile: React.FC = () => {
     }
   };
 
-  const handleAttachAudioClick = (e: React.MouseEvent, replace = false) => {
+  const handleAttachAudioClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast.info('Please log in to upload audio');
+      toast.info('Please log in to replace audio');
       navigate('/login');
       return;
     }
-    if (replace ? !canReplaceAudio() : !canAttachAudio()) return;
-    setAttachAudioReplace(replace);
+    if (!canReplaceAudio()) return;
     setShowAttachAudioModal(true);
   };
 
@@ -1350,10 +1384,8 @@ const TuneProfile: React.FC = () => {
 
   const closeAttachAudioModal = () => {
     setShowAttachAudioModal(false);
-    setAttachAudioReplace(false);
     setAttachAudioFile(null);
     setAttachAudioRightsConfirmed(false);
-    setAttachAudioDisclaimer('');
     setIsAttachingAudio(false);
     if (audioFileInputRef.current) {
       audioFileInputRef.current.value = '';
@@ -1366,37 +1398,24 @@ const TuneProfile: React.FC = () => {
       toast.error('Please confirm your rights to upload this audio');
       return;
     }
-    if (isContributorAudioUpload() && !attachAudioDisclaimer.trim()) {
-      toast.error('Please describe your authorization to upload on behalf of the rights holder');
-      return;
-    }
 
     setIsAttachingAudio(true);
     try {
-      const isContributor = isContributorAudioUpload();
       const response = await mediaAPI.attachUpload(
         media?._id || mediaId,
         attachAudioFile,
-        {
-          ...(isContributor
-            ? {
-                uploaderRole: 'third_party' as const,
-                rightsDisclaimer: attachAudioDisclaimer.trim(),
-              }
-            : { uploaderRole: 'owner' as const }),
-          ...(attachAudioReplace ? { replaceExisting: true } : {}),
-        }
+        { uploaderRole: 'owner', replaceExisting: true }
       );
       if (response.media) {
         setMedia(enrichMediaWithPlayability(response.media));
       } else {
         await fetchMediaProfile();
       }
-      toast.success(attachAudioReplace ? 'Audio replaced — playback updated' : 'Audio uploaded — this tune is now playable!');
+      toast.success('Audio replaced — playback updated');
       closeAttachAudioModal();
     } catch (err: any) {
-      console.error('Error attaching audio:', err);
-      toast.error(err.response?.data?.error || 'Failed to upload audio');
+      console.error('Error replacing audio:', err);
+      toast.error(err.response?.data?.error || 'Failed to replace audio');
       setIsAttachingAudio(false);
     }
   };
@@ -1536,6 +1555,73 @@ const TuneProfile: React.FC = () => {
     setShowClaimModal(true);
   };
 
+  const handleInviteArtist = useCallback(async () => {
+    const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
+    if (!user) {
+      toast.error('Sign in to invite this artist');
+      navigate('/login');
+      return;
+    }
+    if (!inviteCode) {
+      toast.error('Your account does not have an invite code yet');
+      return;
+    }
+    const artistName = media?.artist || 'this artist';
+    const title = media?.title || 'this track';
+    const link = `${window.location.origin}/creator/register?invite=${inviteCode}`;
+    const affiliateLine = user?.isFoundingCreator
+      ? `If you upload your own music, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.`
+      : `Upload your own music to claim a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}) — status benefits only, not equity.`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator with my invite code ${inviteCode}, then upload or claim it so tips can reach you.\n\n${affiliateLine}\n\n${link}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(message);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = message;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success('Invite message copied — send it to the artist');
+    } catch {
+      toast.error('Could not copy invite');
+    }
+  }, [media?.artist, media?.title, navigate, user]);
+
+  const handleRightsStatusChange = async (status: RightsStatus) => {
+    if (!media?._id || savingRightsStatus) return;
+    const previous = media.rightsStatus;
+    setSavingRightsStatus(true);
+    setMedia((current) => current
+      ? enrichMediaWithPlayability({
+          ...current,
+          rightsStatus: status,
+          rightsCleared: status === 'cleared',
+        })
+      : current);
+    try {
+      await mediaAPI.updateMedia(media._id, { rightsStatus: status });
+      toast.success(
+        status === 'permitted'
+          ? 'Marked permitted — playable, tips held until the artist claims'
+          : `Rights status set to ${status}`
+      );
+      await fetchMediaProfile();
+    } catch (err: any) {
+      setMedia((current) => current
+        ? enrichMediaWithPlayability({ ...current, rightsStatus: previous })
+        : current);
+      toast.error(err.response?.data?.error || 'Failed to update rights status');
+    } finally {
+      setSavingRightsStatus(false);
+    }
+  };
+
   // Load tag rankings for this tune
   const loadTagRankings = async () => {
     if (!media && !mediaId) {
@@ -1585,6 +1671,9 @@ const TuneProfile: React.FC = () => {
   };
 
   const listenElsewhere = media ? getListenElsewhereTarget(media) : null;
+  const coverOverlayKind = getCoverOverlayKind(media);
+  const blockedCover = getBlockedCoverCopy(coverOverlayKind);
+  const coverPlayable = coverOverlayKind === 'play' || coverOverlayKind === 'play_permitted';
 
   const handleListenElsewhere = () => {
     if (!openListenElsewhere(media)) return;
@@ -1594,6 +1683,7 @@ const TuneProfile: React.FC = () => {
   // Handle play button click
   const handlePlaySong = () => {
     if (!media) return;
+    if (!requireAuthToPlay()) return;
 
     if (!isMediaPlayable(media)) {
       toast.info(
@@ -1621,8 +1711,12 @@ const TuneProfile: React.FC = () => {
             break;
         } else if (source && source.platform === 'youtube' && source.url) {
           (sources as any).youtube = source.url;
+        } else if (source && source.platform === 'upload' && source.url) {
+          (sources as any).upload = source.url;
         } else if (source?.youtube) {
           (sources as any).youtube = source.youtube;
+        } else if (source?.upload) {
+          (sources as any).upload = source.upload;
         }
         }
       } else if (typeof media.sources === 'object') {
@@ -1634,6 +1728,7 @@ const TuneProfile: React.FC = () => {
     // Format media for webplayer
     const formattedSong = {
       id: media._id || media.uuid,
+      _id: media._id || media.uuid,
       title: media.title,
       artist: Array.isArray(media.artist) ? media.artist[0]?.name || 'Unknown Artist' : media.artist,
       duration: media.duration,
@@ -1642,7 +1737,8 @@ const TuneProfile: React.FC = () => {
       globalMediaAggregate: media.globalMediaAggregate || 0,
       bids: media.bids || [],
       addedBy: media.addedBy?.username || 'Unknown',
-      totalBidValue: media.globalMediaAggregate || 0
+      totalBidValue: media.globalMediaAggregate || 0,
+      ...playerPlayabilityFields(media),
     } as any;
 
     console.log('🎵 Playing from TuneProfile:', formattedSong);
@@ -1672,6 +1768,7 @@ const TuneProfile: React.FC = () => {
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    ...playerPlayabilityFields(item as any),
   });
 
   const recommendedToQueueShape = (item: RecommendedMediaItem) => ({
@@ -1697,17 +1794,22 @@ const TuneProfile: React.FC = () => {
       sources: item.sources || {},
       contentForm: item.contentForm,
       contentType: item.contentType,
+      isPlayable: item.isPlayable,
+      rightsStatus: item.rightsStatus,
+      rightsCleared: item.rightsCleared,
+      hasHostedAudio: item.hasHostedAudio,
     } as any);
     return isMediaPlayable(enriched);
   };
 
   const startRecommendedQueue = (items: RecommendedMediaItem[], startItem?: RecommendedMediaItem) => {
+    if (!requireAuthToPlay()) return;
     const playableItems = items.filter(isRecommendedPlayable);
 
     if (playableItems.length === 0) {
       if (startItem) {
         toast.info('This track is not playable yet — opening the tune page instead.');
-        navigate(`/tune/${startItem._id || startItem.uuid}`);
+        navigate(getMediaProfileUrl(startItem));
       } else {
         toast.info('No playable related tunes yet.');
       }
@@ -1721,7 +1823,7 @@ const TuneProfile: React.FC = () => {
       );
       if (matchIndex < 0) {
         toast.info('This track is not playable yet — opening the tune page instead.');
-        navigate(`/tune/${startItem._id || startItem.uuid}`);
+        navigate(getMediaProfileUrl(startItem));
         return;
       }
       startIndex = matchIndex;
@@ -1745,7 +1847,7 @@ const TuneProfile: React.FC = () => {
   const handleOpenRecommendedTip = (item: RecommendedMediaItem) => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      const returnUrl = `/tune/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1796,7 +1898,7 @@ const TuneProfile: React.FC = () => {
   const handleOpenTipModal = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      const returnUrl = `/tune/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1807,7 +1909,7 @@ const TuneProfile: React.FC = () => {
   const handleGlobalBid = () => {
     if (!user) {
       toast.info('Please log in to support this tune');
-      const returnUrl = `/tune/${mediaId || media?._id}`;
+      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
       navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
       return;
     }
@@ -1864,77 +1966,33 @@ const TuneProfile: React.FC = () => {
   // Use frontend URL for sharing (canonical URL that users will see)
   // Backend route /api/media/share/:id is for Facebook's crawler to get meta tags
   // Use _id instead of uuid for shorter URLs
-  const shareUrl = media?._id 
-    ? `${window.location.origin}/tune/${media._id}`
+  const shareUrl = media
+    ? `${window.location.origin}${getMediaProfileUrl(media)}`
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this tune'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
+  const tunePath = media ? getMediaProfileUrl(media) : '';
 
-  // Update Open Graph meta tags for better Facebook sharing
-  useEffect(() => {
-    if (!media) return;
-
-    // Helper function to get absolute image URL
-    const getAbsoluteImageUrl = (imageUrl: string | undefined): string => {
-      if (!imageUrl) return `${window.location.origin}${DEFAULT_COVER_ART}`;
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        return imageUrl;
-      }
-      if (imageUrl.startsWith('/')) {
-        return `${window.location.origin}${imageUrl}`;
-      }
-      return `${window.location.origin}/${imageUrl}`;
-    };
-
-    const ogImage = media._id
-      ? getStoryCardUrl(media._id, 'og')
-      : getAbsoluteImageUrl(media.coverArt);
-    const ogTitle = `${media.title}${media.artist ? ` by ${media.artist}` : ''} | Tuneable`;
-    const ogDescription = shareText; // Already includes the new caption
-    const ogUrl = media?._id 
-      ? `${window.location.origin}/tune/${media._id}`
-      : window.location.href;
-
-    // Create or update meta tags
-    const updateMetaTag = (property: string, content: string) => {
-      let meta = document.querySelector(`meta[property="${property}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('property', property);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    // Update Open Graph tags
-    updateMetaTag('og:title', ogTitle);
-    updateMetaTag('og:description', ogDescription);
-    updateMetaTag('og:image', ogImage);
-    updateMetaTag('og:url', ogUrl);
-    updateMetaTag('og:type', 'music.song');
-    updateMetaTag('og:site_name', 'Tuneable');
-
-    // Update Twitter Card tags for better cross-platform sharing
-    const updateTwitterTag = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name="${name}"]`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    updateTwitterTag('twitter:card', 'summary_large_image');
-    updateTwitterTag('twitter:title', ogTitle);
-    updateTwitterTag('twitter:description', ogDescription);
-    updateTwitterTag('twitter:image', ogImage);
-
-    // Cleanup function to restore default meta tags when component unmounts
-    return () => {
-      // Optionally restore default tags here if needed
-    };
-  }, [media, shareUrl, shareText]);
+  usePageMeta(media ? {
+    title: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    description: clipText(`Tip “${media.title}”${creatorDisplay ? ` by ${creatorDisplay}` : ''} on Tuneable. Listener tips support the artists and decide its place on the global chart.`),
+    path: tunePath,
+    image: media._id ? getStoryCardUrl(media._id, 'og') : media.coverArt,
+    imageAlt: creatorDisplay ? `${media.title} by ${creatorDisplay}` : media.title,
+    imageWidth: media._id ? 1200 : undefined,
+    imageHeight: media._id ? 630 : undefined,
+    twitterCard: 'summary_large_image',
+    type: 'music.song',
+    robots: searchParams.get('edit') === 'true' ? 'noindex, nofollow' : 'index, follow',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'MusicRecording',
+      name: media.title,
+      ...(creatorDisplay ? { byArtist: { '@type': 'MusicGroup', name: creatorDisplay } } : {}),
+      url: `${SITE_ORIGIN}${tunePath}`,
+      ...(media.coverArt ? { image: media.coverArt } : {}),
+    },
+  } : null);
 
   const handleNativeShare = async () => {
     if (!media?._id) {
@@ -2091,9 +2149,11 @@ const TuneProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading Tune Profile...</div>
-      </div>
+      <EntertainingLoader
+        flavor="music"
+        size="page"
+        headline="Loading this tune…"
+      />
     );
   }
 
@@ -2117,7 +2177,7 @@ const TuneProfile: React.FC = () => {
     { label: 'Title', value: media.title, icon: Music },
     { label: 'Artist', value: media.artist, icon: Mic },
     { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
-    { label: 'BPM', value: media.bpm, icon: Headphones },
+    { label: 'BPM', value: roundBpm(media.bpm), icon: Headphones },
     {
       label: 'Release Date',
       value: media.releaseDate
@@ -2159,7 +2219,7 @@ const TuneProfile: React.FC = () => {
         : null,
     media.duration ? formatDuration(media.duration) : null,
     media.key,
-    media.bpm ? `${media.bpm} BPM` : null,
+    formatBpmLabel(media.bpm),
   ].filter((part): part is string => Boolean(part));
 
   const topTagRankings = tagRankings.slice(0, 3);
@@ -2252,6 +2312,8 @@ const TuneProfile: React.FC = () => {
     )
   );
 
+  const copyAccessLine = () => (copyAccess ? copyAccessSentence(copyAccess) : null);
+
   const renderSlimSupportSection = () => (
     <div id="support-tune" className="mb-6 px-2 md:px-0">
       <div className="max-w-2xl mx-auto">
@@ -2264,9 +2326,12 @@ const TuneProfile: React.FC = () => {
               </h3>
               <p className="text-gray-300 text-sm mt-1">
                 {!isMediaPlayable(media)
-                  ? 'Tip to help get this track fully added once audio is uploaded.'
+                  ? 'This track is not playable on Tuneable yet. Your tip still supports the listing.'
                   : 'Boost global ranking and support the artist'}
               </p>
+              {copyAccessLine() && (
+                <p className="text-purple-200 text-xs mt-1">{copyAccessLine()}</p>
+              )}
             </div>
             {user && (
               <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
@@ -2354,7 +2419,7 @@ const TuneProfile: React.FC = () => {
             onActionClick={() => {}}
             onPlay={() => startRecommendedQueue(items, item)}
             onTip={() => handleOpenRecommendedTip(item)}
-            mediaHref={`/tune/${item.uuid || item._id}`}
+            mediaHref={getMediaProfileUrl(item)}
           />
         );
       })}
@@ -2377,7 +2442,16 @@ const TuneProfile: React.FC = () => {
             {/* Edit Tune & Report Buttons */}
             <div className="flex flex-wrap justify-end gap-2 md:flex-nowrap md:items-center">
             
-              {/* Report Button - Always visible */}
+              {isAdmin(user) && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-black/30 border border-white/10 rounded-lg">
+                  <span className="text-xs text-gray-400 hidden sm:inline">Rights</span>
+                  <AdminRightsStatusSelect
+                    value={media.rightsStatus}
+                    disabled={savingRightsStatus}
+                    onChange={handleRightsStatusChange}
+                  />
+                </div>
+              )}
               <button
                 onClick={() => setShowReportModal(true)}
                 className="px-3 md:px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
@@ -2386,16 +2460,26 @@ const TuneProfile: React.FC = () => {
                 <span className="hidden sm:inline">Report</span>
               </button>
               
-              {/* Claim media — rights-pending limbo only */}
+              {/* Claim media — pending or permitted until the artist is onboarded */}
               {!canEditTune() && isRightsPendingClaimable(media) && (
-                <button
-                  onClick={handleClaimTune}
-                  className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
-                >
-                  <Award className="h-4 w-4" />
-                  <span className="hidden sm:inline">Claim media</span>
-                  <span className="sm:hidden">Claim</span>
-                </button>
+                <>
+                  <button
+                    onClick={handleClaimTune}
+                    className="px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
+                  >
+                    <Award className="h-4 w-4" />
+                    <span className="hidden sm:inline">Claim media</span>
+                    <span className="sm:hidden">Claim</span>
+                  </button>
+                  <button
+                    onClick={handleInviteArtist}
+                    className="px-3 md:px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-1 md:space-x-2 text-sm md:text-base"
+                  >
+                    <Gift className="h-4 w-4" />
+                    <span className="hidden sm:inline">Invite this artist</span>
+                    <span className="sm:hidden">Invite</span>
+                  </button>
+                </>
               )}
               
               {/* Edit Tune Button - Only show if user can edit and not in edit mode */}
@@ -2429,69 +2513,85 @@ const TuneProfile: React.FC = () => {
                 alt={`${media.title} cover`}
                 className="w-56 h-56 sm:w-64 sm:h-64 md:w-auto md:h-auto md:max-w-sm rounded-lg shadow-xl object-cover"
               />
-              {/* Play / awaiting rights overlay (matches mobile claim flow) */}
+              {coverOverlayKind === 'play_permitted' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowClaimModal(true);
+                  }}
+                  className="absolute top-2 left-2 z-20 px-2 py-1 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-[11px] font-semibold shadow-lg inline-flex items-center gap-1"
+                >
+                  <Award className="h-3 w-3" />
+                  Claim
+                </button>
+              )}
+              {/* Play / blocked-rights overlay */}
               <div 
-                className={`absolute inset-0 flex items-center justify-center rounded-lg transition-opacity ${
-                  isMediaPlayable(media)
+                className={`absolute inset-0 z-10 flex items-center justify-center rounded-lg transition-opacity ${
+                  coverPlayable
                     ? 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
                     : 'bg-black/50 opacity-100 cursor-default'
                 }`}
-                onClick={isMediaPlayable(media) ? handlePlaySong : undefined}
+                onClick={coverPlayable ? handlePlaySong : undefined}
               >
-                {isMediaPlayable(media) ? (
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-purple-600 rounded-full flex items-center justify-center hover:bg-purple-700 hover:scale-110 transition-all shadow-2xl">
+                {coverPlayable ? (
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-2xl bg-purple-600 hover:bg-purple-700">
                     <Play className="h-8 w-8 md:h-10 md:w-10 text-white ml-1" fill="currentColor" />
                   </div>
-                ) : (
-                  (() => {
-                    const blockReason = getPlayabilityBlockReason(media);
-                    const rightsBlocked = blockReason === 'rights';
-                    const disputed = blockReason === 'disputed';
-
-                    return (
-                      <div className="text-center px-4">
-                        <Award className="h-8 w-8 text-amber-400 mx-auto mb-2" />
-                        <p className="text-white text-sm font-semibold">
-                          {disputed ? 'Rights disputed' : 'Awaiting Rights'}
-                        </p>
-                        <p className="text-gray-300 text-xs mt-1 mb-3">
-                          {disputed
-                            ? 'Playback is paused while ownership is resolved'
-                            : rightsBlocked
-                              ? 'Claim ownership to receive tips held in escrow'
-                              : 'Claim this media and upload audio if you are the rights holder'}
-                        </p>
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          {!disputed && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowClaimModal(true);
-                              }}
-                              className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
-                            >
-                              Claim media
-                            </button>
-                          )}
-                          {listenElsewhere && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleListenElsewhere();
-                              }}
-                              className="px-4 py-2 bg-black/50 hover:bg-black/70 border border-white/20 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              {listenElsewhere.label}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })()
-                )}
+                ) : blockedCover ? (
+                  <div className="text-center px-4">
+                    <Award className={`h-8 w-8 mx-auto mb-2 ${
+                      coverOverlayKind === 'disputed' ? 'text-red-400' : 'text-amber-400'
+                    }`} />
+                    <p className="text-white text-sm font-semibold">
+                      {blockedCover.title}
+                    </p>
+                    <p className="text-gray-300 text-xs mt-1 mb-3">
+                      {blockedCover.hint}
+                    </p>
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      {blockedCover.showClaim && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowClaimModal(true);
+                          }}
+                          className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-sm font-semibold rounded-lg shadow-lg transition-all"
+                        >
+                          Claim media
+                        </button>
+                      )}
+                      {blockedCover.showClaim && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleInviteArtist();
+                          }}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
+                        >
+                          <Gift className="h-3.5 w-3.5" />
+                          Invite this artist
+                        </button>
+                      )}
+                      {listenElsewhere && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleListenElsewhere();
+                          }}
+                          className="px-4 py-2 bg-black/50 hover:bg-black/70 border border-white/20 text-white text-sm font-semibold rounded-lg shadow-lg transition-all inline-flex items-center gap-1.5"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          {listenElsewhere.label}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
             
@@ -3038,6 +3138,9 @@ const TuneProfile: React.FC = () => {
                       <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
                         Boost this tune's global ranking and support the artist
                       </p>
+                      {copyAccessLine() && (
+                        <p className="text-purple-200 text-xs md:text-sm mb-4">{copyAccessLine()}</p>
+                      )}
                       
                       <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
                         <button
@@ -3742,6 +3845,7 @@ const TuneProfile: React.FC = () => {
                   <label className="block text-white font-medium mb-2">BPM</label>
                   <input
                     type="number"
+                    step="1"
                     value={editForm.bpm}
                     onChange={(e) => setEditForm({ ...editForm, bpm: parseInt(e.target.value) || 0 })}
                     className="input"
@@ -3911,6 +4015,27 @@ const TuneProfile: React.FC = () => {
                 </p>
               </div>
 
+              <div className="mb-4">
+                <label className="block text-white font-medium mb-2">
+                  Who can keep a copy
+                </label>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={editForm.copySharePercent}
+                  onChange={(e) => setEditForm({
+                    ...editForm,
+                    copySharePercent: normalizeCopySharePercent(e.target.value),
+                  })}
+                  className="w-full accent-purple-500"
+                />
+                <p className="text-sm text-white mt-2">{copyShareLabel(editForm.copySharePercent)}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  100% is everyone who tips. 1% is only the most generous. People who already cleared the line keep the copy if you raise it.
+                </p>
+              </div>
+
                 {/* Cover Art URL */}
                 <div>
                   <label className="block text-white font-medium mb-2">Cover Art URL</label>
@@ -4002,7 +4127,7 @@ const TuneProfile: React.FC = () => {
                     ) : null}
                     <button
                       type="button"
-                      onClick={(e) => handleAttachAudioClick(e, true)}
+                      onClick={handleAttachAudioClick}
                       disabled={isAttachingAudio}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
                     >
@@ -4061,6 +4186,7 @@ const TuneProfile: React.FC = () => {
           mediaId={media._id}
           mediaTitle={media.title}
           contentLabel="Tune"
+          rightsStatus={media.rightsStatus}
           onClose={() => setShowClaimModal(false)}
         />
       )}
@@ -4190,18 +4316,12 @@ const TuneProfile: React.FC = () => {
         </div>
       )}
 
-      {/* Attach Audio Modal */}
+      {/* Replace audio on a tune that already has a hosted file */}
       {showAttachAudioModal && media && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
           <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl md:text-2xl font-bold text-white">
-                {attachAudioReplace
-                  ? 'Replace audio'
-                  : isContributorAudioUpload()
-                    ? 'Upload on behalf'
-                    : 'Upload audio'}
-              </h2>
+              <h2 className="text-xl md:text-2xl font-bold text-white">Replace audio</h2>
               <button
                 onClick={closeAttachAudioModal}
                 disabled={isAttachingAudio}
@@ -4212,23 +4332,8 @@ const TuneProfile: React.FC = () => {
             </div>
 
             <p className="text-gray-300 text-sm mb-4">
-              {attachAudioReplace
-                ? `Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`
-                : isContributorAudioUpload()
-                  ? `Attach an audio file (MP3) for "${media.title}" on behalf of the rights holder. This will make the tune playable on Tuneable.`
-                  : `Attach your audio file (MP3) for "${media.title}". This will make the tune playable on Tuneable.`}
+              {`Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`}
             </p>
-
-            {isContributorAudioUpload() && (
-              <div className="mb-4 bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
-                <p className="text-amber-200 text-sm font-medium mb-2">Contributor upload</p>
-                <p className="text-gray-300 text-sm">
-                  You are uploading as a verified contributor, not as the primary rights holder.
-                  Please confirm you have explicit authorization from the rights holder to upload
-                  this audio file to Tuneable.
-                </p>
-              </div>
-            )}
 
             <div className="mb-4">
               <label className="block text-white font-medium mb-2">Audio File</label>
@@ -4255,25 +4360,6 @@ const TuneProfile: React.FC = () => {
               )}
             </div>
 
-            {isContributorAudioUpload() && (
-              <div className="mb-4">
-                <label className="block text-white font-medium mb-2">
-                  Authorization from rights holder
-                </label>
-                <textarea
-                  value={attachAudioDisclaimer}
-                  onChange={(e) => setAttachAudioDisclaimer(e.target.value)}
-                  placeholder="Describe how you are authorized to upload this file (e.g. label manager, distributor, artist representative, written permission)..."
-                  className="input min-h-24"
-                  maxLength={1000}
-                  disabled={isAttachingAudio}
-                />
-                <div className="text-xs text-gray-400 mt-1">
-                  {attachAudioDisclaimer.length}/1000 characters
-                </div>
-              </div>
-            )}
-
             <div className="mb-6 bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
               <div className="flex items-start space-x-3">
                 <input
@@ -4286,12 +4372,10 @@ const TuneProfile: React.FC = () => {
                 />
                 <label htmlFor="attach-audio-rights-confirmation" className="text-sm text-gray-300">
                   <strong className="text-white">Rights confirmation:</strong>{' '}
-                  {isContributorAudioUpload()
-                    ? 'I confirm I have authorization from the rights holder to upload this audio, and I grant Tuneable CIC a non-exclusive license to host and stream it.'
-                    : 'I confirm that I own or have authorization to distribute the rights in this work, and I grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.'}
+                  I confirm that I own or have authorization to distribute the rights in this work, and I grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.
                   {' '}
-                  <Link to="/terms-of-service" className="text-purple-400 underline hover:text-purple-300">
-                    View Terms
+                  <Link to="/terms-of-service#copyright" className="text-purple-400 underline hover:text-purple-300">
+                    Copyright and takedown terms
                   </Link>
                 </label>
               </div>
@@ -4309,12 +4393,7 @@ const TuneProfile: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAttachAudioSubmit}
-                disabled={
-                  isAttachingAudio ||
-                  !attachAudioFile ||
-                  !attachAudioRightsConfirmed ||
-                  (isContributorAudioUpload() && !attachAudioDisclaimer.trim())
-                }
+                disabled={isAttachingAudio || !attachAudioFile || !attachAudioRightsConfirmed}
                 className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isAttachingAudio ? (
@@ -4325,7 +4404,7 @@ const TuneProfile: React.FC = () => {
                 ) : (
                   <>
                     <Upload className="h-5 w-5" />
-                    <span>Upload</span>
+                    <span>Replace</span>
                   </>
                 )}
               </button>

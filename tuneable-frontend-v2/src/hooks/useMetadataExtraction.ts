@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { roundBpm } from '../utils/bpm';
 
 export interface ExtractedMetadata {
   // Basic information
@@ -101,7 +102,7 @@ export const useMetadataExtraction = () => {
         lossless: metadata.format.lossless || false,
         
         // Advanced metadata
-        bpm: metadata.common.bpm || null,
+        bpm: roundBpm(metadata.common.bpm),
         key: metadata.common.key || null,
         isrc: Array.isArray(metadata.common.isrc) ? metadata.common.isrc[0] : metadata.common.isrc || null,
         upc: Array.isArray(metadata.common.barcode) ? metadata.common.barcode[0] : metadata.common.barcode || null,

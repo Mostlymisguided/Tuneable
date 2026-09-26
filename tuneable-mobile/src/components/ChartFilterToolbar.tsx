@@ -189,18 +189,13 @@ export function ChartFilterToolbar({
         {showPlayable && onPlayableOnlyChange ? (
           <FilterTrigger
             icon="headset-outline"
-            label="Playable"
+            label={playableOnly ? 'Playable' : 'All'}
             active={playableOnly}
-            detail={
-              playableOnly
-                ? hiddenPlayableCount > 0
-                  ? `−${hiddenPlayableCount}`
-                  : undefined
-                : 'All'
-            }
             onPress={() => onPlayableOnlyChange(!playableOnly)}
             accessibilityLabel={
-              playableOnly ? 'Playable only, on' : 'Playable only, off'
+              playableOnly
+                ? 'Showing playable. Tap to show all.'
+                : 'Showing all. Tap to show playable only.'
             }
           />
         ) : null}
@@ -213,7 +208,10 @@ export function ChartFilterToolbar({
           accessibilityRole="button"
           accessibilityLabel={catalogHiddenLabel(hiddenPlayableCount)}>
           <Text style={styles.hiddenHint}>
-            Showing playable only · {catalogHiddenLabel(hiddenPlayableCount)}
+            Showing playable only ·{' '}
+            <Text style={styles.hiddenHintLink}>
+              {catalogHiddenLabel(hiddenPlayableCount)}
+            </Text>
           </Text>
         </Pressable>
       ) : null}
@@ -541,5 +539,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
+  },
+  hiddenHintLink: {
+    color: '#d8b4fe',
+    textDecorationLine: 'underline',
   },
 });

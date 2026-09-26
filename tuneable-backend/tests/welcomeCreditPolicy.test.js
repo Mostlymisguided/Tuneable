@@ -6,8 +6,11 @@
 const assert = require('assert');
 const {
   getMediaControllerUserIds,
+  userControlsMedia,
+  remainingSelfMediaWelcomePence,
   getArtistCapTargets,
   MAX_WELCOME_PER_TIP_PENCE,
+  MAX_WELCOME_SELF_PER_MEDIA_PENCE,
   MAX_WELCOME_PER_ARTIST_PENCE,
   MAX_WELCOME_MEDIA_PER_ARTIST,
   computeWelcomeExpiryDate,
@@ -23,6 +26,25 @@ function testControllers() {
   const ids = getMediaControllerUserIds(media);
   assert.ok(ids.has(ownerId));
   assert.ok(ids.has(artistId));
+}
+
+function testUserControlsMedia() {
+  const ownerId = '507f1f77bcf86cd799439011';
+  const otherId = '507f1f77bcf86cd799439012';
+  const media = {
+    mediaOwners: [{ userId: ownerId, percentage: 100 }],
+  };
+
+  assert.strictEqual(userControlsMedia({ _id: ownerId, role: ['user'] }, media), true);
+  assert.strictEqual(userControlsMedia({ _id: ownerId, role: ['admin'] }, media), true);
+  assert.strictEqual(userControlsMedia({ _id: otherId, role: ['user'] }, media), false);
+}
+
+function testSelfMediaCapRemaining() {
+  assert.strictEqual(remainingSelfMediaWelcomePence(0), 111);
+  assert.strictEqual(remainingSelfMediaWelcomePence(50), 61);
+  assert.strictEqual(remainingSelfMediaWelcomePence(111), 0);
+  assert.strictEqual(remainingSelfMediaWelcomePence(200), 0);
 }
 
 function testCapTargetsOwned() {
@@ -53,6 +75,7 @@ function testCapTargetsByName() {
 
 function testConstantsMatchBrandMaths() {
   assert.strictEqual(MAX_WELCOME_PER_TIP_PENCE, 111);
+  assert.strictEqual(MAX_WELCOME_SELF_PER_MEDIA_PENCE, 111);
   assert.strictEqual(MAX_WELCOME_PER_ARTIST_PENCE, 333);
   assert.strictEqual(MAX_WELCOME_MEDIA_PER_ARTIST, 3);
 }
@@ -66,6 +89,8 @@ function testExpiryMonths() {
 
 function run() {
   testControllers();
+  testUserControlsMedia();
+  testSelfMediaCapRemaining();
   testCapTargetsOwned();
   testCapTargetsByName();
   testConstantsMatchBrandMaths();

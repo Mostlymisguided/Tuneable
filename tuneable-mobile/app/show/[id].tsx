@@ -535,13 +535,13 @@ export default function PodcastShowScreen() {
                   style={styles.searchInput}
                   value={searchInput}
                   onChangeText={setSearchInput}
-                  placeholder="Search episodes in this show"
+                  placeholder="Search this show’s catalogue"
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="search"
                   clearButtonMode="while-editing"
-                  accessibilityLabel="Search episodes in this show"
+                  accessibilityLabel="Search this show’s catalogue"
                 />
                 {searchInput.length > 0 ? (
                   <Pressable
@@ -560,7 +560,7 @@ export default function PodcastShowScreen() {
               {searchQuery && (loadingEpisodes || episodes.length > 0) ? (
                 <Text style={styles.searchMeta}>
                   {loadingEpisodes && episodes.length === 0
-                    ? 'Searching…'
+                    ? 'Searching catalogue…'
                     : `${episodes.length}${hasMore ? '+' : ''} matching episode${
                         episodes.length === 1 ? '' : 's'
                       }`}
@@ -601,7 +601,7 @@ export default function PodcastShowScreen() {
             !loadingEpisodes ? (
               <Text style={styles.empty}>
                 {searchQuery
-                  ? `No episodes in this show match “${searchQuery}”.`
+                  ? `No episodes in this show’s catalogue match “${searchQuery}”.`
                   : 'No episodes in this show yet.'}
               </Text>
             ) : null

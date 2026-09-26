@@ -3,9 +3,22 @@ const { uuidv7 } = require('uuidv7');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeLanguageInput } = require('../utils/language');
 const { normalizeIsbn } = require('../utils/isbn');
+const { roundBpm } = require('../utils/bpm');
+const { normalizeKey } = require('../utils/keyNormalizer');
+const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 const mediaSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
+  // Public URL slug (artist-title). IDs stay on uuid/_id.
+  slug: {
+    type: String,
+    unique: true,
+    sparse: true,
+    lowercase: true,
+    trim: true,
+    maxlength: 120,
+  },
+  slugAliases: [{ type: String, lowercase: true, trim: true }],
   
   // Core identification
   title: { type: String, required: true },
@@ -226,8 +239,20 @@ const mediaSchema = new mongoose.Schema({
   upc: { type: String, default: null }, // Universal Product Code
   lyrics: { type: String }, // lyrics
   transcript: { type: String }, // Podcast/video transcript
-  bpm: { type: Number },
-  key: { type: String },
+  bpm: {
+    type: Number,
+    set(value) {
+      if (value === undefined) return undefined;
+      return roundBpm(value);
+    },
+  },
+  key: {
+    type: String,
+    set(value) {
+      if (value === undefined) return undefined;
+      return normalizeKey(value);
+    },
+  },
   pitch: { type: Number, default: 440 },
   timeSignature: { type: String, default: '4/4' },
   bitrate: { type: Number },
@@ -305,57 +330,8 @@ const mediaSchema = new mongoose.Schema({
   category: { type: String, default: null }, // YouTube category name (mapped from categoryId)
   
   // Location fields (aligned with User homeLocation / Mapbox resolve)
-  primaryLocation: {
-    city: { type: String },
-    region: { type: String }, // State, province, or region
-    country: { type: String },
-    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    detectedFromIP: { type: Boolean, default: false }, // Track if auto-detected from IP
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
-  secondaryLocation: {
-    city: { type: String },
-    region: { type: String },
-    country: { type: String },
-    countryCode: { type: String },
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
+  primaryLocation: mapboxLocationFields(),
+  secondaryLocation: mapboxLocationFields(),
   /** Where primaryLocation came from: artist_home | musicbrainz | uploader | manual | … */
   locationSource: { type: String, default: null },
   
@@ -364,6 +340,14 @@ const mediaSchema = new mongoose.Schema({
     type: Number,
     default: null,
     min: [0.01, 'Minimum bid must be at least £0.01']
+  },
+
+  // Share of tippers who can keep a copy. 100 = everyone who tipped, 1 = top 1%.
+  copySharePercent: {
+    type: Number,
+    default: 50,
+    min: [1, 'Copy share must be at least 1%'],
+    max: [100, 'Copy share cannot exceed 100%'],
   },
   
   // Release information
@@ -460,11 +444,15 @@ const mediaSchema = new mongoose.Schema({
   creatorDisplay: { type: String, default: null }, // Optional display string for UI
   
   // Rights confirmation fields
+  // pending: hosted without permission — not playable, escrow until claim
+  // permitted: admin has off-platform permission; playable, escrow until the artist claims
+  // cleared: rights holder is on the platform (self-upload or approved claim)
+  // disputed: ownership contested — not playable
   rightsCleared: { type: Boolean, default: false },
   rightsStatus: {
     type: String,
-    enum: ['cleared', 'pending', 'disputed'],
-    default: 'cleared',
+    enum: ['cleared', 'pending', 'permitted', 'disputed'],
+    default: 'pending',
     index: true,
   },
   rightsConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -528,7 +516,9 @@ const mediaSchema = new mongoose.Schema({
   vetoedReason: { type: String },
   deletedAt: { type: Date },
   deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  deletedReason: { type: String }
+  deletedReason: { type: String },
+  // Live media that replaced this deleted duplicate. Public tune URLs follow it.
+  supersededBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Media', default: null }
 }, { 
   timestamps: true // Automatically manage createdAt and updatedAt
 });
@@ -573,10 +563,11 @@ mediaSchema.pre('save', function (next) {
     }
   }
   
-  // Auto-generate creatorDisplay if not set and we have artist/featuring data
-  if (!this.creatorDisplay && (this.artist || this.featuring)) {
-    const { formatCreatorDisplay } = require('../utils/artistParser');
-    this.creatorDisplay = formatCreatorDisplay(this.artist || [], this.featuring || []);
+  // Auto-generate creatorDisplay from artist, show title, host, or author
+  if (!this.creatorDisplay) {
+    const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
+    const resolved = resolveCreatorDisplay(this, { fallback: null });
+    if (resolved) this.creatorDisplay = resolved;
   }
 
   if (this.isModified('isrc')) {
@@ -590,12 +581,32 @@ mediaSchema.pre('save', function (next) {
     if (normalizedIsbn) this.isbn = normalizedIsbn;
   }
 
+  if (this.bpm != null) {
+    const roundedBpm = roundBpm(this.bpm);
+    if (roundedBpm !== this.bpm) this.bpm = roundedBpm;
+  }
+
+  if (this.key != null) {
+    const normalizedKey = normalizeKey(this.key);
+    if (normalizedKey !== this.key) this.key = normalizedKey;
+  }
+
   // MongoDB text indexes treat `language` as a stemming override (`en`, not `eng`).
   if (this.language) {
     this.language = normalizeLanguageInput(this.language);
   }
   
   next();
+});
+
+mediaSchema.pre('save', async function generateMediaSlug(next) {
+  if (this.slug) return next();
+  try {
+    this.slug = await this.constructor.generateUniqueSlug(this);
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Post-save hook: Check and create tag parties when media is saved
@@ -717,6 +728,7 @@ mediaSchema.index({ "externalIds.googleBooks": 1 });
 mediaSchema.index({ "sources.soundcloud": 1 }); // Index for SoundCloud permalink matching
 mediaSchema.index({ "relationships.type": 1 }); // Index for relationship type queries
 mediaSchema.index({ "relationships.targetId": 1 }); // Index for finding relationships to specific media
+mediaSchema.index({ slugAliases: 1 });
 mediaSchema.index({ "mediaOwners.userId": 1 }); // Index for finding media by owner
 mediaSchema.index({ "mediaOwners.verified": 1 }); // Index for verified owners
 mediaSchema.index({ "editHistory.editedBy": 1 }); // Index for finding edits by user
@@ -1230,6 +1242,110 @@ mediaSchema.statics.repairIsbnUniqueness = async function repairIsbnUniqueness()
     unsetCount: unsetResult.modifiedCount || 0,
     dropped,
   };
+};
+
+mediaSchema.statics.generateUniqueSlug = async function generateUniqueSlug(media, excludeId = null) {
+  const { buildMediaSlugBase } = require('../utils/mediaSlug');
+  const { isUuidString, isMongoObjectIdString } = require('../utils/identifierFormat');
+
+  let base = buildMediaSlugBase(media);
+  if (!base) base = 'untitled';
+  if (isUuidString(base) || isMongoObjectIdString(base)) {
+    base = `${base}-media`;
+  }
+
+  let slug = base;
+  let counter = 2;
+  const idToExclude = excludeId || media?._id || null;
+
+  while (counter < 60) {
+    const query = { $or: [{ slug }, { slugAliases: slug }] };
+    if (idToExclude) query._id = { $ne: idToExclude };
+    // eslint-disable-next-line no-await-in-loop
+    const existing = await this.findOne(query).select('_id').lean();
+    if (!existing) return slug;
+    slug = `${base}-${counter}`;
+    counter += 1;
+  }
+
+  const short = String(media?.uuid || Date.now()).replace(/-/g, '').slice(0, 8);
+  return `${String(base).slice(0, 70)}-${short}`;
+};
+
+/**
+ * Persist a public slug if this media does not have one yet.
+ * Used on profile reads so UUID/ObjectId URLs can canonical-redirect.
+ */
+mediaSchema.statics.ensureSlug = async function ensureSlug(media) {
+  if (!media) return media;
+  if (media.slug) return media;
+  try {
+    const slug = await this.generateUniqueSlug(media);
+    await this.updateOne({ _id: media._id }, { $set: { slug } });
+    media.slug = slug;
+  } catch (err) {
+    if (err && err.code === 11000) {
+      try {
+        const retry = await this.generateUniqueSlug(media);
+        await this.updateOne({ _id: media._id }, { $set: { slug: retry } });
+        media.slug = retry;
+      } catch (retryErr) {
+        console.error('ensureSlug collision retry failed:', retryErr.message);
+      }
+    } else {
+      console.error('ensureSlug failed:', err.message);
+    }
+  }
+  return media;
+};
+
+/**
+ * Public media lookup: slug | uuid | ObjectId.
+ */
+mediaSchema.statics.findByIdentifier = async function findByIdentifier(identifier, options = {}) {
+  const {
+    isUuidString,
+    isMongoObjectIdString,
+    normalizeIdentifier,
+  } = require('../utils/identifierFormat');
+  const mongoose = require('mongoose');
+
+  const applyReadOptions = (query) => {
+    if (options.select) query = query.select(options.select);
+    if (options.lean) query = query.lean();
+    return query;
+  };
+
+  if (identifier instanceof mongoose.Types.ObjectId) {
+    return applyReadOptions(this.findById(identifier));
+  }
+
+  const value = normalizeIdentifier(identifier);
+  if (!value) return null;
+
+  let filter;
+  let slugLookup = false;
+  if (isUuidString(value)) {
+    filter = { $or: [{ uuid: value }, { slug: value.toLowerCase() }, { slugAliases: value.toLowerCase() }] };
+  } else if (isMongoObjectIdString(value)) {
+    filter = { $or: [{ _id: value }, { slug: value.toLowerCase() }, { slugAliases: value.toLowerCase() }] };
+  } else {
+    slugLookup = true;
+    const slug = value.toLowerCase();
+    filter = { $or: [{ slug }, { slugAliases: slug }] };
+  }
+
+  // UUID / ObjectId address one document, including soft-deleted media (restore, purge).
+  if (!slugLookup) {
+    return applyReadOptions(this.findOne(filter));
+  }
+
+  // Artist-title URLs should open the living tune when a deleted copy still
+  // holds the same slug or lists it as an alias.
+  const matches = await this.find(filter).select('_id status').limit(8).lean();
+  if (!matches.length) return null;
+  const chosen = matches.find((match) => match.status !== 'deleted') || matches[0];
+  return applyReadOptions(this.findById(chosen._id));
 };
 
 module.exports = mongoose.models.Media || mongoose.model('Media', mediaSchema);

@@ -30,6 +30,10 @@ export function setAuthTokenGetter(getter: (() => string | null) | null) {
   authTokenGetter = getter;
 }
 
+export function getAuthToken(): string | null {
+  return authTokenGetter?.() ?? null;
+}
+
 api.interceptors.request.use((config) => {
   const token = authTokenGetter?.() ?? null;
   if (token) {

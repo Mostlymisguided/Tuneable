@@ -3,10 +3,8 @@
  * scoped to media, tag, or artist; optionally filtered by Mapbox place.
  */
 
-const mongoose = require('mongoose');
 const Bid = require('../models/Bid');
 const Media = require('../models/Media');
-const { isValidObjectId } = require('../utils/validators');
 const { resolveTagFromSlug, collectTagVariants, generateSlug, mediaBpmQuery } = require('./tagProfileService');
 const { getCanonicalTag, tagsMatch, normalizeTagForStorage } = require('../utils/tagNormalizer');
 const {
@@ -35,30 +33,19 @@ const WRITTEN_FORMS = ['book', 'article'];
  */
 async function resolveMediaObjectId(mediaId) {
   if (!mediaId || typeof mediaId !== 'string') return null;
-
-  if (isValidObjectId(mediaId)) {
-    const exists = await Media.exists({ _id: mediaId });
-    return exists ? new mongoose.Types.ObjectId(mediaId) : null;
-  }
-
-  const media = await Media.findOne({ uuid: mediaId }).select('_id').lean();
+  const media = await Media.findByIdentifier(mediaId, { select: '_id', lean: true });
   return media?._id || null;
 }
 
 /**
- * Resolve user UUID or ObjectId.
+ * Resolve user username, UUID, or ObjectId.
  * @param {string} userId
  * @returns {Promise<mongoose.Types.ObjectId|null>}
  */
 async function resolveUserObjectId(userId) {
   if (!userId || typeof userId !== 'string') return null;
-
-  if (isValidObjectId(userId)) {
-    return new mongoose.Types.ObjectId(userId);
-  }
-
   const User = require('../models/User');
-  const user = await User.findOne({ uuid: userId }).select('_id').lean();
+  const user = await User.findByIdentifier(userId, { select: '_id', lean: true });
   return user?._id || null;
 }
 

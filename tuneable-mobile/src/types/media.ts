@@ -11,6 +11,8 @@ export interface ChartMediaItem {
   title?: string;
   artist?: string | Array<string | { name?: string; userId?: string | { _id?: string; uuid?: string } }>;
   creatorDisplay?: string;
+  host?: Array<string | { name?: string }>;
+  author?: Array<string | { name?: string }>;
   duration?: number;
   coverArt?: string;
   partyMediaAggregate?: number;
@@ -55,7 +57,7 @@ export interface ChartMediaItem {
     | null;
   contentForm?: string[];
   rightsCleared?: boolean;
-  rightsStatus?: 'cleared' | 'pending' | 'disputed';
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   isPlayable?: boolean;
   hasHostedAudio?: boolean;
   playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
@@ -159,6 +161,7 @@ export interface SortedMediaResponse {
   timePeriod: string;
   media: ChartMediaItem[];
   count: number;
+  hiddenCount?: number;
   locationFilter?: { placeId: string } | null;
 }
 

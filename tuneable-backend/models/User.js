@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const { uuidv7 } = require('uuidv7');
+const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 const userSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
@@ -40,6 +41,7 @@ const userSchema = new mongoose.Schema({
   }],
   parentInviteCode: { type: String, required: false },
   parentInviteCodeId: { type: mongoose.Schema.Types.ObjectId }, // Reference to specific invite code object (optional, for tracking)
+  invitedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   balance: { type: Number, default: 0 }, // Wallet balance stored in PENCE (integer), not pounds
   // Example: 1050 represents £10.50, 3300 represents £33.00
   // Unspent promotional welcome credit still in the wallet (pence). Spent promo-first; revocable by admin.
@@ -101,8 +103,33 @@ const userSchema = new mongoose.Schema({
     allocatedAt: { type: Date, default: Date.now },
     claimedAt: { type: Date },
     status: { type: String, enum: ['pending', 'claimed'], default: 'pending' },
+    source: { type: String, enum: ['tip', 'affiliate'], default: 'tip' },
     _id: false
   }],
+  referralCommissionEarned: {
+    type: Number,
+    default: 0,
+  }, // Paid artist-invite affiliate earnings in PENCE (also added to artistEscrowBalance)
+
+  // ========================================
+  // FOUNDING CREATORS (first N original uploaders)
+  // Status/benefits only — not equity or ownership
+  // ========================================
+  isFoundingCreator: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  foundingSeatNumber: {
+    type: Number,
+    default: null,
+    sparse: true,
+    unique: true,
+    min: 1,
+  },
+  foundingSeatAssignedAt: { type: Date, default: null },
+  foundingUploadQuotaBytes: { type: Number, default: null, min: 0 },
+  foundingSeatClaimReason: { type: String, default: null },
   totalEscrowEarned: { 
     type: Number, 
     default: 0 
@@ -116,58 +143,8 @@ const userSchema = new mongoose.Schema({
   stripeConnectAccountId: { 
     type: String 
   }, // For future Stripe Connect migration (Phase 2)
-  homeLocation: {
-    city: { type: String },
-    region: { type: String }, // State, province, or region
-    country: { type: String },
-    countryCode: { type: String }, // ISO 3166-1 alpha-2 (e.g., "US", "GB", "FR")
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    detectedFromIP: { type: Boolean, default: false }, // Track if auto-detected from IP
-    // Mapbox-resolved hierarchy (permanent geocoding)
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
-  secondaryLocation: {
-    city: { type: String },
-    region: { type: String },
-    country: { type: String },
-    countryCode: { type: String },
-    coordinates: {
-      lat: { type: Number },
-      lng: { type: Number },
-    },
-    placeProvider: { type: String, enum: ['mapbox'] },
-    placeId: { type: String },
-    featureType: { type: String },
-    ancestorIds: [{ type: String }],
-    ancestors: [{
-      placeId: { type: String },
-      label: { type: String },
-      placetype: { type: String },
-      regionCode: { type: String },
-      countryCode: { type: String },
-      _id: false,
-    }],
-    label: { type: String },
-    display: { type: String },
-    resolvedAt: { type: Date },
-  },
+  homeLocation: mapboxLocationFields(),
+  secondaryLocation: mapboxLocationFields(),
   preferences: {
     theme: { type: String, default: 'light' },
     anonymousMode: { type: Boolean, default: false },
@@ -216,7 +193,11 @@ const userSchema = new mongoose.Schema({
     default: ['user'] 
   },
   isActive: { type: Boolean, default: true },
+  // Admin-created accounts used for tipping tests. Only these can be hard-deleted.
+  isTestUser: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
+  // Users this account has blocked (Play / App Store UGC requirement).
+  blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   
   // Email verification
   emailVerified: { type: Boolean, default: false },
@@ -370,6 +351,7 @@ const userSchema = new mongoose.Schema({
     transform(_doc, ret) {
       ret.hasPushDevice = Array.isArray(ret.pushDevices) && ret.pushDevices.length > 0;
       delete ret.pushDevices;
+      delete ret.blockedUsers;
       return ret;
     },
   },
@@ -417,6 +399,44 @@ userSchema.statics.findByLoginIdentifier = async function(identifier) {
   return this.findOne({
     [field]: { $regex: new RegExp(`^${escapeRegex(trimmed)}$`, 'i') },
   });
+};
+
+/**
+ * Public profile lookup: username | uuid | ObjectId.
+ * Usernames are 3–20 chars so they never collide with UUID (36) or ObjectId (24 hex).
+ */
+userSchema.statics.findByIdentifier = async function findByIdentifier(identifier, options = {}) {
+  const {
+    isUuidString,
+    isMongoObjectIdString,
+    escapeRegex,
+    normalizeIdentifier,
+  } = require('../utils/identifierFormat');
+
+  if (!identifier && identifier !== 0) return null;
+  if (identifier instanceof mongoose.Types.ObjectId) {
+    let query = this.findById(identifier);
+    if (options.select) query = query.select(options.select);
+    if (options.lean) query = query.lean();
+    return query;
+  }
+
+  const value = normalizeIdentifier(identifier);
+  if (!value) return null;
+
+  let filter;
+  if (isUuidString(value)) {
+    filter = { uuid: value };
+  } else if (isMongoObjectIdString(value)) {
+    filter = { _id: value };
+  } else {
+    filter = { username: { $regex: new RegExp(`^${escapeRegex(value)}$`, 'i') } };
+  }
+
+  let query = this.findOne(filter);
+  if (options.select) query = query.select(options.select);
+  if (options.lean) query = query.lean();
+  return query;
 };
 
 // Generate email verification token

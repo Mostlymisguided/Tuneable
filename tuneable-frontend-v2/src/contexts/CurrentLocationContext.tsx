@@ -14,7 +14,7 @@ import {
   getCurrentLocationStatus,
   getTipCurrentLocation,
   isCurrentLocationPromptDismissed,
-  maybeRefreshCurrentLocationIfGranted,
+  recheckLocationPermission,
   refreshCurrentLocation,
   subscribeCurrentLocation,
   type CurrentLocationStatus,
@@ -25,6 +25,8 @@ interface CurrentLocationContextType {
   status: CurrentLocationStatus;
   error: string | null;
   promptDismissed: boolean;
+  /** True after the first permission check for this signed-in session. */
+  locationChecked: boolean;
   enableCurrentLocation: () => Promise<ResolvedLocation | null>;
   dismissPrompt: () => void;
 }
@@ -45,12 +47,15 @@ interface CurrentLocationProviderProps {
 
 export const CurrentLocationProvider: React.FC<CurrentLocationProviderProps> = ({ children }) => {
   const { user } = useAuth();
+  const userId = user?.id || user?._id;
+
   const [currentLocation, setCurrentLocation] = useState<ResolvedLocation | null>(() =>
     getTipCurrentLocation()
   );
   const [status, setStatus] = useState<CurrentLocationStatus>(() => getCurrentLocationStatus());
   const [error, setError] = useState<string | null>(() => getCurrentLocationError());
   const [promptDismissed, setPromptDismissed] = useState(() => isCurrentLocationPromptDismissed());
+  const [locationChecked, setLocationChecked] = useState(false);
 
   useEffect(() => {
     return subscribeCurrentLocation(() => {
@@ -62,9 +67,30 @@ export const CurrentLocationProvider: React.FC<CurrentLocationProviderProps> = (
   }, []);
 
   useEffect(() => {
-    if (!user) return;
-    void maybeRefreshCurrentLocationIfGranted();
-  }, [user]);
+    if (!userId) {
+      setLocationChecked(false);
+      return;
+    }
+    let cancelled = false;
+    setLocationChecked(false);
+    const run = async () => {
+      await recheckLocationPermission();
+      if (!cancelled) setLocationChecked(true);
+    };
+    void run();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void recheckLocationPermission();
+      }
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [userId]);
 
   const enableCurrentLocation = useCallback(async () => {
     return refreshCurrentLocation({ force: true });
@@ -81,6 +107,7 @@ export const CurrentLocationProvider: React.FC<CurrentLocationProviderProps> = (
         status,
         error,
         promptDismissed,
+        locationChecked,
         enableCurrentLocation,
         dismissPrompt,
       }}

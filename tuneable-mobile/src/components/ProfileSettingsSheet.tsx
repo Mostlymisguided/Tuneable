@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -13,12 +15,21 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LEGAL_URLS, LegalLinks } from '@/src/components/LegalLinks';
+import { useAuth } from '@/src/auth/AuthContext';
+import { authAPI } from '@/src/api/auth';
+import {
+  disablePushOnThisDevice,
+  getPushPermissionSnapshot,
+  requestAndRegisterPush,
+} from '@/src/lib/pushNotifications';
+import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 
 type Props = {
   visible: boolean;
   inviteCode?: string | null;
   username?: string;
+  isFoundingCreator?: boolean;
   canUpload?: boolean;
   deleting?: boolean;
   onClose: () => void;
@@ -33,6 +44,7 @@ export function ProfileSettingsSheet({
   visible,
   inviteCode,
   username,
+  isFoundingCreator = false,
   canUpload = false,
   deleting = false,
   onClose,
@@ -79,7 +91,7 @@ export function ProfileSettingsSheet({
                           'Could not delete account',
                           err instanceof Error
                             ? err.message
-                            : 'Please try again or email privacy@tuneable.com'
+                            : 'Please try again or email hi@tuneable.stream'
                         );
                       } finally {
                         setBusy(false);
@@ -137,6 +149,8 @@ export function ProfileSettingsSheet({
             <Text style={styles.rowText}>Edit profile</Text>
           </Pressable>
 
+          {Platform.OS !== 'web' ? <PushNotificationsRow disabled={disabled} /> : null}
+
           <Pressable
             style={styles.row}
             onPress={() => void openAdvancedOnWeb()}
@@ -157,7 +171,11 @@ export function ProfileSettingsSheet({
             <Text style={styles.rowText}>Data deletion info</Text>
           </Pressable>
 
-          <InviteShareCard inviteCode={inviteCode} username={username} />
+          <InviteShareCard
+            inviteCode={inviteCode}
+            username={username}
+            isFoundingCreator={isFoundingCreator}
+          />
 
           <LegalLinks compact />
 
@@ -235,6 +253,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  rowCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  rowHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
   signOut: {
     marginTop: 8,
     backgroundColor: 'rgba(239, 68, 68, 0.25)',
@@ -261,3 +287,101 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.6 },
 });
+
+function PushNotificationsRow({ disabled }: { disabled: boolean }) {
+  const { user, refreshUser } = useAuth();
+  const [osGranted, setOsGranted] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getPushPermissionSnapshot()
+      .then((snap) => {
+        if (cancelled) return;
+        setOsGranted(snap?.status === 'granted');
+      })
+      .catch(() => {
+        if (!cancelled) setOsGranted(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.hasPushDevice]);
+
+  const enabled =
+    osGranted === true &&
+    !!user?.hasPushDevice &&
+    user?.preferences?.notifications?.push !== false;
+
+  const promptForSettings = () => {
+    Alert.alert(
+      'Notifications are off',
+      'Turn on notifications for Tuneable in Settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+      ]
+    );
+  };
+
+  const onToggle = (next: boolean) => {
+    if (busy || disabled) return;
+    setBusy(true);
+    void (async () => {
+      try {
+        if (!next) {
+          await disablePushOnThisDevice();
+          await authAPI.updateProfile({
+            onboarding: { notificationsPromptSeenAt: new Date().toISOString() },
+          });
+          await refreshUser();
+          return;
+        }
+        const snap = await getPushPermissionSnapshot();
+        if (snap && snap.status !== 'granted' && snap.canAskAgain === false) {
+          setOsGranted(false);
+          promptForSettings();
+          return;
+        }
+        const result = await requestAndRegisterPush();
+        if (result === 'granted') {
+          setOsGranted(true);
+          await refreshUser();
+          return;
+        }
+        if (result === 'denied') {
+          const again = await getPushPermissionSnapshot();
+          setOsGranted(false);
+          if (again && again.canAskAgain === false) promptForSettings();
+          return;
+        }
+        showToast('Could not turn on notifications. Try again.', 'error');
+      } catch {
+        showToast('Could not update notifications.', 'error');
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
+
+  return (
+    <View style={styles.row}>
+      <Ionicons name="notifications-outline" size={20} color={colors.accentLight} />
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowText}>Push notifications</Text>
+        <Text style={styles.rowHint}>Tips, replies, and outtips</Text>
+      </View>
+      {busy || osGranted === null ? (
+        <ActivityIndicator color={colors.accentLight} />
+      ) : (
+        <Switch
+          value={enabled}
+          onValueChange={onToggle}
+          disabled={disabled}
+          trackColor={{ false: 'rgba(255,255,255,0.2)', true: colors.accent }}
+          thumbColor="#fff"
+        />
+      )}
+    </View>
+  );
+}

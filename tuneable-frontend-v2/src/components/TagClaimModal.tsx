@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Tag, X } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
 import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
 import { penceToPounds } from '../utils/currency';

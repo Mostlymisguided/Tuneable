@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,8 +14,11 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { UserLibrarySection } from '@/src/components/UserLibrarySection';
 import { UserProfileHero } from '@/src/components/UserProfileHero';
+import { ReportSheet } from '@/src/components/ReportSheet';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
+import { getApiErrorMessage } from '@/src/lib/apiError';
+import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
 import { colors } from '@/src/theme/colors';
 import { championBadgesFromResponse } from '@/src/lib/championBadges';
 import type {
@@ -26,7 +30,7 @@ import type {
 
 export default function PublicUserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user: authUser, updateBalance } = useAuth();
+  const { user: authUser, updateBalance, isAuthenticated } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
@@ -34,6 +38,11 @@ export default function PublicUserProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const markBlocked = useBlockedUsersStore((s) => s.markBlocked);
+  const markUnblocked = useBlockedUsersStore((s) => s.markUnblocked);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -61,6 +70,7 @@ export default function PublicUserProfileScreen() {
         setLibrary(libraryRes.library ?? []);
         setRankings(rankingsRes.tuneBytesTagRankings ?? []);
         setChampionBadges(championBadgesFromResponse(championsRes));
+        setBlockedByMe(Boolean(profileRes.blockedByMe));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load profile');
       } finally {
@@ -93,6 +103,59 @@ export default function PublicUserProfileScreen() {
 
   if (isOwnProfile) return null;
 
+  const targetId = user?.uuid || user?.id || user?._id || id || '';
+
+  const confirmBlock = () => {
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    Alert.alert(
+      'Block this user?',
+      'You will no longer see their profile activity. You can unblock them later.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setBlockBusy(true);
+              try {
+                await userAPI.blockUser(targetId);
+                setBlockedByMe(true);
+                markBlocked(targetId, [user?.uuid, user?.id, user?._id, user?.username]);
+              } catch (err) {
+                Alert.alert(
+                  'Could not block user',
+                  getApiErrorMessage(err, 'Please try again.')
+                );
+              } finally {
+                setBlockBusy(false);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
+  const unblock = async () => {
+    setBlockBusy(true);
+    try {
+      await userAPI.unblockUser(targetId);
+      setBlockedByMe(false);
+      markUnblocked(targetId, [user?.uuid, user?.id, user?._id, user?.username]);
+    } catch (err) {
+      Alert.alert(
+        'Could not unblock user',
+        getApiErrorMessage(err, 'Please try again.')
+      );
+    } finally {
+      setBlockBusy(false);
+    }
+  };
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -124,12 +187,48 @@ export default function PublicUserProfileScreen() {
             user={user}
             rankings={rankings}
             championBadges={championBadges}
+            onReportPress={() => setReportOpen(true)}
           />
-          <UserLibrarySection
-            items={library}
-            user={authUser}
-            onBalanceUpdate={updateBalance}
-            emptyLabel="This user has not tipped any tunes yet."
+          {blockedByMe ? (
+            <View style={styles.blockedBanner}>
+              <Text style={styles.blockedText}>You blocked this user</Text>
+              <Pressable onPress={() => void unblock()} disabled={blockBusy}>
+                <Text style={styles.unblockText}>
+                  {blockBusy ? 'Working…' : 'Unblock'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.blockBtn}
+              onPress={confirmBlock}
+              disabled={blockBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Block user">
+              <Ionicons name="ban-outline" size={16} color="#fca5a5" />
+              <Text style={styles.blockBtnText}>
+                {blockBusy ? 'Working…' : 'Block user'}
+              </Text>
+            </Pressable>
+          )}
+          {blockedByMe ? (
+            <Text style={styles.hiddenNote}>
+              Their library is hidden while they are blocked.
+            </Text>
+          ) : (
+            <UserLibrarySection
+              items={library}
+              user={authUser}
+              onBalanceUpdate={updateBalance}
+              emptyLabel="This user has not tipped any tunes yet."
+            />
+          )}
+          <ReportSheet
+            visible={reportOpen}
+            reportType="user"
+            targetId={targetId}
+            targetTitle={`@${user.username}`}
+            onClose={() => setReportOpen(false)}
           />
         </ScrollView>
       ) : null}
@@ -169,5 +268,52 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  blockBtn: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+    backgroundColor: 'rgba(127, 29, 29, 0.25)',
+    paddingVertical: 12,
+  },
+  blockBtnText: {
+    color: '#fecaca',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  blockedBanner: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+    backgroundColor: 'rgba(127, 29, 29, 0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  blockedText: {
+    color: '#fecaca',
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  unblockText: {
+    color: colors.accentLight,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  hiddenNote: {
+    marginTop: 16,
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

@@ -4,13 +4,14 @@
  */
 
 const { BOOK_CATALOG_QUERY, isWrittenMedia } = require('../utils/mediaKinds');
-const { GLOBAL_PARTY_TUNES_FILTER } = require('../utils/globalPartyChart');
+const { GLOBAL_PARTY_TUNES_FILTER, chartTunesFilter } = require('../utils/globalPartyChart');
 const { isMediaPlayable } = require('../utils/mediaPlayability');
 
 describe('books vs music chart isolation', () => {
   it('keeps Global Party charts on music + tune', () => {
     expect(GLOBAL_PARTY_TUNES_FILTER.contentType).toEqual({ $in: ['music'] });
     expect(GLOBAL_PARTY_TUNES_FILTER.contentForm).toEqual({ $in: ['tune'] });
+    expect(GLOBAL_PARTY_TUNES_FILTER.status).toEqual({ $ne: 'deleted' });
   });
 
   it('keeps the books chart on written + book', () => {
@@ -35,5 +36,70 @@ describe('books vs music chart isolation', () => {
     };
     expect(isWrittenMedia(book)).toBe(true);
     expect(isMediaPlayable(book)).toBe(false);
+  });
+
+  it('nests the playable $or under $and so a location $or is preserved', () => {
+    const filter = chartTunesFilter({
+      playableOnly: true,
+      extra: { $or: [{ 'primaryLocation.placeId': 'x' }] },
+    });
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      GLOBAL_PARTY_TUNES_FILTER,
+      { $or: [{ 'primaryLocation.placeId': 'x' }] },
+    ]));
+    const playableClause = filter.$and.find((clause) => clause['sources.upload']);
+    expect(playableClause.$or).toEqual(expect.arrayContaining([
+      { rightsStatus: 'permitted' },
+    ]));
+  });
+
+  it('omits the playable clause when All is requested', () => {
+    expect(chartTunesFilter({ playableOnly: false })).toEqual(GLOBAL_PARTY_TUNES_FILTER);
+  });
+
+  it('still excludes deleted duplicates when the query also skips vetoed tracks', () => {
+    const filter = chartTunesFilter({
+      playableOnly: true,
+      extra: {
+        bids: { $exists: true, $ne: [] },
+        status: { $ne: 'vetoed' },
+      },
+    });
+    expect(filter.$and).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: { $ne: 'deleted' } }),
+      expect.objectContaining({ status: { $ne: 'vetoed' } }),
+    ]));
+  });
+
+  it('counts excluded catalog only while Playable is on', () => {
+    const { hiddenCatalogCount } = require('../utils/globalPartyChart');
+    expect(hiddenCatalogCount(true, 250, 22)).toBe(228);
+    expect(hiddenCatalogCount(true, 22, 22)).toBe(0);
+    expect(hiddenCatalogCount(false, 250, 22)).toBe(0);
+  });
+
+  it('ranks merged recent rows by tip total instead of leaving them first', () => {
+    const { sortAssembledChartRows } = require('../utils/globalPartyChart');
+    const ranked = sortAssembledChartRows([
+      { title: 'Default tip', globalMediaAggregate: 111, createdAt: '2026-09-18T21:07:00.000Z' },
+      { title: 'Several tips', globalMediaAggregate: 203, createdAt: '2025-12-02T10:19:00.000Z' },
+      { title: 'Also several', globalMediaAggregate: 113, createdAt: '2025-11-07T21:26:00.000Z' },
+    ], 'most-tipped');
+    expect(ranked.map((row) => row.title)).toEqual([
+      'Several tips',
+      'Also several',
+      'Default tip',
+    ]);
+  });
+
+  it('casts hex strings back to ObjectIds for Bid.aggregate $in', () => {
+    const mongoose = require('mongoose');
+    const { toObjectIds } = require('../utils/globalPartyChart');
+    const id = new mongoose.Types.ObjectId();
+    const [cast] = toObjectIds([id.toString(), id.toString(), 'not-an-id']);
+    expect(cast).toBeInstanceOf(mongoose.Types.ObjectId);
+    expect(cast.toString()).toBe(id.toString());
+    expect(toObjectIds([id, id.toString()])).toHaveLength(1);
+    expect(toObjectIds([])).toEqual([]);
   });
 });

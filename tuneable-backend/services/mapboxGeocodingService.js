@@ -2,7 +2,28 @@ const axios = require('axios');
 
 const MAPBOX_FORWARD_URL = 'https://api.mapbox.com/search/geocode/v6/forward';
 const MAPBOX_REVERSE_URL = 'https://api.mapbox.com/search/geocode/v6/reverse';
-const PLACE_TYPES = 'country,region,district,place,locality,neighborhood';
+
+/**
+ * Mapbox Geocoding v6 types, coarse → fine.
+ * Search/reverse stay above street/address (privacy + picker UX);
+ * parse still persists street/address when they appear in context.
+ */
+const CONTEXT_TYPE_ORDER = [
+  'country',
+  'region',
+  'postcode',
+  'district',
+  'place',
+  'locality',
+  'neighborhood',
+  'street',
+  'address',
+];
+const SEARCH_PLACE_TYPES = 'country,region,postcode,district,place,locality,neighborhood';
+const VENUE_SEARCH_PLACE_TYPES = `${SEARCH_PLACE_TYPES},street,address`;
+const SEARCH_BOX_URL = 'https://api.mapbox.com/search/searchbox/v1';
+const COARSE_FEATURE_TYPES = new Set(['country', 'region', 'district']);
+const PLACE_LIKE_FEATURE_TYPES = new Set(['place', 'locality', 'neighborhood']);
 
 function getAccessToken() {
   const token = process.env.MAPBOX_ACCESS_TOKEN;
@@ -26,17 +47,74 @@ async function forwardGeocode(params) {
 /**
  * Autocomplete suggestions (temporary geocoding — do not persist results).
  */
+async function suggestSearchBox(query, options = {}) {
+  const params = {
+    q: query,
+    access_token: getAccessToken(),
+    session_token: options.sessionToken,
+    language: options.language || 'en',
+    limit: Math.min(Math.max(options.limit || 8, 1), 10),
+    types: 'poi,address',
+  };
+  if (options.country) {
+    params.country = options.country;
+  }
+  if (options.proximity) {
+    params.proximity = options.proximity;
+  }
+
+  const response = await axios.get(`${SEARCH_BOX_URL}/suggest`, {
+    params,
+    timeout: 10000,
+  });
+
+  return (response.data?.suggestions || [])
+    .filter((item) => item && item.mapbox_id)
+    .map((item) => ({
+      mapboxId: item.mapbox_id,
+      label: item.name || item.feature_name || item.mapbox_id,
+      placeFormatted: item.place_formatted || item.full_address || null,
+      featureType: item.feature_type || null,
+    }));
+}
+
+async function retrieveSearchBox(mapboxId, sessionToken) {
+  if (!sessionToken) return null;
+  const response = await axios.get(
+    `${SEARCH_BOX_URL}/retrieve/${encodeURIComponent(mapboxId)}`,
+    {
+      params: {
+        access_token: getAccessToken(),
+        session_token: sessionToken,
+      },
+      timeout: 10000,
+    }
+  );
+  const feature = response.data?.features?.[0];
+  if (!feature) return null;
+  return parseFeatureToLocation(feature);
+}
+
 async function suggest(query, options = {}) {
   const trimmed = typeof query === 'string' ? query.trim() : '';
   if (!trimmed) {
     return [];
   }
 
+  if (options.mode === 'venue' && options.sessionToken) {
+    try {
+      const poiSuggestions = await suggestSearchBox(trimmed, options);
+      if (poiSuggestions.length > 0) return poiSuggestions;
+    } catch (err) {
+      console.warn('Search Box suggest failed, falling back to geocoding:', err.message);
+    }
+  }
+
   const params = {
     q: trimmed,
     autocomplete: true,
     permanent: false,
-    types: PLACE_TYPES,
+    types: options.mode === 'venue' ? VENUE_SEARCH_PLACE_TYPES : (options.types || SEARCH_PLACE_TYPES),
     limit: Math.min(Math.max(options.limit || 8, 1), 10),
     language: options.language || 'en',
   };
@@ -58,10 +136,19 @@ async function suggest(query, options = {}) {
 /**
  * Resolve a place by mapbox_id for storage (permanent geocoding).
  */
-async function resolveByMapboxId(mapboxId) {
+async function resolveByMapboxId(mapboxId, options = {}) {
   const id = typeof mapboxId === 'string' ? mapboxId.trim() : '';
   if (!id) {
     return null;
+  }
+
+  if (options.sessionToken) {
+    try {
+      const retrieved = await retrieveSearchBox(id, options.sessionToken);
+      if (retrieved) return retrieved;
+    } catch (err) {
+      console.warn('Search Box retrieve failed, falling back to geocoding:', err.message);
+    }
   }
 
   const data = await forwardGeocode({
@@ -89,34 +176,93 @@ function featureToSuggestion(feature) {
   };
 }
 
+function pushUniquePart(parts, value) {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return;
+  if (parts.some((part) => part.toLowerCase() === trimmed.toLowerCase())) return;
+  parts.push(trimmed);
+}
+
 function formatLocationDisplay(props, context) {
   const featureType = props.feature_type || null;
   const name = props.name || props.name_preferred;
+  const ctx = context || {};
 
   // Country / region features: don't duplicate the place name as city + country
   if (featureType === 'country') {
     return name || props.place_formatted || props.full_address || '';
   }
   if (featureType === 'region') {
-    const parts = [name];
-    if (context.country?.name && context.country.name !== name) {
-      parts.push(context.country.name);
-    }
-    return parts.filter(Boolean).join(', ') || props.place_formatted || '';
+    const parts = [];
+    pushUniquePart(parts, name);
+    pushUniquePart(parts, ctx.country?.name);
+    return parts.join(', ') || props.place_formatted || '';
   }
 
   const parts = [];
-  if (name) parts.push(name);
-  if (context.region?.name && context.region.name !== name) {
-    parts.push(context.region.name);
+  pushUniquePart(parts, name);
+  // Public label includes the city (London) but not postcode / street / address
+  if (featureType !== 'place') {
+    pushUniquePart(parts, ctx.place?.name);
   }
-  if (context.country?.name) {
-    parts.push(context.country.name);
-  }
+  pushUniquePart(parts, ctx.region?.name);
+  pushUniquePart(parts, ctx.country?.name);
+
   if (parts.length > 0) {
     return parts.join(', ');
   }
   return props.place_formatted || props.full_address || name || '';
+}
+
+function isContextEntry(entry) {
+  return Boolean(
+    entry
+    && typeof entry === 'object'
+    && !Array.isArray(entry)
+    && typeof entry.mapbox_id === 'string'
+    && entry.mapbox_id.trim()
+  );
+}
+
+function ancestorFromContextEntry(placetype, entry) {
+  const ancestor = {
+    placeId: entry.mapbox_id,
+    label: entry.name || entry.name_preferred || null,
+    placetype,
+  };
+  const regionCode = entry.region_code_full || entry.region_code || null;
+  const countryCode = entry.country_code ? String(entry.country_code).toUpperCase() : null;
+  const wikidataId = entry.wikidata_id || null;
+  if (regionCode) ancestor.regionCode = regionCode;
+  if (countryCode) ancestor.countryCode = countryCode;
+  if (wikidataId) ancestor.wikidataId = wikidataId;
+  return ancestor;
+}
+
+function collectAncestors(context) {
+  const ctx = context && typeof context === 'object' ? context : {};
+  const byId = new Map();
+
+  for (const [placetype, entry] of Object.entries(ctx)) {
+    if (!isContextEntry(entry)) continue;
+    if (!byId.has(entry.mapbox_id)) {
+      byId.set(entry.mapbox_id, ancestorFromContextEntry(placetype, entry));
+    }
+  }
+
+  const ordered = [];
+  const seen = new Set();
+  for (const placetype of CONTEXT_TYPE_ORDER) {
+    const entry = ctx[placetype];
+    if (!isContextEntry(entry) || seen.has(entry.mapbox_id)) continue;
+    seen.add(entry.mapbox_id);
+    ordered.push(byId.get(entry.mapbox_id));
+  }
+  for (const ancestor of byId.values()) {
+    if (seen.has(ancestor.placeId)) continue;
+    ordered.push(ancestor);
+  }
+  return ordered;
 }
 
 /**
@@ -127,23 +273,18 @@ function parseFeatureToLocation(feature) {
   const context = props.context || {};
   const placeId = props.mapbox_id || feature.id || null;
   const featureType = props.feature_type || null;
+  const ancestors = collectAncestors(context);
 
+  const ancestorIds = [];
   const ancestorIdSet = new Set();
-  if (placeId) ancestorIdSet.add(placeId);
-
-  const ancestors = [];
-  const contextOrder = ['country', 'region', 'district', 'place', 'locality', 'neighborhood'];
-  for (const placetype of contextOrder) {
-    const entry = context[placetype];
-    if (!entry?.mapbox_id) continue;
-    ancestorIdSet.add(entry.mapbox_id);
-    ancestors.push({
-      placeId: entry.mapbox_id,
-      label: entry.name,
-      placetype,
-      regionCode: entry.region_code_full || entry.region_code || null,
-      countryCode: entry.country_code || null,
-    });
+  const addAncestorId = (id) => {
+    if (!id || ancestorIdSet.has(id)) return;
+    ancestorIdSet.add(id);
+    ancestorIds.push(id);
+  };
+  addAncestorId(placeId);
+  for (const ancestor of ancestors) {
+    addAncestorId(ancestor.placeId);
   }
 
   let city = null;
@@ -161,20 +302,20 @@ function parseFeatureToLocation(feature) {
     countryCode = countryCode
       || (props.country_code ? String(props.country_code).toUpperCase() : null)
       || (context.country?.country_code ? String(context.country.country_code).toUpperCase() : null);
-  } else if (featureType === 'region' || featureType === 'district') {
+  } else if (COARSE_FEATURE_TYPES.has(featureType)) {
     city = null;
     region = props.name || props.name_preferred || context.region?.name || null;
   } else {
     city =
       context.locality?.name ||
       context.place?.name ||
-      (featureType === 'place' || featureType === 'locality' || featureType === 'neighborhood'
+      (PLACE_LIKE_FEATURE_TYPES.has(featureType)
         ? (props.name || props.name_preferred)
         : null) ||
       context.neighborhood?.name ||
       null;
     // Only fall back to props.name as city for place-like features
-    if (!city && featureType !== 'country' && featureType !== 'region') {
+    if (!city && !COARSE_FEATURE_TYPES.has(featureType)) {
       city = props.name || props.name_preferred || null;
     }
     region = context.region?.name || context.district?.name || null;
@@ -193,14 +334,18 @@ function parseFeatureToLocation(feature) {
       ? { lat: Number(lat), lng: Number(lng) }
       : null;
 
-  return {
+  const location = {
     placeProvider: 'mapbox',
     placeId,
     featureType,
-    ancestorIds: Array.from(ancestorIdSet),
+    ancestorIds,
     ancestors,
     label: props.name || props.name_preferred || null,
+    namePreferred: props.name_preferred || null,
     display: formatLocationDisplay(props, context),
+    placeFormatted: props.place_formatted || null,
+    fullAddress: props.full_address || null,
+    postcode: context.postcode?.name || null,
     city,
     region,
     country,
@@ -209,6 +354,13 @@ function parseFeatureToLocation(feature) {
     resolvedAt: new Date(),
     detectedFromIP: false,
   };
+
+  if (!location.namePreferred) delete location.namePreferred;
+  if (!location.placeFormatted) delete location.placeFormatted;
+  if (!location.fullAddress) delete location.fullAddress;
+  if (!location.postcode) delete location.postcode;
+
+  return location;
 }
 
 /**
@@ -231,7 +383,7 @@ async function reverseGeocode(longitude, latitude, options = {}) {
       access_token: getAccessToken(),
       longitude: lng,
       latitude: lat,
-      types: options.types || PLACE_TYPES,
+      types: options.types || SEARCH_PLACE_TYPES,
       limit: Math.min(Math.max(options.limit || 1, 1), 5),
       language: options.language || 'en',
       permanent: options.permanent !== false,
@@ -260,7 +412,7 @@ async function geocodeQuery(query, options = {}) {
     q: trimmed,
     autocomplete: false,
     permanent: true,
-    types: options.types || PLACE_TYPES,
+    types: options.types || SEARCH_PLACE_TYPES,
     limit: 1,
     language: options.language || 'en',
   };
@@ -291,4 +443,7 @@ module.exports = {
   geocodeQuery,
   parseFeatureToLocation,
   featureToSuggestion,
+  CONTEXT_TYPE_ORDER,
+  SEARCH_PLACE_TYPES,
+  VENUE_SEARCH_PLACE_TYPES,
 };

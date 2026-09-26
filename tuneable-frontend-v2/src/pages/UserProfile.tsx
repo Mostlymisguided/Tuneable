@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
 import { 
   Coins, 
@@ -111,6 +111,7 @@ import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
+import { requireAuthToPlay } from '../utils/playAuth';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import {
@@ -118,7 +119,7 @@ import {
   getPlaceProfilePath,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
-import { normalizeSources, isMediaPlayable } from '../utils/mediaPlayability';
+import { normalizeSources, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import {
   championBadgeKey,
@@ -131,7 +132,10 @@ import {
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
-import { getMediaProfileUrl, isBookMedia } from '../utils/mediaNavigation';
+import { getMediaProfileUrl, isBookMedia, toMediaPathFields } from '../utils/mediaNavigation';
+import { getUserProfileUrl, isCanonicalUserParam } from '../utils/profileNavigation';
+import { usePageMeta } from '../seo/usePageMeta';
+import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
 interface UserProfile {
   id: string; // UUID as primary ID
@@ -238,6 +242,7 @@ interface PlaybackQueueItem {
   note?: string;
   mediaId: string;
   mediaUuid: string;
+  slug?: string | null;
   title: string;
   artist: string;
   coverArt?: string;
@@ -258,10 +263,14 @@ interface ListeningHistoryItem {
   lastPositionSeconds: number;
   listenDurationSeconds: number;
   completionPercent: number;
+  countedAsPlay?: boolean;
+  qualifiedAt?: string | null;
+  client?: string;
   status: 'in_progress' | 'partial' | 'completed';
   media: {
     _id: string;
     uuid?: string | null;
+    slug?: string | null;
     title: string;
     artist: string;
     coverArt?: string;
@@ -281,6 +290,24 @@ const UserProfile: React.FC = () => {
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   
   const [user, setUser] = useState<UserProfile | null>(null);
+  const profileName = user?.creatorProfile?.artistName || user?.username || '';
+  usePageMeta(user?.username ? {
+    title: profileName,
+    description: clipText(user.creatorProfile?.bio) || `${profileName} on Tuneable. See the tunes they support.`,
+    path: `/user/${encodeURIComponent(user.username)}`,
+    image: user.profilePic,
+    imageAlt: profileName,
+    type: 'profile',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      mainEntity: {
+        '@type': 'Person',
+        name: profileName,
+        url: `${SITE_ORIGIN}/user/${encodeURIComponent(user.username)}`,
+      },
+    },
+  } : null);
   const [, setStats] = useState<UserStats | null>(null);
   const [, setMediaWithBids] = useState<MediaWithBids[]>([]);
   const [tuneBytesTagRankings, setTuneBytesTagRankings] = useState<Array<{
@@ -839,9 +866,8 @@ const UserProfile: React.FC = () => {
     if (userId) {
       // If userId is "profile", redirect to proper profile route
       if (userId === 'profile') {
-        if (currentUser && (currentUser._id || currentUser.uuid)) {
-          // Redirect to proper user profile route
-          navigate(`/user/${currentUser._id || currentUser.uuid}${searchParams.toString() ? '?' + searchParams.toString() : ''}`, { replace: true });
+        if (currentUser && (currentUser.username || currentUser._id || currentUser.uuid)) {
+          navigate(getUserProfileUrl(currentUser, searchParams), { replace: true });
           return;
         } else {
           // No current user, redirect to profile page which will handle auth
@@ -854,6 +880,12 @@ const UserProfile: React.FC = () => {
       }
     }
   }, [userId, currentUser, navigate, searchParams, fetchUserProfile]);
+
+  useEffect(() => {
+    if (!user?.username || !userId) return;
+    if (isCanonicalUserParam(userId, user.username)) return;
+    navigate(getUserProfileUrl(user, searchParams), { replace: true });
+  }, [user, userId, navigate, searchParams]);
 
   // Separate useEffect for OAuth callbacks to avoid dependency issues with isOwnProfile
   useEffect(() => {
@@ -1292,6 +1324,7 @@ const UserProfile: React.FC = () => {
 
   // Handle playing media from Tune Library with auto-transition
   const handlePlayLibrary = (item: LibraryItem, _index: number, list?: LibraryItem[]) => {
+    if (!requireAuthToPlay()) return;
     try {
       // Use provided list or full library to maintain the order the user sees.
       // Sources come from the library payload — no per-track profile fetches.
@@ -1311,6 +1344,7 @@ const UserProfile: React.FC = () => {
           addedBy: null,
           totalBidValue: libItem.globalMediaAggregate,
           sourceType: 'library',
+          ...playerPlayabilityFields(libItem),
         }))
         .filter((media) => isMediaPlayable(media)) as any[];
 
@@ -1356,6 +1390,7 @@ const UserProfile: React.FC = () => {
 
   // Handle playing episodes from Podcast Library with auto-transition
   const handlePlayPodcastLibrary = (item: LibraryItem, index: number, list?: LibraryItem[]) => {
+    if (!requireAuthToPlay()) return;
     try {
       const sortedLibrary = list ?? getSortedPodcastLibrary();
 
@@ -1407,7 +1442,7 @@ const UserProfile: React.FC = () => {
   const handlePlayLibraryItem = (item: LibraryItem, _index?: number, sourceList?: LibraryItem[]) => {
     const baseList = sourceList ?? getSortedLibrary();
     if (isBookItem(item)) {
-      navigate(getMediaProfileUrl({ _id: item.mediaId || item.mediaUuid, contentForm: item.contentForm }));
+      navigate(getMediaProfileUrl(toMediaPathFields(item)));
       return;
     }
     if (isPodcastItem(item)) {
@@ -1465,6 +1500,7 @@ const UserProfile: React.FC = () => {
   };
 
   const handlePlayQueueItem = (item: PlaybackQueueItem) => {
+    if (!requireAuthToPlay()) return;
     try {
       const queueItems = [...playbackQueue];
 
@@ -1529,6 +1565,7 @@ const UserProfile: React.FC = () => {
             addedBy: null,
             totalBidValue: 0,
             sourceType: 'user_queue' as const,
+            ...playerPlayabilityFields(queueItem),
           }))
           .filter((media) => isMediaPlayable(media)) as any[];
 
@@ -2446,7 +2483,7 @@ const UserProfile: React.FC = () => {
                     </button>
                   </div>
                   <p className="mt-3 text-xs text-gray-400">
-                    Tunes found in MusicBrainz or Spotify can be tipped into your library now and become playable once audio is uploaded.
+                    Tunes found in MusicBrainz or Spotify can be tipped into your library. Playback is available when the track has audio hosted on Tuneable.
                   </p>
                 </>
               )}
@@ -2479,7 +2516,7 @@ const UserProfile: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <p className="text-white font-medium truncate text-sm md:text-base">
                                 <Link
-                                  to={`/tune/${media._id || media.id}`}
+                                  to={getMediaProfileUrl(media)}
                                   className="cursor-pointer hover:text-purple-300 transition-colors"
                                   title="View tune profile"
                                 >
@@ -2758,13 +2795,8 @@ const UserProfile: React.FC = () => {
                 onQueue={handleAddLibraryItemToQueue}
                 showTipButton={!!isOwnProfile}
                 showQueueButton={!!isOwnProfile}
-                artistColumnLabel="Artist / Show"
-                itemPath={(item) =>
-                  getMediaProfileUrl({
-                    _id: item.mediaId || item.mediaUuid,
-                    contentForm: item.contentForm,
-                  })
-                }
+                artistColumnLabel="Artist / Show / Author"
+                itemPath={(item) => getMediaProfileUrl(toMediaPathFields(item))}
               />
             )}
               </>
@@ -2821,10 +2853,7 @@ const UserProfile: React.FC = () => {
                         {index + 1}
                       </div>
                       <Link
-                        to={getMediaProfileUrl({
-                          _id: item.mediaUuid || item.mediaId,
-                          contentForm: item.contentForm,
-                        })}
+                        to={getMediaProfileUrl(toMediaPathFields(item))}
                         className="flex-shrink-0"
                       >
                         <img
@@ -2836,10 +2865,7 @@ const UserProfile: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <Link
-                            to={getMediaProfileUrl({
-                              _id: item.mediaUuid || item.mediaId,
-                              contentForm: item.contentForm,
-                            })}
+                            to={getMediaProfileUrl(toMediaPathFields(item))}
                             className="text-left text-white font-semibold truncate hover:text-purple-300 transition-colors"
                           >
                             {item.title}
@@ -2913,10 +2939,7 @@ const UserProfile: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {listeningHistory.map((entry) => {
-                  const path = getMediaProfileUrl({
-                    _id: entry.media.uuid || entry.media._id,
-                    contentForm: entry.media.contentForm,
-                  });
+                  const path = getMediaProfileUrl(toMediaPathFields(entry.media));
                   return (
                     <div key={entry._id} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
                       <div className="flex items-start gap-4">
@@ -3047,7 +3070,7 @@ const UserProfile: React.FC = () => {
                       {/* Media Cover Art */}
                       {tip.media?.coverArt && (
                         (tip.media?._id || tip.media?.uuid) ? (
-                          <Link to={`/tune/${tip.media._id || tip.media.uuid}`} className="flex-shrink-0">
+                          <Link to={getMediaProfileUrl(tip.media)} className="flex-shrink-0">
                             <img
                               src={tip.media.coverArt}
                               alt={tip.media.title || 'Media'}
@@ -3068,7 +3091,7 @@ const UserProfile: React.FC = () => {
                         <h3 className="text-lg font-semibold text-white mb-1">
                           {(tip.media?._id || tip.media?.uuid) ? (
                             <Link
-                              to={`/tune/${tip.media._id || tip.media.uuid}`}
+                              to={getMediaProfileUrl(tip.media)}
                               className="cursor-pointer hover:text-purple-300 transition-colors"
                             >
                               {tip.media?.title || tip.mediaTitle || 'Unknown Media'}

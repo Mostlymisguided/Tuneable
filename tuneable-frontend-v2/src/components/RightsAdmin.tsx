@@ -1,18 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import {
   Clock,
+  Copy,
   ExternalLink,
+  Instagram,
+  Link2,
   Mail,
   Music,
   Plus,
   RefreshCw,
   Scale,
   Send,
+  Search,
   StickyNote,
+  X,
 } from 'lucide-react';
 import { rightsAPI } from '../lib/api';
+import type { RightsContactCandidate } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
 
@@ -56,12 +62,67 @@ const STATUS_COLORS: Record<string, string> = {
   takedown: 'bg-red-600',
 };
 
+const FALLBACK_ROLES = [
+  'artist',
+  'songwriter',
+  'composer',
+  'producer',
+  'host',
+  'guest',
+  'narrator',
+  'director',
+  'cinematographer',
+  'editor',
+  'author',
+  'publisher',
+  'label',
+  'collective',
+  'reporter',
+  'other',
+];
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  verified: 'bg-green-600',
+  reused: 'bg-blue-600',
+  likely: 'bg-amber-600',
+  weak: 'bg-gray-500',
+  manual: 'bg-gray-600',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  user: 'Tuneable user',
+  label: 'Label',
+  collective: 'Collective',
+  prior_case: 'Prior case',
+  media_owner: 'Listing owner',
+  media_credit: 'Linked credit',
+  media_label: 'Listing label',
+  manual: 'Manual',
+};
+
+function mediaIdFromSelection(limbo: any, rightsCase: any): string | undefined {
+  if (limbo?._id) return String(limbo._id);
+  const media = rightsCase?.mediaId;
+  if (!media) return undefined;
+  if (typeof media === 'object') return String(media._id || '');
+  return String(media);
+}
+
 const TEMPLATE_LABELS: Record<string, string> = {
   claim_keep_invite: 'Claim-keep invite',
   takedown_option: 'Takedown option',
   follow_up: 'Follow-up',
   copyright_reporter: 'Copyright reporter reply',
   custom: 'Custom',
+};
+
+const CHANNEL_LABELS: Record<string, string> = {
+  email: 'Email',
+  instagram: 'Instagram',
+  link: 'Link',
+  note: 'Note',
+  manual: 'Manual',
+  in_app: 'In-app',
 };
 
 function artistLine(media: any): string {
@@ -86,11 +147,126 @@ function formatDate(value?: string | Date | null): string {
   return date.toLocaleString();
 }
 
+function instagramHandleFromValue(value?: string | null): string {
+  let raw = String(value || '').trim();
+  if (!raw) return '';
+  raw = raw.replace(/^@+/, '');
+  const fromUrl = raw.match(/(?:instagram\.com|instagr\.am)\/(?:[a-z]{2}\/)?([^/?#]+)/i)
+    || raw.match(/ig\.me\/m\/([^/?#]+)/i);
+  if (fromUrl) raw = fromUrl[1];
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // keep raw if it isn't a valid URI sequence
+  }
+  raw = raw.replace(/\/+$/, '').trim().replace(/^@+/, '');
+  const reserved = new Set(['p', 'reel', 'reels', 'stories', 'explore', 'accounts', 'direct', 'legal']);
+  if (!raw || reserved.has(raw.toLowerCase())) return '';
+  return raw;
+}
+
+function instagramDmUrl(handle?: string | null): string {
+  const normalized = instagramHandleFromValue(handle);
+  return normalized ? `https://ig.me/m/${encodeURIComponent(normalized)}` : 'https://www.instagram.com/';
+}
+
+function firstContactValue(contacts: Array<{ type?: string; value?: string }> | undefined, type: string): string {
+  return contacts?.find((c) => c.type === type)?.value || '';
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+}
+
 function StatusPill({ status }: { status: string }) {
   return (
     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium text-white ${STATUS_COLORS[status] || 'bg-gray-600'}`}>
       {STATUS_LABELS[status] || status}
     </span>
+  );
+}
+
+function ContactCandidateList({
+  candidates,
+  loading,
+  acceptedId,
+  onAccept,
+  onDismiss,
+}: {
+  candidates: RightsContactCandidate[];
+  loading: boolean;
+  acceptedId?: string | null;
+  onAccept: (candidate: RightsContactCandidate) => void;
+  onDismiss: (id: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <h4 className="text-sm font-medium text-gray-200 flex items-center gap-2">
+        <Search className="h-4 w-4" />
+        Contact matches
+      </h4>
+      {loading && <p className="text-xs text-gray-500">Searching Tuneable users, labels, and prior cases…</p>}
+      {!loading && candidates.length === 0 && (
+        <p className="text-xs text-gray-500">No internal matches. Paste an email below if you found one elsewhere.</p>
+      )}
+      {candidates.map((candidate) => (
+        <div
+          key={candidate.id}
+          className={`rounded-lg p-2.5 text-xs ${acceptedId === candidate.id ? 'bg-purple-900/40 border border-purple-500' : 'bg-gray-700/70'}`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-white font-medium">{candidate.displayName}</p>
+              <p className="text-gray-400 mt-0.5">
+                {SOURCE_LABELS[candidate.source] || candidate.source}
+                {candidate.role ? ` · ${candidate.role}` : ''}
+                {candidate.usedOnCases ? ` · used on ${candidate.usedOnCases} case${candidate.usedOnCases === 1 ? '' : 's'}` : ''}
+              </p>
+            </div>
+            <span className={`inline-flex px-2 py-0.5 rounded text-white ${CONFIDENCE_COLORS[candidate.confidence] || 'bg-gray-600'}`}>
+              {candidate.confidence}
+            </span>
+          </div>
+          {candidate.email
+            ? <p className="text-gray-200 mt-1">{candidate.email}</p>
+            : <p className="text-gray-500 mt-1">No email on file</p>}
+          {candidate.evidence && <p className="text-gray-500 mt-1">{candidate.evidence}</p>}
+          {(candidate.contacts || []).filter((c) => c.type !== 'email').length > 0 && (
+            <p className="text-gray-500 mt-1">
+              {(candidate.contacts || []).filter((c) => c.type !== 'email').map((c) => `${c.type}: ${c.value}`).join(' · ')}
+            </p>
+          )}
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => onAccept(candidate)}
+              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded"
+            >
+              {acceptedId === candidate.id ? 'Selected' : 'Accept'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDismiss(candidate.id)}
+              className="px-2 py-1 bg-gray-600 hover:bg-gray-600/80 text-gray-200 rounded inline-flex items-center gap-1"
+            >
+              <X className="h-3 w-3" /> Not this
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -112,13 +288,19 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   const [partyName, setPartyName] = useState('');
   const [partyRole, setPartyRole] = useState('artist');
   const [partyEmail, setPartyEmail] = useState('');
-  const [sendOnCreate, setSendOnCreate] = useState(true);
+  const [sendOnCreate, setSendOnCreate] = useState(false);
   const [template, setTemplate] = useState('claim_keep_invite');
   const [customMessage, setCustomMessage] = useState('');
   const [outreachTo, setOutreachTo] = useState('');
+  const [instagramHandle, setInstagramHandle] = useState('');
   const [manualNote, setManualNote] = useState('');
   const [caseStatus, setCaseStatus] = useState('');
   const [followUp, setFollowUp] = useState('');
+  const [roles, setRoles] = useState<string[]>(FALLBACK_ROLES);
+  const [candidates, setCandidates] = useState<RightsContactCandidate[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [accepted, setAccepted] = useState<RightsContactCandidate | null>(null);
 
   const limit = 25;
   const attention = counts.followUps + counts.inbound;
@@ -137,7 +319,12 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     try {
       setLoading(true);
       if (queue === 'limbo') {
-        const data = await rightsAPI.getLimbo({ page, limit, uncontacted: true });
+        const data = await rightsAPI.getLimbo({
+          page,
+          limit,
+          uncontacted: true,
+          search: debouncedSearch.trim() || undefined,
+        });
         setLimbo(data.media || []);
         setCases([]);
         setTotal(data.total || 0);
@@ -167,7 +354,10 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
   useEffect(() => {
     rightsAPI.getMeta()
-      .then((meta) => setReplyTo(meta.replyTo))
+      .then((meta) => {
+        setReplyTo(meta.replyTo);
+        if (meta.roles?.length) setRoles(meta.roles);
+      })
       .catch(() => undefined);
     refreshCounts();
   }, [refreshCounts]);
@@ -180,7 +370,53 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setPage(1);
     setSelectedCase(null);
     setSelectedLimbo(null);
+    setCandidates([]);
+    setAccepted(null);
+    setDismissedIds([]);
   }, [queue]);
+
+  const contactQueryName = selectedLimbo
+    ? partyName
+    : (selectedCase?.party?.displayName || '');
+  const contactQueryRole = selectedLimbo
+    ? partyRole
+    : (selectedCase?.party?.role || '');
+  const contactMediaId = mediaIdFromSelection(selectedLimbo, selectedCase);
+
+  useEffect(() => {
+    if (!selectedLimbo && !selectedCase) {
+      setCandidates([]);
+      return undefined;
+    }
+    if (!contactQueryName.trim() && !contactMediaId) {
+      setCandidates([]);
+      return undefined;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setContactsLoading(true);
+        const data = await rightsAPI.searchContacts({
+          name: contactQueryName.trim() || undefined,
+          role: contactQueryRole || undefined,
+          mediaId: contactMediaId || undefined,
+        });
+        setCandidates(data.candidates || []);
+      } catch (error) {
+        console.error('Failed to search contacts', error);
+        setCandidates([]);
+      } finally {
+        setContactsLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [selectedLimbo, selectedCase, contactQueryName, contactQueryRole, contactMediaId]);
+
+  const visibleCandidates = useMemo(
+    () => candidates.filter((c) => !dismissedIds.includes(c.id)),
+    [candidates, dismissedIds]
+  );
 
   const selectLimbo = (media: any) => {
     setSelectedCase(null);
@@ -189,9 +425,12 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setPartyName(first?.displayName || artistLine(media));
     setPartyRole(first?.role || 'artist');
     setPartyEmail('');
+    setInstagramHandle('');
     setTemplate('claim_keep_invite');
     setCustomMessage('');
-    setSendOnCreate(true);
+    setSendOnCreate(false);
+    setAccepted(null);
+    setDismissedIds([]);
   };
 
   const selectCase = (rightsCase: any) => {
@@ -199,11 +438,14 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setSelectedCase(rightsCase);
     setCaseStatus(rightsCase.status);
     setFollowUp(toDatetimeLocal(rightsCase.nextFollowUpAt));
-    const email = (rightsCase.party?.contacts || []).find((c: any) => c.type === 'email')?.value || '';
+    const email = firstContactValue(rightsCase.party?.contacts, 'email');
     setOutreachTo(email);
+    setInstagramHandle(instagramHandleFromValue(firstContactValue(rightsCase.party?.contacts, 'instagram')));
     setTemplate(rightsCase.source === 'report' ? 'copyright_reporter' : 'claim_keep_invite');
     setCustomMessage('');
     setManualNote('');
+    setAccepted(null);
+    setDismissedIds([]);
   };
 
   const reloadSelectedCase = async (id: string) => {
@@ -215,31 +457,144 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     await loadList();
   };
 
-  const handleCreateFromLimbo = async () => {
-    if (!selectedLimbo) return;
-    if (!partyName.trim()) {
-      toast.error('Party name is required');
+  const handleAcceptCandidate = async (candidate: RightsContactCandidate) => {
+    setAccepted(candidate);
+    if (candidate.displayName) setPartyName(candidate.displayName);
+    if (candidate.role) setPartyRole(candidate.role);
+    setSendOnCreate(false);
+
+    if (selectedLimbo) {
+      setPartyEmail(candidate.email || '');
+      const ig = instagramHandleFromValue(
+        candidate.contacts?.find((c) => c.type === 'instagram')?.value
+      );
+      if (ig) setInstagramHandle(ig);
       return;
     }
+
+    if (!selectedCase) return;
+    const existing = (selectedCase.party?.contacts || []) as Array<{ type: string; value: string }>;
+    const contacts = existing.map((c) => ({ ...c }));
+    for (const contact of candidate.contacts || []) {
+      if (!contact.value) continue;
+      const already = contacts.some(
+        (c) => c.type === contact.type && c.value.toLowerCase() === contact.value.toLowerCase()
+      );
+      if (!already) {
+        contacts.push({
+          type: contact.type,
+          value: contact.value,
+          notes: candidate.evidence || '',
+          source: candidate.source,
+          confidence: candidate.confidence,
+        } as any);
+      }
+    }
+    try {
+      setBusy(true);
+      await rightsAPI.updateCase(selectedCase._id, {
+        party: {
+          userId: candidate.userId || undefined,
+          labelId: candidate.labelId || undefined,
+          collectiveId: candidate.collectiveId || undefined,
+          contacts,
+        },
+      });
+      if (candidate.email) setOutreachTo(candidate.email);
+      const ig = instagramHandleFromValue(
+        candidate.contacts?.find((c) => c.type === 'instagram')?.value
+      );
+      if (ig) setInstagramHandle(ig);
+      toast.success(candidate.email ? 'Contact attached' : 'Match linked (no email on file)');
+      await reloadSelectedCase(selectedCase._id);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to attach contact');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDismissCandidate = (id: string) => {
+    setDismissedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    if (accepted?.id === id) {
+      setAccepted(null);
+    }
+  };
+
+  const createCaseFromLimbo = async () => {
+    if (!selectedLimbo) return null;
+    if (!partyName.trim()) {
+      toast.error('Party name is required');
+      return null;
+    }
+    const match = (selectedLimbo.suggestedParties || []).find(
+      (p: any) => p.displayName === partyName.trim() && p.role === partyRole
+    );
+    const emailChanged = accepted?.email && partyEmail.trim().toLowerCase() !== accepted.email.toLowerCase();
+    const contacts: Array<{
+      type: string;
+      value: string;
+      notes?: string;
+      source?: string;
+      confidence?: string;
+    }> = [];
+    if (partyEmail.trim()) {
+      contacts.push({
+        type: 'email',
+        value: partyEmail.trim(),
+        notes: accepted?.evidence || '',
+        source: accepted && !emailChanged ? accepted.source : 'manual',
+        confidence: accepted && !emailChanged ? accepted.confidence : 'manual',
+      });
+    }
+    const ig = instagramHandleFromValue(instagramHandle);
+    if (ig) {
+      contacts.push({
+        type: 'instagram',
+        value: ig,
+        notes: accepted?.evidence || '',
+        source: accepted ? accepted.source : 'manual',
+        confidence: accepted ? accepted.confidence : 'manual',
+      });
+    }
+    if (accepted?.contacts) {
+      for (const contact of accepted.contacts) {
+        if (!contact.value) continue;
+        if (contact.type === 'email' || contact.type === 'instagram') continue;
+        contacts.push({
+          type: contact.type,
+          value: contact.value,
+          notes: accepted.evidence || '',
+          source: accepted.source,
+          confidence: accepted.confidence,
+        });
+      }
+    }
+    const created = await rightsAPI.createCase({
+      mediaId: selectedLimbo._id,
+      party: {
+        displayName: partyName.trim(),
+        role: partyRole,
+        userId: accepted?.userId || match?.userId || undefined,
+        labelId: accepted?.labelId || match?.labelId || undefined,
+        collectiveId: accepted?.collectiveId || match?.collectiveId || undefined,
+        contacts,
+      },
+      source: 'import',
+    });
+    return created;
+  };
+
+  const handleCreateFromLimbo = async () => {
+    if (!selectedLimbo) return;
     if (sendOnCreate && !partyEmail.trim()) {
       toast.error('Add an email, or uncheck send now');
       return;
     }
     try {
       setBusy(true);
-      const match = (selectedLimbo.suggestedParties || []).find(
-        (p: any) => p.displayName === partyName.trim() && p.role === partyRole
-      );
-      const created = await rightsAPI.createCase({
-        mediaId: selectedLimbo._id,
-        party: {
-          displayName: partyName.trim(),
-          role: partyRole,
-          userId: match?.userId || undefined,
-          contacts: partyEmail.trim() ? [{ type: 'email', value: partyEmail.trim() }] : [],
-        },
-        source: 'import',
-      });
+      const created = await createCaseFromLimbo();
+      if (!created) return;
       if (sendOnCreate && partyEmail.trim()) {
         await rightsAPI.sendOutreach(created.case._id, {
           channel: 'email',
@@ -261,25 +616,97 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     }
   };
 
+  const ensureSelectedCaseId = async () => {
+    if (selectedCase?._id) return String(selectedCase._id);
+    const created = await createCaseFromLimbo();
+    if (!created) return null;
+    await refreshCounts();
+    setQueue('open');
+    await reloadSelectedCase(created.case._id);
+    return String(created.case._id);
+  };
+
   const handleSendEmail = async () => {
-    if (!selectedCase) return;
-    if (!outreachTo.trim()) {
+    const to = (selectedCase ? outreachTo : partyEmail).trim();
+    if (!to) {
       toast.error('Email address required');
       return;
     }
     try {
       setBusy(true);
-      await rightsAPI.sendOutreach(selectedCase._id, {
+      const caseId = await ensureSelectedCaseId();
+      if (!caseId) return;
+      await rightsAPI.sendOutreach(caseId, {
         channel: 'email',
         template,
-        to: outreachTo.trim(),
+        to,
         customMessage,
       });
       toast.success('Email sent');
-      await reloadSelectedCase(selectedCase._id);
+      await reloadSelectedCase(caseId);
       setCustomMessage('');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send email');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      setBusy(true);
+      const caseId = await ensureSelectedCaseId();
+      if (!caseId) return;
+      const preview = await rightsAPI.previewOutreach(caseId, {
+        template,
+        customMessage,
+        format: 'link',
+      });
+      await copyToClipboard(preview.text);
+      await rightsAPI.sendOutreach(caseId, {
+        channel: 'link',
+        template,
+        customMessage,
+        body: preview.text,
+        to: preview.tuneUrl,
+      });
+      toast.success('Tipped-on-Tuneable message and listing link copied');
+      await reloadSelectedCase(caseId);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to copy listing message');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCopyInstagram = async () => {
+    try {
+      setBusy(true);
+      const caseId = await ensureSelectedCaseId();
+      if (!caseId) return;
+      const preview = await rightsAPI.previewOutreach(caseId, {
+        template,
+        customMessage,
+        format: 'instagram',
+      });
+      await copyToClipboard(preview.text);
+      const handle = instagramHandleFromValue(instagramHandle) || instagramHandleFromValue(preview.instagramHandle);
+      await rightsAPI.sendOutreach(caseId, {
+        channel: 'instagram',
+        template,
+        customMessage,
+        body: preview.text,
+        to: handle,
+      });
+      if (handle) {
+        window.open(instagramDmUrl(handle), '_blank', 'noopener,noreferrer');
+        toast.success('IG message copied — paste it in the DM');
+      } else {
+        toast.success('IG message copied — open the artist’s profile and paste it');
+      }
+      await reloadSelectedCase(caseId);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to copy Instagram message');
     } finally {
       setBusy(false);
     }
@@ -349,7 +776,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             Rights
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Outreach cases for rights holders. Replies go to {replyTo}. Playability still lives on the media rights status.
+            Outreach cases for rights holders. Copy a tipped-on-Tuneable link, send email, or paste an Instagram DM. Replies go to {replyTo}. Playability still lives on the media rights status.
           </p>
         </div>
         <button
@@ -384,14 +811,25 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         ))}
       </div>
 
-      {queue !== 'limbo' && (
+      <div className="relative w-full max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search party name or notes"
-          className="w-full max-w-md px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+          placeholder={queue === 'limbo' ? 'Search title, artist, or ISRC' : 'Search counterpart, email, title, or notes'}
+          className="w-full pl-9 pr-9 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
         />
-      )}
+        {search && (
+          <button
+            type="button"
+            onClick={() => { setSearch(''); setPage(1); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-white"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 bg-gray-800 rounded-lg overflow-hidden">
@@ -401,7 +839,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             </div>
           ) : queue === 'limbo' ? (
             limbo.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">No uncontacted pending media</div>
+              <div className="p-8 text-center text-gray-400">
+                {search.trim() ? 'No matching pending media' : 'No uncontacted pending media'}
+              </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-700">
                 <thead className="bg-gray-700">
@@ -436,7 +876,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             )
           ) : (
             cases.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">No cases in this queue</div>
+              <div className="p-8 text-center text-gray-400">
+                {search.trim() ? 'No matching cases' : 'No cases in this queue'}
+              </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-700">
                 <thead className="bg-gray-700">
@@ -512,7 +954,14 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   {selectedLimbo.suggestedParties.map((party: any) => (
                     <button
                       key={`${party.role}-${party.displayName}`}
-                      onClick={() => { setPartyName(party.displayName); setPartyRole(party.role); }}
+                      onClick={() => {
+                        setPartyName(party.displayName);
+                        setPartyRole(party.role);
+                        setAccepted(null);
+                        setPartyEmail('');
+                        setInstagramHandle('');
+                        setSendOnCreate(false);
+                      }}
                       className={`px-2 py-1 rounded text-xs ${
                         partyName === party.displayName && partyRole === party.role
                           ? 'bg-purple-600 text-white'
@@ -532,14 +981,32 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
               <label className="block text-sm text-gray-300">
                 Role
                 <select value={partyRole} onChange={(e) => setPartyRole(e.target.value)} className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white">
-                  {['artist', 'songwriter', 'composer', 'producer', 'publisher', 'label', 'collective', 'other'].map((role) => (
+                  {roles.map((role) => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>
               </label>
+
+              <ContactCandidateList
+                candidates={visibleCandidates}
+                loading={contactsLoading}
+                acceptedId={accepted?.id}
+                onAccept={handleAcceptCandidate}
+                onDismiss={handleDismissCandidate}
+              />
+
               <label className="block text-sm text-gray-300">
                 Email
                 <input type="email" value={partyEmail} onChange={(e) => setPartyEmail(e.target.value)} placeholder="rights holder" className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white" />
+              </label>
+              <label className="block text-sm text-gray-300">
+                Instagram
+                <input
+                  value={instagramHandle}
+                  onChange={(e) => setInstagramHandle(e.target.value)}
+                  placeholder="@handle"
+                  className="mt-1 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                />
               </label>
               <label className="block text-sm text-gray-300">
                 Template
@@ -556,10 +1023,47 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                 rows={3}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
               />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  disabled={busy}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Link2 className="h-4 w-4" />
+                  Copy link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendEmail}
+                  disabled={busy || !partyEmail.trim()}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  Send email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyInstagram}
+                  disabled={busy}
+                  className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Instagram className="h-4 w-4" />
+                  Copy IG DM
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Copy link / IG logs the outreach and opens a case. IG copies a DM then opens Instagram to paste it.
+              </p>
               <label className="flex items-center gap-2 text-sm text-gray-300">
                 <input type="checkbox" checked={sendOnCreate} onChange={(e) => setSendOnCreate(e.target.checked)} />
-                Send email now (reply-to {replyTo})
+                Also send email when opening a case (reply-to {replyTo})
               </label>
+              {accepted && !accepted.allowSend && (
+                <p className="text-xs text-amber-400">
+                  This match is not auto-send. Confirm the address before sending.
+                </p>
+              )}
               <button
                 onClick={handleCreateFromLimbo}
                 disabled={busy}
@@ -614,6 +1118,14 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                 Case status does not change playability. Approve a claim or edit media rights for that.
               </p>
 
+              <ContactCandidateList
+                candidates={visibleCandidates}
+                loading={contactsLoading}
+                acceptedId={accepted?.id}
+                onAccept={handleAcceptCandidate}
+                onDismiss={handleDismissCandidate}
+              />
+
               <div>
                 <h4 className="text-sm font-medium text-gray-200 mb-2 flex items-center gap-2">
                   <Clock className="h-4 w-4" /> Timeline
@@ -623,7 +1135,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   {timeline.map((event: any) => (
                     <div key={event._id} className="bg-gray-700/70 rounded p-2 text-xs text-gray-300">
                       <div className="flex justify-between gap-2 text-gray-400">
-                        <span>{event.channel} · {event.direction}{event.template && event.template !== 'none' ? ` · ${event.template}` : ''}</span>
+                        <span>{CHANNEL_LABELS[event.channel] || event.channel} · {event.direction}{event.template && event.template !== 'none' ? ` · ${event.template}` : ''}</span>
                         <span>{formatDate(event.sentAt)}</span>
                       </div>
                       {event.subject && <p className="text-white mt-1">{event.subject}</p>}
@@ -635,13 +1147,22 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
               <div className="space-y-2 border-t border-gray-700 pt-4">
                 <h4 className="text-sm font-medium text-gray-200 flex items-center gap-2">
-                  <Mail className="h-4 w-4" /> Send email
+                  <Send className="h-4 w-4" /> Your tune has been tipped
                 </h4>
+                <p className="text-xs text-gray-500">
+                  Copy a YES / founding-artist message, send email (reply-to {replyTo}), or copy an Instagram DM.
+                </p>
                 <input
                   type="email"
                   value={outreachTo}
                   onChange={(e) => setOutreachTo(e.target.value)}
-                  placeholder="To"
+                  placeholder="Email"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                />
+                <input
+                  value={instagramHandle}
+                  onChange={(e) => setInstagramHandle(e.target.value)}
+                  placeholder="Instagram @handle"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                 />
                 <select value={template} onChange={(e) => setTemplate(e.target.value)} className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm">
@@ -656,14 +1177,35 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                   rows={3}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
                 />
-                <button
-                  onClick={handleSendEmail}
-                  disabled={busy}
-                  className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  Send via Resend
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    disabled={busy}
+                    className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy link
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    disabled={busy}
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyInstagram}
+                    disabled={busy}
+                    className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Instagram className="h-4 w-4" />
+                    Copy IG DM
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2 border-t border-gray-700 pt-4">

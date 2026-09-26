@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Calendar, ExternalLink, MessagesSquare, X } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { conversationAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds, poundsToPence } from '../utils/currency';

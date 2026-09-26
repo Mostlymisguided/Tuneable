@@ -13,6 +13,7 @@ final class PodcastPlayerStore: ObservableObject {
 
     private var player: AVPlayer?
     private var timeObserver: Any?
+    private var endObserver: NSObjectProtocol?
     private var remoteCommandsReady = false
     private var artworkURLString: String?
 
@@ -34,7 +35,9 @@ final class PodcastPlayerStore: ObservableObject {
         duration = (d.isFinite && d >= 0) ? d : 0
         currentTime = 0
         addTimeObserver()
+        observeTrackEnd(item)
         updateNowPlaying(reloadArtwork: true)
+        syncListeningHistory()
     }
 
     func play() {
@@ -44,12 +47,14 @@ final class PodcastPlayerStore: ObservableObject {
         p.play()
         isPlaying = true
         updateNowPlaying()
+        syncListeningHistory()
     }
 
     func pause() {
         player?.pause()
         isPlaying = false
         updateNowPlaying()
+        syncListeningHistory()
     }
 
     func togglePlayPause() {
@@ -90,8 +95,13 @@ final class PodcastPlayerStore: ObservableObject {
     }
 
     func stop() {
+        ListeningHistoryTracker.shared.endSession()
         if let p = player, let obs = timeObserver {
             p.removeTimeObserver(obs)
+        }
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+            self.endObserver = nil
         }
         timeObserver = nil
         player?.pause()
@@ -126,8 +136,40 @@ final class PodcastPlayerStore: ObservableObject {
                     }
                 }
                 self?.updateNowPlayingElapsed()
+                self?.syncListeningHistory()
             }
         }
+    }
+
+    private func observeTrackEnd(_ item: AVPlayerItem) {
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.isPlaying = false
+                ListeningHistoryTracker.shared.complete()
+                self?.updateNowPlaying()
+            }
+        }
+    }
+
+    private func syncListeningHistory() {
+        guard let episode = currentEpisode else { return }
+        ListeningHistoryTracker.shared.sync(
+            mediaId: episode.id,
+            title: episode.title ?? "",
+            artist: episode.podcastSeries?.title ?? episode.podcastTitle ?? "",
+            coverArt: episode.coverArt ?? episode.podcastSeries?.coverArt ?? "",
+            currentTime: currentTime,
+            duration: duration,
+            sourceType: "direct",
+            isPlaying: isPlaying
+        )
     }
 
     private func setupRemoteCommands() {

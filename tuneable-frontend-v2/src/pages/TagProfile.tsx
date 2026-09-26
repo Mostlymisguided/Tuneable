@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { Tag, Loader2, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
+import { toast } from '../utils/toast';
+import { Tag, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
 import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_COVER_ART } from '../constants';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
-import { enrichMediaWithPlayability, isMediaPlayable } from '../utils/mediaPlayability';
+import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { requireAuthToPlay } from '../utils/playAuth';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -31,9 +32,12 @@ import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
+import EntertainingLoader from '../components/EntertainingLoader';
+import { usePageMeta } from '../seo/usePageMeta';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import {
   getEpisodeAudioUrl,
+  isEpisodePlayable,
   usePodcastPlayerStore,
   type PodcastPlayerEpisode,
 } from '../stores/podcastPlayerStore';
@@ -104,6 +108,7 @@ function toPodcastPlayerEpisode(episode: PodcastEpisodeCardData): PodcastPlayerE
     sources: episode.sources,
     audioUrl: episode.audioUrl,
     enclosure: episode.enclosure,
+    isPlayable: episode.isPlayable,
   };
 }
 
@@ -126,6 +131,7 @@ function formatTagItemForPlayer(item: TagMediaItem) {
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    ...playerPlayabilityFields(item as any),
   };
 }
 
@@ -258,6 +264,7 @@ const TagProfile: React.FC = () => {
 
   const handlePodcastPlay = async (episode: PodcastEpisodeCardData, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!requireAuthToPlay()) return;
     const ep = {
       _id: episode._id,
       id: episode.id,
@@ -313,10 +320,11 @@ const TagProfile: React.FC = () => {
   };
 
   const handlePlayQueue = () => {
+    if (!requireAuthToPlay()) return;
     if (isPodcast) {
       const playable = episodes
         .map(toPodcastPlayerEpisode)
-        .filter((episode) => getEpisodeAudioUrl(episode));
+        .filter((episode) => isEpisodePlayable(episode));
       if (playable.length === 0) {
         toast.info('No playable episodes in this list.');
         return;
@@ -391,6 +399,16 @@ const TagProfile: React.FC = () => {
               Number(displayName) <= 400
             ? 'BPM'
             : 'Tag';
+
+  usePageMeta(slug ? {
+    title: kindLabel === 'BPM' ? `${displayName} BPM` : displayName,
+    description: kindLabel === 'Year'
+      ? `Music from ${displayName} on Tuneable. Tip a tune and move it up the chart.`
+      : kindLabel === 'BPM'
+        ? `Tunes around ${displayName} BPM on Tuneable.`
+        : `Tunes tagged ${displayName} on Tuneable. Tip one and move it up the chart.`,
+    path: `/tag/${encodeURIComponent(tag?.slug || slug)}`,
+  } : null);
   const tipTotal = stats?.globalTagAggregate ?? 0;
   const mosaicCovers = media.slice(0, 4).map((item, index) => ({
     id: item._id || `${item.title}-${index}`,
@@ -600,7 +618,6 @@ const TagProfile: React.FC = () => {
                 <PlayableFilterTrigger
                   playableOnly={playableOnly}
                   onToggle={togglePlayableOnly}
-                  hiddenCount={hiddenPlayableCount}
                 />
               ) : null}
             </div>
@@ -746,10 +763,11 @@ const TagProfile: React.FC = () => {
                 <div className="mb-3 md:mb-4">{heading}</div>
                 <div className="card bg-black/20 rounded-lg p-4 md:p-6">
                   {loading ? (
-                    <div className="flex items-center justify-center py-16 text-gray-300">
-                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                      {isPodcast ? 'Loading podcasts…' : 'Loading tracks…'}
-                    </div>
+                    <EntertainingLoader
+                      flavor={isPodcast ? 'podcast' : 'music'}
+                      size="section"
+                      headline={isPodcast ? 'Loading podcasts…' : 'Loading tracks…'}
+                    />
                   ) : error ? (
                     <div className="text-center py-12 text-red-300">{error}</div>
                   ) : (

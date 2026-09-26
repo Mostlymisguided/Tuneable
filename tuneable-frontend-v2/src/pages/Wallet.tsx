@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { paymentAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { ArrowLeft, Wallet as WalletIcon, Loader } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
 import TopUpConfirmationModal from '../components/TopUpConfirmationModal';

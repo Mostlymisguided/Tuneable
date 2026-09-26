@@ -1,7 +1,7 @@
 import * as Linking from 'expo-linking';
 import { API_ORIGIN } from '@/src/api/client';
 
-export type OAuthProvider = 'google' | 'facebook' | 'soundcloud' | 'spotify';
+export type OAuthProvider = 'google' | 'facebook' | 'spotify';
 
 /** Deep link returned after backend OAuth completes. */
 export function getOAuthCallbackRedirect(): string {
@@ -17,7 +17,6 @@ export function buildOAuthStartUrl(
     linkAccount?: boolean;
     token?: string;
     customRedirect?: string;
-    youtubeImport?: boolean;
   }
 ): string {
   const params = new URLSearchParams();
@@ -25,7 +24,6 @@ export function buildOAuthStartUrl(
   if (options?.inviteCode) params.set('invite', options.inviteCode);
   if (options?.linkAccount) params.set('link_account', 'true');
   if (options?.token) params.set('token', options.token);
-  if (options?.youtubeImport) params.set('youtube_import', 'true');
   return `${API_ORIGIN}/api/auth/${provider}?${params.toString()}`;
 }
 

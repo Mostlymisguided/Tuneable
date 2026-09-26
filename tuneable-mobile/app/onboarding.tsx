@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -7,11 +7,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
@@ -27,52 +24,32 @@ import {
   maybeRefreshCurrentLocationIfGranted,
   refreshCurrentLocation,
 } from '@/src/lib/currentLocation';
-import {
-  DEFAULT_TIP_POUNDS,
-  hasHomeLocation,
-  needsOnboarding,
-} from '@/src/lib/onboarding';
-import {
-  buildOAuthStartUrl,
-  extractOAuthError,
-} from '@/src/lib/oauth';
-import { showToast } from '@/src/stores/toastStore';
+import { hasHomeLocation, needsOnboarding } from '@/src/lib/onboarding';
 import { colors } from '@/src/theme/colors';
 import type { ResolvedLocation } from '@/src/types/user';
 
-WebBrowser.maybeCompleteAuthSession();
+type OnboardingStep = 'intro' | 'location';
 
-type OnboardingStep = 'location' | 'import';
-type ImportSource = 'soundcloud' | 'youtube';
-
-const STEP_ORDER: OnboardingStep[] = ['location', 'import'];
-const ONBOARDING_IMPORT_LIMIT = 25;
+const STEP_ORDER: OnboardingStep[] = ['intro', 'location'];
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {
   const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'import' || raw === 'notifications') return 'import';
-  return 'location';
-}
-
-function parseSource(value: string | string[] | undefined): ImportSource | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (raw === 'soundcloud' || raw === 'youtube') return raw;
-  return null;
+  if (raw === 'location' || raw === 'import' || raw === 'notifications') {
+    return 'location';
+  }
+  return 'intro';
 }
 
 export default function OnboardingScreen() {
-  const params = useLocalSearchParams<{ step?: string; source?: string }>();
+  const params = useLocalSearchParams<{ step?: string }>();
   const {
     user,
-    token,
     refreshUser,
-    updateBalance,
     isAuthenticated,
     isLoading: authLoading,
   } = useAuth();
 
   const step = parseStep(params.step);
-  const importSource = parseSource(params.source);
   const stepIndex = STEP_ORDER.indexOf(step);
 
   const [saving, setSaving] = useState(false);
@@ -82,16 +59,6 @@ export default function OnboardingScreen() {
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [requestingGps, setRequestingGps] = useState(false);
   const [locationFromGps, setLocationFromGps] = useState(false);
-
-  const [soundcloudConnected, setSoundcloudConnected] = useState(false);
-  const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
-  const [importLoading, setImportLoading] = useState(false);
-  const [importProgress, setImportProgress] = useState<string | null>(null);
-  const [importPreview, setImportPreview] = useState<{
-    actionableCount: number;
-    estimatedCost: number;
-    userBalance: number;
-  } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -147,13 +114,10 @@ export default function OnboardingScreen() {
     };
   }, [step, homeLocation?.city, homeLocation?.country, homeLocation?.placeId]);
 
-  const goToStep = (next: OnboardingStep, source?: ImportSource) => {
+  const goToStep = (next: OnboardingStep) => {
     router.replace({
       pathname: '/onboarding',
-      params:
-        next === 'import' && source
-          ? { step: next, source }
-          : { step: next },
+      params: { step: next },
     });
   };
 
@@ -190,7 +154,7 @@ export default function OnboardingScreen() {
     try {
       await authAPI.updateProfile({ homeLocation });
       await refreshUser();
-      goToStep('import');
+      await finishOnboarding();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save home location.'));
     } finally {
@@ -198,7 +162,7 @@ export default function OnboardingScreen() {
     }
   };
 
-  const finishOnboarding = async (options?: { importSkipped?: boolean }) => {
+  const finishOnboarding = async () => {
     setSaving(true);
     setError(null);
     try {
@@ -206,7 +170,7 @@ export default function OnboardingScreen() {
         onboarding: {
           completedAt: new Date().toISOString(),
           importPromptSeenAt: new Date().toISOString(),
-          importSkipped: options?.importSkipped ?? false,
+          importSkipped: true,
         },
       });
       await refreshUser();
@@ -218,239 +182,7 @@ export default function OnboardingScreen() {
     }
   };
 
-  const checkConnections = useCallback(async () => {
-    try {
-      const soundcloud = await userAPI.getSoundCloudStatus();
-      const connected = Boolean(soundcloud?.connected);
-      setSoundcloudConnected(connected);
-      return { soundcloud: connected };
-    } catch {
-      return { soundcloud: false };
-    }
-  }, []);
-
-  useEffect(() => {
-    if (step !== 'import') return;
-    void checkConnections();
-  }, [step, checkConnections]);
-
-  const loadImportPreview = useCallback(
-    async (source: ImportSource, playlistUrl?: string) => {
-      setImportLoading(true);
-      setImportProgress(
-        source === 'youtube' ? 'Matching playlist…' : 'Scanning your likes…'
-      );
-      setImportPreview(null);
-      try {
-        const started =
-          source === 'soundcloud'
-            ? await userAPI.startSoundCloudImportPreview(
-                ONBOARDING_IMPORT_LIMIT,
-                'spotify_only'
-              )
-            : await userAPI.startYouTubeImportPreview(
-                playlistUrl || youtubePlaylistUrl,
-                ONBOARDING_IMPORT_LIMIT,
-                'playlist'
-              );
-        const data = await userAPI.waitForImportJob<{
-          items?: Array<{ matchStatus: string; selected?: boolean }>;
-          summary?: { userBalance?: number };
-        }>(started.jobId, (job) => {
-          setImportProgress(
-            job.message
-              || (source === 'youtube'
-                ? 'Matching playlist…'
-                : 'Scanning your likes…')
-          );
-        });
-
-        const tip = user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
-        const items = data.items || [];
-        const actionable = items.filter(
-          (i) =>
-            i.matchStatus !== 'in_library' &&
-            (source !== 'youtube' || i.selected !== false)
-        );
-        const balance =
-          data.summary?.userBalance ??
-          (user?.balance != null ? user.balance / 100 : 0);
-
-        setImportPreview({
-          actionableCount: actionable.length,
-          estimatedCost: actionable.length * tip,
-          userBalance: balance,
-        });
-      } catch (err) {
-        setError(getApiErrorMessage(err, 'Could not preview your library.'));
-        setImportPreview(null);
-      } finally {
-        setImportLoading(false);
-        setImportProgress(null);
-      }
-    },
-    [user?.balance, user?.preferences?.defaultTip, youtubePlaylistUrl]
-  );
-
-  useEffect(() => {
-    if (step !== 'import') return;
-    const sourceParam = parseSource(params.source);
-    if (!sourceParam || sourceParam === 'youtube') return;
-
-    void (async () => {
-      const connections = await checkConnections();
-      if (connections.soundcloud) {
-        await loadImportPreview(sourceParam);
-      }
-    })();
-  }, [step, params.source, checkConnections, loadImportPreview]);
-
-  const connectImportSource = async () => {
-    if (!token) {
-      setError('You need to be signed in to connect an account.');
-      return;
-    }
-    setError(null);
-    setImportLoading(true);
-    try {
-      const redirect = Linking.createURL('onboarding', {
-        queryParams: { step: 'import', source: 'soundcloud' },
-      });
-      const startUrl = buildOAuthStartUrl('soundcloud', {
-        linkAccount: true,
-        token,
-        customRedirect: redirect,
-      });
-      const result = await WebBrowser.openAuthSessionAsync(startUrl, redirect);
-      if (result.type === 'success' && result.url) {
-        const oauthError = extractOAuthError(result.url);
-        if (oauthError) {
-          setError(oauthError.replace(/_/g, ' '));
-          return;
-        }
-        goToStep('import', 'soundcloud');
-        const connections = await checkConnections();
-        if (connections.soundcloud) {
-          await loadImportPreview('soundcloud');
-        } else {
-          setError('SoundCloud did not connect. Try again.');
-        }
-      }
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Connection failed.'));
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const clearImportSource = () => {
-    setImportPreview(null);
-    setError(null);
-    goToStep('import');
-  };
-
-  const handleImportSourcePress = (source: ImportSource) => {
-    if (source === 'youtube') {
-      goToStep('import', 'youtube');
-      return;
-    }
-    if (soundcloudConnected) {
-      if (importSource === source) {
-        void loadImportPreview(source);
-        return;
-      }
-      goToStep('import', source);
-      return;
-    }
-    void connectImportSource();
-  };
-
-  const runQuickImport = async () => {
-    if (!importSource) return;
-    setImportLoading(true);
-    setImportProgress('Preparing import…');
-    setError(null);
-    try {
-      const tip = user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
-      const previewStarted =
-        importSource === 'soundcloud'
-          ? await userAPI.startSoundCloudImportPreview(
-              ONBOARDING_IMPORT_LIMIT,
-              'spotify_only'
-            )
-          : await userAPI.startYouTubeImportPreview(
-              youtubePlaylistUrl,
-              ONBOARDING_IMPORT_LIMIT,
-              'playlist'
-            );
-      const data = await userAPI.waitForImportJob<{
-        items?: Array<{
-          key: string;
-          title?: string;
-          mediaId?: string;
-          matchStatus?: string;
-          useSuggestedMatch?: boolean;
-          crossRefStatus?: string;
-          selected?: boolean;
-          externalMedia?: Record<string, unknown>;
-        }>;
-      }>(previewStarted.jobId, (job) => {
-        setImportProgress(job.message || 'Scanning…');
-      });
-
-      const items = (data.items || [])
-        .filter((i) => i.matchStatus !== 'in_library')
-        .filter((i) => importSource !== 'youtube' || i.selected !== false)
-        .slice(0, ONBOARDING_IMPORT_LIMIT)
-        .map((i) => ({
-          key: i.key,
-          title: i.title,
-          selected: true,
-          mediaId: i.mediaId,
-          matchStatus: i.matchStatus,
-          useSuggestedMatch: i.useSuggestedMatch,
-          crossRefStatus: i.crossRefStatus,
-          amount: tip,
-          externalMedia: i.externalMedia,
-          skipIfInLibrary: true,
-        }));
-
-      if (items.length === 0) {
-        showToast("No new tracks to import — you're all set!");
-        await finishOnboarding({ importSkipped: false });
-        return;
-      }
-
-      setImportProgress(
-        `Importing ${items.length} track${items.length === 1 ? '' : 's'}…`
-      );
-      const executeStarted =
-        importSource === 'soundcloud'
-          ? await userAPI.startSoundCloudImportExecute(items, tip)
-          : await userAPI.startYouTubeImportExecute(items, tip);
-      const result = await userAPI.waitForImportJob<{
-        tipped: number;
-        updatedBalance: number;
-      }>(executeStarted.jobId, (job) => {
-        setImportProgress(job.message || 'Importing…');
-      });
-
-      if (result.updatedBalance != null) {
-        updateBalance(Math.round(result.updatedBalance * 100));
-      }
-      showToast(
-        `Imported ${result.tipped} track${result.tipped === 1 ? '' : 's'} with tips`
-      );
-      await finishOnboarding({ importSkipped: false });
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Import failed.'));
-    } finally {
-      setImportLoading(false);
-      setImportProgress(null);
-    }
-  };
-
-  const busy = saving || importLoading || requestingGps;
+  const busy = saving || requestingGps;
 
   if (authLoading) {
     return (
@@ -497,6 +229,33 @@ export default function OnboardingScreen() {
           </View>
 
           <View style={styles.card}>
+            {step === 'intro' && (
+              <View style={styles.stepBody}>
+                <View style={styles.stepHeader}>
+                  <View style={styles.iconBubble}>
+                    <Ionicons name="library-outline" size={20} color={colors.accentLight} />
+                  </View>
+                  <View style={styles.stepHeaderCopy}>
+                    <Text style={styles.stepTitle}>Your showcase, not a subscription</Text>
+                    <Text style={styles.introLead}>
+                      Tuneable is where you show your taste in music, podcasts, and books.
+                    </Text>
+                    <Text style={styles.stepText}>
+                      Tip what you love. Each tip supports the creator, moves global and local
+                      charts, and puts that work in your public showcase. Tip a work more than anyone
+                      else where you live — or worldwide — and you become its champion. Your name
+                      stands beside the media you love most.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => goToStep('location')}>
+                  <Text style={styles.primaryBtnText}>Continue</Text>
+                </Pressable>
+              </View>
+            )}
+
             {step === 'location' && (
               <View style={styles.stepBody}>
                 <View style={styles.stepHeader}>
@@ -504,11 +263,11 @@ export default function OnboardingScreen() {
                     <Ionicons name="location-outline" size={20} color={colors.accentLight} />
                   </View>
                   <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Enable location for local charts</Text>
+                    <Text style={styles.stepTitle}>Set a home place for local charts</Text>
                     <Text style={styles.stepText}>
-                      Tips influence charts where you are — at home, and wherever
-                      you tip. Location is only used while Tuneable is open,
-                      never in the background. Search if GPS isn&apos;t home.
+                      Tips on local charts use the home place you save. Use your
+                      current place once, or search. GPS is only used while
+                      Tuneable is open. The saved place stays on your profile.
                     </Text>
                   </View>
                 </View>
@@ -535,7 +294,7 @@ export default function OnboardingScreen() {
                             ? styles.gpsBtnOutlineText
                             : styles.primaryBtnText
                         }>
-                        {locationFromGps ? 'Detect again' : 'Enable location'}
+                        {locationFromGps ? 'Detect again' : 'Use current place'}
                       </Text>
                     </View>
                   )}
@@ -543,8 +302,8 @@ export default function OnboardingScreen() {
 
                 {locationFromGps && homeLocation ? (
                   <Text style={styles.successHint}>
-                    Detected {formatLocationLabel(homeLocation)}. Confirm below,
-                    or search if that&apos;s not home.
+                    Detected {formatLocationLabel(homeLocation)}. Save it as your
+                    home place, or search if that isn&apos;t home.
                   </Text>
                 ) : null}
 
@@ -583,7 +342,7 @@ export default function OnboardingScreen() {
                   {saving ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.primaryBtnText}>Save and continue</Text>
+                    <Text style={styles.primaryBtnText}>Save and finish</Text>
                   )}
                 </Pressable>
                 <Pressable
@@ -591,159 +350,19 @@ export default function OnboardingScreen() {
                   disabled={busy}
                   onPress={() => {
                     setError(null);
-                    goToStep('import');
+                    void finishOnboarding();
                   }}>
                   <Text style={styles.secondaryBtnText}>Skip for now</Text>
-                </Pressable>
-              </View>
-            )}
-
-            {step === 'import' && (
-              <View style={styles.stepBody}>
-                <View style={styles.stepHeader}>
-                  <View style={styles.iconBubble}>
-                    <Ionicons name="musical-notes-outline" size={20} color={colors.accentLight} />
-                  </View>
-                  <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Import your existing library</Text>
-                    <Text style={styles.stepText}>
-                      Bring in likes from SoundCloud or a public YouTube
-                      playlist. Each track gets a tip at your default (£
-                      {(user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS).toFixed(2)}
-                      ).
-                    </Text>
-                  </View>
-                </View>
-
-                {!importLoading && !importPreview && !importSource ? (
-                  <View style={styles.importGrid}>
-                    <Pressable
-                      style={[styles.importCard, styles.soundcloudCard]}
-                      disabled={busy}
-                      onPress={() => handleImportSourcePress('soundcloud')}>
-                      <Text style={styles.importTitleSc}>
-                        {soundcloudConnected
-                          ? 'Import from SoundCloud'
-                          : 'Connect SoundCloud'}
-                      </Text>
-                      <Text style={styles.importSub}>
-                        {soundcloudConnected
-                          ? 'Connected — tap to scan your likes'
-                          : 'Import your liked tracks'}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.importCard, styles.youtubeCard]}
-                      disabled={busy}
-                      onPress={() => handleImportSourcePress('youtube')}>
-                      <Text style={styles.importTitleYt}>YouTube</Text>
-                      <Text style={styles.importSub}>
-                        Paste a public playlist URL — no YouTube login
-                      </Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View style={styles.previewBox}>
-                    {importSource === 'youtube' && !importPreview && !importLoading ? (
-                      <>
-                        <Text style={styles.previewText}>
-                          Paste a public YouTube playlist URL
-                        </Text>
-                        <TextInput
-                          value={youtubePlaylistUrl}
-                          onChangeText={setYoutubePlaylistUrl}
-                          placeholder="https://www.youtube.com/playlist?list=…"
-                          placeholderTextColor={colors.textMuted}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          style={styles.input}
-                        />
-                        <Pressable
-                          style={[
-                            styles.primaryBtn,
-                            (busy || !youtubePlaylistUrl.trim()) && styles.btnDisabled,
-                          ]}
-                          disabled={busy || !youtubePlaylistUrl.trim()}
-                          onPress={() =>
-                            void loadImportPreview('youtube', youtubePlaylistUrl)
-                          }>
-                          <Text style={styles.primaryBtnText}>Scan playlist</Text>
-                        </Pressable>
-                      </>
-                    ) : importLoading && !importPreview ? (
-                      <View style={styles.previewLoading}>
-                        <ActivityIndicator color={colors.accentLight} />
-                        <Text style={styles.hint}>
-                          {importProgress ||
-                            (importSource === 'youtube'
-                              ? 'Matching playlist…'
-                              : `Scanning your SoundCloud likes…`)}
-                        </Text>
-                      </View>
-                    ) : importPreview ? (
-                      <>
-                        <Text style={styles.previewText}>
-                          Found {importPreview.actionableCount} tracks on
-                          Tuneable
-                          {importPreview.actionableCount > 0
-                            ? ` · estimated £${importPreview.estimatedCost.toFixed(2)}`
-                            : ''}
-                        </Text>
-                        {importLoading && importProgress ? (
-                          <Text style={styles.hint}>{importProgress}</Text>
-                        ) : null}
-                        <Pressable
-                          style={[styles.primaryBtn, busy && styles.btnDisabled]}
-                          disabled={busy}
-                          onPress={() => void runQuickImport()}>
-                          {importLoading ? (
-                            <ActivityIndicator color="#fff" />
-                          ) : (
-                            <Text style={styles.primaryBtnText}>
-                              Import up to {ONBOARDING_IMPORT_LIMIT} tracks
-                            </Text>
-                          )}
-                        </Pressable>
-                      </>
-                    ) : (
-                      <View style={styles.previewLoading}>
-                        <ActivityIndicator color={colors.accentLight} />
-                        <Text style={styles.hint}>
-                          {importSource === 'youtube'
-                            ? 'Matching playlist…'
-                            : `Scanning your SoundCloud likes…`}
-                        </Text>
-                      </View>
-                    )}
-                    <Pressable
-                      style={styles.backBtn}
-                      disabled={busy}
-                      onPress={clearImportSource}>
-                      <Text style={styles.backBtnText}>Choose a different source</Text>
-                    </Pressable>
-                  </View>
-                )}
-
-                {error ? <Text style={styles.error}>{error}</Text> : null}
-
-                <Pressable
-                  style={[styles.secondaryBtn, busy && styles.btnDisabled]}
-                  disabled={busy}
-                  onPress={() => void finishOnboarding({ importSkipped: true })}>
-                  {saving ? (
-                    <ActivityIndicator color={colors.text} />
-                  ) : (
-                    <Text style={styles.secondaryBtnText}>Skip for now</Text>
-                  )}
                 </Pressable>
                 <Pressable
                   style={styles.backBtn}
                   disabled={busy}
-                  onPress={() => goToStep('location')}>
+                  onPress={() => goToStep('intro')}>
                   <Text style={styles.backBtnText}>Back</Text>
                 </Pressable>
               </View>
             )}
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -835,6 +454,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     lineHeight: 19,
+  },
+  introLead: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
   },
   creditBanner: {
     borderRadius: 12,
@@ -969,54 +593,5 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.55,
-  },
-  importGrid: {
-    gap: 10,
-  },
-  importCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-  },
-  soundcloudCard: {
-    borderColor: 'rgba(249, 115, 22, 0.4)',
-    backgroundColor: 'rgba(249, 115, 22, 0.1)',
-  },
-  importTitleSc: {
-    color: '#fdba74',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  importTitleYt: {
-    color: '#fca5a5',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  importSub: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontSize: 13,
-  },
-  youtubeCard: {
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  previewBox: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    padding: 14,
-    gap: 12,
-  },
-  previewLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  previewText: {
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 22,
   },
 });

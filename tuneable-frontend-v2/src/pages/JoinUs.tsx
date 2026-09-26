@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, TrendingUp, MessageCircle, Music, Sparkles, Shield, Zap, ArrowRight, Check, Plus, Minus } from 'lucide-react';
 import { paymentAPI } from '../lib/api';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { HOW_MONEY_WORKS_PATH } from '../constants';
 

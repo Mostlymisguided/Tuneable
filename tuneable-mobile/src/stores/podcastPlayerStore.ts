@@ -11,11 +11,24 @@ import {
   PODCAST_SKIP_FORWARD_MS,
 } from '@/src/lib/playbackAudio';
 import {
+  episodeCoverArt,
   episodeId,
   getEpisodeAudioUrl,
   isEpisodePlayable,
+  seriesTitle,
 } from '@/src/lib/podcast';
+import {
+  clearNowPlaying,
+  ensureNowPlayingRemoteHandlers,
+  setNowPlaying,
+  updateNowPlayingElapsed,
+} from '@/src/lib/nowPlaying';
 import { showToast } from '@/src/stores/toastStore';
+import {
+  completeListeningHistory,
+  endListeningHistorySession,
+  syncListeningHistory,
+} from '@/src/lib/listeningHistoryTracker';
 
 type PodcastPlayerState = {
   queue: PodcastEpisode[];
@@ -56,6 +69,7 @@ async function ensureAudioMode() {
     playThroughEarpieceAndroid: false,
   });
   audioModeReady = true;
+  ensureNowPlayingRemoteHandlers();
 }
 
 async function unloadSound() {
@@ -154,7 +168,28 @@ function onStatus(status: AVPlaybackStatus) {
     error: null,
   });
 
+  const item = getStore().queue[getStore().currentIndex];
+  if (item) {
+    syncListeningHistory({
+      mediaId: episodeId(item),
+      title: item.title,
+      artist: seriesTitle(item),
+      coverArt: item.coverArt || (typeof item.podcastSeries === 'object' ? item.podcastSeries?.coverArt : undefined),
+      currentTime: (status.positionMillis ?? 0) / 1000,
+      duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
+      sourceType: 'direct',
+      isPlaying: status.isPlaying,
+    });
+    updateNowPlayingElapsed({
+      positionMs: status.positionMillis ?? 0,
+      durationMs: status.durationMillis ?? (item.duration ?? 0) * 1000,
+      playbackRate: getStore().playbackRate,
+      isPlaying: status.isPlaying,
+    });
+  }
+
   if (status.didJustFinish && !status.isLooping) {
+    completeListeningHistory();
     void getStore().next();
   }
 }
@@ -166,6 +201,7 @@ async function loadAndPlay(item: PodcastEpisode) {
     return;
   }
 
+  await endListeningHistorySession();
   await ensureAudioMode();
   await unloadSound();
 
@@ -189,6 +225,16 @@ async function loadAndPlay(item: PodcastEpisode) {
     );
     sound = created.sound;
     await applyPlaybackRate();
+    setNowPlaying({
+      title: item.title,
+      artist: seriesTitle(item),
+      artworkUrl: episodeCoverArt(item),
+      durationMs: getStore().durationMs,
+      positionMs: 0,
+      playbackRate: getStore().playbackRate,
+      isPlaying: true,
+      mode: 'podcast',
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
@@ -335,10 +381,19 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
     const next = nextPlaybackSpeed(get().playbackRate);
     set({ playbackRate: next });
     await applyPlaybackRate();
+    const { positionMs, durationMs, isPlaying } = get();
+    updateNowPlayingElapsed({
+      positionMs,
+      durationMs,
+      playbackRate: next,
+      isPlaying,
+    });
   },
 
   clear: async () => {
+    endListeningHistorySession();
     await unloadSound();
+    clearNowPlaying();
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
     set({

@@ -48,7 +48,7 @@ describe('Rekordbox XML playlist parse', () => {
     expect(tracks[0].title).toBe('Track One');
     expect(tracks[0].artist).toBe('Artist A');
     expect(tracks[0].bpm).toBe(122);
-    expect(tracks[0].key).toBe('8A');
+    expect(tracks[0].key).toBe('A Minor');
     expect(tracks[0].duration).toBe(180);
     expect(tracks[0].playlistName).toBe('House Favorites');
   });
@@ -85,7 +85,7 @@ describe('convertRekordboxTrack', () => {
     expect(converted.title).toBe('Track One');
     expect(converted.artist).toBe('Artist A');
     expect(converted.bpm).toBe(122);
-    expect(converted.key).toBe('8A');
+    expect(converted.key).toBe('A Minor');
     expect(converted.externalIds.rekordbox).toBe('101');
     expect(converted.sources).toEqual({});
     expect(converted.importSource).toBe('rekordbox');
@@ -98,5 +98,68 @@ describe('convertRekordboxTrack', () => {
       artist: 'Someone',
     });
     expect(converted.externalIds.rekordbox).toBe('name:Untitled::Someone');
+  });
+});
+
+const {
+  classifyLocalFile,
+  buildIngestItems,
+  summarizeItems,
+} = require('../services/rekordboxPlaylistIngestService');
+
+describe('Rekordbox playlist MP3 ingest classification', () => {
+  it('treats missing disk files as upload-needed catalog creates', async () => {
+    const { tracks } = await getTracksFromPlaylistsFromContent(SAMPLE_XML, ['House Favorites']);
+    const items = await buildIngestItems(tracks, {
+      createUnmatched: true,
+    });
+    expect(items).toHaveLength(2);
+    expect(items.every((item) => item.action === 'create' && item.needsUpload)).toBe(true);
+    expect(items.every((item) => item.fileExists === false)).toBe(true);
+    expect(summarizeItems(items).needsUpload).toBe(2);
+    expect(summarizeItems(items).missingFiles).toBe(2);
+  });
+
+  it('classifies non-mp3 files as skip', () => {
+    const result = classifyLocalFile({
+      filePath: '/tmp/track.wav',
+      fileExists: true,
+    });
+    expect(result).toEqual({ action: 'skip', skipReason: 'not_mp3' });
+  });
+
+  it('classifies low-bitrate mp3s as skip when a gate is set', () => {
+    const result = classifyLocalFile({
+      filePath: '/tmp/track.mp3',
+      fileExists: true,
+      bitrate: 192,
+    }, { minBitrate: 320 });
+    expect(result.action).toBe('skip');
+    expect(result.skipReason).toBe('low_bitrate');
+  });
+
+  it('requires a playlist name for ingest preview', async () => {
+    const { previewPlaylistIngest } = require('../services/rekordboxPlaylistIngestService');
+    await expect(previewPlaylistIngest(SAMPLE_XML, { playlists: [] }))
+      .rejects.toThrow(/playlist/i);
+  });
+});
+
+const { decodeRekordboxLocation } = require('../utils/libraryXml');
+
+describe('decodeRekordboxLocation', () => {
+  it('strips file://localhost to a POSIX path', () => {
+    expect(decodeRekordboxLocation('file://localhost/Users/admin/Music/Track.mp3'))
+      .toBe('/Users/admin/Music/Track.mp3');
+  });
+
+  it('strips file:/// when localhost is omitted', () => {
+    expect(decodeRekordboxLocation('file:///Users/admin/Music/Track.mp3'))
+      .toBe('/Users/admin/Music/Track.mp3');
+  });
+
+  it('URL-decodes spaces in Location', () => {
+    expect(decodeRekordboxLocation('file://localhost/Users/admin/Music/K%20Tea.mp3'))
+      .toBe('/Users/admin/Music/K Tea.mp3');
   });
 });
