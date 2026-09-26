@@ -229,7 +229,8 @@ bidSchema.post('save', function(doc) {
         userId: doc.userId,
         mediaId: doc.mediaId,
         partyId: doc.partyId,
-        amount: doc.amount
+        amount: doc.amount,
+        status: doc.status,
     };
 
     setImmediate(async () => {
@@ -242,6 +243,17 @@ bidSchema.post('save', function(doc) {
             );
         } catch (error) {
             console.error('Error updating metrics after bid save:', error);
+        }
+
+        if (!bidData.mediaId) return;
+        try {
+            const copyAccessService = require('../services/copyAccessService');
+            await copyAccessService.grantCurrentHalf(bidData.mediaId);
+            if (bidData.status && bidData.status !== 'active' && bidData.userId) {
+                await copyAccessService.revokeIfLapsed(bidData.mediaId, bidData.userId);
+            }
+        } catch (error) {
+            console.error('Error updating copy access after bid save:', error);
         }
     });
 });

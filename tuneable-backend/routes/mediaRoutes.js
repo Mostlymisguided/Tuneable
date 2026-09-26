@@ -1543,6 +1543,44 @@ router.get('/top-tunes', async (req, res) => {
   }
 });
 
+// @route   GET /api/media/:mediaId/copy-access
+// @desc    Whether the viewer is in the most generous half, or still holds a copy from when they were
+// @access  Public (user fields only when a valid token is sent)
+router.get('/:mediaId/copy-access', async (req, res) => {
+  try {
+    const media = await findPlayableMedia(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const User = require('../models/User');
+        const decoded = jwt.verify(
+          authHeader.slice(7),
+          process.env.JWT_SECRET || 'defaultsecretkey'
+        );
+        const user = decoded.userId && String(decoded.userId).includes('-')
+          ? await User.findOne({ uuid: decoded.userId }).select('_id')
+          : await User.findById(decoded.userId).select('_id');
+        userId = user?._id || null;
+      } catch (_error) {
+        userId = null;
+      }
+    }
+
+    const copyAccessService = require('../services/copyAccessService');
+    const status = await copyAccessService.getStatus(media._id, userId);
+    return res.json(status);
+  } catch (error) {
+    console.error('Error loading copy access:', error);
+    return res.status(500).json({ error: 'Failed to load copy access' });
+  }
+});
+
 // @route   GET /api/media/:mediaId/profile
 // @desc    Get comprehensive media details for Tune Profile page
 // @access  Public (for viewing media details)
@@ -1948,16 +1986,24 @@ router.put('/:id', authMiddleware, async (req, res) => {
       'title', 'producer', 'album', 'genre',
       'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
-      'lyrics', 'description', 'language', 'minimumBid'
+      'lyrics', 'description', 'language', 'minimumBid', 'copySharePercent'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
+
+    if (req.body.copySharePercent !== undefined && req.body.copySharePercent !== null && req.body.copySharePercent !== '') {
+      const share = Math.round(Number(req.body.copySharePercent));
+      if (!Number.isFinite(share) || share < 1 || share > 100) {
+        return res.status(400).json({ error: 'Copy share must be between 1 and 100' });
+      }
+      req.body.copySharePercent = share;
+    }
     
     allowedUpdates.forEach(field => {
       if (req.body[field] !== undefined) {
         let value = req.body[field];
         
         // Convert numeric fields from string to number if needed
-        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear', 'minimumBid'];
+        const numericFields = ['pitch', 'bpm', 'duration', 'bitrate', 'sampleRate', 'releaseYear', 'minimumBid', 'copySharePercent'];
         if (numericFields.includes(field) && typeof value === 'string' && value.trim() !== '') {
           const numValue = field === 'releaseYear' ? parseInt(value) : parseFloat(value);
           if (!isNaN(numValue)) {
@@ -1966,6 +2012,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
         }
         
         // Validate minimumBid (must be at least 0.01 or null to clear override)
+        if (field === 'copySharePercent') {
+          const { normalizeCopySharePercent } = require('../utils/generousHalf');
+          value = normalizeCopySharePercent(value);
+        }
+
         if (field === 'minimumBid') {
           if (value !== null && value !== undefined && value !== '') {
             const numValue = typeof value === 'string' ? parseFloat(value) : value;
@@ -4384,6 +4435,15 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
     }
 
     await media.save();
+
+    if (req.body.copySharePercent !== undefined) {
+      try {
+        const copyAccessService = require('../services/copyAccessService');
+        await copyAccessService.grantCurrentHalf(media._id);
+      } catch (copyError) {
+        console.error('Error granting copy access after share change:', copyError);
+      }
+    }
 
     // Format response
     const artistNames = media.artist && media.artist.length > 0
