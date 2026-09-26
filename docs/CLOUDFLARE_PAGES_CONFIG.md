@@ -2,13 +2,46 @@
 
 This document explains how to properly configure Cloudflare Pages deployment for the Tuneable frontend.
 
+## TL;DR - Quick Fix
+
+**Current configuration is missing dependency installation.** 
+
+**Change this:**
+```
+Build command: npm run build
+```
+
+**To this:**
+```
+Build command: npm install && npm run build
+```
+
+**And add these environment variables in Cloudflare Dashboard:**
+- `VITE_API_URL` = `https://tuneable.stream/api`
+- `VITE_BACKEND_URL` = `https://tuneable.stream`
+- `NODE_VERSION` = `20`
+
+Then retry the deployment. ✅
+
+---
+
 ## Current Issue
 
-Cloudflare Pages deployments are currently failing because the build configuration needs to account for the monorepo structure where the frontend is in the `tuneable-frontend-v2/` subdirectory.
+Cloudflare Pages deployments are currently failing. The current configuration is:
+
+```
+Build command:     npm run build
+Build output:      dist
+Root directory:    tuneable-frontend-v2
+```
+
+**Problem**: The build command doesn't install dependencies first, so `tsc` and `vite` commands fail with "command not found" errors.
 
 ## Solution
 
-### Option 1: Configure via Cloudflare Dashboard (Recommended)
+### Option 1: Fix Build Command (Recommended - Quick Fix)
+
+The root directory is already correctly set to `tuneable-frontend-v2`, so we just need to update the build command to install dependencies first.
 
 1. **Go to Cloudflare Dashboard**
    - Navigate to: https://dash.cloudflare.com
@@ -20,56 +53,67 @@ Cloudflare Pages deployments are currently failing because the build configurati
 
    **Framework preset**: None (or Vite)
    
-   **Build command**:
+   **Build command** (change from `npm run build` to):
    ```bash
-   cd tuneable-frontend-v2 && npm install && npm run build:prod
+   npm install && npm run build
    ```
    
-   **Build output directory**:
+   **Build output directory** (keep as is):
    ```
-   tuneable-frontend-v2/dist
+   dist
    ```
    
-   **Root directory** (optional, leave blank or set to):
+   **Root directory** (keep as is):
    ```
-   /
+   tuneable-frontend-v2
    ```
 
 3. **Set Environment Variables**
 
-   Go to **Settings** → **Environment variables** and add:
+   Go to **Settings** → **Environment variables** and add these variables:
 
    | Variable Name | Value | Environment |
    |---------------|-------|-------------|
-   | `VITE_API_URL` | `https://tuneable.stream/api` | Production |
-   | `VITE_BACKEND_URL` | `https://tuneable.stream` | Production |
-   | `NODE_VERSION` | `18` or `20` | All |
+   | `VITE_API_URL` | `https://tuneable.stream/api` | Production, Preview |
+   | `VITE_BACKEND_URL` | `https://tuneable.stream` | Production, Preview |
+   | `NODE_VERSION` | `20` | Production, Preview |
+
+   **Important**: These environment variables are required because:
+   - Vite needs `VITE_` prefixed variables to be available at build time
+   - The `build:prod` script in package.json has inline env vars that don't work in Cloudflare's Linux environment
+   - Setting them in Cloudflare dashboard makes them available to the build process
 
 4. **Save and Redeploy**
 
-   - Click **Save**
+   - Click **Save** after updating build command
+   - Click **Save** after adding environment variables
    - Go to **Deployments** tab
    - Click **Retry deployment** on the latest failed deployment
    - Or push a new commit to trigger a new deployment
 
+   The build should now succeed!
+
 ### Option 2: Alternative Build Commands
 
-If the above doesn't work, try these alternative build commands:
+Since Root Directory is already set to `tuneable-frontend-v2`, you don't need `cd` commands. Try these alternatives if Option 1 doesn't work:
 
-**Option A - Install dependencies first:**
+**Option A - Use npm ci (faster, more reliable):**
 ```bash
-npm install -g pnpm && cd tuneable-frontend-v2 && pnpm install && pnpm run build:prod
+npm ci && npm run build
 ```
 
-**Option B - Use the production build script:**
+**Option B - Clean install:**
 ```bash
-cd tuneable-frontend-v2 && npm ci && npm run build:prod
+rm -rf node_modules && npm install && npm run build
 ```
 
-**Option C - Specify Node version:**
+**Option C - Use the prod build script (requires env vars set in dashboard):**
 ```bash
-cd tuneable-frontend-v2 && node --version && npm install && npm run build:prod
+npm install && npm run build:prod
 ```
+Note: Option C won't work unless you set the environment variables in Cloudflare dashboard first, because the inline env vars in the script (`VITE_API_URL=...`) don't work in Cloudflare's build environment.
+
+**Recommended**: Use Option 1 (npm install && npm run build) with environment variables set in the dashboard.
 
 ### Option 3: Add Build Config File (Currently Not Supported)
 
