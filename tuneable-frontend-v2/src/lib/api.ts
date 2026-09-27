@@ -1578,6 +1578,23 @@ export const userAPI = {
     return response.data;
   },
 
+  previewTipRaise: async (targetPounds: number, mediaIds?: string[]) => {
+    const response = await api.post('/users/me/tip-raise/preview', {
+      targetPounds,
+      ...(mediaIds && mediaIds.length > 0 ? { mediaIds } : {}),
+    });
+    return response.data;
+  },
+
+  confirmTipRaise: async (payload: {
+    targetPounds: number;
+    idempotencyKey: string;
+    mediaIds?: string[];
+  }) => {
+    const response = await api.post('/users/me/tip-raise/confirm', payload);
+    return response.data;
+  },
+
   // Get authenticated user's personal playback queue
   getPlaybackQueue: async () => {
     const response = await api.get('/users/me/queue');

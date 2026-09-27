@@ -1256,6 +1256,36 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/me/tip-raise/preview
+// @desc    Price bringing the caller's tips up to a target. Writes nothing.
+router.post('/me/tip-raise/preview', authMiddleware, async (req, res) => {
+  try {
+    const tipRaiseService = require('../services/tipRaiseService');
+    const preview = await tipRaiseService.previewTipRaise(req.user._id, req.body || {});
+    res.json(preview);
+  } catch (error) {
+    const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    if (sendPolicyError(res, error)) return;
+    console.error('Tip raise preview failed:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to preview tip raise' });
+  }
+});
+
+// @route   POST /api/users/me/tip-raise/confirm
+// @desc    Place one gap tip per tune below the target, when the balance covers the set.
+router.post('/me/tip-raise/confirm', authMiddleware, async (req, res) => {
+  try {
+    const tipRaiseService = require('../services/tipRaiseService');
+    const result = await tipRaiseService.confirmTipRaise(req.user._id, req.body || {});
+    res.json(result);
+  } catch (error) {
+    const { sendPolicyError } = require('../utils/welcomeCreditPolicy');
+    if (sendPolicyError(res, error)) return;
+    console.error('Tip raise confirm failed:', error);
+    res.status(error.status || 500).json({ error: error.message || 'Failed to raise tips' });
+  }
+});
+
 /**
  * @route   GET /api/users/me/blocked
  * @desc    List users the authenticated account has blocked

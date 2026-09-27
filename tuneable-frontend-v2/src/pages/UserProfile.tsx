@@ -130,6 +130,7 @@ import {
   type ChampionBadge,
 } from '../utils/championBadges';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
+import BringTipsUpControl from '../components/BringTipsUpControl';
 import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import { getMediaProfileUrl, isBookMedia, toMediaPathFields } from '../utils/mediaNavigation';
@@ -2760,18 +2761,29 @@ const UserProfile: React.FC = () => {
                   {getSortedLibrary().length}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const sorted = getSortedLibrary();
-                  if (sorted.length > 0) handlePlayLibraryItem(sorted[0]);
-                }}
-                disabled={isLoadingLibrary || getSortedLibrary().length === 0}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
-              >
-                <Play className="h-4 w-4" fill="currentColor" />
-                Play
-              </button>
+              <div className="flex items-center gap-2">
+                {getSortedLibrary().length > 0 && (
+                  <BringTipsUpControl
+                    defaultTipPounds={currentUser?.preferences?.defaultTip || 1.11}
+                    onCompleted={async (balanceAfterPence) => {
+                      if (typeof balanceAfterPence === 'number') updateBalance(balanceAfterPence);
+                      await loadTuneLibrary();
+                    }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sorted = getSortedLibrary();
+                    if (sorted.length > 0) handlePlayLibraryItem(sorted[0]);
+                  }}
+                  disabled={isLoadingLibrary || getSortedLibrary().length === 0}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-medium transition-colors"
+                >
+                  <Play className="h-4 w-4" fill="currentColor" />
+                  Play
+                </button>
+              </div>
             </div>
 
             {isLoadingLibrary ? (

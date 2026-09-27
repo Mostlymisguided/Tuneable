@@ -292,109 +292,176 @@ async function getWelcomeUsageOnMedia(tipperUserId, mediaId) {
 }
 
 /**
- * Enforce welcome-credit rules for a media tip (party / global / podcast).
- * Call after media is resolved and before creating the Bid.
- * @returns {{ welcomeAppliedPence: number }}
+ * In-memory welcome usage for a batch of tips.
+ * DB history is loaded once per key; planned tips in the same batch are added on top
+ * so later items see earlier welcome spend before those bids exist.
  */
-async function assertWelcomeMediaSpend({ user, amountPence, media }) {
-  await assertAccountCanSpend(user);
+function createWelcomeUsageLedger(userId) {
+  const selfDb = new Map();
+  const selfExtra = new Map();
+  const artistDb = new Map();
+  const artistExtra = new Map();
 
+  return {
+    async selfUsed(mediaId) {
+      const key = String(mediaId);
+      if (!selfDb.has(key)) {
+        selfDb.set(key, await getWelcomeUsageOnMedia(userId, key));
+      }
+      return selfDb.get(key) + (selfExtra.get(key) || 0);
+    },
+    async artistUsage(artistKey) {
+      if (!artistDb.has(artistKey)) {
+        artistDb.set(artistKey, await getWelcomeUsageTowardArtist(userId, artistKey));
+      }
+      const base = artistDb.get(artistKey);
+      const extra = artistExtra.get(artistKey) || { pence: 0, mediaIds: new Set() };
+      return {
+        pence: base.pence + extra.pence,
+        mediaIds: new Set([...base.mediaIds, ...extra.mediaIds]),
+      };
+    },
+    note({ mediaId, welcomeAppliedPence, controlsMedia, targets }) {
+      const applied = Math.max(0, Math.round(Number(welcomeAppliedPence) || 0));
+      if (applied <= 0) return;
+      const id = String(mediaId);
+      if (controlsMedia) {
+        selfExtra.set(id, (selfExtra.get(id) || 0) + applied);
+        return;
+      }
+      for (const target of targets || []) {
+        const extra = artistExtra.get(target.key) || { pence: 0, mediaIds: new Set() };
+        extra.pence += Math.round(applied * (target.weight || 1));
+        extra.mediaIds.add(id);
+        artistExtra.set(target.key, extra);
+      }
+    },
+  };
+}
+
+/**
+ * Welcome-credit decision for one media tip.
+ * Returns a result instead of throwing so a batch can skip one tune and continue.
+ * @returns {Promise<{ ok: true, welcomeAppliedPence: number } | { ok: false, code: string, message: string, status: number, details: object }>}
+ */
+async function assessWelcomeMediaSpend({ user, amountPence, media, ledger, skipBalanceCheck = false }) {
   const amount = Math.max(0, Math.round(Number(amountPence)) || 0);
-  if ((user.balance || 0) < amount) {
-    throw policyError(
-      'WELCOME_INSUFFICIENT_BALANCE',
-      'Insufficient balance',
-      400,
-      {
+  if (!skipBalanceCheck && (user.balance || 0) < amount) {
+    return {
+      ok: false,
+      code: 'WELCOME_INSUFFICIENT_BALANCE',
+      message: 'Insufficient balance',
+      status: 400,
+      details: {
         required: amount / 100,
         available: (user.balance || 0) / 100,
-      }
-    );
+      },
+    };
   }
 
   const welcomeAppliedPence = peekWelcomeCreditApplied(user, amount);
-
   if (welcomeAppliedPence <= 0) {
-    return { welcomeAppliedPence: 0 };
+    return { ok: true, welcomeAppliedPence: 0 };
   }
 
   if (amount > MAX_WELCOME_PER_TIP_PENCE) {
-    throw policyError(
-      CODES.TIP_TOO_LARGE,
-      `Tips funded by welcome credit are limited to £${(MAX_WELCOME_PER_TIP_PENCE / 100).toFixed(2)} each.`,
-      400,
-      {
+    return {
+      ok: false,
+      code: CODES.TIP_TOO_LARGE,
+      message: `Tips funded by welcome credit are limited to £${(MAX_WELCOME_PER_TIP_PENCE / 100).toFixed(2)} each.`,
+      status: 400,
+      details: {
         maxWelcomeTipPence: MAX_WELCOME_PER_TIP_PENCE,
         maxWelcomeTipPounds: MAX_WELCOME_PER_TIP_PENCE / 100,
         amountPence: amount,
-      }
-    );
+      },
+    };
   }
 
   if (userControlsMedia(user, media)) {
-    const usedPence = await getWelcomeUsageOnMedia(user._id, media?._id);
+    const usedPence = ledger
+      ? await ledger.selfUsed(media?._id)
+      : await getWelcomeUsageOnMedia(user._id, media?._id);
     const remaining = remainingSelfMediaWelcomePence(usedPence);
     if (welcomeAppliedPence > remaining) {
       const maxLabel = `£${(MAX_WELCOME_SELF_PER_MEDIA_PENCE / 100).toFixed(2)}`;
-      throw policyError(
-        CODES.SELF_MEDIA_CAP,
-        remaining <= 0
+      return {
+        ok: false,
+        code: CODES.SELF_MEDIA_CAP,
+        message: remaining <= 0
           ? `Welcome credit on your own media is limited to ${maxLabel} per track.`
           : `Welcome credit on your own media is limited to ${maxLabel} per track. You have £${(remaining / 100).toFixed(2)} remaining on this track.`,
-        400,
-        {
+        status: 400,
+        details: {
           maxSelfMediaPence: MAX_WELCOME_SELF_PER_MEDIA_PENCE,
           usedPence,
           remainingPence: remaining,
-        }
-      );
+        },
+      };
     }
-    // Per-media cap replaces per-artist welcome caps on catalogue you control.
-    return { welcomeAppliedPence };
+    return { ok: true, welcomeAppliedPence };
   }
 
   const targets = getArtistCapTargets(media);
   const mediaIdStr = idStr(media?._id);
 
   for (const target of targets) {
-    const usage = await getWelcomeUsageTowardArtist(user._id, target.key);
+    const usage = ledger
+      ? await ledger.artistUsage(target.key)
+      : await getWelcomeUsageTowardArtist(user._id, target.key);
     const attributed = Math.round(welcomeAppliedPence * (target.weight || 1));
     const nextPence = usage.pence + attributed;
 
     if (nextPence > MAX_WELCOME_PER_ARTIST_PENCE) {
       const remaining = Math.max(0, MAX_WELCOME_PER_ARTIST_PENCE - usage.pence);
-      throw policyError(
-        CODES.ARTIST_CAP_AMOUNT,
-        `Welcome credit toward this artist is capped at £${(MAX_WELCOME_PER_ARTIST_PENCE / 100).toFixed(2)}. ` +
+      return {
+        ok: false,
+        code: CODES.ARTIST_CAP_AMOUNT,
+        message: `Welcome credit toward this artist is capped at £${(MAX_WELCOME_PER_ARTIST_PENCE / 100).toFixed(2)}. ` +
           `You have £${(remaining / 100).toFixed(2)} remaining for this artist.`,
-        400,
-        {
+        status: 400,
+        details: {
           artistKey: target.key,
           artistLabel: target.label,
           maxPence: MAX_WELCOME_PER_ARTIST_PENCE,
           usedPence: usage.pence,
           remainingPence: remaining,
-        }
-      );
+        },
+      };
     }
 
     const alreadyTippedThisMedia = mediaIdStr && usage.mediaIds.has(mediaIdStr);
     if (!alreadyTippedThisMedia && usage.mediaIds.size >= MAX_WELCOME_MEDIA_PER_ARTIST) {
-      throw policyError(
-        CODES.ARTIST_CAP_MEDIA,
-        `Welcome credit can be used on at most ${MAX_WELCOME_MEDIA_PER_ARTIST} songs per artist.`,
-        400,
-        {
+      return {
+        ok: false,
+        code: CODES.ARTIST_CAP_MEDIA,
+        message: `Welcome credit can be used on at most ${MAX_WELCOME_MEDIA_PER_ARTIST} songs per artist.`,
+        status: 400,
+        details: {
           artistKey: target.key,
           artistLabel: target.label,
           maxMedia: MAX_WELCOME_MEDIA_PER_ARTIST,
           tippedMediaCount: usage.mediaIds.size,
-        }
-      );
+        },
+      };
     }
   }
 
-  return { welcomeAppliedPence };
+  return { ok: true, welcomeAppliedPence };
+}
+
+/**
+ * Enforce welcome-credit rules for a media tip (party / global / podcast).
+ * Call after media is resolved and before creating the Bid.
+ * @returns {{ welcomeAppliedPence: number }}
+ */
+async function assertWelcomeMediaSpend({ user, amountPence, media }) {
+  await assertAccountCanSpend(user);
+  const result = await assessWelcomeMediaSpend({ user, amountPence, media });
+  if (!result.ok) {
+    throw policyError(result.code, result.message, result.status || 400, result.details || {});
+  }
+  return { welcomeAppliedPence: result.welcomeAppliedPence };
 }
 
 /**
@@ -561,6 +628,8 @@ module.exports = {
   stampWelcomeCreditGrant,
   expireWelcomeCreditIfNeeded,
   assertAccountCanSpend,
+  createWelcomeUsageLedger,
+  assessWelcomeMediaSpend,
   assertWelcomeMediaSpend,
   assertWelcomeGenericSpend,
   getWelcomeUsageTowardArtist,

@@ -24,6 +24,7 @@ import UserProfilePrompts from '../components/UserProfilePrompts';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
+import BringTipsUpControl from '../components/BringTipsUpControl';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 import TipCtaLabel from '../components/TipCtaLabel';
@@ -51,7 +52,7 @@ interface SearchResult {
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
@@ -2949,16 +2950,28 @@ Join here: ${inviteLink}`.trim();
               {tuneLibrary.length}
             </span>
           </div>
-          {user && (user._id || user.uuid) && (
-            <Link
-              to={getUserProfileUrl(user, 'view=tip-history')}
-              className="flex items-center space-x-2 px-4 mx-4 md:mx-0 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
-            >
-              <History className="h-4 w-4" />
-              <span className="hidden md:block">View Tip History</span>
-              <ArrowRight className="hidden md:block h-4 w-4" />
-            </Link>
-          )}
+          <div className="flex items-center gap-2 mx-4 md:mx-0">
+            {tuneLibrary.length > 0 && (
+              <BringTipsUpControl
+                defaultTipPounds={user?.preferences?.defaultTip || 1.11}
+                onCompleted={async (balanceAfterPence) => {
+                  if (typeof balanceAfterPence === 'number') updateBalance(balanceAfterPence);
+                  const data = await userAPI.getTuneLibrary();
+                  setTuneLibrary(data.library || []);
+                }}
+              />
+            )}
+            {user && (user._id || user.uuid) && (
+              <Link
+                to={getUserProfileUrl(user, 'view=tip-history')}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
+              >
+                <History className="h-4 w-4" />
+                <span className="hidden md:block">View Tip History</span>
+                <ArrowRight className="hidden md:block h-4 w-4" />
+              </Link>
+            )}
+          </div>
         </div>
         
         {isLoadingLibrary ? (

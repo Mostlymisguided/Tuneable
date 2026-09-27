@@ -26,6 +26,9 @@ async function placeGlobalBid(userId, {
   currentLocation,
   skipIfAlreadyTipped = false,
   tags: tipTags,
+  allowWritten = false,
+  skipTagRankings = false,
+  platform = 'global-bid',
 } = {}) {
   if (!amount || amount < 0.01) {
     const err = new Error('Minimum bid is £0.01');
@@ -184,7 +187,8 @@ async function placeGlobalBid(userId, {
   }
 
   const { isWrittenMedia } = require('../utils/mediaKinds');
-  if (isWrittenMedia(media)) {
+  const written = isWrittenMedia(media);
+  if (written && !allowWritten) {
     const err = new Error('Books cannot be tipped through the Global Party queue. Use the books boost endpoint.');
     err.status = 400;
     throw err;
@@ -253,7 +257,7 @@ async function placeGlobalBid(userId, {
     partyName: globalParty.name,
     partyType: globalParty.type,
     mediaTitle: media.title,
-    mediaArtist: media.artist?.[0]?.name || 'Unknown',
+    mediaArtist: media.artist?.[0]?.name || media.author?.[0]?.name || media.host?.[0]?.name || 'Unknown',
     mediaCoverArt: media.coverArt,
     isInitialBid: isInitialPartyEntry,
     mediaContentType: media.contentType,
@@ -289,25 +293,31 @@ async function placeGlobalBid(userId, {
     console.error('Error setting up escrow allocation:', error);
   }
 
-  try {
-    const tagRankingsService = require('./tagRankingsService');
-    tagRankingsService.invalidateUserTagRankings(userId).catch(console.error);
-    tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10, true).catch(console.error);
-  } catch (error) {
-    console.error('Error setting up tag rankings:', error);
+  if (!skipTagRankings) {
+    try {
+      const tagRankingsService = require('./tagRankingsService');
+      tagRankingsService.invalidateUserTagRankings(userId).catch(console.error);
+      tagRankingsService.calculateAndUpdateUserTagRankings(userId, 10, true).catch(console.error);
+    } catch (error) {
+      console.error('Error setting up tag rankings:', error);
+    }
   }
 
-  const { isNewMedia: isNewGlobalPartyMedia } = await Party.addGlobalBidToMedia({
-    partyId: globalParty._id,
-    media,
-    bid,
-    userId,
-    amount: bidAmountPence,
-  });
+  // Books stay off the Global Party queue. The bid still counts on charts via metrics.
+  let isNewGlobalPartyMedia = false;
+  if (!written) {
+    const added = await Party.addGlobalBidToMedia({
+      partyId: globalParty._id,
+      media,
+      bid,
+      userId,
+      amount: bidAmountPence,
+    });
+    isNewGlobalPartyMedia = added.isNewMedia;
+  }
 
   const previousTopBidAmount = media.globalMediaBidTop || 0;
-  const previousTopBidderId = media.globalMediaBidTopUser;
-  const wasNewTopBid = bidAmountPence > previousTopBidAmount;
+  const wasNewTopBid = !written && bidAmountPence > previousTopBidAmount;
 
   const userBalancePre = user.balance;
   const mediaAggregatePre = media.globalMediaAggregate || 0;
@@ -341,7 +351,7 @@ async function placeGlobalBid(userId, {
       metadata: {
         bidScope: 'global',
         isNewMedia: isNewGlobalPartyMedia,
-        platform: 'global-bid',
+        platform,
         tunebytesCalculatedAsync: true,
       },
     });
