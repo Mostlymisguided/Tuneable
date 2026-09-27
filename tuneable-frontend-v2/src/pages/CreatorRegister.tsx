@@ -57,7 +57,6 @@ const CreatorRegister: React.FC = () => {
 
   const [formData, setFormData] = useState({
     artistName: '',
-    bio: '',
     genres: [] as string[],
     roles: [] as string[],
     website: '',
@@ -203,8 +202,26 @@ const CreatorRegister: React.FC = () => {
     'History', 'Culture', 'Self Development', 'True Crime', 'Documentary', 'Audiobook',
   ];
 
-  const availableRoles = [
-    'artist', 'producer', 'songwriter', 'composer', 'DJ', 'vocalist', 'instrumentalist', 'podcaster',
+  const availableRoles: { id: string; label: string }[] = [
+    { id: 'artist', label: 'Artist' },
+    { id: 'producer', label: 'Producer' },
+    { id: 'songwriter', label: 'Songwriter' },
+    { id: 'composer', label: 'Composer' },
+    { id: 'DJ', label: 'DJ' },
+    { id: 'vocalist', label: 'Vocalist' },
+    { id: 'instrumentalist', label: 'Instrumentalist' },
+    { id: 'podcaster', label: 'Podcaster' },
+    { id: 'host', label: 'Host' },
+    { id: 'guest', label: 'Guest' },
+    { id: 'narrator', label: 'Narrator' },
+    { id: 'director', label: 'Director' },
+    { id: 'cinematographer', label: 'Cinematographer' },
+    { id: 'editor', label: 'Editor' },
+    { id: 'author', label: 'Author' },
+    { id: 'mixedBy', label: 'Mixer' },
+    { id: 'masteredBy', label: 'Mastering engineer' },
+    { id: 'reporter', label: 'Reporter' },
+    { id: 'publisher', label: 'Publisher' },
   ];
 
   const isBasicValid = () => (
@@ -288,7 +305,7 @@ const CreatorRegister: React.FC = () => {
       return;
     }
     if (!isMusicValid()) {
-      toast.error('Please add at least one genre');
+      toast.error('Please add at least one tag');
       return;
     }
 
@@ -306,7 +323,6 @@ const CreatorRegister: React.FC = () => {
 
       const submitData = new FormData();
       submitData.append('artistName', formData.artistName);
-      submitData.append('bio', formData.bio);
       submitData.append('genres', JSON.stringify(formData.genres));
       submitData.append('roles', JSON.stringify(formData.roles));
       submitData.append('website', formData.website);
@@ -318,10 +334,10 @@ const CreatorRegister: React.FC = () => {
         alreadyFounding
           ? 'You\'re a creator.'
           : eligibleNow && foundingStatus.open
-            ? 'You\'re a creator. Upload your own music to claim a founding seat.'
+            ? 'You\'re a creator. Upload your own music to claim a founding share.'
             : requestStatus === 'pending'
               ? 'You\'re a creator. Your founding request is in review. You can still upload.'
-              : 'You\'re a creator. A founding seat needs an invite or an approved request.'
+              : 'You\'re a creator. A founding share needs an invite or an approved request.'
       );
       navigate('/creator/upload');
     } catch (error: any) {
@@ -385,37 +401,21 @@ const CreatorRegister: React.FC = () => {
 
           <div>
             <label className="block text-white font-medium mb-2">
-              Creator Bio
-            </label>
-            <textarea
-              value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 min-h-[120px]"
-              placeholder="Tell us about yourself, your music, and your journey..."
-              maxLength={500}
-            />
-            <div className="text-xs text-gray-400 mt-1">
-              {formData.bio.length}/500 characters
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-white font-medium mb-2">
               Your Roles* (Select All That Apply)
             </label>
             <div className="flex flex-wrap gap-2">
               {availableRoles.map((role) => (
                 <button
-                  key={role}
+                  key={role.id}
                   type="button"
-                  onClick={() => toggleRole(role)}
+                  onClick={() => toggleRole(role.id)}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    formData.roles.includes(role)
+                    formData.roles.includes(role.id)
                       ? 'bg-purple-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                  {role.label}
                 </button>
               ))}
             </div>
@@ -562,13 +562,13 @@ const CreatorRegister: React.FC = () => {
       <div>
         <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
           <Music className="h-6 w-6 mr-2 text-purple-400" />
-          Creator Details
+          Tags
         </h3>
 
         <div className="space-y-4">
           <div>
             <label className="block text-white font-medium mb-2">
-              Genres * (add at least one)
+              Tags * (add at least one)
             </label>
             <div className="flex gap-2 mb-2">
               <input
@@ -582,7 +582,7 @@ const CreatorRegister: React.FC = () => {
                   }
                 }}
                 className="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                placeholder="Type or select a genre"
+                placeholder="Type or select a tag"
               />
               <button
                 type="button"
@@ -657,7 +657,7 @@ const CreatorRegister: React.FC = () => {
       setRequestStatus('pending');
       toast.success(result?.alreadyPending
         ? 'You already have a request in review'
-        : 'Request sent. A seat is claimed only if it is approved and you upload your own music.');
+        : 'Request sent. A share is claimed only if it is approved and you upload your own music.');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send request');
     } finally {
@@ -674,10 +674,10 @@ const CreatorRegister: React.FC = () => {
         </h3>
         <p className="text-gray-300 mb-6">
           {alreadyFounding
-            ? `You already have a founding seat. Founding status is not equity or ownership.`
+            ? 'You already have a founding share. We will issue shares where possible.'
             : foundingStatus.open
-              ? `${foundingStatus.remaining.toLocaleString()} of ${foundingStatus.cap.toLocaleString()} seats left. A seat is claimed when you upload your own music, and only if you have an invite or an approved request.`
-              : `All ${foundingStatus.cap.toLocaleString()} founding seats are claimed. You can still become a creator and upload your music.`}
+              ? `${foundingStatus.remaining.toLocaleString()} of ${foundingStatus.cap.toLocaleString()} shares left. A share is claimed when you upload your own music, and only if you have an invite or an approved request. We will issue shares where possible.`
+              : `All ${foundingStatus.cap.toLocaleString()} founding shares are claimed. You can still become a creator and upload your music.`}
         </p>
 
         {foundingStatus.open && !alreadyFounding && (
@@ -706,11 +706,11 @@ const CreatorRegister: React.FC = () => {
                 {isValidatingCode ? (
                   'Checking invite…'
                 ) : inviteCodeValid && inviterUsername ? (
-                  <>Invited by <strong className="text-white">@{inviterUsername}</strong>. You are eligible. The seat is still claimed when you upload.</>
+                  <>Invited by <strong className="text-white">@{inviterUsername}</strong>. You are eligible. The share is still claimed when you upload.</>
                 ) : inviteCodeValid && parentInviteCode ? (
-                  <>Invite code {parentInviteCode} is valid. You are eligible. The seat is still claimed when you upload.</>
+                  <>Invite code {parentInviteCode} is valid. You are eligible. The share is still claimed when you upload.</>
                 ) : inviteCodeValid === false ? (
-                  'That invite code is invalid. You can still finish signup, or request a seat below.'
+                  'That invite code is invalid. You can still finish signup, or request a share below.'
                 ) : (
                   'Have a code from another creator? Enter it here. A link with ?invite= is filled in for you.'
                 )}
@@ -719,18 +719,18 @@ const CreatorRegister: React.FC = () => {
 
             {foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && (
               <p className="text-sm text-amber-200">
-                You are eligible{requestStatus === 'approved' ? ' — your request was approved' : ''}. The seat is still claimed when you upload your own music.
+                You are eligible{requestStatus === 'approved' ? ' — your request was approved' : ''}. The share is still claimed when you upload your own music.
               </p>
             )}
 
             {!foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && (
               <div className="rounded-lg border border-white/10 bg-black/20 p-4 space-y-3">
                 <p className="text-sm text-gray-200">
-                  No invite? Request a founding seat. Approval makes you eligible. It does not assign the seat.
+                  No invite? Request a founding share. Approval makes you eligible. It does not assign the share.
                 </p>
                 {requestStatus === 'pending' ? (
                   <p className="text-sm text-amber-200">
-                    Request sent. You can finish signup and upload. A seat is claimed only after this is approved, and only while seats remain.
+                    Request sent. You can finish signup and upload. A share is claimed only after this is approved, and only while shares remain.
                   </p>
                 ) : (
                   <>
@@ -741,7 +741,7 @@ const CreatorRegister: React.FC = () => {
                       value={requestNote}
                       onChange={(e) => setRequestNote(e.target.value.slice(0, 500))}
                       className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-amber-500 min-h-[90px]"
-                      placeholder="Optional note — music, links, why you want a seat"
+                      placeholder="Optional note — music, links, why you want a share"
                       maxLength={500}
                     />
                     <button
@@ -756,7 +756,7 @@ const CreatorRegister: React.FC = () => {
                           Sending…
                         </>
                       ) : (
-                        'Request a founding seat'
+                        'Request a founding share'
                       )}
                     </button>
                   </>
@@ -773,7 +773,7 @@ const CreatorRegister: React.FC = () => {
           <p>
             Founding creators who invite an artist earn <strong className="text-white">{foundingStatus.affiliatePercent}%</strong> of that artist&apos;s paid tips for the first year after that artist is verified, taken from Tuneable&apos;s share, on music they upload themselves. The founding creator&apos;s own profile must be complete and verified before that share is paid.
           </p>
-          <p>Founding status is not equity or ownership.</p>
+          <p>We will issue shares where possible.</p>
         </div>
       </div>
     </div>
@@ -809,8 +809,8 @@ const CreatorRegister: React.FC = () => {
 
   const totalSteps = isAuthenticated ? 3 : 4;
   const stepLabels = isAuthenticated
-    ? ['Basic', 'Music', 'Founding']
-    : ['Basic', 'Account', 'Music', 'Founding'];
+    ? ['Basic', 'Tags', 'Founding']
+    : ['Basic', 'Account', 'Tags', 'Founding'];
 
   const nextDisabled = isCreatingAccount
     || (step === 1 && !isBasicValid())
@@ -823,9 +823,6 @@ const CreatorRegister: React.FC = () => {
       <div className="max-w-3xl mx-auto px-4">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-white mb-2">Become a Creator</h1>
-          <p className="text-gray-300">
-            Set up your artist profile. An invite or an approved request makes you eligible to claim a founding seat when you upload.
-          </p>
           {(parentInviteCode || inviterUsername) && !isAuthenticated && (
             <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-800/50 border border-purple-400/30 text-sm text-purple-100">
               <Gift className="h-4 w-4 flex-shrink-0" />
@@ -921,7 +918,7 @@ const CreatorRegister: React.FC = () => {
                 ) : (
                   <>
                     <Upload className="h-5 w-5 mr-2" />
-                    Continue to upload
+                    Finish and continue to upload
                   </>
                 )}
               </button>
