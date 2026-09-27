@@ -5,6 +5,7 @@ const Bid = require('../models/Bid');
 const User = require('../models/User');
 const Party = require('../models/Party');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { firstIsbn } = require('../utils/isbn');
 const { BOOK_CATALOG_QUERY } = require('../utils/mediaKinds');
 const { toClientMedia } = require('../utils/mediaPlayability');
@@ -12,7 +13,11 @@ const { searchOpenLibrary } = require('../services/openLibraryService');
 const { searchGoogleBooks, isGoogleBooksEnabled } = require('../services/googleBooksService');
 const { findOrCreateBook } = require('../services/bookAdapter');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
-const { getPeriodStartDate } = require('../utils/globalPartyChart');
+const {
+  getPeriodStartDate,
+  loadTopSupportersByMedia,
+  DEFAULT_SUPPORTERS_LIMIT,
+} = require('../utils/globalPartyChart');
 
 const router = express.Router();
 
@@ -157,7 +162,7 @@ router.get('/search', async (req, res) => {
   }
 });
 
-router.get('/chart', async (req, res) => {
+router.get('/chart', optionalAuthMiddleware, async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit, 50);
     const timePeriod = req.query.timePeriod || req.query.timeRange || 'all-time';
@@ -212,8 +217,20 @@ router.get('/chart', async (req, res) => {
         .lean();
     }
 
+    const supportersByMedia = await loadTopSupportersByMedia(
+      books.map((book) => book._id).filter(Boolean),
+      {
+        supportersLimit: DEFAULT_SUPPORTERS_LIMIT,
+        userId: req.user?._id || null,
+        startDate: startDate || null,
+      }
+    );
+
     res.json({
-      books: books.map(serializeBook),
+      books: books.map((book) => serializeBook({
+        ...book,
+        bids: supportersByMedia.get(book._id.toString()) || [],
+      })),
       count: books.length,
       timePeriod,
       locationPlaceId: locationPlaceId || null,

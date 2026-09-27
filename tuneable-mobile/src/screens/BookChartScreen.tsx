@@ -158,19 +158,36 @@ export function BookChartScreen({ onChartKindChange }: Props) {
     const id = mediaId(tipTarget);
     if (!id) throw new Error('Missing book id');
     const res = await booksAPI.boost(id, amountPounds);
+    const tipPence = Math.round(amountPounds * 100);
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
     }
     setBooks((prev) =>
-      prev.map((book) =>
-        mediaId(book) === id
-          ? {
-              ...book,
-              globalMediaAggregate:
-                (book.globalMediaAggregate ?? 0) + Math.round(amountPounds * 100),
-            }
-          : book
-      )
+      prev.map((book) => {
+        if (mediaId(book) !== id) return book;
+        const nextBids = [...(book.bids ?? [])];
+        if (user?.username) {
+          nextBids.push({
+            amount: tipPence,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            userId: {
+              _id: user._id || user.id,
+              uuid: user.uuid || user.id,
+              username: user.username,
+              profilePic: user.profilePic,
+              homeLocation: user.homeLocation,
+            },
+          });
+        }
+        return {
+          ...book,
+          bids: nextBids,
+          globalMediaAggregate: (book.globalMediaAggregate ?? 0) + tipPence,
+          partyMediaAggregate: (book.partyMediaAggregate ?? 0) + tipPence,
+          timePeriodBidValue: (book.timePeriodBidValue ?? book.globalMediaAggregate ?? 0) + tipPence,
+        };
+      })
     );
     return res;
   };
