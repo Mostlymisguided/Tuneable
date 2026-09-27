@@ -238,13 +238,15 @@ export default function OnboardingScreen() {
                   <View style={styles.stepHeaderCopy}>
                     <Text style={styles.stepTitle}>Your showcase, not a subscription</Text>
                     <Text style={styles.introLead}>
-                      Tuneable is where you show your taste in music, podcasts, and books.
+                      Tuneable is where you show your taste in music, podcasts, and media.
                     </Text>
                     <Text style={styles.stepText}>
-                      Tip what you love. Each tip supports the creator, moves global and local
-                      charts, and puts that work in your public showcase. Tip a work more than anyone
-                      else where you live — or worldwide — and you become its champion. Your name
-                      stands beside the media you love most.
+                      Tip what you love. Each tip supports the creator, influences charts and puts
+                      that work in your public showcase.
+                    </Text>
+                    <Text style={styles.stepText}>
+                      Tip a work more than anyone else locally or globally and you become its
+                      champion. Displayed beside your favorite media.
                     </Text>
                   </View>
                 </View>

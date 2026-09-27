@@ -227,15 +227,15 @@ const Onboarding: React.FC = () => {
               <div>
                 <h2 className="text-xl font-semibold text-white">Your showcase, not a subscription</h2>
                 <p className="mt-2 text-sm leading-relaxed text-gray-300">
-                  Tuneable is where you show your taste in music, podcasts, and books.
+                  Tuneable is where you show your taste in music, podcasts, and media.
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-gray-400">
-                  Tip what you love. Each tip supports the creator, moves global and local charts,
-                  and puts that work in your public showcase.
+                  Tip what you love. Each tip supports the creator, influences charts and puts that
+                  work in your public showcase.
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-gray-400">
-                  Tip a work more than anyone else where you live — or worldwide — and you become its
-                  champion. Your name stands beside the media you love most.
+                  Tip a work more than anyone else locally or globally and you become its champion.
+                  Displayed beside your favorite media.
                 </p>
               </div>
             </div>
