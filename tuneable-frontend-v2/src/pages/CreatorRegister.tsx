@@ -1,8 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { creatorAPI, authAPI } from '../lib/api';
+import { creatorAPI, authAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  FOUNDING_CREATOR_CAP,
+  FOUNDING_UPLOAD_QUOTA_MB,
+} from '../constants';
+import type { FoundingCreatorsStatus } from '../types';
 import {
   User,
   Music,
@@ -21,7 +26,8 @@ import {
   Shield,
   Facebook,
   Instagram,
-  Gift
+  Gift,
+  Sparkles,
 } from 'lucide-react';
 
 const CreatorRegister: React.FC = () => {
@@ -87,6 +93,7 @@ const CreatorRegister: React.FC = () => {
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
   const [inviterUsername, setInviterUsername] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [foundingStatus, setFoundingStatus] = useState<FoundingCreatorsStatus | null>(null);
 
   // Refs for error fields
   const usernameInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +101,29 @@ const CreatorRegister: React.FC = () => {
 
   const [genreInput, setGenreInput] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    userAPI.getFoundingCreatorsStatus()
+      .then((status) => {
+        if (!cancelled) setFoundingStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFoundingStatus({
+            cap: FOUNDING_CREATOR_CAP,
+            claimed: 0,
+            remaining: FOUNDING_CREATOR_CAP,
+            open: true,
+            uploadQuotaMb: FOUNDING_UPLOAD_QUOTA_MB,
+            uploadQuotaBytes: FOUNDING_UPLOAD_QUOTA_MB * 1024 * 1024,
+            affiliatePercent: 3,
+            affiliateExclusiveToFounding: true,
+          });
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const inviteParam = searchParams.get('invite');
@@ -1034,6 +1064,25 @@ const CreatorRegister: React.FC = () => {
           <p className="text-gray-300">
             Join Tuneable as a verified creator and claim your music
           </p>
+          {foundingStatus && (
+            <div className="mt-4 mx-auto max-w-xl text-left rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-5 w-5 text-amber-300 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-100">
+                    {foundingStatus.open
+                      ? `Founding Creators — ${foundingStatus.remaining.toLocaleString()} of ${foundingStatus.cap.toLocaleString()} seats left`
+                      : `Founding Creators — all ${foundingStatus.cap.toLocaleString()} seats claimed`}
+                  </p>
+                  <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                    {foundingStatus.open
+                      ? `After you sign up, upload your own music to claim a seat. Founding creators get a ${(foundingStatus.uploadQuotaMb || FOUNDING_UPLOAD_QUOTA_MB).toLocaleString()} MB upload allowance and exclusive invite commission. Status benefit only — not equity.`
+                      : 'Seats are full, but you can still join as a creator, upload your music, and earn 70% of tips.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {(parentInviteCode || inviterUsername) && !isAuthenticated && (
             <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-800/50 border border-purple-400/30 text-sm text-purple-100">
               <Gift className="h-4 w-4 flex-shrink-0" />
