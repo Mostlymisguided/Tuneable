@@ -36,6 +36,8 @@ export default function PublicUserProfileScreen() {
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
   const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [loading, setLoading] = useState(true);
+  const [libraryLoading, setLibraryLoading] = useState(true);
+  const [badgesLoading, setBadgesLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
@@ -49,12 +51,25 @@ export default function PublicUserProfileScreen() {
       if (!id) return;
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+      setLibraryLoading(true);
+      setBadgesLoading(true);
       setError(null);
-      try {
-        const [profileRes, libraryRes, rankingsRes, championsRes] =
-          await Promise.all([
-            userAPI.getProfileById(id),
-            userAPI.getTuneLibraryByUserId(id),
+
+      const profileLoad = (async () => {
+        try {
+          const profileRes = await userAPI.getProfileById(id);
+          setUser(profileRes.user);
+          setBlockedByMe(Boolean(profileRes.blockedByMe));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load profile');
+        } finally {
+          setLoading(false);
+        }
+      })();
+
+      const badgesLoad = (async () => {
+        try {
+          const [rankingsRes, championsRes] = await Promise.all([
             userAPI.getTuneBytesTagRankings(id, 5).catch(() => ({
               tuneBytesTagRankings: [],
             })),
@@ -66,15 +81,27 @@ export default function PublicUserProfileScreen() {
               })
               .catch(() => ({ tags: [], media: [], badges: [] })),
           ]);
-        setUser(profileRes.user);
-        setLibrary(libraryRes.library ?? []);
-        setRankings(rankingsRes.tuneBytesTagRankings ?? []);
-        setChampionBadges(championBadgesFromResponse(championsRes));
-        setBlockedByMe(Boolean(profileRes.blockedByMe));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load profile');
+          setRankings(rankingsRes.tuneBytesTagRankings ?? []);
+          setChampionBadges(championBadgesFromResponse(championsRes));
+        } finally {
+          setBadgesLoading(false);
+        }
+      })();
+
+      const libraryLoad = (async () => {
+        try {
+          const libraryRes = await userAPI.getTuneLibraryByUserId(id);
+          setLibrary(libraryRes.library ?? []);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load library');
+        } finally {
+          setLibraryLoading(false);
+        }
+      })();
+
+      try {
+        await Promise.all([profileLoad, badgesLoad, libraryLoad]);
       } finally {
-        setLoading(false);
         setRefreshing(false);
       }
     },
@@ -187,6 +214,7 @@ export default function PublicUserProfileScreen() {
             user={user}
             rankings={rankings}
             championBadges={championBadges}
+            badgesLoading={badgesLoading}
             onReportPress={() => setReportOpen(true)}
           />
           {blockedByMe ? (
@@ -216,9 +244,11 @@ export default function PublicUserProfileScreen() {
               Their library is hidden while they are blocked.
             </Text>
           ) : (
+            {error ? <Text style={styles.error}>{error}</Text> : null}
             <UserLibrarySection
               items={library}
               user={authUser}
+              loading={libraryLoading}
               onBalanceUpdate={updateBalance}
               emptyLabel="This user has not tipped any tunes yet."
             />

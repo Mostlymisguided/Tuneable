@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -37,7 +36,8 @@ export default function ProfileScreen() {
   const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [rankings, setRankings] = useState<TuneBytesTagRanking[]>([]);
   const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [libraryLoading, setLibraryLoading] = useState(true);
+  const [badgesLoading, setBadgesLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -47,14 +47,15 @@ export default function ProfileScreen() {
     async (isRefresh = false) => {
       if (!user?.uuid && !user?.id) return;
       if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      setLibraryLoading(true);
+      setBadgesLoading(true);
       setError(null);
-      try {
-        const userId = user.uuid || user.id;
-        const [profileRes, libraryRes, rankingsRes, championsRes] =
-          await Promise.all([
+      const userId = user.uuid || user.id;
+
+      const shell = (async () => {
+        try {
+          const [profileRes, rankingsRes, championsRes] = await Promise.all([
             userAPI.getProfileById(userId),
-            userAPI.getTuneLibrary(),
             userAPI.getTuneBytesTagRankings(userId, 5).catch(() => ({
               tuneBytesTagRankings: [],
             })),
@@ -66,14 +67,30 @@ export default function ProfileScreen() {
               })
               .catch(() => ({ tags: [], media: [], badges: [] })),
           ]);
-        setProfileUser(profileRes.user);
-        setLibrary(libraryRes.library ?? []);
-        setRankings(rankingsRes.tuneBytesTagRankings ?? []);
-        setChampionBadges(championBadgesFromResponse(championsRes));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load profile');
+          setProfileUser(profileRes.user);
+          setRankings(rankingsRes.tuneBytesTagRankings ?? []);
+          setChampionBadges(championBadgesFromResponse(championsRes));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load profile');
+        } finally {
+          setBadgesLoading(false);
+        }
+      })();
+
+      const libraryLoad = (async () => {
+        try {
+          const libraryRes = await userAPI.getTuneLibrary();
+          setLibrary(libraryRes.library ?? []);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to load library');
+        } finally {
+          setLibraryLoading(false);
+        }
+      })();
+
+      try {
+        await Promise.all([shell, libraryLoad]);
       } finally {
-        setLoading(false);
         setRefreshing(false);
       }
     },
@@ -127,6 +144,7 @@ export default function ProfileScreen() {
                 user={heroUser}
                 rankings={rankings}
                 championBadges={championBadges}
+                badgesLoading={badgesLoading}
                 isOwnProfile
                 onWalletPress={() => router.push('/wallet')}
                 onSettingsPress={() => setSettingsOpen(true)}
@@ -144,18 +162,13 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {loading && !library.length ? (
-              <ActivityIndicator
-                color={colors.accentLight}
-                style={{ marginTop: 8, marginBottom: 20 }}
-              />
-            ) : null}
           </View>
         }
         renderItem={() => (
           <UserLibrarySection
             items={library}
             user={user}
+            loading={libraryLoading}
             onBalanceUpdate={updateBalance}
             contentPaddingBottom={12}
           />

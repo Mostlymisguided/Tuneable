@@ -88,6 +88,7 @@ export default function HomeScreen() {
   const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [libraryLoading, setLibraryLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,13 +135,14 @@ export default function HomeScreen() {
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
+      setLibraryLoading(true);
       setError(null);
-      try {
-        const userId = user?.uuid || user?.id;
-        const [chartRes, libraryRes, profileRes, championsRes] =
-          await Promise.all([
+      const userId = user?.uuid || user?.id;
+
+      const shell = (async () => {
+        try {
+          const [chartRes, profileRes, championsRes] = await Promise.all([
             partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today'),
-            userAPI.getTuneLibrary().catch(() => ({ library: [], total: 0 })),
             userId
               ? userAPI.getProfileById(userId).catch(() => null)
               : Promise.resolve(null),
@@ -154,16 +156,32 @@ export default function HomeScreen() {
                   .catch(() => ({ tags: [], media: [], badges: [] }))
               : Promise.resolve({ tags: [], media: [], badges: [] }),
           ]);
-        setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
-        setLibrary(libraryRes.library ?? []);
-        setStats(profileRes?.stats ?? null);
-        setChampionBadges(championBadgesFromResponse(championsRes));
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load home';
-        setError(message);
+          setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
+          setStats(profileRes?.stats ?? null);
+          setChampionBadges(championBadgesFromResponse(championsRes));
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : 'Failed to load home';
+          setError(message);
+        } finally {
+          setLoading(false);
+        }
+      })();
+
+      const libraryLoad = (async () => {
+        try {
+          const libraryRes = await userAPI
+            .getTuneLibrary()
+            .catch(() => ({ library: [], total: 0 }));
+          setLibrary(libraryRes.library ?? []);
+        } finally {
+          setLibraryLoading(false);
+        }
+      })();
+
+      try {
+        await Promise.all([shell, libraryLoad]);
       } finally {
-        setLoading(false);
         setRefreshing(false);
       }
     },
@@ -431,6 +449,7 @@ export default function HomeScreen() {
           <UserLibrarySection
             items={library}
             user={user}
+            loading={libraryLoading}
             onBalanceUpdate={updateBalance}
             title="Recently tipped"
             actionLabel="Library"

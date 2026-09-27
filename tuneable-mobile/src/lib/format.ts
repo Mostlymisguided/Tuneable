@@ -13,6 +13,16 @@ export function formatTuneBytes(value: number | undefined | null): string {
   });
 }
 
+/** TuneBytes earned on one tune, rounded to one decimal place. */
+export function formatTuneBytesDecimal(value: number | undefined | null): string {
+  const n = Number(value);
+  const safe = Number.isFinite(n) ? n : 0;
+  return safe.toLocaleString(undefined, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+}
+
 /** Canonical BPM for display: nearest whole number. Empty / non-positive → null. */
 export function roundBpm(value: unknown): number | null {
   if (value === undefined || value === null || value === '') return null;

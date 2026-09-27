@@ -35,6 +35,8 @@ type Props = {
   /** Pre-aggregated tip champions (e.g. series-wide). Takes precedence over bids. */
   champions?: ChampionSupporter[];
   maxVisible?: number;
+  /** Full tipper count when `bids` only includes the top few. */
+  totalCount?: number;
   /** Overlapping avatars for dense footers; chips for expanded view. */
   variant?: 'chips' | 'stack';
   /** Stack tap (e.g. expand card). Defaults to no-op when stack. */
@@ -81,6 +83,7 @@ export function MiniSupportersBar({
   champions,
   maxVisible = 5,
   variant = 'chips',
+  totalCount,
   onStackPress,
 }: Props) {
   const isBlocked = useBlockedUsersStore((s) => s.isBlocked);
@@ -120,7 +123,8 @@ export function MiniSupportersBar({
 
   if (variant === 'stack') {
     const stackVisible = supporters.slice(0, Math.min(3, maxVisible));
-    const more = supporters.length - stackVisible.length;
+    const counted = Math.max(totalCount ?? supporters.length, supporters.length);
+    const more = counted - stackVisible.length;
 
     return (
       <Pressable
@@ -128,7 +132,7 @@ export function MiniSupportersBar({
         onPress={onStackPress}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={`${supporters.length} tipper${supporters.length !== 1 ? 's' : ''}`}>
+        accessibilityLabel={`${counted} tipper${counted !== 1 ? 's' : ''}`}>
         {stackVisible.map((s, index) => {
           const rank = podiumRankById.get(s.id);
           return (

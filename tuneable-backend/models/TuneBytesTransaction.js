@@ -159,6 +159,7 @@ tuneBytesTransactionSchema.index({ 'calculationSnapshot.discoveryRank': 1 }); //
 
 // Compound indexes
 tuneBytesTransactionSchema.index({ userId: 1, status: 1, createdAt: -1 });
+tuneBytesTransactionSchema.index({ userId: 1, status: 1, mediaId: 1 });
 tuneBytesTransactionSchema.index({ mediaId: 1, 'calculationSnapshot.discoveryRank': 1 });
 
 // Virtual for total TuneBytes earned by user

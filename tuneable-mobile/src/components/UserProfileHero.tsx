@@ -1,5 +1,13 @@
 import { Children, useState, type ReactNode } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { colors } from '@/src/theme/colors';
@@ -77,6 +85,7 @@ type Props = {
   tipTagChampions?: TipTagChampion[];
   mediaChampions?: MediaChampionTitle[];
   isOwnProfile?: boolean;
+  badgesLoading?: boolean;
   onWalletPress?: () => void;
   onSettingsPress?: () => void;
   onReportPress?: () => void;
@@ -89,6 +98,7 @@ export function UserProfileHero({
   tipTagChampions = [],
   mediaChampions = [],
   isOwnProfile = false,
+  badgesLoading = false,
   onWalletPress,
   onSettingsPress,
   onReportPress,
@@ -319,6 +329,13 @@ export function UserProfileHero({
             </Pressable>
           ))}
         </View>
+      ) : null}
+
+      {badgesLoading && titles.length === 0 && discovery.length === 0 ? (
+        <ActivityIndicator
+          color={colors.accentLight}
+          style={styles.badgesLoading}
+        />
       ) : null}
 
       {titles.length > 0 ? (
@@ -620,6 +637,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  badgesLoading: {
+    alignSelf: 'flex-start',
+    marginTop: 14,
   },
   badgeSection: {
     marginTop: 16,

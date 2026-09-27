@@ -146,6 +146,7 @@ export interface UserLibraryItem {
   globalUserMediaAggregate?: number;
   bidCount?: number;
   tuneBytesEarned?: number;
+  supporterCount?: number;
   lastBidAt?: string;
   firstBidAt?: string;
   bids?: UserLibraryBid[];

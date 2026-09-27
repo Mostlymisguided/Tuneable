@@ -174,7 +174,7 @@ export function resolveTipStatInputs(
   let avgTip = averageTipPounds(bids);
   const storedAvgPence =
     typeof media.globalMediaAggregateAvg === 'number' ? media.globalMediaAggregateAvg : 0;
-  if (avgTip == null && storedAvgPence > 0) {
+  if (storedAvgPence > 0) {
     avgTip = Math.round((storedAvgPence / 100) * 100) / 100;
   }
 

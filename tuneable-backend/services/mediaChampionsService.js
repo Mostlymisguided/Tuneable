@@ -568,31 +568,62 @@ async function getUserMediaChampionTitles(userObjectId, userIdStr, options = {})
     { $limit: checkMediaLimit },
   ]);
 
-  const media = [];
-  for (const row of userMediaAggregates) {
-    const rankMatch = { mediaId: row._id, status: 'active' };
-    if (locationPlaceId) {
-      rankMatch.bidderLocationAncestorIds = locationPlaceId;
-    }
+  if (userMediaAggregates.length === 0) return [];
 
-    const rankResult = await Bid.aggregate([
-      { $match: rankMatch },
-      {
-        $group: {
-          _id: '$userId',
-          totalAmount: { $sum: '$amount' },
+  const candidateIds = userMediaAggregates.map((row) => row._id).filter(Boolean);
+  const rankMatch = { mediaId: { $in: candidateIds }, status: 'active' };
+  if (locationPlaceId) {
+    rankMatch.bidderLocationAncestorIds = locationPlaceId;
+  }
+
+  // One pass for the top 3 on every candidate tune, instead of a query per tune.
+  const rankedByMedia = await Bid.aggregate([
+    { $match: rankMatch },
+    {
+      $group: {
+        _id: { mediaId: '$mediaId', userId: '$userId' },
+        totalAmount: { $sum: '$amount' },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id.mediaId',
+        top: {
+          $topN: {
+            n: CHAMPION_PODIUM_SIZE,
+            sortBy: { totalAmount: -1 },
+            output: { userId: '$_id.userId', totalAmount: '$totalAmount' },
+          },
         },
       },
-      { $sort: { totalAmount: -1 } },
-    ]);
+    },
+  ]);
 
-    const rankIndex = rankResult.findIndex((r) => r._id.toString() === userIdStr);
+  const topByMediaId = new Map(
+    rankedByMedia.map((row) => [String(row._id), row.top || []])
+  );
+
+  const winners = [];
+  for (const row of userMediaAggregates) {
+    const top = topByMediaId.get(String(row._id)) || [];
+    const rankIndex = top.findIndex((entry) => String(entry.userId) === userIdStr);
     const rank = rankIndex + 1;
     if (rank < 1 || rank > CHAMPION_PODIUM_SIZE) continue;
+    winners.push({ row, rank });
+    if (winners.length >= mediaLimit) break;
+  }
 
-    const mediaDoc = await Media.findById(row._id).select('title uuid').lean();
+  if (winners.length === 0) return [];
+
+  const mediaDocs = await Media.find({ _id: { $in: winners.map((winner) => winner.row._id) } })
+    .select('title uuid')
+    .lean();
+  const mediaById = new Map(mediaDocs.map((doc) => [String(doc._id), doc]));
+
+  const media = [];
+  for (const { row, rank } of winners) {
+    const mediaDoc = mediaById.get(String(row._id));
     if (!mediaDoc) continue;
-
     media.push({
       entityType: 'media',
       rank,
@@ -603,8 +634,6 @@ async function getUserMediaChampionTitles(userObjectId, userIdStr, options = {})
       bidCount: row.bidCount,
       medal: medalForRank(rank),
     });
-
-    if (media.length >= mediaLimit) break;
   }
 
   return media.sort((a, b) => a.rank - b.rank || b.totalAmount - a.totalAmount);

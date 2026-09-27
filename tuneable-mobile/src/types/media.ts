@@ -18,6 +18,8 @@ export interface ChartMediaItem {
   partyMediaAggregate?: number;
   timePeriodBidValue?: number;
   globalMediaAggregate?: number;
+  tuneBytesEarned?: number;
+  supporterCount?: number;
   globalMediaAggregateTop?: number;
   globalMediaAggregateTopRank?: number;
   tipCount?: number;

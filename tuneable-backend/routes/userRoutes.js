@@ -1055,17 +1055,21 @@ router.post('/admin/backfill-founding-creators', authMiddleware, adminMiddleware
 });
 
 // Shared helper to fetch tune library for a user by their MongoDB _id
-async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
+async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUserId = null } = {}) {
     
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     const TuneBytesTransaction = require('../models/TuneBytesTransaction');
+    const TOP_LIBRARY_SUPPORTERS = 8;
     
-    // Get all bids for this user (active only)
+    // Active bids for this user only. Supporters on each tune are aggregated
+    // separately so a large library does not pull every bid on every tune.
     const userBids = await Bid.find({ 
       userId: user._id,
       status: 'active'
-    }).lean();
+    })
+      .select('mediaId amount createdAt mediaTitle mediaArtist mediaCoverArt mediaDuration')
+      .lean();
     
     if (userBids.length === 0) {
       return { library: [], total: 0 };
@@ -1123,119 +1127,154 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
       return { library: [], total: 0 };
     }
     
-    // Fetch media details (include contentForm + sources for instant library playback)
-    const mediaItems = await Media.find({ _id: { $in: mediaIds } })
-      .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
-      .populate('podcastSeries', 'title')
-      .populate('globalMediaAggregateTopUser', 'username uuid _id')
-      .lean();
-    
-    // Create media lookup
+    const ownerId = user._id;
+    const viewerDiffers =
+      viewerUserId && String(viewerUserId) !== String(ownerId);
+    const userIdObjId = mongoose.Types.ObjectId.isValid(ownerId)
+      ? new mongoose.Types.ObjectId(ownerId)
+      : ownerId;
+
+    const [mediaItems, tuneBytesByMedia, supporterStats, viewerTotals] = await Promise.all([
+      Media.find({ _id: { $in: mediaIds } })
+        .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
+        .populate('podcastSeries', 'title')
+        .populate('globalMediaAggregateTopUser', 'username uuid _id')
+        .lean(),
+      TuneBytesTransaction.aggregate([
+        {
+          $match: {
+            userId: userIdObjId,
+            status: 'confirmed',
+            mediaId: { $in: mediaIds },
+          },
+        },
+        {
+          $group: {
+            _id: '$mediaId',
+            totalTuneBytes: { $sum: '$tuneBytesEarned' },
+          },
+        },
+      ]).catch((tuneBytesError) => {
+        console.error('Error fetching TuneBytes:', tuneBytesError);
+        return [];
+      }),
+      // Top supporters per tune, plus bid/tipper counts. Avoids loading every bid.
+      Bid.aggregate([
+        {
+          $match: {
+            mediaId: { $in: mediaIds },
+            status: 'active',
+          },
+        },
+        {
+          $group: {
+            _id: { mediaId: '$mediaId', userId: '$userId' },
+            totalAmount: { $sum: '$amount' },
+            bidCount: { $sum: 1 },
+          },
+        },
+        {
+          $group: {
+            _id: '$_id.mediaId',
+            totalBidCount: { $sum: '$bidCount' },
+            supporterCount: { $sum: 1 },
+            supporters: {
+              $topN: {
+                n: TOP_LIBRARY_SUPPORTERS,
+                sortBy: { totalAmount: -1 },
+                output: {
+                  userId: '$_id.userId',
+                  amount: '$totalAmount',
+                },
+              },
+            },
+          },
+        },
+      ]).catch((bidsError) => {
+        console.error('Error aggregating library supporters:', bidsError);
+        return [];
+      }),
+      viewerDiffers
+        ? Bid.aggregate([
+            {
+              $match: {
+                userId: viewerUserId,
+                status: 'active',
+                mediaId: { $in: mediaIds },
+              },
+            },
+            {
+              $group: {
+                _id: '$mediaId',
+                totalAmount: { $sum: '$amount' },
+              },
+            },
+          ]).catch((viewerError) => {
+            console.error('Error fetching viewer library totals:', viewerError);
+            return [];
+          })
+        : Promise.resolve([]),
+    ]);
+
     const mediaLookup = {};
     mediaItems.forEach(media => {
       mediaLookup[media._id.toString()] = media;
     });
-    
-    // Get TuneBytes earned per media for this user (only if we have mediaIds)
-    let tuneBytesByMedia = [];
-    if (mediaIds.length > 0) {
-      try {
-        const userIdObjId = mongoose.Types.ObjectId.isValid(user._id) 
-          ? new mongoose.Types.ObjectId(user._id) 
-          : user._id;
-        
-        tuneBytesByMedia = await TuneBytesTransaction.aggregate([
-          {
-            $match: {
-              userId: userIdObjId,
-              status: 'confirmed',
-              mediaId: { $in: mediaIds }
-            }
-          },
-          {
-            $group: {
-              _id: '$mediaId',
-              totalTuneBytes: { $sum: '$tuneBytesEarned' }
-            }
-          }
-        ]);
-      } catch (tuneBytesError) {
-        console.error('Error fetching TuneBytes:', tuneBytesError);
-        console.error('TuneBytes error stack:', tuneBytesError.stack);
-        // Continue without TuneBytes data
-      }
-    }
-    
-    // Create TuneBytes lookup
+
     const tuneBytesLookup = {};
     tuneBytesByMedia.forEach(item => {
       if (item._id) {
         tuneBytesLookup[item._id.toString()] = item.totalTuneBytes;
       }
     });
-    
-    // Get total bid counts per media (for calculating average)
-    let bidCountsByMedia = [];
-    try {
-      bidCountsByMedia = await Bid.aggregate([
-        {
-          $match: {
-            mediaId: { $in: mediaIds },
-            status: 'active'
-          }
-        },
-        {
-          $group: {
-            _id: '$mediaId',
-            totalBidCount: { $sum: 1 }
-          }
-        }
-      ]);
-    } catch (bidCountError) {
-      console.error('Error fetching bid counts:', bidCountError);
-      // Continue without bid count data
-    }
-    
-    // Create bid count lookup
-    const bidCountLookup = {};
-    bidCountsByMedia.forEach(item => {
-      if (item._id) {
-        bidCountLookup[item._id.toString()] = item.totalBidCount;
-      }
+
+    const supporterLookup = {};
+    const supporterUserIds = [];
+    const seenSupporterIds = new Set();
+    const rememberUserId = (id) => {
+      if (!id) return;
+      const key = id.toString();
+      if (seenSupporterIds.has(key)) return;
+      seenSupporterIds.add(key);
+      supporterUserIds.push(id);
+    };
+    rememberUserId(ownerId);
+    supporterStats.forEach(row => {
+      if (!row?._id) return;
+      supporterLookup[row._id.toString()] = row;
+      (row.supporters || []).forEach(supporter => rememberUserId(supporter.userId));
     });
 
-    // Fetch active bids per media for supporters bar in tune library UI
-    const bidsByMedia = {};
-    try {
-      const allBids = await Bid.find({
-        mediaId: { $in: mediaIds },
-        status: 'active',
-      })
-        .populate('userId', 'username profilePic uuid _id')
-        .select('mediaId userId amount createdAt status')
-        .lean();
+    const supporterUsers = supporterUserIds.length
+      ? await User.find({ _id: { $in: supporterUserIds } })
+          .select('username profilePic uuid')
+          .lean()
+      : [];
+    const supporterUserLookup = {};
+    supporterUsers.forEach(doc => {
+      supporterUserLookup[doc._id.toString()] = doc;
+    });
 
-      for (const bid of allBids) {
-        const mid = bid.mediaId?.toString();
-        if (!mid) continue;
-        if (!bidsByMedia[mid]) bidsByMedia[mid] = [];
-        bidsByMedia[mid].push({
-          userId: bid.userId
-            ? {
-                _id: bid.userId._id?.toString(),
-                uuid: bid.userId.uuid,
-                username: bid.userId.username,
-                profilePic: bid.userId.profilePic,
-              }
-            : undefined,
-          amount: bid.amount,
-          createdAt: bid.createdAt,
-          status: bid.status,
-        });
-      }
-    } catch (bidsError) {
-      console.error('Error fetching bids for tune library:', bidsError);
-    }
+    const viewerTotalLookup = {};
+    viewerTotals.forEach(row => {
+      if (row?._id) viewerTotalLookup[row._id.toString()] = row.totalAmount || 0;
+    });
+
+    const toSupporterBid = (userId, amount) => {
+      const key = userId?.toString();
+      const doc = key ? supporterUserLookup[key] : null;
+      if (!doc?.username) return null;
+      return {
+        userId: {
+          _id: key,
+          uuid: doc.uuid,
+          username: doc.username,
+          profilePic: doc.profilePic,
+        },
+        amount: amount || 0,
+        status: 'active',
+      };
+    };
     
     // Build library items (use Media when found, else fallback to bid denormalized data)
     const library = Object.values(mediaAggregates)
@@ -1280,10 +1319,36 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
         }
 
         try {
-          const totalBidCount = bidCountLookup[aggregate.mediaId] || 1;
+          const supporterStat = supporterLookup[aggregate.mediaId] || {};
+          const totalBidCount = supporterStat.totalBidCount || aggregate.bidCount || 1;
           const globalMediaAggregateAvg = totalBidCount > 0
             ? globalMediaAggregate / totalBidCount
             : 0;
+          const bids = [];
+          const includedSupporterIds = new Set();
+          (supporterStat.supporters || []).forEach(supporter => {
+            const bid = toSupporterBid(supporter.userId, supporter.amount);
+            const id = bid?.userId?._id;
+            if (!bid || !id || includedSupporterIds.has(id)) return;
+            includedSupporterIds.add(id);
+            bids.push(bid);
+          });
+          const ownerKey = String(ownerId);
+          if (!includedSupporterIds.has(ownerKey)) {
+            const ownerBid = toSupporterBid(ownerId, aggregate.userBidTotal || 0);
+            if (ownerBid) bids.push(ownerBid);
+          }
+          if (viewerDiffers) {
+            const viewerKey = String(viewerUserId);
+            const viewerAmount = viewerTotalLookup[aggregate.mediaId] || 0;
+            if (viewerAmount > 0 && !includedSupporterIds.has(viewerKey)) {
+              bids.push({
+                userId: { _id: viewerKey },
+                amount: viewerAmount,
+                status: 'active',
+              });
+            }
+          }
 
           return {
             mediaId: aggregate.mediaId,
@@ -1310,9 +1375,10 @@ async function fetchTuneLibraryForUser(user, { authenticated = false } = {}) {
             globalUserMediaAggregate: aggregate.userBidTotal || 0,
             bidCount: aggregate.bidCount || 0,
             tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,
+            supporterCount: supporterStat.supporterCount || bids.length,
             lastBidAt: aggregate.lastBidAt,
             firstBidAt: aggregate.firstBidAt,
-            bids: bidsByMedia[aggregate.mediaId] || [],
+            bids,
           };
         } catch (buildError) {
           console.error('Error building library item for mediaId:', aggregate.mediaId, buildError);
@@ -1421,9 +1487,12 @@ router.post('/me/welcome-credit/claim', authMiddleware, async (req, res) => {
 // @access  Private
 router.get('/me/tune-library', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('_id uuid username profilePic');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await fetchTuneLibraryForUser(user, { authenticated: true });
+    const result = await fetchTuneLibraryForUser(user, {
+      authenticated: true,
+      viewerUserId: req.user._id,
+    });
     res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);
@@ -2443,9 +2512,14 @@ router.get('/me/import/jobs/:jobId', authMiddleware, async (req, res) => {
 router.get('/:userId/tune-library', optionalAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findByIdentifier(userId);
+    const user = await User.findByIdentifier(userId, {
+      select: '_id uuid username profilePic',
+    });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await fetchTuneLibraryForUser(user, { authenticated: Boolean(req.user) });
+    const result = await fetchTuneLibraryForUser(user, {
+      authenticated: Boolean(req.user),
+      viewerUserId: req.user?._id || null,
+    });
     res.json(result);
   } catch (error) {
     console.error('Error fetching tune library:', error);
@@ -3860,25 +3934,46 @@ router.get('/:userId/profile', async (req, res) => {
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
     
-    const userBids = await Bid.find({ userId: userObj._id })
-      .populate({
-        path: 'mediaId',
-        model: 'Media',
-        select: 'title artist coverArt duration globalMediaAggregate uuid slug _id contentType contentForm tags', // Updated to schema grammar - added tags
-      })
-      .populate({
-        path: 'partyId',
-        model: 'Party',
-        select: 'name partyCode uuid _id',
-      })
-      .sort({ createdAt: -1 }) // Most recent bids first
-      .limit(50); // Limit to 50 most recent bids for display
+    const [userBids, bidStatsByStatus] = await Promise.all([
+      Bid.find({ userId: userObj._id })
+        .populate({
+          path: 'mediaId',
+          model: 'Media',
+          select: 'title artist coverArt duration globalMediaAggregate uuid slug _id contentType contentForm tags', // Updated to schema grammar - added tags
+        })
+        .populate({
+          path: 'partyId',
+          model: 'Party',
+          select: 'name partyCode uuid _id',
+        })
+        .sort({ createdAt: -1 }) // Most recent bids first
+        .limit(50), // Limit to 50 most recent bids for display
+      // Header stats must match tip history, which counts every bid, without loading them all.
+      Bid.aggregate([
+        { $match: { userId: userObj._id } },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+            amount: { $sum: { $ifNull: ['$amount', 0] } },
+            mediaIds: { $addToSet: '$mediaId' },
+          },
+        },
+      ]),
+    ]);
 
-    // Calculate bidding statistics from ALL bids (not just the 50 displayed)
-    // Header stats must match tip history tab which uses full bid count
-    const allUserBidsForStats = await Bid.find({ userId: userObj._id }).select('amount mediaId status').lean();
-    const totalBids = allUserBidsForStats.length;
-    const totalAmountBid = allUserBidsForStats.reduce((sum, bid) => sum + (bid.amount || 0), 0);
+    let totalBids = 0;
+    let totalAmountBid = 0;
+    const activeMediaIds = new Set();
+    for (const row of bidStatsByStatus) {
+      totalBids += row.count || 0;
+      totalAmountBid += row.amount || 0;
+      if (row._id === 'active') {
+        for (const mediaId of row.mediaIds || []) {
+          if (mediaId) activeMediaIds.add(mediaId.toString());
+        }
+      }
+    }
     const averageBidAmount = totalBids > 0 ? totalAmountBid / totalBids : 0;
     
     // Calculate global user statistics
@@ -3890,8 +3985,7 @@ router.get('/:userId/profile', async (req, res) => {
     const userAggregateRank = await User.countDocuments();
     
     // Get unique media items bid on - from ACTIVE bids only (matches tune library which only shows active bids)
-    const activeBidsForStats = allUserBidsForStats.filter(bid => bid.status === 'active');
-    const uniqueMedia = [...new Set(activeBidsForStats.map(bid => bid.mediaId?.toString()).filter(Boolean))];
+    const uniqueMedia = [...activeMediaIds];
     
     // Get top 5 highest bids
     const topBids = [...userBids]

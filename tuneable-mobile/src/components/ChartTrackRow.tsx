@@ -9,7 +9,12 @@ import {
 import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
-import { formatDuration, formatPoundsFromPence, roundBpm } from '@/src/lib/format';
+import {
+  formatDuration,
+  formatPoundsFromPence,
+  formatTuneBytesDecimal,
+  roundBpm,
+} from '@/src/lib/format';
 import {
   getCountryLabelFromLocation,
   getCountryPlaceProfileHref,
@@ -68,7 +73,8 @@ export function ChartTrackRow({
   const countryHref = getCountryPlaceProfileHref(item.primaryLocation);
   const countryLabel = country || 'Earth';
   const allTags = item.tags ?? [];
-  const supporterCount = countSupporters(item.bids);
+  const listedSupporters = countSupporters(item.bids);
+  const supporterCount = Math.max(item.supporterCount ?? 0, listedSupporters);
   const hasFooter = allTags.length > 0 || supporterCount > 0;
   const hiddenTagCount = Math.max(0, allTags.length - COLLAPSED_TAG_COUNT);
   const canExpandFooter =
@@ -235,6 +241,13 @@ export function ChartTrackRow({
                 <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>
               ) : null}
             </Pressable>
+            {typeof item.tuneBytesEarned === 'number' ? (
+              <Text
+                style={styles.tuneBytes}
+                accessibilityLabel={`${formatTuneBytesDecimal(item.tuneBytesEarned)} TuneBytes earned`}>
+                {formatTuneBytesDecimal(item.tuneBytesEarned)} TB
+              </Text>
+            ) : null}
             <Pressable
               onPress={onTip}
               hitSlop={8}
@@ -260,6 +273,7 @@ export function ChartTrackRow({
           </View>
           <MiniSupportersBar
             bids={item.bids}
+            totalCount={item.supporterCount}
             maxVisible={3}
             variant="stack"
             onStackPress={canExpandFooter ? toggleFooter : undefined}
@@ -447,6 +461,12 @@ const styles = StyleSheet.create({
   artistPress: {
     flex: 1,
     minWidth: 0,
+  },
+  tuneBytes: {
+    color: '#facc15',
+    fontSize: 12,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   tipBtn: {
     width: 40,

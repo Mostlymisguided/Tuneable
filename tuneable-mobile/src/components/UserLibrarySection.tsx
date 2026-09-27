@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
@@ -76,6 +76,8 @@ function toChartMediaItem(item: UserLibraryItem): ChartMediaItem {
     playabilityBlockReason: item.playabilityBlockReason,
     partyMediaAggregate: item.globalUserMediaAggregate ?? 0,
     globalMediaAggregate: item.globalMediaAggregate ?? 0,
+    tuneBytesEarned: item.tuneBytesEarned ?? 0,
+    supporterCount: item.supporterCount,
     lastBidAt: item.lastBidAt ?? null,
     contentForm: item.contentForm,
     bids: (item.bids ?? []).map((bid) => ({
@@ -132,6 +134,7 @@ type Props = {
   onEmptyAction?: () => void;
   searchHint?: string;
   compactHeader?: boolean;
+  loading?: boolean;
 };
 
 export function UserLibrarySection({
@@ -154,6 +157,7 @@ export function UserLibrarySection({
   onEmptyAction,
   searchHint = 'Filters your tipped tunes.',
   compactHeader = false,
+  loading = false,
 }: Props) {
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
   const [chartSort, setChartSort] = useState<ChartSortKey>(
@@ -298,6 +302,7 @@ export function UserLibrarySection({
         ? 'No tunes match these filters.'
         : emptyLabel;
   const showFilters = items.length > 0;
+  const showLoading = loading && items.length === 0;
 
   const emptyState =
     filtersActive || !emptyTitle ? (
@@ -383,6 +388,10 @@ export function UserLibrarySection({
         />
       ) : null}
 
+      {showLoading ? (
+        <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+      ) : null}
+
       {playableCount > 0 ? (
         <Pressable
           style={styles.playBtn}
@@ -399,7 +408,7 @@ export function UserLibrarySection({
         scrollEnabled={false}
         contentContainerStyle={{ paddingBottom: contentPaddingBottom }}
         ListEmptyComponent={
-          playableOnly && matching.length > 0 && filtered.length === 0 ? (
+          showLoading ? null : playableOnly && matching.length > 0 && filtered.length === 0 ? (
             <View>
               <Text style={styles.empty}>{emptyMessage}</Text>
               <Pressable
@@ -493,6 +502,10 @@ const styles = StyleSheet.create({
     color: colors.accentLight,
     fontSize: 13,
     fontWeight: '600',
+  },
+  loader: {
+    marginTop: 12,
+    marginBottom: 16,
   },
   playBtn: {
     alignSelf: 'center',
