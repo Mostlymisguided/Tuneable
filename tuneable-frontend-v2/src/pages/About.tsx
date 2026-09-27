@@ -36,8 +36,8 @@ const pillars: {
   {
     title: 'Be a champion',
     items: [
-      { icon: Crown, label: 'Be a local champion', panel: 'bg-amber-100 text-amber-600' },
-      { icon: MapPin, label: 'Local or worldwide', panel: 'bg-indigo-100 text-indigo-600' },
+      { icon: Crown, label: 'Get recognition', panel: 'bg-amber-100 text-amber-600' },
+      { icon: MapPin, label: 'Locally and globally', panel: 'bg-indigo-100 text-indigo-600' },
     ],
   },
   {
