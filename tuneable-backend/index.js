@@ -140,32 +140,6 @@ app.options('*', cors(corsOptions)); // Enable pre-flight for all routes
 
 console.log('CORS enabled for allowed origins:', allowedOrigins);
 
-// #region agent log
-// Debug logging middleware - capture all incoming requests
-app.use((req, res, next) => {
-  const fs = require('fs');
-  const logEntry = JSON.stringify({
-    hypothesisId: 'ALL',
-    location: 'index.js:145',
-    message: 'Incoming request',
-    data: {
-      method: req.method,
-      path: req.path,
-      originalUrl: req.originalUrl,
-      query: req.query,
-      headers: {
-        origin: req.headers.origin,
-        'user-agent': req.headers['user-agent'],
-        authorization: req.headers.authorization ? 'present' : 'missing'
-      }
-    },
-    timestamp: Date.now()
-  }) + '\n';
-  fs.appendFileSync('/opt/cursor/logs/debug.log', logEntry);
-  next();
-});
-// #endregion
-
 // Middleware to parse JSON bodies (exclude webhook route which needs raw body)
 // Reuse one parser instance — calling express.json() per request leaks memory.
 const jsonParser = express.json();

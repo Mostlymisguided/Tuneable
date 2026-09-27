@@ -575,9 +575,6 @@ router.post(
     }),
   ],
   async (req, res) => {
-    // #region agent log
-    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A,E',location:'userRoutes.js:577',message:'/api/users/login reached',data:{identifier:req.body.identifier,hasPassword:!!req.body.password},timestamp:Date.now()})+'\n');
-    // #endregion
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
