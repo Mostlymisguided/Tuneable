@@ -29,7 +29,7 @@ import type {
 } from '@/src/types/user';
 
 export default function ProfileScreen() {
-  const { user, logout, deleteAccount, updateBalance } = useAuth();
+  const { user, logout, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const canUpload = canUploadMedia(user);
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -116,9 +116,10 @@ export default function ProfileScreen() {
     }, [load])
   );
 
-  const onLogout = async () => {
-    await logout();
-    router.replace('/');
+  const onLogout = () => {
+    // Tabs layout redirects to / once the session is cleared. A second
+    // router.replace here races that redirect and can freeze the iOS stack.
+    void logout();
   };
 
   return (
@@ -285,10 +286,7 @@ export default function ProfileScreen() {
           router.push('/upload');
         }}
         onSignOut={() => void onLogout()}
-        onDeleteAccount={async () => {
-          await deleteAccount();
-          router.replace('/');
-        }}
+        onDeleteAccount={() => userAPI.deleteAccount()}
       />
     </Screen>
   );

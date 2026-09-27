@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -55,6 +55,29 @@ export function ProfileSettingsSheet({
   onDeleteAccount,
 }: Props) {
   const [busy, setBusy] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
+  const afterCloseRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (visible) setDismissing(false);
+  }, [visible]);
+
+  // Unmounting this sheet while iOS is still dismissing it freezes the app
+  // (the stuck modal overlay eats every touch). Sign-out clears auth and
+  // unmounts the screen, so it has to wait until the sheet is gone.
+  const runAfterSheetCloses = (action: () => void) => {
+    let ran = false;
+    const run = () => {
+      if (ran) return;
+      ran = true;
+      afterCloseRef.current = null;
+      setTimeout(action, 0);
+    };
+    afterCloseRef.current = run;
+    setDismissing(true);
+    onClose();
+    setTimeout(run, 450);
+  };
 
   const openAdvancedOnWeb = async () => {
     await WebBrowser.openBrowserAsync(
@@ -85,7 +108,7 @@ export function ProfileSettingsSheet({
                       setBusy(true);
                       try {
                         await onDeleteAccount();
-                        onClose();
+                        runAfterSheetCloses(onSignOut);
                       } catch (err) {
                         Alert.alert(
                           'Could not delete account',
@@ -107,14 +130,15 @@ export function ProfileSettingsSheet({
     );
   };
 
-  const disabled = busy || deleting;
+  const disabled = busy || deleting || dismissing;
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}>
+      onRequestClose={onClose}
+      onDismiss={() => afterCloseRef.current?.()}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
@@ -125,13 +149,19 @@ export function ProfileSettingsSheet({
             </Pressable>
           </View>
 
-          <Pressable style={styles.row} onPress={onWallet} disabled={disabled}>
+          <Pressable
+            style={styles.row}
+            onPress={() => runAfterSheetCloses(onWallet)}
+            disabled={disabled}>
             <Ionicons name="wallet-outline" size={20} color={colors.accentLight} />
             <Text style={styles.rowText}>Wallet & top up</Text>
           </Pressable>
 
           {canUpload && onUpload ? (
-            <Pressable style={styles.row} onPress={onUpload} disabled={disabled}>
+            <Pressable
+              style={styles.row}
+              onPress={() => runAfterSheetCloses(onUpload)}
+              disabled={disabled}>
               <Ionicons
                 name="cloud-upload-outline"
                 size={20}
@@ -143,7 +173,7 @@ export function ProfileSettingsSheet({
 
           <Pressable
             style={styles.row}
-            onPress={onEditProfile}
+            onPress={() => runAfterSheetCloses(onEditProfile)}
             disabled={disabled}>
             <Ionicons name="create-outline" size={20} color={colors.accentLight} />
             <Text style={styles.rowText}>Edit profile</Text>
@@ -182,10 +212,7 @@ export function ProfileSettingsSheet({
           <Pressable
             style={styles.signOut}
             disabled={disabled}
-            onPress={() => {
-              onClose();
-              onSignOut();
-            }}>
+            onPress={() => runAfterSheetCloses(onSignOut)}>
             <Text style={styles.signOutText}>Sign out</Text>
           </Pressable>
 
@@ -193,7 +220,7 @@ export function ProfileSettingsSheet({
             style={[styles.deleteBtn, disabled && styles.disabled]}
             onPress={confirmDelete}
             disabled={disabled}>
-            {disabled ? (
+            {busy || deleting ? (
               <ActivityIndicator color="#fecaca" />
             ) : (
               <Text style={styles.deleteText}>Delete account</Text>
