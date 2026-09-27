@@ -259,7 +259,6 @@ const About: React.FC = () => {
 
       <section className="bg-gradient-to-r from-purple-600 to-indigo-600 py-16 text-white">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-          <h2 className="mb-8 text-3xl font-bold md:text-4xl">Tip what you love</h2>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               to="/register"
