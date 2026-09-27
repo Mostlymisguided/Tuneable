@@ -120,11 +120,9 @@ const userSchema = new mongoose.Schema({
     default: false,
     index: true,
   },
+  // No default. A unique index that stores null only allows one user without a seat.
   foundingSeatNumber: {
     type: Number,
-    default: null,
-    sparse: true,
-    unique: true,
     min: 1,
   },
   foundingSeatAssignedAt: { type: Date, default: null },
@@ -358,6 +356,15 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true } 
 });
 
+// Omit an empty seat so the partial unique index is the only uniqueness check.
+userSchema.pre('save', function unsetEmptyFoundingSeat(next) {
+  // Only an explicit null. Undefined means the path was not loaded.
+  if (this.foundingSeatNumber === null) {
+    this.$unset('foundingSeatNumber');
+  }
+  next();
+});
+
 // Pre-save hook to hash the password
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
@@ -554,6 +561,62 @@ userSchema.virtual('primaryInviteCode').get(function() {
 userSchema.index({ 'personalInviteCodes.code': 1 });
 userSchema.index({ 'playbackQueue.mediaId': 1 });
 // Note: personalInviteCode already has unique: true which creates an index automatically
+userSchema.index(
+  { foundingSeatNumber: 1 },
+  {
+    unique: true,
+    name: 'foundingSeatNumber_unique_partial',
+    // Sparse unique indexes still index null, so only one user can have foundingSeatNumber:null.
+    // Partial index only uniqueness-checks actual seat numbers.
+    partialFilterExpression: { foundingSeatNumber: { $type: 'number' } },
+  }
+);
+
+const FOUNDING_SEAT_PARTIAL_INDEX_NAME = 'foundingSeatNumber_unique_partial';
+
+/**
+ * Drop the old unique foundingSeatNumber_1 index (which treats null as a value)
+ * and clear stored null seats so signup can create more than one user.
+ */
+userSchema.statics.repairFoundingSeatUniqueness = async function repairFoundingSeatUniqueness() {
+  const coll = this.collection;
+  if (!coll) return { unsetCount: 0, dropped: [] };
+
+  const unsetResult = await coll.updateMany(
+    { foundingSeatNumber: null },
+    { $unset: { foundingSeatNumber: 1 } }
+  );
+
+  const dropped = [];
+  const indexes = await coll.indexes();
+  for (const idx of indexes) {
+    const keys = idx.key && Object.keys(idx.key);
+    const isSeatOnly = keys && keys.length === 1 && idx.key.foundingSeatNumber === 1;
+    if (!isSeatOnly) continue;
+    const isDesiredPartial = idx.name === FOUNDING_SEAT_PARTIAL_INDEX_NAME
+      && idx.unique
+      && idx.partialFilterExpression
+      && idx.partialFilterExpression.foundingSeatNumber
+      && idx.partialFilterExpression.foundingSeatNumber.$type === 'number';
+    if (isDesiredPartial) continue;
+    await coll.dropIndex(idx.name);
+    dropped.push(idx.name);
+  }
+
+  await coll.createIndex(
+    { foundingSeatNumber: 1 },
+    {
+      unique: true,
+      name: FOUNDING_SEAT_PARTIAL_INDEX_NAME,
+      partialFilterExpression: { foundingSeatNumber: { $type: 'number' } },
+    }
+  );
+
+  return {
+    unsetCount: unsetResult.modifiedCount || 0,
+    dropped,
+  };
+};
 
 //comment to check debug restart
 

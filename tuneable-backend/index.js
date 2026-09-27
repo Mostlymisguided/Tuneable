@@ -69,6 +69,21 @@ db.connectDB()
         });
     });
 
+    setImmediate(() => {
+      const User = require('./models/User');
+      User.repairFoundingSeatUniqueness()
+        .then((result) => {
+          if (result.unsetCount || (result.dropped && result.dropped.length)) {
+            console.log(
+              `Repaired founding seat uniqueness: unset ${result.unsetCount} null seat(s), dropped indexes [${(result.dropped || []).join(', ')}]`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to repair founding seat uniqueness:', error);
+        });
+    });
+
     // Optional ongoing tags + location drip (ENRICHMENT_DRIP_ENABLED=true)
     try {
       const { startEnrichmentDripCron } = require('./services/enrichmentDripService');
