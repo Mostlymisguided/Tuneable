@@ -244,14 +244,16 @@ export default function PublicUserProfileScreen() {
               Their library is hidden while they are blocked.
             </Text>
           ) : (
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <UserLibrarySection
-              items={library}
-              user={authUser}
-              loading={libraryLoading}
-              onBalanceUpdate={updateBalance}
-              emptyLabel="This user has not tipped any tunes yet."
-            />
+            <>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <UserLibrarySection
+                items={library}
+                user={authUser}
+                loading={libraryLoading}
+                onBalanceUpdate={updateBalance}
+                emptyLabel="This user has not tipped any tunes yet."
+              />
+            </>
           )}
           <ReportSheet
             visible={reportOpen}
