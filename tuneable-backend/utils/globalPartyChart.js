@@ -268,6 +268,24 @@ function getPeriodStartDate(timePeriod) {
 /**
  * Load top N active bids per media (by amount), optionally merging the viewer's own bids.
  */
+function shapeSupporterBid(bid) {
+  return {
+    _id: bid._id,
+    userId: bid.userId,
+    amount: bid.amount,
+    status: bid.status,
+    createdAt: bid.createdAt,
+    bidderLocationDisplay: bid.bidderLocationDisplay,
+    bidderLocationAncestorIds: bid.bidderLocationAncestorIds,
+    bidderHomePlaceId: bid.bidderHomePlaceId,
+    bidderCountryPlaceId: bid.bidderCountryPlaceId,
+    bidderCountry: bid.bidderCountry,
+    bidderCountryCode: bid.bidderCountryCode,
+    bidderPlaceLabel: bid.bidderPlaceLabel,
+    bidderFeatureType: bid.bidderFeatureType,
+  };
+}
+
 async function loadTopSupportersByMedia(mediaIds, {
   supportersLimit = DEFAULT_SUPPORTERS_LIMIT,
   userId = null,
@@ -310,6 +328,11 @@ async function loadTopSupportersByMedia(mediaIds, {
         bidderLocationDisplay: 1,
         bidderLocationAncestorIds: 1,
         bidderHomePlaceId: 1,
+        bidderCountryPlaceId: 1,
+        bidderCountry: 1,
+        bidderCountryCode: 1,
+        bidderPlaceLabel: 1,
+        bidderFeatureType: 1,
       },
     },
   ];
@@ -319,16 +342,7 @@ async function loadTopSupportersByMedia(mediaIds, {
   for (const bid of topRows) {
     const key = bid.mediaId.toString();
     if (!byMedia.has(key)) byMedia.set(key, []);
-    byMedia.get(key).push({
-      _id: bid._id,
-      userId: bid.userId,
-      amount: bid.amount,
-      status: bid.status,
-      createdAt: bid.createdAt,
-      bidderLocationDisplay: bid.bidderLocationDisplay,
-      bidderLocationAncestorIds: bid.bidderLocationAncestorIds,
-      bidderHomePlaceId: bid.bidderHomePlaceId,
-    });
+    byMedia.get(key).push(shapeSupporterBid(bid));
   }
 
   if (userId) {
@@ -345,23 +359,14 @@ async function loadTopSupportersByMedia(mediaIds, {
     }
 
     const viewerBids = await Bid.find(viewerMatch)
-      .select('_id userId amount status createdAt bidderLocationDisplay bidderLocationAncestorIds bidderHomePlaceId mediaId')
+      .select('_id userId amount status createdAt bidderLocationDisplay bidderLocationAncestorIds bidderHomePlaceId bidderCountryPlaceId bidderCountry bidderCountryCode bidderPlaceLabel bidderFeatureType mediaId')
       .lean();
 
     for (const bid of viewerBids) {
       const key = bid.mediaId.toString();
       const existing = byMedia.get(key) || [];
       if (!existing.some((b) => b._id.toString() === bid._id.toString())) {
-        existing.push({
-          _id: bid._id,
-          userId: bid.userId,
-          amount: bid.amount,
-          status: bid.status,
-          createdAt: bid.createdAt,
-          bidderLocationDisplay: bid.bidderLocationDisplay,
-          bidderLocationAncestorIds: bid.bidderLocationAncestorIds,
-          bidderHomePlaceId: bid.bidderHomePlaceId,
-        });
+        existing.push(shapeSupporterBid(bid));
         byMedia.set(key, existing);
       }
     }

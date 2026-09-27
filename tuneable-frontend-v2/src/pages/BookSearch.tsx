@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { Loader2, Search, BookPlus } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import BookCover from '../components/BookCover';
+import { DEFAULT_COVER_ART } from '../constants';
 import EntertainingLoader from '../components/EntertainingLoader';
 
 type DiscoveryBook = {
@@ -27,7 +27,8 @@ type DiscoveryBook = {
 const BookSearch: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [query, setQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get('q') || '');
   const [catalog, setCatalog] = useState<any[]>([]);
   const [openLibrary, setOpenLibrary] = useState<DiscoveryBook[]>([]);
   const [googleBooks, setGoogleBooks] = useState<DiscoveryBook[]>([]);
@@ -59,6 +60,15 @@ const BookSearch: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const q = searchParams.get('q')?.trim() || '';
+    if (q.length >= 2) {
+      void runSearch();
+    }
+    // Initial catalogue lookup when the chart sends a query.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const importBook = async (book: DiscoveryBook) => {
     if (!user) {
@@ -93,8 +103,9 @@ const BookSearch: React.FC = () => {
               key={key}
               className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl p-3"
             >
-              <BookCover
-                src={book.coverArt}
+              <img
+                src={book.coverArt || DEFAULT_COVER_ART}
+                alt=""
                 className="w-12 h-16 object-cover rounded"
               />
               <div className="flex-1 min-w-0">
@@ -161,7 +172,7 @@ const BookSearch: React.FC = () => {
                     onClick={() => navigate(`/book/${book._id}`)}
                     className="w-full text-left flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl p-3"
                   >
-                    <BookCover src={book.coverArt} className="w-12 h-16 object-cover rounded" />
+                    <img src={book.coverArt || DEFAULT_COVER_ART} alt="" className="w-12 h-16 object-cover rounded" />
                     <div>
                       <div className="font-medium">{book.title}</div>
                       <div className="text-sm text-gray-400">

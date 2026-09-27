@@ -3019,10 +3019,17 @@ export const booksAPI = {
     limit?: number;
     timePeriod?: string;
     locationPlaceId?: string;
+    locationScope?: string;
     tag?: string;
   }) => {
     const response = await api.get('/books/chart', { params });
-    return response.data as { books: any[]; count: number; timePeriod?: string };
+    return response.data as {
+      books: any[];
+      count: number;
+      timePeriod?: string;
+      locationPlaceId?: string | null;
+      locationScope?: string;
+    };
   },
   getBook: async (bookId: string) => {
     const response = await api.get(`/books/${bookId}`);

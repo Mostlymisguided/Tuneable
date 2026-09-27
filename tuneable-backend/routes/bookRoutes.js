@@ -9,7 +9,6 @@ const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { firstIsbn } = require('../utils/isbn');
 const { BOOK_CATALOG_QUERY } = require('../utils/mediaKinds');
 const { toClientMedia } = require('../utils/mediaPlayability');
-const { resolveBookCoverArt } = require('../utils/coverArtUtils');
 const { searchOpenLibrary } = require('../services/openLibraryService');
 const { searchGoogleBooks, isGoogleBooksEnabled } = require('../services/googleBooksService');
 const { findOrCreateBook } = require('../services/bookAdapter');
@@ -18,7 +17,14 @@ const {
   getPeriodStartDate,
   loadTopSupportersByMedia,
   DEFAULT_SUPPORTERS_LIMIT,
+  toObjectIds,
 } = require('../utils/globalPartyChart');
+const {
+  normalizeLocationScope,
+  locationScopeIncludesOrigin,
+  locationScopeIncludesTips,
+  locationScopeRanksByLocalTips,
+} = require('../utils/locationScope');
 
 const router = express.Router();
 
@@ -39,7 +45,6 @@ function serializeBook(media) {
     : [];
   raw.authors = authors;
   raw.creatorDisplay = raw.creatorDisplay || authors.join(', ');
-  raw.coverArt = resolveBookCoverArt(raw.coverArt);
   return toClientMedia(raw);
 }
 
@@ -164,6 +169,15 @@ router.get('/search', async (req, res) => {
   }
 });
 
+function originPlaceMatch(locationPlaceId) {
+  return {
+    $or: [
+      { 'primaryLocation.placeId': locationPlaceId },
+      { 'primaryLocation.ancestorIds': locationPlaceId },
+    ],
+  };
+}
+
 router.get('/chart', optionalAuthMiddleware, async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit, 50);
@@ -171,52 +185,103 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
     const locationPlaceId = typeof req.query.locationPlaceId === 'string'
       ? req.query.locationPlaceId.trim()
       : '';
+    const locationScope = normalizeLocationScope(req.query.locationScope);
     const tag = typeof req.query.tag === 'string' ? req.query.tag.trim() : '';
     const startDate = getPeriodStartDate(timePeriod);
 
     const query = { ...BOOK_CATALOG_QUERY };
     if (tag) query.tags = new RegExp(escapeRegex(tag), 'i');
-    if (locationPlaceId) {
-      query.$or = [
-        { 'primaryLocation.placeId': locationPlaceId },
-        { 'primaryLocation.ancestorIds': locationPlaceId },
-      ];
-    }
 
-    let books;
-    if (startDate) {
-      const catalogIds = await Media.find(query).distinct('_id');
-      if (!catalogIds.length) {
-        books = [];
-      } else {
-        const ranked = await Bid.aggregate([
-          {
-            $match: {
-              status: 'active',
-              createdAt: { $gte: startDate },
-              mediaId: { $in: catalogIds },
-            },
-          },
-          { $group: { _id: '$mediaId', periodTotal: { $sum: '$amount' } } },
-          { $sort: { periodTotal: -1 } },
-          { $limit: limit },
-        ]);
-        const ids = ranked.map((row) => row._id);
-        const docs = await Media.find({ _id: { $in: ids } }).lean();
-        const byId = new Map(docs.map((doc) => [doc._id.toString(), doc]));
-        books = ranked
-          .map((row) => {
-            const doc = byId.get(row._id.toString());
-            if (!doc) return null;
-            return { ...doc, periodTotal: row.periodTotal };
-          })
-          .filter(Boolean);
-      }
-    } else {
+    let books = [];
+    const rankByLocalTips = Boolean(
+      locationPlaceId && locationScopeRanksByLocalTips(locationScope)
+    );
+
+    if (!startDate && !locationPlaceId) {
       books = await Media.find(query)
         .sort({ globalMediaAggregate: -1, createdAt: -1 })
         .limit(limit)
         .lean();
+    } else {
+      const catalogIds = await Media.find(query).distinct('_id');
+      let filteredIds = catalogIds.map((id) => id.toString());
+
+      if (locationPlaceId && catalogIds.length) {
+        const includeTips = locationScopeIncludesTips(locationScope);
+        const includeOrigin = locationScopeIncludesOrigin(locationScope);
+        const idSet = new Set();
+
+        if (includeTips) {
+          const tipBidQuery = {
+            status: 'active',
+            mediaId: { $in: catalogIds },
+            bidderLocationAncestorIds: locationPlaceId,
+          };
+          if (startDate) tipBidQuery.createdAt = { $gte: startDate };
+          const tipMatchedIds = await Bid.distinct('mediaId', tipBidQuery);
+          for (const id of tipMatchedIds) {
+            if (id) idSet.add(id.toString());
+          }
+        }
+
+        if (includeOrigin) {
+          const originMatchedIds = await Media.find({
+            ...query,
+            ...originPlaceMatch(locationPlaceId),
+          }).distinct('_id');
+          for (const id of originMatchedIds) {
+            if (id) idSet.add(id.toString());
+          }
+        }
+
+        filteredIds = [...idSet];
+      }
+
+      const useStoredGlobalAggregate = Boolean(
+        locationPlaceId && !startDate && !rankByLocalTips
+      );
+
+      if (!filteredIds.length) {
+        books = [];
+      } else if (useStoredGlobalAggregate) {
+        books = await Media.find({ _id: { $in: toObjectIds(filteredIds) } })
+          .sort({ globalMediaAggregate: -1, createdAt: -1 })
+          .limit(limit)
+          .lean();
+      } else {
+        const rankBidQuery = {
+          status: 'active',
+          mediaId: { $in: toObjectIds(filteredIds) },
+        };
+        if (startDate) rankBidQuery.createdAt = { $gte: startDate };
+        if (rankByLocalTips) rankBidQuery.bidderLocationAncestorIds = locationPlaceId;
+
+        const ranked = await Bid.aggregate([
+          { $match: rankBidQuery },
+          { $group: { _id: '$mediaId', periodTotal: { $sum: '$amount' } } },
+        ]);
+        const totals = new Map(ranked.map((row) => [row._id.toString(), row.periodTotal]));
+        let rows = filteredIds.map((id) => ({ id, periodTotal: totals.get(id) || 0 }));
+        if (!locationPlaceId || rankByLocalTips) {
+          rows = rows.filter((row) => row.periodTotal > 0);
+        }
+        rows.sort((a, b) => b.periodTotal - a.periodTotal);
+        rows = rows.slice(0, limit);
+
+        const docs = await Media.find({ _id: { $in: toObjectIds(rows.map((row) => row.id)) } }).lean();
+        const byId = new Map(docs.map((doc) => [doc._id.toString(), doc]));
+        books = rows
+          .map((row) => {
+            const doc = byId.get(row.id);
+            if (!doc) return null;
+            return {
+              ...doc,
+              periodTotal: row.periodTotal,
+              timePeriodBidValue: row.periodTotal,
+            };
+          })
+          .filter(Boolean);
+      }
     }
 
     const supportersByMedia = await loadTopSupportersByMedia(
@@ -225,6 +290,7 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
         supportersLimit: DEFAULT_SUPPORTERS_LIMIT,
         userId: req.user?._id || null,
         startDate: startDate || null,
+        locationPlaceId: rankByLocalTips ? locationPlaceId : null,
       }
     );
 
@@ -236,6 +302,7 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
       count: books.length,
       timePeriod,
       locationPlaceId: locationPlaceId || null,
+      locationScope: locationPlaceId ? locationScope : 'in',
     });
   } catch (error) {
     console.error('Book chart failed:', error);
@@ -305,7 +372,7 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
       partyName: globalParty.name,
       mediaTitle: book.title,
       mediaArtist: book.author?.[0]?.name || '',
-      mediaCoverArt: resolveBookCoverArt(book.coverArt),
+      mediaCoverArt: book.coverArt || '',
       mediaContentType: book.contentType,
       mediaContentForm: book.contentForm,
       ...buildBidLocationSnapshot(user, currentLocation),
