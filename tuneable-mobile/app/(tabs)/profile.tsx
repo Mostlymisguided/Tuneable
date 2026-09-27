@@ -204,7 +204,10 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
             <Pressable
-              style={[styles.addSheetRow, styles.addSheetRowLast]}
+              style={[
+                styles.addSheetRow,
+                !canUpload && styles.addSheetRowLast,
+              ]}
               onPress={() => {
                 setAddMediaOpen(false);
                 router.push('/podcast-search');
@@ -223,6 +226,28 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </Pressable>
+            {canUpload ? (
+              <Pressable
+                style={[styles.addSheetRow, styles.addSheetRowLast]}
+                onPress={() => {
+                  setAddMediaOpen(false);
+                  router.push('/upload');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Upload audio">
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={20}
+                  color={colors.accentLight}
+                />
+                <View style={styles.addSheetCopy}>
+                  <Text style={styles.addSheetRowText}>Upload</Text>
+                  <Text style={styles.addSheetRowHint}>
+                    Upload your own audio
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
           </Pressable>
         </Pressable>
       </Modal>
