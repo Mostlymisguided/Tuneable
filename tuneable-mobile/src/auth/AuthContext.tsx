@@ -22,6 +22,7 @@ import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { syncPushTokenIfGranted } from '@/src/lib/pushNotifications';
 import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
+import { useNotificationStore } from '@/src/stores/notificationStore';
 
 interface AuthContextValue {
   user: User | null;
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     useBlockedUsersStore.getState().clear();
+    useNotificationStore.getState().clear();
     await clearSession();
     await useMusicPlayerStore.getState().clear();
     await usePodcastPlayerStore.getState().clear();

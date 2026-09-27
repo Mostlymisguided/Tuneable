@@ -33,7 +33,7 @@ async function removeInvalidTokens(tokens) {
 /**
  * Send a push to every registered device for a user.
  * @param {string|import('mongoose').Types.ObjectId} userId
- * @param {{ title: string, body: string, data?: Record<string, unknown> }} payload
+ * @param {{ title: string, body: string, data?: Record<string, unknown>, badge?: number }} payload
  */
 async function sendPushToUser(userId, payload) {
   try {
@@ -48,12 +48,14 @@ async function sendPushToUser(userId, payload) {
       .filter(isExpoPushToken);
     if (!tokens.length) return;
 
+    const badge = Number.isInteger(payload.badge) ? payload.badge : undefined;
     const messages = tokens.map((token) => ({
       to: token,
       title: payload.title,
       body: payload.body,
       sound: 'default',
       data: payload.data || {},
+      ...(badge !== undefined ? { badge } : {}),
     }));
 
     const invalid = [];

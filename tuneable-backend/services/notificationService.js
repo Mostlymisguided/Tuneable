@@ -134,6 +134,7 @@ const createNotification = async (params) => {
     sendPushToUser(userId, {
       title: populated.title,
       body: populated.message,
+      badge: unreadCount,
       data: {
         type: populated.type,
         url: populated.link || '',

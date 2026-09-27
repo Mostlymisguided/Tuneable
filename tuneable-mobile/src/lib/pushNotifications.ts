@@ -2,7 +2,9 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { router, type Href } from 'expo-router';
+import { notificationAPI } from '@/src/api/notifications';
 import { userAPI } from '@/src/api/user';
+import { useNotificationStore } from '@/src/stores/notificationStore';
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
@@ -144,12 +146,86 @@ export function openNotificationUrl(url?: string | null) {
   }
 }
 
-export function subscribeNotificationResponses() {
-  const received = Notifications.addNotificationResponseReceivedListener(
-    (response) => {
-      const url = response.notification.request.content.data?.url;
-      openNotificationUrl(typeof url === 'string' ? url : null);
+const handledResponseIds = new Set<string>();
+let pendingResponse: Notifications.NotificationResponse | null = null;
+let routingReady = false;
+let didReadInitialResponse = false;
+
+function responseId(response: Notifications.NotificationResponse): string {
+  return response.notification.request.identifier || '';
+}
+
+function stringData(
+  data: Record<string, unknown> | undefined,
+  key: string
+): string | null {
+  const value = data?.[key];
+  return typeof value === 'string' && value ? value : null;
+}
+
+function queueNotificationResponse(response: Notifications.NotificationResponse) {
+  const id = responseId(response);
+  if (id && handledResponseIds.has(id)) return;
+  pendingResponse = response;
+  if (routingReady) void flushNotificationResponse();
+}
+
+async function flushNotificationResponse() {
+  if (!routingReady || !pendingResponse) return;
+  const response = pendingResponse;
+  const id = responseId(response);
+  if (id && handledResponseIds.has(id)) {
+    pendingResponse = null;
+    return;
+  }
+  if (id) handledResponseIds.add(id);
+  pendingResponse = null;
+
+  const data = response.notification.request.content.data as
+    | Record<string, unknown>
+    | undefined;
+  const url = stringData(data, 'url');
+  const notificationId = stringData(data, 'notificationId');
+  if (notificationId) {
+    try {
+      await notificationAPI.markRead(notificationId);
+    } catch {
+      // Still open the target if marking read fails.
     }
+    void useNotificationStore.getState().refreshUnreadCount();
+  }
+  if (!routingReady) return;
+  openNotificationUrl(url);
+}
+
+/** Allow deep links only after the session is restored. */
+export function setNotificationRoutingReady(ready: boolean) {
+  routingReady = ready;
+  if (ready) void flushNotificationResponse();
+}
+
+export function subscribeNotificationResponses() {
+  if (Platform.OS === 'web') return () => {};
+  const received = Notifications.addNotificationResponseReceivedListener(
+    queueNotificationResponse
   );
   return () => received.remove();
+}
+
+export function subscribeForegroundNotifications(onReceived: () => void) {
+  if (Platform.OS === 'web') return () => {};
+  const received = Notifications.addNotificationReceivedListener(() => {
+    onReceived();
+  });
+  return () => received.remove();
+}
+
+/** Open the notification that cold-started the app, once per launch. */
+export function openInitialNotificationResponse() {
+  if (Platform.OS === 'web' || didReadInitialResponse) return;
+  didReadInitialResponse = true;
+  const response = Notifications.getLastNotificationResponse();
+  if (!response) return;
+  Notifications.clearLastNotificationResponse();
+  queueNotificationResponse(response);
 }

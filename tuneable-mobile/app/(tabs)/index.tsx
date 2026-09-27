@@ -43,6 +43,7 @@ import {
   championBadgesFromResponse,
 } from '@/src/lib/championBadges';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
+import { useNotificationStore } from '@/src/stores/notificationStore';
 import { colors } from '@/src/theme/colors';
 import {
   GLOBAL_PARTY_ID,
@@ -76,6 +77,7 @@ type HomeBadge = {
 
 export default function HomeScreen() {
   const { user, updateBalance } = useAuth();
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
   const { contentPaddingBottom } = usePlayerDockState();
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
   const canUpload = canUploadMedia(user);
@@ -263,6 +265,24 @@ export default function HomeScreen() {
                 <Text style={styles.tbLabel}>TuneBytes</Text>
               </View>
             </View>
+            <Pressable
+              onPress={() => router.push('/notifications')}
+              style={styles.bell}
+              accessibilityRole="button"
+              accessibilityLabel={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : 'Notifications'
+              }>
+              <Ionicons name="notifications-outline" size={22} color={colors.text} />
+              {unreadCount > 0 ? (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>
+                    {unreadCount > 99 ? '99+' : String(unreadCount)}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
             <Pressable
               style={styles.walletChip}
               onPress={() => router.push('/wallet')}
@@ -560,6 +580,33 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
+  },
+  bell: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+  },
+  bellBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   walletChip: {
     alignItems: 'flex-end',

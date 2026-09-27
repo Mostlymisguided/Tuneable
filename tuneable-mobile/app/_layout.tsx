@@ -10,7 +10,13 @@ import { AuthProvider, useAuth } from '@/src/auth/AuthContext';
 import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
-import { subscribeNotificationResponses } from '@/src/lib/pushNotifications';
+import {
+  openInitialNotificationResponse,
+  setNotificationRoutingReady,
+  subscribeForegroundNotifications,
+  subscribeNotificationResponses,
+} from '@/src/lib/pushNotifications';
+import { useNotificationStore } from '@/src/stores/notificationStore';
 import { recheckLocationPermission } from '@/src/lib/currentLocation';
 import { colors } from '@/src/theme/colors';
 
@@ -51,11 +57,33 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { isLoading } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
     return subscribeNotificationResponses();
   }, []);
+
+  useEffect(() => {
+    const ready = !isLoading && isAuthenticated;
+    setNotificationRoutingReady(ready);
+    if (!ready) return;
+
+    openInitialNotificationResponse();
+    void useNotificationStore.getState().refreshUnreadCount();
+
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void useNotificationStore.getState().refreshUnreadCount();
+      }
+    });
+    const unsubscribeForeground = subscribeForegroundNotifications(() => {
+      void useNotificationStore.getState().refreshUnreadCount();
+    });
+    return () => {
+      appState.remove();
+      unsubscribeForeground();
+    };
+  }, [isLoading, isAuthenticated]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -96,6 +124,7 @@ function RootNavigator() {
         <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="music-search" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="podcast-search" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="books" options={{ animation: 'slide_from_right' }} />
