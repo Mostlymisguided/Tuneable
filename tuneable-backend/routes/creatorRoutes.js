@@ -100,7 +100,7 @@ router.post('/apply', authMiddleware, upload.array('proofFiles', 5), async (req,
     res.status(200).json({
       message: isOAuthVerified 
         ? 'Creator application approved! You are now a verified creator.' 
-        : 'Creator application submitted successfully. We\'ll review it within 24-48 hours.',
+        : 'You\'re a creator. Upload your own music to claim a founding seat.',
       creatorProfile: {
         artistName: user.creatorProfile.artistName,
         verificationStatus: user.creatorProfile.verificationStatus,

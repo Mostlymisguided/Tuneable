@@ -4015,7 +4015,7 @@ const UserProfile: React.FC = () => {
                     <Award className="h-16 w-16 text-purple-400 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-4">Become a Creator</h2>
                     <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                      Join our community of verified creators and artists. Apply to get verified and start sharing your music on Tuneable.
+                      Set up your artist profile, then upload your own music to claim a founding creator seat.
                     </p>
                     <Link
                       to="/creator/register"
