@@ -381,6 +381,9 @@ const UserProfile: React.FC = () => {
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
   const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
+  const creatorVerificationStatus = (user as any)?.creatorProfile?.verificationStatus as string | undefined;
+  const hasCreatorSettingsTab = ['verified', 'pending', 'rejected'].includes(creatorVerificationStatus || '');
+  const activeSettingsTab = settingsTab === 'creator' && !hasCreatorSettingsTab ? 'profile' : settingsTab;
   
   // View mode tabs - controlled by query params
   // Note: the former 'podcast-library' tab has been merged into 'tune-library'.
@@ -3417,48 +3420,33 @@ const UserProfile: React.FC = () => {
                 <button
                   onClick={() => handleSettingsTabChange('profile')}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    settingsTab === 'profile'
+                    activeSettingsTab === 'profile'
                       ? 'border-purple-500 text-purple-400'
                       : 'border-transparent text-gray-400 hover:text-white'
                   }`}
                 >
                   Edit Profile
                 </button>
-                {user && (
-                  (user as any).role?.includes('creator') ? (
-                    <button
-                      onClick={() => handleSettingsTabChange('creator')}
-                      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                        settingsTab === 'creator'
-                          ? 'border-purple-500 text-purple-400'
-                          : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {(user as any).creatorProfile?.verificationStatus === 'verified' 
-                        ? 'Edit Creator Profile'
-                        : (user as any).creatorProfile?.verificationStatus === 'pending' 
-                        ? 'Creator Application (Pending)' 
-                        : (user as any).creatorProfile?.verificationStatus === 'rejected'
-                        ? 'Creator Application (Rejected)'
-                        : 'Creator Profile'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleSettingsTabChange('creator')}
-                      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                        settingsTab === 'creator'
-                          ? 'border-purple-500 text-purple-400'
-                          : 'border-transparent text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Become a Creator
-                    </button>
-                  )
+                {user && (user as any).role?.includes('creator') && hasCreatorSettingsTab && (
+                  <button
+                    onClick={() => handleSettingsTabChange('creator')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeSettingsTab === 'creator'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {(user as any).creatorProfile?.verificationStatus === 'verified' 
+                      ? 'Edit Creator Profile'
+                      : (user as any).creatorProfile?.verificationStatus === 'pending' 
+                      ? 'Creator Application (Pending)' 
+                      : 'Creator Application (Rejected)'}
+                  </button>
                 )}
                 <button
                   onClick={() => handleSettingsTabChange('notifications')}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                    settingsTab === 'notifications'
+                    activeSettingsTab === 'notifications'
                       ? 'border-purple-500 text-purple-400'
                       : 'border-transparent text-gray-400 hover:text-white'
                   }`}
@@ -3469,7 +3457,7 @@ const UserProfile: React.FC = () => {
             </div>
 
             {/* Tab Content */}
-            {settingsTab === 'profile' && (
+            {activeSettingsTab === 'profile' && (
               <div className="card p-6">
                 <h2 className="text-2xl font-bold text-white mb-6">Edit Profile</h2>
 
@@ -3680,6 +3668,15 @@ const UserProfile: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                  {!hasCreatorSettingsTab && (
+                    <Link
+                      to="/creator/register"
+                      className="mt-4 inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors"
+                    >
+                      <Award className="w-4 h-4" />
+                      <span>Become a Creator</span>
+                    </Link>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -3701,7 +3698,7 @@ const UserProfile: React.FC = () => {
               </div>
             )}
 
-            {settingsTab === 'creator' && (
+            {activeSettingsTab === 'creator' && (
               <div className="card p-6">
                 {(user as any).creatorProfile?.verificationStatus === 'verified' ? (
                   <>
@@ -4010,26 +4007,11 @@ const UserProfile: React.FC = () => {
                       <span>Re-apply as Creator</span>
                     </Link>
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Award className="h-16 w-16 text-purple-400 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-white mb-4">Become a Creator</h2>
-                    <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                      Set up your artist profile. An invite or an approved request makes you eligible to claim a founding seat when you upload.
-                    </p>
-                    <Link
-                      to="/creator/register"
-                      className="w-fit px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
-                    >
-                      <Award className="w-5 h-5" />
-                      <span>Become a Creator</span>
-                    </Link>
-                  </div>
-                )}
+                ) : null}
               </div>
             )}
 
-            {settingsTab === 'notifications' && (
+            {activeSettingsTab === 'notifications' && (
               <div className="card p-6">
                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                   <Bell className="h-6 w-6" />
