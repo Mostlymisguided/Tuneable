@@ -9,7 +9,6 @@ import {
   MapPin,
   Music,
   Users,
-  Shield,
   Waves,
   Coins,
   Percent,
@@ -30,19 +29,19 @@ const pillars: {
   {
     title: 'Tip what you love',
     items: [
-      { icon: Heart, label: 'Pays the creator', panel: 'bg-pink-100 text-pink-600' },
-      { icon: Globe, label: 'Moves the charts', panel: 'bg-purple-100 text-purple-600' },
+      { icon: Heart, label: 'Pay creators', panel: 'bg-pink-100 text-pink-600' },
+      { icon: Globe, label: 'Influence charts', panel: 'bg-purple-100 text-purple-600' },
     ],
   },
   {
-    title: 'Own what you champion',
+    title: 'Be a champion',
     items: [
       { icon: Crown, label: 'Be a local champion', panel: 'bg-amber-100 text-amber-600' },
       { icon: MapPin, label: 'Local or worldwide', panel: 'bg-indigo-100 text-indigo-600' },
     ],
   },
   {
-    title: 'Showcase your taste',
+    title: 'Own your taste',
     items: [
       { icon: Music, label: 'Music', panel: 'bg-purple-100 text-purple-600' },
       { icon: Headphones, label: 'Podcasts', panel: 'bg-pink-100 text-pink-600' },
@@ -86,8 +85,8 @@ const About: React.FC = () => {
         <div className="mx-auto max-w-4xl px-4 py-24 text-center sm:px-6 lg:px-8">
           <h1 className="text-balance text-3xl font-bold leading-tight sm:text-5xl md:text-6xl">
             <span className="block">Tip what you love</span>
-            <span className="mt-3 block text-pink-300">Own what you champion</span>
-            <span className="mt-3 block">Showcase your taste</span>
+            <span className="mt-3 block text-pink-300">Be a champion</span>
+            <span className="mt-3 block">Own your taste</span>
           </h1>
           <div className="mt-12 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
@@ -137,9 +136,8 @@ const About: React.FC = () => {
           ))}
         </div>
         <p className="mx-auto mt-8 max-w-2xl px-4 text-center text-base leading-relaxed text-gray-600">
-          The people who tip a work the most become its champion - displayed beside the tune,
-          podcast, or book they love. Vie for that place where you live, or worldwide. Anyone can
-          take it by tipping more.
+          The people who tip a work the most become its champion - displayed beside the media they
+          love. Vie for that place where you live, or worldwide. Anyone can take it by tipping more.
         </p>
       </section>
 
@@ -171,8 +169,9 @@ const About: React.FC = () => {
             <div className="rounded-xl border border-white/15 bg-white/10 p-6">
               <Vote className="mb-4 h-8 w-8 text-green-400" />
               <h3 className="mb-2 font-semibold text-white">At £1 billion</h3>
+              <p className="text-3xl font-bold text-white">DAO</p>
               <p className="mt-2 text-sm leading-relaxed text-indigo-100">
-                Full community governance: a DAO owned and steered by artists and users.
+                Full community governance, owned and steered by artists and users.
               </p>
             </div>
           </div>
@@ -181,25 +180,6 @@ const About: React.FC = () => {
             <p className="leading-relaxed text-indigo-100">
               Tuneable is a UK Community Interest Company. It is not conducted for private gain:
               surplus and assets are used for the benefit of the community.
-            </p>
-          </div>
-          <div className="mt-6 flex items-start gap-4 rounded-xl border border-white/10 bg-white/5 p-6">
-            <Shield className="mt-1 h-8 w-8 flex-shrink-0 text-pink-300" />
-            <div>
-              <h3 className="mb-2 font-semibold text-white">No billionaires</h3>
-              <p className="leading-relaxed text-indigo-100">
-                Anyone whose net worth exceeds £1 billion must sell their shares in Tuneable and
-                end their involvement with the organisation.
-              </p>
-            </div>
-          </div>
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-6">
-            <h3 className="mb-2 font-semibold text-white">Founding Creators</h3>
-            <p className="text-sm leading-relaxed text-indigo-100">
-              The first 1,111 creators who upload their own music become founding creators, with a
-              tuneable upload allowance and exclusive access to the 3% artist-invite commission
-              (from Tuneable&apos;s share). Founding status is a platform benefit — not equity or
-              ownership. Details are in the Terms.
             </p>
           </div>
           <p className="mt-8 text-center text-sm text-indigo-200">
@@ -222,7 +202,14 @@ const About: React.FC = () => {
           </div>
           <div className="rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-6 text-center sm:p-8">
             <h3 className="text-xl font-bold text-gray-900 md:text-2xl">
-              After the MVP, spend them with that creator
+              Spend them with that creator
+              <a
+                href="#tunebytes-spend"
+                className="text-purple-600 hover:text-purple-800"
+                aria-label="See when you can spend TuneBytes"
+              >
+                *
+              </a>
             </h3>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
@@ -242,9 +229,8 @@ const About: React.FC = () => {
               the TuneBytes they earned.
             </p>
           </div>
-          <p className="mt-8 text-center text-sm text-gray-500">
-            You can earn TuneBytes today. Spending them opens after the MVP, when creators can fund
-            these pools.
+          <p id="tunebytes-spend" className="mt-8 scroll-mt-24 text-center text-sm text-gray-500">
+            * You can earn TuneBytes today and spend them when we launch V1.1
           </p>
         </div>
       </section>
