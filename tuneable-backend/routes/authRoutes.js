@@ -364,10 +364,16 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 } else {
   // Facebook OAuth not configured - return 503 Service Unavailable
   router.get('/facebook', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:367',message:'Facebook OAuth endpoint hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'Facebook OAuth not configured' });
   });
   
   router.get('/facebook/callback', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:373',message:'Facebook OAuth callback hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'Facebook OAuth not configured' });
   });
 }
@@ -602,10 +608,16 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   // Google OAuth not configured - return 503 Service Unavailable
   console.log('⚠️  Google OAuth NOT configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
   router.get('/google', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:605',message:'Google OAuth endpoint hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'Google OAuth not configured' });
   });
   
   router.get('/google/callback', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:612',message:'Google OAuth callback hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'Google OAuth not configured' });
   });
 }
@@ -820,10 +832,16 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 } else {
   // SoundCloud OAuth not configured - return 503 Service Unavailable
   router.get('/soundcloud', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:823',message:'SoundCloud OAuth endpoint hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'SoundCloud OAuth not configured' });
   });
   
   router.get('/soundcloud/callback', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:830',message:'SoundCloud OAuth callback hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'SoundCloud OAuth not configured' });
   });
 }
@@ -1050,10 +1068,16 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
 } else {
   // Instagram OAuth not configured - return 503 Service Unavailable
   router.get('/instagram', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:1053',message:'Instagram OAuth endpoint hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'Instagram OAuth not configured' });
   });
   
   router.get('/instagram/callback', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:1060',message:'Instagram OAuth callback hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
     res.status(503).json({ error: 'Instagram OAuth not configured' });
   });
 }
@@ -1169,8 +1193,18 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
     }
   );
 } else {
-  router.get('/spotify', (req, res) => res.status(503).json({ error: 'Spotify OAuth not configured' }));
-  router.get('/spotify/callback', (req, res) => res.status(503).json({ error: 'Spotify OAuth not configured' }));
+  router.get('/spotify', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:1173',message:'Spotify OAuth endpoint hit (not configured)',data:{method:req.method,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
+    res.status(503).json({ error: 'Spotify OAuth not configured' });
+  });
+  router.get('/spotify/callback', (req, res) => {
+    // #region agent log
+    require('fs').appendFileSync('/opt/cursor/logs/debug.log', JSON.stringify({hypothesisId:'A',location:'authRoutes.js:1180',message:'Spotify OAuth callback hit (not configured)',data:{method:req.query,path:req.path,query:req.query},timestamp:Date.now()})+'\n');
+    // #endregion
+    res.status(503).json({ error: 'Spotify OAuth not configured' });
+  });
 }
 
 // Token refresh endpoint
