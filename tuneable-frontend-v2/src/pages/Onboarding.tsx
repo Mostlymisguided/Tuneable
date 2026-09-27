@@ -2,10 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
-  Library,
+  BarChart3,
+  Heart,
   Loader2,
   MapPin,
+  Mic,
+  Music,
   Navigation,
+  Trophy,
 } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -220,24 +224,50 @@ const Onboarding: React.FC = () => {
       <div className="flex-1 rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-xl">
         {step === 'intro' && (
           <div className="space-y-6">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-600/20 text-purple-300">
-                <Library className="h-5 w-5" />
+            <h2 className="text-xl font-semibold text-white">Show your taste</h2>
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
+              <p className="px-3 pt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Your public profile
+              </p>
+              <div className="flex items-center gap-3 px-3 py-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-700 text-violet-100">
+                  <Music className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-white">Night Drive</p>
+                  <p className="text-xs text-gray-400">Song</p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-xs font-semibold text-amber-200">
+                  <Trophy className="h-3 w-3 text-amber-300" />
+                  You
+                </span>
               </div>
-              <div>
-                <h2 className="text-xl font-semibold text-white">Your showcase, not a subscription</h2>
-                <p className="mt-2 text-sm leading-relaxed text-gray-300">
-                  Tuneable is where you show your taste in music, podcasts, and media.
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-gray-400">
-                  Tip what you love. Each tip supports the creator, influences charts and puts that
-                  work in your public showcase.
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-gray-400">
-                  Tip a work more than anyone else locally or globally and you become its champion.
-                  Displayed beside your favorite media.
-                </p>
+              <div className="mx-3 h-px bg-white/10" />
+              <div className="flex items-center gap-3 px-3 py-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-teal-800 text-teal-100">
+                  <Mic className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-white">The Long Listen</p>
+                  <p className="text-xs text-gray-400">Podcast</p>
+                </div>
               </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { icon: Heart, label: 'Tip', hint: 'Supports them' },
+                { icon: BarChart3, label: 'Charts', hint: 'Your tip counts' },
+                { icon: Trophy, label: 'Champion', hint: 'Top tipper' },
+              ].map(({ icon: Icon, label, hint }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-1 rounded-xl bg-white/5 px-2 py-3 text-center"
+                >
+                  <Icon className="h-4 w-4 text-purple-300" />
+                  <p className="text-sm font-semibold text-white">{label}</p>
+                  <p className="text-[11px] leading-tight text-gray-400">{hint}</p>
+                </div>
+              ))}
             </div>
             <button
               type="button"

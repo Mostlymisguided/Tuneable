@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -31,6 +31,16 @@ import type { ResolvedLocation } from '@/src/types/user';
 type OnboardingStep = 'intro' | 'location';
 
 const STEP_ORDER: OnboardingStep[] = ['intro', 'location'];
+
+const INTRO_FACTS: {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  hint: string;
+}[] = [
+  { icon: 'heart', label: 'Tip', hint: 'Supports them' },
+  { icon: 'stats-chart', label: 'Charts', hint: 'Your tip counts' },
+  { icon: 'trophy', label: 'Champion', hint: 'Top tipper' },
+];
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -231,24 +241,41 @@ export default function OnboardingScreen() {
           <View style={styles.card}>
             {step === 'intro' && (
               <View style={styles.stepBody}>
-                <View style={styles.stepHeader}>
-                  <View style={styles.iconBubble}>
-                    <Ionicons name="library-outline" size={20} color={colors.accentLight} />
+                <Text style={styles.stepTitle}>Show your taste</Text>
+                <View style={styles.showcase}>
+                  <Text style={styles.showcaseKicker}>Your public profile</Text>
+                  <View style={styles.showcaseRow}>
+                    <View style={[styles.cover, styles.coverSong]}>
+                      <Ionicons name="musical-notes" size={18} color="#ede9fe" />
+                    </View>
+                    <View style={styles.showcaseCopy}>
+                      <Text style={styles.showcaseTitle}>Night Drive</Text>
+                      <Text style={styles.showcaseMeta}>Song</Text>
+                    </View>
+                    <View style={styles.championPill}>
+                      <Ionicons name="trophy" size={11} color="#fbbf24" />
+                      <Text style={styles.championPillText}>You</Text>
+                    </View>
                   </View>
-                  <View style={styles.stepHeaderCopy}>
-                    <Text style={styles.stepTitle}>Your showcase, not a subscription</Text>
-                    <Text style={styles.introLead}>
-                      Tuneable is where you show your taste in music, podcasts, and media.
-                    </Text>
-                    <Text style={styles.stepText}>
-                      Tip what you love. Each tip supports the creator, influences charts and puts
-                      that work in your public showcase.
-                    </Text>
-                    <Text style={styles.stepText}>
-                      Tip a work more than anyone else locally or globally and you become its
-                      champion. Displayed beside your favorite media.
-                    </Text>
+                  <View style={styles.showcaseDivider} />
+                  <View style={styles.showcaseRow}>
+                    <View style={[styles.cover, styles.coverPodcast]}>
+                      <Ionicons name="mic" size={18} color="#ccfbf1" />
+                    </View>
+                    <View style={styles.showcaseCopy}>
+                      <Text style={styles.showcaseTitle}>The Long Listen</Text>
+                      <Text style={styles.showcaseMeta}>Podcast</Text>
+                    </View>
                   </View>
+                </View>
+                <View style={styles.factRow}>
+                  {INTRO_FACTS.map((fact) => (
+                    <View key={fact.label} style={styles.fact}>
+                      <Ionicons name={fact.icon} size={16} color={colors.accentLight} />
+                      <Text style={styles.factLabel}>{fact.label}</Text>
+                      <Text style={styles.factHint}>{fact.hint}</Text>
+                    </View>
+                  ))}
                 </View>
                 <Pressable
                   style={styles.primaryBtn}
@@ -457,10 +484,97 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  introLead: {
+  showcase: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
+  showcaseKicker: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  showcaseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  showcaseDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  cover: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverSong: {
+    backgroundColor: '#6d28d9',
+  },
+  coverPodcast: {
+    backgroundColor: '#0f766e',
+  },
+  showcaseCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  showcaseTitle: {
     color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  showcaseMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  championPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.45)',
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  championPillText: {
+    color: '#fde68a',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  factRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fact: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+  },
+  factLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  factHint: {
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
   },
   creditBanner: {
     borderRadius: 12,
