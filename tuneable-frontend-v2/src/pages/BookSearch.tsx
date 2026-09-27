@@ -4,7 +4,7 @@ import { toast } from '../utils/toast';
 import { Loader2, Search, BookPlus } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { DEFAULT_COVER_ART } from '../constants';
+import BookCover from '../components/BookCover';
 import EntertainingLoader from '../components/EntertainingLoader';
 
 type DiscoveryBook = {
@@ -103,9 +103,8 @@ const BookSearch: React.FC = () => {
               key={key}
               className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl p-3"
             >
-              <img
-                src={book.coverArt || DEFAULT_COVER_ART}
-                alt=""
+              <BookCover
+                src={book.coverArt}
                 className="w-12 h-16 object-cover rounded"
               />
               <div className="flex-1 min-w-0">
@@ -172,7 +171,7 @@ const BookSearch: React.FC = () => {
                     onClick={() => navigate(`/book/${book._id}`)}
                     className="w-full text-left flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-xl p-3"
                   >
-                    <img src={book.coverArt || DEFAULT_COVER_ART} alt="" className="w-12 h-16 object-cover rounded" />
+                    <BookCover src={book.coverArt} className="w-12 h-16 object-cover rounded" />
                     <div>
                       <div className="font-medium">{book.title}</div>
                       <div className="text-sm text-gray-400">

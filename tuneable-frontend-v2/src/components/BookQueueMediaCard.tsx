@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Heart, Loader } from 'lucide-react';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
-import { DEFAULT_COVER_ART } from '../constants';
+import BookCover from './BookCover';
 import {
   getCountryLabelFromLocation,
   getCountryPlaceProfilePath,
@@ -134,21 +134,17 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
         <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden group flex-shrink-0">
           {href ? (
             <Link to={href} className="block w-full h-full" tabIndex={-1}>
-              <img
-                src={book.coverArt || DEFAULT_COVER_ART}
+              <BookCover
+                src={book.coverArt}
                 alt={book.title}
                 className="w-full h-full object-cover"
-                width="96"
-                height="96"
               />
             </Link>
           ) : (
-            <img
-              src={book.coverArt || DEFAULT_COVER_ART}
+            <BookCover
+              src={book.coverArt}
               alt={book.title}
               className="w-full h-full object-cover"
-              width="96"
-              height="96"
             />
           )}
           {showRank && (
