@@ -79,6 +79,12 @@ const CreatorRegister: React.FC = () => {
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
   const [inviterUsername, setInviterUsername] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [inviteLocked, setInviteLocked] = useState(false);
+  const [foundingEligible, setFoundingEligible] = useState(false);
+  const [alreadyFounding, setAlreadyFounding] = useState(false);
+  const [requestNote, setRequestNote] = useState('');
+  const [requestStatus, setRequestStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -113,35 +119,80 @@ const CreatorRegister: React.FC = () => {
 
   useEffect(() => {
     const inviteParam = searchParams.get('invite');
-    if (!inviteParam) return;
-    const code = inviteParam.toUpperCase().slice(0, 5);
+    if (!inviteParam || inviteLocked) return;
+    const code = inviteParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
     setParentInviteCode(code);
+  }, [searchParams, inviteLocked]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    userAPI.getMyFoundingCreator()
+      .then((data) => {
+        if (cancelled || !data) return;
+        setFoundingEligible(Boolean(data.eligible));
+        setAlreadyFounding(Boolean(data.isFoundingCreator));
+        const status = data.foundingRequestStatus;
+        if (status === 'pending' || status === 'approved' || status === 'rejected') {
+          setRequestStatus(status);
+        }
+        if (data.foundingRequestNote) setRequestNote(data.foundingRequestNote);
+        if (data.parentInviteCode) {
+          setParentInviteCode(String(data.parentInviteCode).toUpperCase());
+          setInviteCodeValid(true);
+          setInviterUsername(data.inviterUsername || '');
+          setInviteLocked(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (inviteLocked) {
+      setIsValidatingCode(false);
+      return;
+    }
+    const code = parentInviteCode.trim().toUpperCase();
+    if (!code) {
+      setInviteCodeValid(null);
+      setInviterUsername('');
+      setIsValidatingCode(false);
+      return;
+    }
     if (code.length !== 5) {
       setInviteCodeValid(false);
+      setInviterUsername('');
+      setIsValidatingCode(false);
       return;
     }
 
     let cancelled = false;
     setIsValidatingCode(true);
-    authAPI.validateInvite(code)
-      .then((data) => {
-        if (cancelled) return;
-        setInviteCodeValid(Boolean(data.valid));
-        setInviterUsername(data.inviterUsername || '');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setInviteCodeValid(false);
-        setInviterUsername('');
-      })
-      .finally(() => {
-        if (!cancelled) setIsValidatingCode(false);
-      });
+    const timer = window.setTimeout(() => {
+      authAPI.validateInvite(code)
+        .then((data) => {
+          if (cancelled) return;
+          setInviteCodeValid(Boolean(data.valid));
+          setInviterUsername(data.inviterUsername || '');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setInviteCodeValid(false);
+          setInviterUsername('');
+        })
+        .finally(() => {
+          if (!cancelled) setIsValidatingCode(false);
+        });
+    }, 300);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [searchParams]);
+  }, [parentInviteCode, inviteLocked]);
 
   const availableGenres = [
     'Electronic', 'Techno', 'House', 'Minimal', 'D&B', 'Jungle', 'Trance',
@@ -244,6 +295,15 @@ const CreatorRegister: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      let eligibleNow = foundingEligible || inviteLocked;
+      if (parentInviteCode.length === 5 && inviteCodeValid && !inviteLocked) {
+        const attached = await userAPI.attachFoundingInvite(parentInviteCode);
+        eligibleNow = true;
+        setFoundingEligible(true);
+        setInviteLocked(true);
+        if (attached?.inviterUsername) setInviterUsername(attached.inviterUsername);
+      }
+
       const submitData = new FormData();
       submitData.append('artistName', formData.artistName);
       submitData.append('bio', formData.bio);
@@ -255,9 +315,13 @@ const CreatorRegister: React.FC = () => {
       await refreshUser();
 
       toast.success(
-        foundingStatus.open
-          ? 'You\'re a creator. Upload your own music to claim a founding seat.'
-          : 'You\'re a creator. You can upload your music.'
+        alreadyFounding
+          ? 'You\'re a creator.'
+          : eligibleNow && foundingStatus.open
+            ? 'You\'re a creator. Upload your own music to claim a founding seat.'
+            : requestStatus === 'pending'
+              ? 'You\'re a creator. Your founding request is in review. You can still upload.'
+              : 'You\'re a creator. A founding seat needs an invite or an approved request.'
       );
       navigate('/creator/upload');
     } catch (error: any) {
@@ -581,6 +645,26 @@ const CreatorRegister: React.FC = () => {
     </div>
   );
 
+  const handleFoundingRequest = async () => {
+    if (!isAuthenticated) {
+      toast.error('Create your account first, then send the request');
+      return;
+    }
+    if (isRequesting) return;
+    setIsRequesting(true);
+    try {
+      const result = await userAPI.requestFoundingSeat(requestNote);
+      setRequestStatus('pending');
+      toast.success(result?.alreadyPending
+        ? 'You already have a request in review'
+        : 'Request sent. A seat is claimed only if it is approved and you upload your own music.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to send request');
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
   const renderFoundingStep = () => (
     <div className="space-y-6">
       <div>
@@ -589,17 +673,105 @@ const CreatorRegister: React.FC = () => {
           Founding Creators
         </h3>
         <p className="text-gray-300 mb-6">
-          {foundingStatus.open
-            ? `${foundingStatus.remaining.toLocaleString()} of ${foundingStatus.cap.toLocaleString()} seats left. A seat is claimed when you upload your own music, not when you finish this form.`
-            : `All ${foundingStatus.cap.toLocaleString()} founding seats are claimed. You can still become a creator and upload your music.`}
+          {alreadyFounding
+            ? `You already have a founding seat. Founding status is not equity or ownership.`
+            : foundingStatus.open
+              ? `${foundingStatus.remaining.toLocaleString()} of ${foundingStatus.cap.toLocaleString()} seats left. A seat is claimed when you upload your own music, and only if you have an invite or an approved request.`
+              : `All ${foundingStatus.cap.toLocaleString()} founding seats are claimed. You can still become a creator and upload your music.`}
         </p>
+
+        {foundingStatus.open && !alreadyFounding && (
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-white font-medium mb-2" htmlFor="founding-invite-code">
+                Invite code
+              </label>
+              <input
+                id="founding-invite-code"
+                type="text"
+                value={parentInviteCode}
+                disabled={inviteLocked}
+                maxLength={5}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => {
+                  const code = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+                  setParentInviteCode(code);
+                }}
+                className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-amber-500 disabled:opacity-70 tracking-[0.3em] uppercase"
+                placeholder="ABCDE"
+              />
+              <p className="text-sm mt-2 text-gray-300">
+                {isValidatingCode ? (
+                  'Checking invite…'
+                ) : inviteCodeValid && inviterUsername ? (
+                  <>Invited by <strong className="text-white">@{inviterUsername}</strong>. You are eligible. The seat is still claimed when you upload.</>
+                ) : inviteCodeValid && parentInviteCode ? (
+                  <>Invite code {parentInviteCode} is valid. You are eligible. The seat is still claimed when you upload.</>
+                ) : inviteCodeValid === false ? (
+                  'That invite code is invalid. You can still finish signup, or request a seat below.'
+                ) : (
+                  'Have a code from another creator? Enter it here. A link with ?invite= is filled in for you.'
+                )}
+              </p>
+            </div>
+
+            {foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && (
+              <p className="text-sm text-amber-200">
+                You are eligible{requestStatus === 'approved' ? ' — your request was approved' : ''}. The seat is still claimed when you upload your own music.
+              </p>
+            )}
+
+            {!foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && (
+              <div className="rounded-lg border border-white/10 bg-black/20 p-4 space-y-3">
+                <p className="text-sm text-gray-200">
+                  No invite? Request a founding seat. Approval makes you eligible. It does not assign the seat.
+                </p>
+                {requestStatus === 'pending' ? (
+                  <p className="text-sm text-amber-200">
+                    Request sent. You can finish signup and upload. A seat is claimed only after this is approved, and only while seats remain.
+                  </p>
+                ) : (
+                  <>
+                    {requestStatus === 'rejected' && (
+                      <p className="text-sm text-gray-400">Your last request was not approved. You can send another.</p>
+                    )}
+                    <textarea
+                      value={requestNote}
+                      onChange={(e) => setRequestNote(e.target.value.slice(0, 500))}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-amber-500 min-h-[90px]"
+                      placeholder="Optional note — music, links, why you want a seat"
+                      maxLength={500}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleFoundingRequest}
+                      disabled={isRequesting}
+                      className="inline-flex items-center px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      {isRequesting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Sending…
+                        </>
+                      ) : (
+                        'Request a founding seat'
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="rounded-lg border border-amber-500/30 bg-amber-900/20 p-5 space-y-3 text-sm text-amber-50">
           <p>
             <strong className="text-white">{foundingStatus.uploadQuotaMb.toLocaleString()} MB</strong> upload allowance for founding creators.
           </p>
           <p>
-            Founding creators who invite an artist earn <strong className="text-white">{foundingStatus.affiliatePercent}%</strong> of that artist&apos;s paid tips for their first year, taken from Tuneable&apos;s share, on music they upload themselves.
+            Founding creators who invite an artist earn <strong className="text-white">{foundingStatus.affiliatePercent}%</strong> of that artist&apos;s paid tips for the first year after that artist is verified, taken from Tuneable&apos;s share, on music they upload themselves. The founding creator&apos;s own profile must be complete and verified before that share is paid.
           </p>
           <p>Founding status is not equity or ownership.</p>
         </div>
@@ -643,7 +815,8 @@ const CreatorRegister: React.FC = () => {
   const nextDisabled = isCreatingAccount
     || (step === 1 && !isBasicValid())
     || (step === 2 && !isAuthenticated && !isAccountValid())
-    || (isMusicStep && !isMusicValid());
+    || (isMusicStep && !isMusicValid())
+    || isValidatingCode;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 py-8 pb-40">
@@ -651,7 +824,7 @@ const CreatorRegister: React.FC = () => {
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-white mb-2">Become a Creator</h1>
           <p className="text-gray-300">
-            Set up your artist profile, then upload your own music to claim a founding seat
+            Set up your artist profile. An invite or an approved request makes you eligible to claim a founding seat when you upload.
           </p>
           {(parentInviteCode || inviterUsername) && !isAuthenticated && (
             <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-800/50 border border-purple-400/30 text-sm text-purple-100">
@@ -737,7 +910,7 @@ const CreatorRegister: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isValidatingCode}
                 className="flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
                 {isSubmitting ? (

@@ -8,6 +8,7 @@ const {
   FOUNDING_UPLOAD_QUOTA_BYTES,
   bytesToMb,
   isFoundingCreator,
+  isFoundingSeatEligible,
   getUploadQuotaBytes,
 } = require('../utils/foundingCreators');
 
@@ -21,6 +22,28 @@ describe('foundingCreators config', () => {
   it('converts bytes to MB with one decimal', () => {
     expect(bytesToMb(1024 * 1024)).toBe(1);
     expect(bytesToMb(1.5 * 1024 * 1024)).toBe(1.5);
+  });
+});
+
+describe('isFoundingSeatEligible', () => {
+  it('accepts an invite or an approved request', () => {
+    expect(isFoundingSeatEligible({ parentInviteCode: 'ABCDE' })).toBe(true);
+    expect(isFoundingSeatEligible({ invitedByUserId: 'u1' })).toBe(true);
+    expect(isFoundingSeatEligible({ foundingEligible: true })).toBe(true);
+    expect(isFoundingSeatEligible({ foundingRequestStatus: 'approved' })).toBe(true);
+  });
+
+  it('rejects a pending request and an empty account', () => {
+    expect(isFoundingSeatEligible({ foundingRequestStatus: 'pending' })).toBe(false);
+    expect(isFoundingSeatEligible({})).toBe(false);
+    expect(isFoundingSeatEligible(null)).toBe(false);
+  });
+
+  it('does not treat someone who already has a seat as still eligible to claim', () => {
+    expect(isFoundingSeatEligible({
+      isFoundingCreator: true,
+      foundingEligible: true,
+    })).toBe(false);
   });
 });
 

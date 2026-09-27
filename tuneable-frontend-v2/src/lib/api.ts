@@ -1521,6 +1521,38 @@ export const userAPI = {
     return response.data;
   },
 
+  // Attach an invite to the current account and become eligible for a founding seat
+  attachFoundingInvite: async (code: string) => {
+    const response = await api.post('/users/me/founding-invite', { code });
+    return response.data as { message: string; code: string; inviterUsername?: string; eligible: boolean };
+  },
+
+  // Ask to become eligible for a founding seat. Does not assign the seat.
+  requestFoundingSeat: async (note?: string) => {
+    const response = await api.post('/users/me/founding-request', { note: note || '' });
+    return response.data as { message: string; foundingRequestStatus: string; alreadyPending?: boolean };
+  },
+
+  getFoundingRequests: async (status: 'pending' | 'approved' | 'rejected' = 'pending') => {
+    const response = await api.get('/users/admin/founding-requests', { params: { status } });
+    return response.data as {
+      requests: Array<{
+        userId: string;
+        username: string;
+        email: string;
+        artistName: string | null;
+        note: string;
+        requestedAt: string | null;
+        status: string;
+      }>;
+    };
+  },
+
+  reviewFoundingRequest: async (userId: string, action: 'approve' | 'reject') => {
+    const response = await api.post(`/users/admin/founding-requests/${userId}/review`, { action });
+    return response.data as { message: string; foundingRequestStatus: string; eligible: boolean };
+  },
+
   // Admin: backfill founding seats for earliest original uploaders
   backfillFoundingCreators: async () => {
     const response = await api.post('/users/admin/backfill-founding-creators');

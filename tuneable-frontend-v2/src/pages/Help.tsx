@@ -180,10 +180,11 @@ const Help: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-2">Artist earnings</h3>
             <p className="text-gray-300">
               Verified creators receive 70% of each tip on their media via escrow. Tuneable keeps 30% today
-              and is committed to reducing that to 10% at scale. The first {FOUNDING_CREATOR_CAP.toLocaleString()}{' '}
-              creators who upload their own music become founding creators ({FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB
-              upload allowance). Founding creators who invite an artist earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of
-              that artist&apos;s paid tips for a year, taken from Tuneable&apos;s share, on music they upload
+              and is committed to reducing that to 10% at scale. Eligible creators — those with an invite or an
+              approved request — claim a founding seat when they upload their own music, up to{' '}
+              {FOUNDING_CREATOR_CAP.toLocaleString()} ({FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB upload allowance).
+              Founding creators with a complete verified profile who invite an artist earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of
+              that artist&apos;s paid tips for a year after that artist is verified, taken from Tuneable&apos;s share, on music they upload
               themselves. Founding status is not equity. If the company reaches a £1 billion valuation, we commit
               to community governance (a DAO for artists and users).{' '}
               <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">

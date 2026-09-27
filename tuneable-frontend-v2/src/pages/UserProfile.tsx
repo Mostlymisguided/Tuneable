@@ -4015,7 +4015,7 @@ const UserProfile: React.FC = () => {
                     <Award className="h-16 w-16 text-purple-400 mx-auto mb-4" />
                     <h2 className="text-2xl font-bold text-white mb-4">Become a Creator</h2>
                     <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                      Set up your artist profile, then upload your own music to claim a founding creator seat.
+                      Set up your artist profile. An invite or an approved request makes you eligible to claim a founding seat when you upload.
                     </p>
                     <Link
                       to="/creator/register"

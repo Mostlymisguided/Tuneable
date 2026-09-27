@@ -177,8 +177,8 @@ const Dashboard: React.FC = () => {
   const inviteMessage = useMemo(() => {
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
     const affiliateBlurb = isFoundingCreator
-      ? `If you sign up with my invite code ${inviteCode || ''}, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours. I'm a founding creator.`
-      : `Upload your own music to claim a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}) — ${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB upload allowance and founding invite benefits. Use my invite code ${inviteCode || ''}.`;
+      ? `If you sign up with my invite code ${inviteCode || ''} and your creator profile is verified, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for the year after verification — taken from Tuneable's share, not yours. I'm a founding creator.`
+      : `Use my invite code ${inviteCode || ''} to become eligible for a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}). A seat is claimed when you upload your own music.`;
 
     return `Hey! I'm inviting you to join Tuneable as a creator. Upload your own music and you keep 70% of paid tips.
 
@@ -242,7 +242,7 @@ Join here: ${inviteLink}`.trim();
     const quote = inviteCode
       ? (isFoundingCreator
         ? `Invite artists to Tuneable — they keep 70% of paid tips, and as a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
-        : `Join Tuneable as a creator — upload to claim a founding seat (first ${FOUNDING_CREATOR_CAP}). Code: ${inviteCode}`)
+        : `Join Tuneable as a creator — my invite code makes you eligible for a founding seat (first ${FOUNDING_CREATOR_CAP}). Code: ${inviteCode}`)
       : 'Support your favourite Creators on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
     
@@ -260,7 +260,7 @@ Join here: ${inviteLink}`.trim();
     // Create Instagram-friendly invite message
     const instagramMessage = isFoundingCreator
       ? `Invite artists to Tuneable 🎵\n\nThey keep 70% of paid tips. As a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`
-      : `Join Tuneable as a creator 🎵\n\nUpload your music to claim a founding seat (first ${FOUNDING_CREATOR_CAP}).\n\nCode: ${inviteCode}\n\n${inviteLink}`;
+      : `Join Tuneable as a creator 🎵\n\nMy invite code makes you eligible for a founding seat (first ${FOUNDING_CREATOR_CAP}). A seat is claimed when you upload your own music.\n\nCode: ${inviteCode}\n\n${inviteLink}`;
 
     try {
       // Copy message to clipboard first
@@ -2735,10 +2735,10 @@ Join here: ${inviteLink}`.trim();
               <p className="text-xs text-gray-400 mt-1">
                 {foundingStatus
                   ? `${foundingStatus.claimed.toLocaleString()} / ${foundingStatus.cap.toLocaleString()} seats claimed`
-                  : `First ${FOUNDING_CREATOR_CAP.toLocaleString()} creators who upload their own music`}
+                  : `First ${FOUNDING_CREATOR_CAP.toLocaleString()} eligible creators who upload their own music`}
                 {isFoundingCreator
                   ? ` · ${(FOUNDING_UPLOAD_QUOTA_MB).toLocaleString()} MB upload allowance`
-                  : ' · upload your music to claim a seat'}
+                  : ' · an invite or an approved request, then an upload, claims a seat'}
                 . Not equity — see Terms.
               </p>
               {isFoundingCreator && foundingMe?.uploadQuotaBytes != null && (
@@ -2791,8 +2791,8 @@ Join here: ${inviteLink}`.trim();
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                   {isFoundingCreator
-                    ? "Taken from Tuneable's share, not theirs, and only on music they upload themselves."
-                    : `Upload your own music to join the first ${FOUNDING_CREATOR_CAP.toLocaleString()} founding creators and unlock the ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission.`}
+                    ? "Taken from Tuneable's share, not theirs, on music they upload themselves, and only after both profiles are verified."
+                    : `An invite or an approved request makes you eligible. Upload your own music to claim one of ${FOUNDING_CREATOR_CAP.toLocaleString()} founding seats and unlock the ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission once your profile is verified.`}
                 </p>
                 <p className="text-xs text-gray-500 mt-1 break-all">
                   {inviteLink}

@@ -31,7 +31,7 @@ const originalMedia = {
 describe('inviteeAffiliateDisclosure', () => {
   it('tells the artist the 3% comes from Tuneable when inviter is founding', () => {
     expect(inviteeAffiliateDisclosure('Ada')).toBe(
-      "If you upload your own music, Ada (a founding creator) earns 3% of your paid tips for your first year — taken from Tuneable's share, not yours."
+      "If you upload your own music and your creator profile is verified, Ada (a founding creator) earns 3% of your paid tips for the first year after verification — taken from Tuneable's share, not yours."
     );
   });
 
@@ -52,14 +52,29 @@ describe('computeAffiliateSharePence', () => {
 });
 
 describe('isAffiliateEligible', () => {
-  const artistUser = { _id: 'artist1', createdAt: new Date() };
+  const verifiedProfile = {
+    artistName: 'Ada',
+    roles: ['artist'],
+    genres: ['House'],
+    verificationStatus: 'verified',
+    verifiedAt: new Date(),
+  };
+  const artistUser = {
+    _id: 'artist1',
+    createdAt: new Date('2020-01-01'),
+    creatorProfile: verifiedProfile,
+  };
   const inviterUser = {
     _id: 'inviter1',
-    createdAt: new Date('2020-01-01'),
     isFoundingCreator: true,
+    creatorProfile: {
+      ...verifiedProfile,
+      artistName: 'Bea',
+      verifiedAt: new Date('2019-01-01'),
+    },
   };
 
-  it('pays on original uploads inside the first year for founding inviters', () => {
+  it('pays on original uploads inside the first year after verification', () => {
     expect(isAffiliateEligible({
       media: originalMedia,
       artistUser,
@@ -75,6 +90,41 @@ describe('isAffiliateEligible', () => {
     })).toBe(false);
   });
 
+  it('skips until the invited artist is verified', () => {
+    expect(isAffiliateEligible({
+      media: originalMedia,
+      artistUser: {
+        ...artistUser,
+        creatorProfile: { ...verifiedProfile, verificationStatus: 'pending', verifiedAt: null },
+      },
+      inviterUser,
+    })).toBe(false);
+  });
+
+  it('skips until the founding creator profile is complete and verified', () => {
+    expect(isAffiliateEligible({
+      media: originalMedia,
+      artistUser,
+      inviterUser: {
+        ...inviterUser,
+        creatorProfile: { ...inviterUser.creatorProfile, genres: [] },
+      },
+    })).toBe(false);
+  });
+
+  it('starts the year at verification, not account creation', () => {
+    expect(isAffiliateEligible({
+      media: originalMedia,
+      artistUser: {
+        ...artistUser,
+        createdAt: new Date('2020-01-01'),
+        creatorProfile: { ...verifiedProfile, verifiedAt: new Date('2026-01-01') },
+      },
+      inviterUser,
+      now: new Date('2026-06-01'),
+    })).toBe(true);
+  });
+
   it('skips claimed library imports', () => {
     expect(isAffiliateEligible({
       media: { ...originalMedia, importSource: 'rekordbox' },
@@ -83,10 +133,13 @@ describe('isAffiliateEligible', () => {
     })).toBe(false);
   });
 
-  it('skips after the first year', () => {
+  it('skips after the first year from verification', () => {
     expect(isAffiliateEligible({
       media: originalMedia,
-      artistUser: { ...artistUser, createdAt: new Date('2020-01-01') },
+      artistUser: {
+        ...artistUser,
+        creatorProfile: { ...verifiedProfile, verifiedAt: new Date('2020-01-01') },
+      },
       inviterUser,
       now: new Date('2022-01-01'),
     })).toBe(false);

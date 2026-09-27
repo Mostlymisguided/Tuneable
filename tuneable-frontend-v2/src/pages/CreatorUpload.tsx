@@ -147,6 +147,7 @@ const CreatorUpload: React.FC = () => {
     cap: number;
     remaining: number;
     isFoundingCreator?: boolean;
+    eligible?: boolean;
     seatNumber?: number | null;
     usedMb?: number;
     quotaMb?: number;
@@ -173,6 +174,7 @@ const CreatorUpload: React.FC = () => {
           cap: status.cap,
           remaining: status.remaining,
           isFoundingCreator: me?.isFoundingCreator,
+          eligible: Boolean(me?.eligible),
           seatNumber: me?.foundingSeatNumber,
           usedMb: me?.uploadUsedBytes != null
             ? Math.round((me.uploadUsedBytes / (1024 * 1024)) * 10) / 10
@@ -711,8 +713,10 @@ const CreatorUpload: React.FC = () => {
               </p>
               <p className="text-xs text-gray-300 mt-1">
                 {foundingBanner.isFoundingCreator
-                  ? `Your allowance: ${foundingBanner.usedMb ?? 0} / ${foundingBanner.quotaMb ?? FOUNDING_UPLOAD_QUOTA_MB} MB used. Affiliate invite commission unlocked.`
-                  : `${foundingBanner.claimed.toLocaleString()} / ${foundingBanner.cap.toLocaleString()} seats claimed — ${foundingBanner.remaining.toLocaleString()} left. Your first original upload can claim a seat (${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB allowance). Not equity.`}
+                  ? `Your allowance: ${foundingBanner.usedMb ?? 0} / ${foundingBanner.quotaMb ?? FOUNDING_UPLOAD_QUOTA_MB} MB used. Affiliate invite commission applies once your profile is verified.`
+                  : foundingBanner.eligible
+                    ? `${foundingBanner.claimed.toLocaleString()} / ${foundingBanner.cap.toLocaleString()} seats claimed — ${foundingBanner.remaining.toLocaleString()} left. This upload can claim a seat (${FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB allowance). Not equity.`
+                    : `${foundingBanner.claimed.toLocaleString()} / ${foundingBanner.cap.toLocaleString()} seats claimed — ${foundingBanner.remaining.toLocaleString()} left. A seat needs an invite or an approved request, then this upload. Not equity.`}
               </p>
             </div>
           )}

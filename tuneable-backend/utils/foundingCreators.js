@@ -1,7 +1,9 @@
 /**
  * Founding Creators program:
- * - First N creators who upload verified original music claim a founding seat
+ * - An invite code, or an approved founding request, makes a creator eligible
+ * - The seat is claimed on their first qualifying original upload, until the cap
  * - Perks: founding status/badge, upload allowance, exclusive artist-invite affiliate (3%)
+ * - The 3% starts only after both profiles are complete and verified
  * - Not equity / ownership — status + platform benefits only
  *
  * Tunables via env (defaults in parentheses):
@@ -32,6 +34,27 @@ function mbToBytes(mb) {
 
 function isFoundingCreator(user) {
   return Boolean(user?.isFoundingCreator);
+}
+
+/**
+ * Invite (including one already stored on the account) or an approved request.
+ * Does not assign a seat.
+ */
+function isFoundingSeatEligible(user) {
+  if (!user || user.isFoundingCreator) return false;
+  if (user.foundingEligible) return true;
+  if (user.foundingRequestStatus === 'approved') return true;
+  if (typeof user.parentInviteCode === 'string' && user.parentInviteCode.trim()) return true;
+  if (user.invitedByUserId) return true;
+  return false;
+}
+
+function foundingInviteEligibilityFields(now = new Date()) {
+  return {
+    foundingEligible: true,
+    foundingEligibleAt: now,
+    foundingEligibilitySource: 'invite',
+  };
 }
 
 /**
@@ -130,16 +153,19 @@ async function getProgramStatus() {
  *
  * @returns {Promise<{ status: 'assigned'|'already'|'full'|'skipped', seatNumber?: number, user?: object }>}
  */
-async function tryClaimFoundingSeat(userId, { reason = 'original_upload' } = {}) {
+async function tryClaimFoundingSeat(userId, { reason = 'original_upload', requireEligibility = true } = {}) {
   const User = require('../models/User');
   const FoundingProgram = getFoundingProgram();
   if (!userId) return { status: 'skipped' };
 
   const existing = await User.findById(userId)
-    .select('isFoundingCreator foundingSeatNumber foundingSeatAssignedAt foundingUploadQuotaBytes username');
+    .select('isFoundingCreator foundingSeatNumber foundingSeatAssignedAt foundingUploadQuotaBytes username foundingEligible foundingRequestStatus parentInviteCode invitedByUserId');
   if (!existing) return { status: 'skipped' };
   if (existing.isFoundingCreator) {
     return { status: 'already', seatNumber: existing.foundingSeatNumber, user: existing };
+  }
+  if (requireEligibility && !isFoundingSeatEligible(existing)) {
+    return { status: 'ineligible' };
   }
 
   const seatNumber = await FoundingProgram.claimSeat(FOUNDING_CREATOR_CAP);
@@ -273,6 +299,8 @@ module.exports = {
   bytesToMb,
   mbToBytes,
   isFoundingCreator,
+  isFoundingSeatEligible,
+  foundingInviteEligibilityFields,
   getOriginalUploadBytesUsed,
   getUploadQuotaBytes,
   assertWithinUploadQuota,

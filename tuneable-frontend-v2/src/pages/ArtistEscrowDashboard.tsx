@@ -433,8 +433,8 @@ const ArtistEscrowDashboard: React.FC = () => {
               </p>
               <p className="text-sm text-indigo-200 mt-2">
                 {user?.isFoundingCreator
-                  ? `As a founding creator, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for year one, taken from Tuneable's share on music they upload themselves.`
-                  : `Artist-invite commission (${ARTIST_INVITE_AFFILIATE_PERCENT}%) is exclusive to founding creators — the first ${FOUNDING_CREATOR_CAP.toLocaleString()} who upload their own music.`}
+                  ? `As a founding creator with a verified profile, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tips for the year after they are verified, taken from Tuneable's share on music they upload themselves.`
+                  : `Artist-invite commission (${ARTIST_INVITE_AFFILIATE_PERCENT}%) is exclusive to verified founding creators — eligible creators claim one of the first ${FOUNDING_CREATOR_CAP.toLocaleString()} seats by uploading their own music.`}
                 {(escrowInfo.affiliateEarned || 0) > 0
                   ? ` You've earned ${penceToPounds(escrowInfo.affiliateEarned)} so far.`
                   : user?.isFoundingCreator

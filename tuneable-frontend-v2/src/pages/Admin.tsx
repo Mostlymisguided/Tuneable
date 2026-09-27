@@ -28,6 +28,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import InviteRequestsAdmin from '../components/InviteRequestsAdmin';
+import FoundingRequestsAdmin from '../components/FoundingRequestsAdmin';
 import SpotifyImportRequestsAdmin from '../components/SpotifyImportRequestsAdmin';
 import ReportsAdmin from '../components/ReportsAdmin';
 import RightsAdmin from '../components/RightsAdmin';
@@ -1478,8 +1479,11 @@ const Admin: React.FC = () => {
                   <div className="mt-6 pt-4 border-t border-gray-700">
                     <h4 className="text-sm font-semibold text-white mb-2">Founding Creators</h4>
                     <p className="text-xs text-gray-400 mb-3">
-                      Assign founding seats to the earliest users who already have verified original uploads (up to the cap).
+                      Approve a request to make someone eligible. The seat is still claimed when they upload their own music. Backfill does the same for eligible creators who already uploaded, earliest first.
                     </p>
+                    <div className="mb-4">
+                      <FoundingRequestsAdmin />
+                    </div>
                     <button
                       type="button"
                       onClick={async () => {

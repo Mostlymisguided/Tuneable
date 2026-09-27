@@ -39,8 +39,8 @@ export function InviteShareCard({
   if (!code) return null;
 
   const shareMessage = isFoundingCreator
-    ? `Join Tuneable as a creator — use my invite code ${code}. Upload your music and keep 70% of paid tips; as a founding creator I earn 3% from Tuneable's share for your first year.\n${getInviteShareUrl(code)}`
-    : `Join Tuneable as a creator — use my invite code ${code}. Upload your music to claim a founding creator seat (first 1,111) and keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
+    ? `Join Tuneable as a creator — use my invite code ${code}. Upload your music and keep 70% of paid tips. Once your profile is verified, as a founding creator I earn 3% from Tuneable's share for the first year after verification.\n${getInviteShareUrl(code)}`
+    : `Join Tuneable as a creator — use my invite code ${code}. That makes you eligible for a founding creator seat (first 1,111), claimed when you upload your own music. You keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
 
   const onCopy = async () => {
     try {
@@ -69,7 +69,7 @@ export function InviteShareCard({
       <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
         {isFoundingCreator
           ? "Invite an artist with this code and earn 3% of their paid tips for year one (from Tuneable's share, on music they upload)."
-          : 'Invite creators with this code. The 3% invite commission is exclusive to founding creators (first 1,111 who upload).'}
+          : 'Invite creators with this code. It makes them eligible for a founding seat (first 1,111), claimed when they upload. The 3% invite commission is exclusive to verified founding creators.'}
       </Text>
       <View style={styles.actions}>
         <Pressable style={styles.actionBtn} onPress={() => void onCopy()}>

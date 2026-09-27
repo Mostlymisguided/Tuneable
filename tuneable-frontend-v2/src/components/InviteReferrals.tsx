@@ -174,8 +174,8 @@ const InviteReferrals: React.FC = () => {
           <>
             <p className="text-sm text-gray-300 mt-4 mb-4">
               {isFoundingCreator
-                ? `As a founding creator, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tip revenue for their first year — taken from Tuneable's share, not theirs. It only applies to music they upload themselves.`
-                : `Invite codes still grow Tuneable. The ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission is exclusive to founding creators (first ${FOUNDING_CREATOR_CAP.toLocaleString()} who upload their own music).`}
+                ? `As a founding creator with a verified profile, invite an artist with your code and you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of their paid tip revenue for the year after they are verified — taken from Tuneable's share, not theirs. It only applies to music they upload themselves.`
+                : `Invite codes still grow Tuneable. The ${ARTIST_INVITE_AFFILIATE_PERCENT}% invite commission is exclusive to verified founding creators (eligible creators claim one of ${FOUNDING_CREATOR_CAP.toLocaleString()} seats by uploading their own music).`}
             </p>
             
             <p className="text-gray-300 mb-4">

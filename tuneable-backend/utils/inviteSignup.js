@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { foundingInviteEligibilityFields } = require('./foundingCreators');
 
 /**
  * Resolve an optional invite code for signup.
@@ -63,6 +64,63 @@ function inviteAttributionFields(invite) {
       ? invite.inviteCodeObj._id
       : undefined,
     invitedByUserId: invite.inviter._id,
+    ...foundingInviteEligibilityFields(),
+  };
+}
+
+/**
+ * Attach a valid invite to an existing account and mark them eligible for a founding seat.
+ * Same code is idempotent and does not spend another invite credit.
+ */
+async function attachInviteForFounding(user, rawCode) {
+  if (!user) return { ok: false, status: 404, error: 'User not found' };
+
+  const invite = await resolveInviteForSignup(rawCode);
+  if (!invite.ok || !invite.inviter) {
+    return { ok: false, status: 400, error: invite.error || 'Invalid invite code' };
+  }
+  if (String(invite.inviter._id) === String(user._id)) {
+    return { ok: false, status: 400, error: 'You cannot use your own invite code' };
+  }
+
+  const existing = typeof user.parentInviteCode === 'string'
+    ? user.parentInviteCode.toUpperCase()
+    : '';
+  if (existing && existing !== invite.code) {
+    return { ok: false, status: 400, error: 'This account already used a different invite code' };
+  }
+
+  const alreadyAttached = existing === invite.code;
+  if (!alreadyAttached) {
+    user.parentInviteCode = invite.code;
+    user.parentInviteCodeId = invite.inviteCodeObj && invite.inviteCodeObj._id
+      ? invite.inviteCodeObj._id
+      : undefined;
+    user.invitedByUserId = invite.inviter._id;
+  }
+
+  if (!user.foundingEligible) {
+    Object.assign(user, foundingInviteEligibilityFields());
+  } else if (!user.foundingEligibilitySource) {
+    user.foundingEligibilitySource = 'invite';
+  }
+
+  await user.save();
+
+  if (!alreadyAttached) {
+    await applyInviteUsage({
+      inviter: invite.inviter,
+      inviteCodeObj: invite.inviteCodeObj,
+      code: invite.code,
+      isInviterAdmin: invite.isInviterAdmin,
+    });
+  }
+
+  return {
+    ok: true,
+    code: invite.code,
+    inviterUsername: invite.inviter.username || null,
+    foundingEligible: true,
   };
 }
 
@@ -116,4 +174,5 @@ module.exports = {
   resolveInviteForSignup,
   applyInviteUsage,
   inviteAttributionFields,
+  attachInviteForFounding,
 };

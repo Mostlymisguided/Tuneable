@@ -835,7 +835,7 @@ async function sendInviteEmail(
     const affiliateLine = inviteeAffiliateDisclosure(inviterUsername, { inviterIsFounding });
     const foundingLine = inviterIsFounding
       ? ''
-      : `<p>Be among the first founding creators: upload your own music to claim a founding seat (limited), with upload allowance and founding creator invite benefits. See Terms for details.</p>`;
+      : `<p>Use this invite to become eligible for a founding creator seat. A seat is claimed when you upload your own music, while seats remain. See Terms for details.</p>`;
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: recipientEmail,

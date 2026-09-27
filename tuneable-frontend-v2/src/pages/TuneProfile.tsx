@@ -1570,8 +1570,8 @@ const TuneProfile: React.FC = () => {
     const title = media?.title || 'this track';
     const link = `${window.location.origin}/creator/register?invite=${inviteCode}`;
     const affiliateLine = user?.isFoundingCreator
-      ? `If you upload your own music, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.`
-      : `Upload your own music to claim a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}) — status benefits only, not equity.`;
+      ? `If you upload your own music and your profile is verified, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for the year after verification — taken from Tuneable's share, not yours.`
+      : `Use my invite code to become eligible for a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}). A seat is claimed when you upload your own music. Status benefits only, not equity.`;
     const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator with my invite code ${inviteCode}, then upload or claim it so tips can reach you.\n\n${affiliateLine}\n\n${link}`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {

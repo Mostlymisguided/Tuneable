@@ -128,6 +128,27 @@ const userSchema = new mongoose.Schema({
   foundingSeatAssignedAt: { type: Date, default: null },
   foundingUploadQuotaBytes: { type: Number, default: null, min: 0 },
   foundingSeatClaimReason: { type: String, default: null },
+  // Eligible to claim a seat on the next original upload: valid invite, or an approved request.
+  foundingEligible: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  foundingEligibleAt: { type: Date, default: null },
+  foundingEligibilitySource: {
+    type: String,
+    enum: ['invite', 'approved_request'],
+  },
+  foundingRequestStatus: {
+    type: String,
+    enum: ['none', 'pending', 'approved', 'rejected'],
+    default: 'none',
+    index: true,
+  },
+  foundingRequestNote: { type: String, default: null, maxlength: 500 },
+  foundingRequestedAt: { type: Date, default: null },
+  foundingRequestReviewedAt: { type: Date, default: null },
+  foundingRequestReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   totalEscrowEarned: { 
     type: Number, 
     default: 0 

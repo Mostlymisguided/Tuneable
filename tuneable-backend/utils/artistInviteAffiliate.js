@@ -1,8 +1,10 @@
 /**
  * Artist-invite affiliate: 3% of an invited artist's paid tip revenue
- * for 12 months, taken from Tuneable's platform share (artist still gets 70%).
+ * for 12 months after that artist is verified, taken from Tuneable's platform share
+ * (artist still gets 70%).
  * Only original artist uploads qualify — not claimed library imports.
- * Only founding creators (inviters) earn the commission.
+ * Only founding creators with a complete, verified profile earn the commission,
+ * and only once the invited artist is complete and verified too.
  */
 
 const { isOriginalUploadOwner, isVerifiedOriginalUpload } = require('./mediaRights');
@@ -24,8 +26,30 @@ function originalUploaderOwner(media) {
   )) || null;
 }
 
+function isCreatorProfileComplete(user) {
+  const profile = user?.creatorProfile;
+  if (!profile) return false;
+  const name = typeof profile.artistName === 'string' ? profile.artistName.trim() : '';
+  const roles = Array.isArray(profile.roles) ? profile.roles.filter(Boolean) : [];
+  const genres = Array.isArray(profile.genres) ? profile.genres.filter(Boolean) : [];
+  return Boolean(name) && roles.length > 0 && genres.length > 0;
+}
+
+function isCreatorVerified(user) {
+  return user?.creatorProfile?.verificationStatus === 'verified';
+}
+
+function affiliateVerificationStart(user) {
+  if (!isCreatorVerified(user)) return null;
+  const verifiedAt = user?.creatorProfile?.verifiedAt;
+  if (!verifiedAt) return null;
+  const start = new Date(verifiedAt);
+  if (Number.isNaN(start.getTime())) return null;
+  return start;
+}
+
 function isWithinAffiliateWindow(artistUser, now = new Date()) {
-  return affiliateWindowInfo(artistUser?.createdAt, now).active;
+  return affiliateWindowInfo(affiliateVerificationStart(artistUser), now).active;
 }
 
 function affiliateWindowInfo(createdAt, now = new Date()) {
@@ -51,6 +75,8 @@ function isAffiliateEligible({
 } = {}) {
   if (!media || !artistUser || !inviterUser) return false;
   if (!inviterUser.isFoundingCreator) return false;
+  if (!isCreatorVerified(inviterUser) || !isCreatorProfileComplete(inviterUser)) return false;
+  if (!isCreatorVerified(artistUser) || !isCreatorProfileComplete(artistUser)) return false;
   if (!isVerifiedOriginalUpload(media)) return false;
   if (String(artistUser._id) === String(inviterUser._id)) return false;
   if (tipperUserId && String(tipperUserId) === String(inviterUser._id)) return false;
@@ -76,7 +102,7 @@ function isInvitedCreator(user) {
 function inviteeAffiliateDisclosure(inviterName, { inviterIsFounding = true } = {}) {
   if (!inviterIsFounding) return null;
   const who = inviterName || 'Your inviter';
-  return `If you upload your own music, ${who} (a founding creator) earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for your first year — taken from Tuneable's share, not yours.`;
+  return `If you upload your own music and your creator profile is verified, ${who} (a founding creator) earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for the first year after verification — taken from Tuneable's share, not yours.`;
 }
 
 /**
@@ -133,7 +159,7 @@ async function attachAffiliateInviteStats(inviter, invitedUsers = [], now = new 
   }
 
   return invitedUsers.map((user) => {
-    const window = affiliateWindowInfo(user.createdAt, now);
+    const window = affiliateWindowInfo(affiliateVerificationStart(user), now);
     const originalUploadCount = countByOwner.get(String(user._id)) || 0;
     const verificationStatus = user.creatorProfile?.verificationStatus || 'unverified';
     return {

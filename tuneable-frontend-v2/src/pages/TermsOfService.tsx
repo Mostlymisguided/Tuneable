@@ -157,7 +157,7 @@ const TermsOfService: React.FC = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">4.4 Founding Creators</h2>
               <div className="space-y-4 text-gray-700">
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>The first 1,111 creators who sign up and upload their own music (verified original upload) may receive Founding Creator status, assigned in order of qualifying upload until the cap is reached</li>
+                  <li>A founding seat is claimed when an eligible creator uploads their own music (verified original upload), in order, until 1,111 seats are claimed. You are eligible if you use a valid invite code or Tuneable approves your request to become a founding creator. Finishing signup does not claim a seat</li>
                   <li>Founding Creator status is a platform benefit only. It is not equity, share capital, ownership of Tuneable, or a right to dividends or residual assets. Tuneable is a Community Interest Company</li>
                   <li>Founding Creators receive a tuneable upload allowance (default 2,048 MB of original audio uploads). Tuneable may adjust allowances and will display your used and remaining allowance in the product</li>
                   <li>Tuneable may revoke Founding Creator status for Terms violations, fraud, or abuse. Unused seats are not transferable</li>
@@ -169,7 +169,7 @@ const TermsOfService: React.FC = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">4.5 Artist Invite Commission (Founding Creators)</h2>
               <div className="space-y-4 text-gray-700">
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>Only Founding Creators may earn artist-invite commission. If you are a Founding Creator and an artist signs up with your invite code and then uploads their own work, you may receive a commission of 3% of that artist&apos;s paid tip revenue for 12 months from the artist&apos;s account creation</li>
+                  <li>Only Founding Creators with a complete, verified creator profile may earn artist-invite commission. The invited artist must also have a complete, verified creator profile and have uploaded their own work. Commission is 3% of that artist&apos;s paid tip revenue for 12 months from the date their creator profile is verified</li>
                   <li>The commission is taken from Tuneable&apos;s platform share, not from the artist&apos;s 70% share</li>
                   <li>Commission applies only to media the invited artist uploaded themselves. It does not apply to claimed library imports, catalog-only listings, or welcome-credit-only tips</li>
                   <li>Commission is added to your escrow balance and paid out under the same payout rules as artist earnings. Tuneable may withhold or reverse commission in cases of abuse (including self-invite or circular tipping)</li>

@@ -828,9 +828,12 @@ router.get('/founding-creators', async (req, res) => {
       affiliatePercent: AFFILIATE_SHARE_PERCENT,
       affiliateExclusiveToFounding: true,
       description:
-        `First ${FOUNDING_CREATOR_CAP} creators who upload their own music become founding creators. `
-        + `Perks: ${FOUNDING_UPLOAD_QUOTA_MB} MB upload allowance and exclusive ${AFFILIATE_SHARE_PERCENT}% artist-invite commission `
-        + `(from Tuneable's share). Founding status is not equity or ownership.`,
+        `Founding seats are claimed when an eligible creator uploads their own music, up to ${FOUNDING_CREATOR_CAP}. `
+        + `A valid invite code or an approved request makes you eligible. `
+        + `Perks: ${FOUNDING_UPLOAD_QUOTA_MB} MB upload allowance. `
+        + `Founding creators with a complete verified profile earn ${AFFILIATE_SHARE_PERCENT}% of an invited artist's paid tips `
+        + `for 12 months after that artist is verified, from Tuneable's share, on music they upload themselves. `
+        + `Founding status is not equity or ownership.`,
     });
   } catch (error) {
     console.error('Error fetching founding creators status:', error);
@@ -843,13 +846,18 @@ router.get('/founding-creators', async (req, res) => {
 // @access  Private
 router.get('/me/founding-creator', authMiddleware, async (req, res) => {
   try {
-    const { attachFoundingProfileFields, getProgramStatus } = require('../utils/foundingCreators');
+    const { attachFoundingProfileFields, getProgramStatus, isFoundingSeatEligible } = require('../utils/foundingCreators');
     const user = await User.findById(req.user._id).select(
-      'username isFoundingCreator foundingSeatNumber foundingSeatAssignedAt foundingUploadQuotaBytes'
+      'username isFoundingCreator foundingSeatNumber foundingSeatAssignedAt foundingUploadQuotaBytes foundingEligible foundingEligibilitySource foundingRequestStatus foundingRequestNote parentInviteCode invitedByUserId'
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
     const enriched = await attachFoundingProfileFields(user);
     const program = await getProgramStatus();
+    let inviterUsername = null;
+    if (user.parentInviteCode) {
+      const inviter = await User.findByInviteCode(user.parentInviteCode);
+      inviterUsername = inviter?.username || null;
+    }
     res.json({
       isFoundingCreator: enriched.isFoundingCreator,
       foundingSeatNumber: enriched.foundingSeatNumber,
@@ -857,11 +865,178 @@ router.get('/me/founding-creator', authMiddleware, async (req, res) => {
       uploadQuotaBytes: enriched.foundingUploadQuotaBytes,
       uploadUsedBytes: enriched.foundingUploadUsedBytes,
       uploadRemainingBytes: enriched.foundingUploadRemainingBytes,
+      eligible: isFoundingSeatEligible(user),
+      foundingEligibilitySource: user.foundingEligibilitySource || null,
+      foundingRequestStatus: user.foundingRequestStatus || 'none',
+      foundingRequestNote: user.foundingRequestNote || null,
+      parentInviteCode: user.parentInviteCode || null,
+      inviterUsername,
       program,
     });
   } catch (error) {
     console.error('Error fetching founding creator profile:', error);
     res.status(500).json({ error: 'Failed to fetch founding creator profile' });
+  }
+});
+
+// @route   POST /api/users/me/founding-invite
+// @desc    Attach an invite code and become eligible for a founding seat
+// @access  Private
+router.post('/me/founding-invite', authMiddleware, async (req, res) => {
+  try {
+    const { attachInviteForFounding } = require('../utils/inviteSignup');
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const result = await attachInviteForFounding(user, req.body?.code);
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+    res.json({
+      message: 'Invite saved. Upload your own music to claim a founding seat while seats remain.',
+      code: result.code,
+      inviterUsername: result.inviterUsername,
+      eligible: true,
+    });
+  } catch (error) {
+    console.error('Error attaching founding invite:', error);
+    res.status(500).json({ error: 'Failed to save invite code' });
+  }
+});
+
+// @route   POST /api/users/me/founding-request
+// @desc    Ask to become eligible for a founding seat (does not grant one)
+// @access  Private
+router.post('/me/founding-request', authMiddleware, async (req, res) => {
+  try {
+    const { isFoundingSeatEligible } = require('../utils/foundingCreators');
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.isFoundingCreator) {
+      return res.status(400).json({ error: 'You already have a founding creator seat' });
+    }
+    if (isFoundingSeatEligible(user)) {
+      return res.status(400).json({ error: 'You are already eligible for a founding seat' });
+    }
+    if (user.foundingRequestStatus === 'pending') {
+      return res.json({
+        message: 'You already have a pending founding request.',
+        foundingRequestStatus: 'pending',
+        alreadyPending: true,
+      });
+    }
+
+    const rawNote = req.body?.note;
+    let note = '';
+    if (rawNote != null && rawNote !== '') {
+      if (typeof rawNote !== 'string') {
+        return res.status(400).json({ error: 'Note must be text' });
+      }
+      note = rawNote.trim();
+      if (note.length > 500) {
+        return res.status(400).json({ error: 'Note must be 500 characters or fewer' });
+      }
+    }
+
+    user.foundingRequestStatus = 'pending';
+    user.foundingRequestNote = note || null;
+    user.foundingRequestedAt = new Date();
+    user.foundingRequestReviewedAt = null;
+    user.foundingRequestReviewedBy = null;
+    await user.save();
+
+    res.status(201).json({
+      message: 'Request sent. You can still finish signup and upload. A seat is claimed only if this is approved.',
+      foundingRequestStatus: 'pending',
+    });
+  } catch (error) {
+    console.error('Error submitting founding request:', error);
+    res.status(500).json({ error: 'Failed to submit founding request' });
+  }
+});
+
+// @route   GET /api/users/admin/founding-requests
+// @desc    List founding-seat requests
+// @access  Private (Admin)
+router.get('/admin/founding-requests', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const status = ['pending', 'approved', 'rejected'].includes(req.query.status)
+      ? req.query.status
+      : 'pending';
+    const requests = await User.find({ foundingRequestStatus: status })
+      .select('username email creatorProfile.artistName foundingRequestNote foundingRequestedAt foundingRequestStatus foundingEligible isFoundingCreator')
+      .sort({ foundingRequestedAt: -1 })
+      .limit(100)
+      .lean();
+    res.json({
+      requests: requests.map((user) => ({
+        userId: user._id,
+        username: user.username,
+        email: user.email,
+        artistName: user.creatorProfile?.artistName || null,
+        note: user.foundingRequestNote || '',
+        requestedAt: user.foundingRequestedAt,
+        status: user.foundingRequestStatus,
+        eligible: Boolean(user.foundingEligible),
+        isFoundingCreator: Boolean(user.isFoundingCreator),
+      })),
+    });
+  } catch (error) {
+    console.error('Error listing founding requests:', error);
+    res.status(500).json({ error: 'Failed to list founding requests' });
+  }
+});
+
+// @route   POST /api/users/admin/founding-requests/:userId/review
+// @desc    Approve or reject a founding-seat request. Approval makes them eligible; the seat is still claimed on upload.
+// @access  Private (Admin)
+router.post('/admin/founding-requests/:userId/review', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const action = req.body?.action;
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be approve or reject' });
+    }
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.foundingRequestStatus !== 'pending' && user.foundingRequestStatus !== 'rejected' && action === 'approve') {
+      if (user.foundingRequestStatus === 'approved' || user.foundingEligible) {
+        return res.json({
+          message: 'Already eligible',
+          foundingRequestStatus: user.foundingRequestStatus || 'none',
+          eligible: true,
+        });
+      }
+    }
+
+    user.foundingRequestReviewedAt = new Date();
+    user.foundingRequestReviewedBy = req.user._id;
+
+    if (action === 'approve') {
+      if (user.isFoundingCreator) {
+        return res.status(400).json({ error: 'This user already has a founding seat' });
+      }
+      user.foundingRequestStatus = 'approved';
+      user.foundingEligible = true;
+      if (!user.foundingEligibleAt) user.foundingEligibleAt = new Date();
+      if (!user.foundingEligibilitySource) user.foundingEligibilitySource = 'approved_request';
+    } else {
+      user.foundingRequestStatus = 'rejected';
+      if (user.foundingEligibilitySource !== 'invite' && !user.parentInviteCode && !user.invitedByUserId) {
+        user.foundingEligible = false;
+      }
+    }
+
+    await user.save();
+    res.json({
+      message: action === 'approve'
+        ? 'Approved. They claim a seat when they upload their own music, if one is left.'
+        : 'Request rejected.',
+      foundingRequestStatus: user.foundingRequestStatus,
+      eligible: Boolean(user.foundingEligible) || Boolean(user.parentInviteCode) || Boolean(user.invitedByUserId),
+    });
+  } catch (error) {
+    console.error('Error reviewing founding request:', error);
+    res.status(500).json({ error: 'Failed to review founding request' });
   }
 });
 
@@ -3992,7 +4167,7 @@ router.get('/referrals', authMiddleware, async (req, res) => {
     }
     
     const referrals = await User.find(query)
-      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId creatorProfile.verificationStatus')
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId creatorProfile.verificationStatus creatorProfile.verifiedAt creatorProfile.artistName creatorProfile.roles creatorProfile.genres')
       .sort({ createdAt: -1 })
       .lean();
 
