@@ -117,8 +117,6 @@ export default function ProfileScreen() {
   );
 
   const onLogout = () => {
-    // Tabs layout redirects to / once the session is cleared. A second
-    // router.replace here races that redirect and can freeze the iOS stack.
     void logout();
   };
 

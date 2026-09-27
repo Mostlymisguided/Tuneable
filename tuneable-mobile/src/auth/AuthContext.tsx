@@ -66,10 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     useBlockedUsersStore.getState().clear();
     useNotificationStore.getState().clear();
-    // Playback teardown can stall inside expo-av on iOS. Don't make sign-out
-    // wait for it; the signed-in UI is already gone.
-    void useMusicPlayerStore.getState().clear().catch(() => undefined);
-    void usePodcastPlayerStore.getState().clear().catch(() => undefined);
+    // Unload after the stack replace. expo-av teardown during that transition
+    // can lock the iOS main thread.
+    setTimeout(() => {
+      void useMusicPlayerStore.getState().clear().catch(() => undefined);
+      void usePodcastPlayerStore.getState().clear().catch(() => undefined);
+    }, 800);
     await Promise.race([
       clearSession().catch(() => undefined),
       new Promise<void>((resolve) => {
