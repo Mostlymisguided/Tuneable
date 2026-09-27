@@ -30,6 +30,12 @@ export const SUPPORT_EMAIL = 'support@tuneable.stream';
 // Default cover art URL for media without cover art
 export const DEFAULT_COVER_ART = 'https://uploads.tuneable.stream/cover-art/default-cover.png';
 
+/** Local portrait stand-in for books with no jacket. File lives in /public. */
+export const DEFAULT_BOOK_COVER_ART = '/default-book-cover.png';
+
+/** Absolute URL the API returns when a book has no stored cover. */
+export const DEFAULT_BOOK_COVER_ART_REMOTE = 'https://tuneable.stream/default-book-cover.png';
+
 // Complete list of countries (195+ including Palestine and Vatican City)
 export const COUNTRIES = [
   'United Kingdom',

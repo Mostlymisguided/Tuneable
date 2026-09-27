@@ -5,6 +5,8 @@
  */
 
 const DEFAULT_COVER_ART = 'https://uploads.tuneable.stream/cover-art/default-cover.png';
+/** Portrait stand-in served with the web app. Not stored on the book record. */
+const DEFAULT_BOOK_COVER_ART = 'https://tuneable.stream/default-book-cover.png';
 const { extractYouTubeVideoId, getYouTubeThumbnail } = require('./youtubeUtils');
 
 /**
@@ -67,9 +69,30 @@ function getMediaCoverArt(media) {
   return getCoverArtUrl(media);
 }
 
+function isUsableCoverArtUrl(value) {
+  if (!value || typeof value !== 'string') return false;
+  const coverArt = value.trim();
+  if (!coverArt || coverArt === '[object Object]') return false;
+  return coverArt.startsWith('http://') ||
+    coverArt.startsWith('https://') ||
+    coverArt.startsWith('/');
+}
+
+/**
+ * Cover URL for a book response. Missing or unusable art becomes the book placeholder.
+ * Callers should not persist this fallback onto the Media document.
+ */
+function resolveBookCoverArt(coverArt) {
+  if (isUsableCoverArtUrl(coverArt)) return coverArt.trim();
+  return DEFAULT_BOOK_COVER_ART;
+}
+
 module.exports = {
   getCoverArtUrl,
   getMediaCoverArt,
-  DEFAULT_COVER_ART
+  isUsableCoverArtUrl,
+  resolveBookCoverArt,
+  DEFAULT_COVER_ART,
+  DEFAULT_BOOK_COVER_ART
 };
 

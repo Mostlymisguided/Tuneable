@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, Search, Coins } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
-import { DEFAULT_COVER_ART } from '../constants';
+import BookCover from '../components/BookCover';
 import EntertainingLoader from '../components/EntertainingLoader';
 import ChartKindToggle from '../components/ChartKindToggle';
 
@@ -123,9 +123,8 @@ const Books: React.FC = () => {
                 style={{ textDecoration: 'none' }}
               >
                 <span className="w-7 text-gray-500 font-mono">{index + 1}</span>
-                <img
-                  src={book.coverArt || DEFAULT_COVER_ART}
-                  alt=""
+                <BookCover
+                  src={book.coverArt}
                   className="w-12 h-16 object-cover rounded"
                 />
                 <div className="flex-1 min-w-0">

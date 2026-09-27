@@ -4,7 +4,11 @@
  * Centralized functions for cover art URL resolution with fallback chain
  */
 
-import { DEFAULT_COVER_ART } from '../constants';
+import {
+  DEFAULT_BOOK_COVER_ART,
+  DEFAULT_BOOK_COVER_ART_REMOTE,
+  DEFAULT_COVER_ART,
+} from '../constants';
 import { extractYouTubeVideoId, getYouTubeThumbnail } from './youtubeUtils';
 
 /**
@@ -58,5 +62,30 @@ export function getCoverArtUrl(media: any, sources?: any): string {
  */
 export function getMediaCoverArt(media: any): string {
   return getCoverArtUrl(media);
+}
+
+function isBookPlaceholderUrl(value: string): boolean {
+  return value === DEFAULT_BOOK_COVER_ART
+    || value === DEFAULT_BOOK_COVER_ART_REMOTE
+    || value.endsWith('/default-book-cover.png');
+}
+
+/**
+ * Jacket URL for a book. Missing, unusable, or API placeholder values use the local asset.
+ */
+export function resolveBookCoverArt(coverArt?: string | null): string {
+  if (!coverArt || typeof coverArt !== 'string') return DEFAULT_BOOK_COVER_ART;
+  const trimmed = coverArt.trim();
+  if (!trimmed || trimmed === '[object Object]' || isBookPlaceholderUrl(trimmed)) {
+    return DEFAULT_BOOK_COVER_ART;
+  }
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('/')
+  ) {
+    return trimmed;
+  }
+  return DEFAULT_BOOK_COVER_ART;
 }
 

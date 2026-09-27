@@ -7,7 +7,8 @@ import { mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
-import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { enrichMediaWithPlayability, isMediaPlayable, isWrittenMedia, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { resolveBookCoverArt } from '../utils/coverArt';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
@@ -180,7 +181,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     artist: item.artist,
     featuring: item.featuring,
     creatorDisplay: item.creatorDisplay,
-    coverArt: item.coverArt || DEFAULT_COVER_ART,
+    coverArt: isWrittenMedia(item) ? resolveBookCoverArt(item.coverArt) : (item.coverArt || DEFAULT_COVER_ART),
     duration: item.duration || 0,
     bpm: item.bpm ?? null,
     releaseDate: item.releaseDate ?? null,
@@ -198,7 +199,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     title: item.title,
     artist: getCreatorDisplay(item),
     duration: item.duration || 0,
-    coverArt: item.coverArt || DEFAULT_COVER_ART,
+    coverArt: isWrittenMedia(item) ? resolveBookCoverArt(item.coverArt) : (item.coverArt || DEFAULT_COVER_ART),
     sources: item.sources || {},
     globalMediaAggregate: item.globalMediaAggregate || 0,
     bids: [],

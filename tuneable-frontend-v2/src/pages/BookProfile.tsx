@@ -5,7 +5,9 @@ import { BookOpen, Coins, ExternalLink } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
-import { DEFAULT_COVER_ART } from '../constants';
+import { DEFAULT_BOOK_COVER_ART_REMOTE } from '../constants';
+import BookCover from '../components/BookCover';
+import { resolveBookCoverArt } from '../utils/coverArt';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import EntertainingLoader from '../components/EntertainingLoader';
 import MediaChampions from '../components/MediaChampions';
@@ -14,6 +16,13 @@ import { getTipCurrentLocation } from '../utils/currentLocationCache';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { usePageMeta } from '../seo/usePageMeta';
 import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
+
+function bookCoverMetaImage(coverArt?: string | null): string {
+  const resolved = resolveBookCoverArt(coverArt);
+  if (resolved.startsWith('http://') || resolved.startsWith('https://')) return resolved;
+  if (resolved === '/default-book-cover.png') return DEFAULT_BOOK_COVER_ART_REMOTE;
+  return `${SITE_ORIGIN}${resolved.startsWith('/') ? resolved : `/${resolved}`}`;
+}
 
 const BookProfile: React.FC = () => {
   const { mediaId } = useParams();
@@ -65,7 +74,7 @@ const BookProfile: React.FC = () => {
     title: authors && authors !== 'Unknown author' ? `${book.title} by ${authors}` : book.title,
     description: clipText(book.description) || `Tip “${book.title}”${authors && authors !== 'Unknown author' ? ` by ${authors}` : ''} on Tuneable and move it up the book chart.`,
     path: bookPath,
-    image: book.coverArt,
+    image: bookCoverMetaImage(book.coverArt),
     imageAlt: book.title,
     type: 'book',
     jsonLd: {
@@ -113,8 +122,8 @@ const BookProfile: React.FC = () => {
     <div className="min-h-screen bg-gray-950 text-white pt-20 pb-24 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col sm:flex-row gap-6">
-          <img
-            src={book.coverArt || DEFAULT_COVER_ART}
+          <BookCover
+            src={book.coverArt}
             alt={book.title}
             className="w-40 h-56 object-cover rounded-xl shadow-lg"
           />

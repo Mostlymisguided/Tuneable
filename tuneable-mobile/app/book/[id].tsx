@@ -24,7 +24,8 @@ import { formatPoundsFromPence } from '@/src/lib/format';
 import { getReadElsewhereTarget } from '@/src/lib/listenElsewhere';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { colors } from '@/src/theme/colors';
-import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
+import { bookCoverSource, isBlankCoverSize } from '@/src/lib/bookCover';
+import { type ChartMediaItem } from '@/src/types/media';
 
 export default function BookProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +38,7 @@ export default function BookProfileScreen() {
   const [tipOpen, setTipOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -46,6 +48,7 @@ export default function BookProfileScreen() {
       setError(null);
       try {
         const data = await booksAPI.getBook(id);
+        setCoverFailed(false);
         setBook(data.book);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Book not found');
@@ -122,7 +125,13 @@ export default function BookProfileScreen() {
           <>
             <View style={styles.coverWrap}>
               <Image
-                source={{ uri: book.coverArt || DEFAULT_COVER_ART }}
+                source={bookCoverSource(coverFailed ? null : book.coverArt)}
+                resizeMode="cover"
+                onLoad={(event) => {
+                  const { width, height } = event.nativeEvent.source;
+                  if (isBlankCoverSize(width, height)) setCoverFailed(true);
+                }}
+                onError={() => setCoverFailed(true)}
                 style={styles.cover}
               />
               {coverState !== 'clear' ? (

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, type Href } from 'expo-router';
@@ -9,6 +9,7 @@ import {
 import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
+import { bookCoverSource, isBlankCoverSize } from '@/src/lib/bookCover';
 import {
   formatDuration,
   formatPoundsFromPence,
@@ -19,7 +20,7 @@ import {
   getCountryLabelFromLocation,
   getCountryPlaceProfileHref,
 } from '@/src/lib/location';
-import { getCreatorDisplay, isUploadPlayable } from '@/src/lib/media';
+import { getCreatorDisplay, isUploadPlayable, isWrittenMedia } from '@/src/lib/media';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
@@ -82,6 +83,15 @@ export function ChartTrackRow({
 
   const showHint = !playable && !hideCatalogHint;
   const toggleFooter = () => setFooterExpanded((open) => !open);
+  const written = isWrittenMedia(item);
+  const [coverFailed, setCoverFailed] = useState(false);
+  useEffect(() => {
+    setCoverFailed(false);
+  }, [item.coverArt, item._id, item.id]);
+
+  const coverSource = written
+    ? bookCoverSource(coverFailed ? null : item.coverArt)
+    : { uri: coverFailed ? DEFAULT_COVER_ART : item.coverArt || DEFAULT_COVER_ART };
 
   const coverArt = (
     <Pressable
@@ -91,12 +101,21 @@ export function ChartTrackRow({
       accessibilityLabel={
         playable
           ? `Play chart position ${rank}`
-          : `Play next available from chart position ${rank}`
+          : written
+            ? `Open chart position ${rank}`
+            : `Play next available from chart position ${rank}`
       }>
       {({ pressed }) => (
         <>
           <Image
-            source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
+            source={coverSource}
+            resizeMode="cover"
+            onLoad={(event) => {
+              if (!written || coverFailed) return;
+              const { width, height } = event.nativeEvent.source;
+              if (isBlankCoverSize(width, height)) setCoverFailed(true);
+            }}
+            onError={() => setCoverFailed(true)}
             style={variant === 'compact' ? styles.cover : styles.richCover}
           />
           <View style={styles.rankPlayOverlay}>

@@ -9,6 +9,7 @@ const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
 const { firstIsbn } = require('../utils/isbn');
 const { BOOK_CATALOG_QUERY } = require('../utils/mediaKinds');
 const { toClientMedia } = require('../utils/mediaPlayability');
+const { resolveBookCoverArt } = require('../utils/coverArtUtils');
 const { searchOpenLibrary } = require('../services/openLibraryService');
 const { searchGoogleBooks, isGoogleBooksEnabled } = require('../services/googleBooksService');
 const { findOrCreateBook } = require('../services/bookAdapter');
@@ -38,6 +39,7 @@ function serializeBook(media) {
     : [];
   raw.authors = authors;
   raw.creatorDisplay = raw.creatorDisplay || authors.join(', ');
+  raw.coverArt = resolveBookCoverArt(raw.coverArt);
   return toClientMedia(raw);
 }
 
@@ -303,7 +305,7 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
       partyName: globalParty.name,
       mediaTitle: book.title,
       mediaArtist: book.author?.[0]?.name || '',
-      mediaCoverArt: book.coverArt || '',
+      mediaCoverArt: resolveBookCoverArt(book.coverArt),
       mediaContentType: book.contentType,
       mediaContentForm: book.contentForm,
       ...buildBidLocationSnapshot(user, currentLocation),

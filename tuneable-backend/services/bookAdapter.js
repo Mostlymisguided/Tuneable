@@ -139,6 +139,7 @@ function buildBookDoc(payload, userId) {
     publisher: payload.publisher || null,
     pages: payload.pageCount || payload.pages || null,
     language: normalizeLanguageInput(payload.language),
+    // Leave unset when the catalogue has no jacket. Responses fill in the placeholder.
     coverArt: payload.coverArt || payload.coverUrl || null,
     description: payload.description || null,
     tags: Array.isArray(payload.subjects) ? payload.subjects.slice(0, 12) : [],

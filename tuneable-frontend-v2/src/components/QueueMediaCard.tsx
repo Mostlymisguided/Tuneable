@@ -6,11 +6,29 @@ import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import AiAssistedBadge from './AiAssistedBadge';
 import { DEFAULT_COVER_ART } from '../constants';
+import BookCover from './BookCover';
+import { isWrittenMedia } from '../utils/mediaPlayability';
 import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { roundBpm } from '../utils/bpm';
+
+function QueueCover({ media }: { media: { coverArt?: string | null; title?: string; contentForm?: string | string[]; contentType?: string | string[] } }) {
+  const alt = media.title || 'Unknown Media';
+  if (isWrittenMedia(media)) {
+    return <BookCover src={media.coverArt} alt={alt} className="w-full h-full object-cover" />;
+  }
+  return (
+    <img
+      src={media.coverArt || DEFAULT_COVER_ART}
+      alt={alt}
+      className="w-full h-full object-cover"
+      width="96"
+      height="96"
+    />
+  );
+}
 
 const META_LINK_CLASS =
   'truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
@@ -210,22 +228,10 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0">
           {href ? (
             <Link to={href} className="block w-full h-full" tabIndex={-1}>
-              <img
-                src={mediaData.coverArt || DEFAULT_COVER_ART}
-                alt={mediaData.title || 'Unknown Media'}
-                className="w-full h-full object-cover"
-                width="96"
-                height="96"
-              />
+              <QueueCover media={mediaData} />
             </Link>
           ) : (
-            <img
-              src={mediaData.coverArt || DEFAULT_COVER_ART}
-              alt={mediaData.title || 'Unknown Media'}
-              className="w-full h-full object-cover"
-              width="96"
-              height="96"
-            />
+            <QueueCover media={mediaData} />
           )}
           <button
             type="button"
