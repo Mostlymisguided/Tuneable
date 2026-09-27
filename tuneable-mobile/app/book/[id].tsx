@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,11 +15,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
+import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { booksAPI } from '@/src/api/books';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
+import { getReadElsewhereTarget } from '@/src/lib/listenElsewhere';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
@@ -31,6 +35,7 @@ export default function BookProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tipOpen, setTipOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(
@@ -61,6 +66,18 @@ export default function BookProfileScreen() {
 
   const author = useMemo(() => (book ? getCreatorDisplay(book) : ''), [book]);
   const support = book?.globalMediaAggregate ?? 0;
+  const coverState =
+    book?.rightsStatus === 'disputed'
+      ? 'disputed'
+      : book?.rightsStatus === 'cleared' || book?.rightsCleared === true
+        ? 'clear'
+        : 'awaiting';
+  const readElsewhere = book ? getReadElsewhereTarget(book) : null;
+
+  const onReadElsewhere = () => {
+    if (!readElsewhere) return;
+    void Linking.openURL(readElsewhere.url);
+  };
 
   const onConfirmTip = async (amountPounds: number, _tags: string[]) => {
     const bookId = book ? mediaId(book) : id;
@@ -103,24 +120,82 @@ export default function BookProfileScreen() {
           <Text style={styles.error}>{error || 'Book not found'}</Text>
         ) : (
           <>
-            <Image
-              source={{ uri: book.coverArt || DEFAULT_COVER_ART }}
-              style={styles.cover}
-            />
+            <View style={styles.coverWrap}>
+              <Image
+                source={{ uri: book.coverArt || DEFAULT_COVER_ART }}
+                style={styles.cover}
+              />
+              {coverState !== 'clear' ? (
+                <View style={styles.coverOverlay}>
+                  <View style={styles.awaitingBox}>
+                    <Ionicons
+                      name="ribbon-outline"
+                      size={28}
+                      color={coverState === 'disputed' ? '#f87171' : '#fbbf24'}
+                    />
+                    <Text style={styles.awaitingTitle}>
+                      {coverState === 'disputed'
+                        ? 'Rights disputed'
+                        : 'Awaiting creator sign up'}
+                    </Text>
+                    <Text style={styles.awaitingHint}>
+                      {coverState === 'disputed'
+                        ? 'Tips are paused while ownership is resolved'
+                        : 'Tips are held until the author joins Tuneable'}
+                    </Text>
+                    <View style={styles.awaitingActions}>
+                      {coverState === 'awaiting' ? (
+                        <Pressable
+                          style={styles.claimOverlayBtn}
+                          onPress={() => setClaimOpen(true)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Claim media">
+                          <Text style={styles.claimOverlayText}>Claim media</Text>
+                        </Pressable>
+                      ) : null}
+                      {readElsewhere ? (
+                        <Pressable
+                          style={styles.openExternalBtn}
+                          onPress={onReadElsewhere}
+                          accessibilityRole="button"
+                          accessibilityLabel="Open externally">
+                          <Ionicons name="open-outline" size={14} color="#fff" />
+                          <Text style={styles.openExternalText}>
+                            {readElsewhere.label}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+            </View>
             <Text style={styles.title}>{book.title || 'Untitled'}</Text>
             <Text style={styles.author}>{author}</Text>
             <Text style={styles.support}>{formatPoundsFromPence(support)} supported</Text>
             <Text style={styles.note}>
               Catalogue and tip written works here. Reading stays off-platform for now.
             </Text>
-            <Pressable
-              style={styles.tipBtn}
-              onPress={() => setTipOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Send a tip">
-              <Ionicons name="heart" size={18} color="#fff" />
-              <Text style={styles.tipBtnText}>Send a tip</Text>
-            </Pressable>
+            <View style={styles.actions}>
+              <Pressable
+                style={styles.tipBtn}
+                onPress={() => setTipOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Send a tip">
+                <Ionicons name="heart" size={18} color="#fff" />
+                <Text style={styles.tipBtnText}>Send a tip</Text>
+              </Pressable>
+              {coverState === 'clear' && readElsewhere ? (
+                <Pressable
+                  style={styles.openExternalPageBtn}
+                  onPress={onReadElsewhere}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open externally">
+                  <Ionicons name="open-outline" size={14} color="#fff" />
+                  <Text style={styles.openExternalText}>{readElsewhere.label}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </>
         )}
       </ScrollView>
@@ -134,6 +209,20 @@ export default function BookProfileScreen() {
         tipMedia={book}
         onClose={() => setTipOpen(false)}
         onConfirm={onConfirmTip}
+      />
+      <ClaimSheet
+        visible={claimOpen}
+        mediaId={book ? mediaId(book) : id || ''}
+        mediaTitle={book?.title || 'Untitled'}
+        mediaKind="book"
+        rightsStatus={book?.rightsStatus}
+        onClose={() => setClaimOpen(false)}
+        onSubmitted={() => {
+          Alert.alert(
+            'Claim submitted',
+            "We'll notify you when it's reviewed. Approved claims receive tips held in escrow."
+          );
+        }}
       />
       <ReportSheet
         visible={reportOpen}
@@ -177,12 +266,84 @@ const styles = StyleSheet.create({
     marginTop: 32,
     textAlign: 'center',
   },
-  cover: {
-    width: 180,
-    height: 240,
-    borderRadius: 8,
+  coverWrap: {
+    width: 200,
+    height: 300,
+    borderRadius: 12,
+    overflow: 'hidden',
     marginBottom: 20,
     backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  cover: {
+    width: '100%',
+    height: '100%',
+  },
+  coverOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 12,
+  },
+  awaitingBox: {
+    alignItems: 'center',
+  },
+  awaitingTitle: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  awaitingHint: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  awaitingActions: {
+    marginTop: 12,
+    gap: 8,
+    alignItems: 'center',
+  },
+  claimOverlayBtn: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  claimOverlayText: {
+    color: '#111',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  openExternalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  openExternalText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  openExternalPageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
   title: {
     color: colors.text,
@@ -208,8 +369,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     lineHeight: 18,
   },
-  tipBtn: {
+  actions: {
     marginTop: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  tipBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

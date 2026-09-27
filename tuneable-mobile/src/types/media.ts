@@ -56,6 +56,8 @@ export interface ChartMediaItem {
       }
     | null;
   contentForm?: string[];
+  isbn?: string | null;
+  externalIds?: Record<string, string> | null;
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   isPlayable?: boolean;

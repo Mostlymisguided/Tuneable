@@ -22,10 +22,13 @@ import { colors } from '@/src/theme/colors';
 
 type Step = 'intent' | 'login' | 'creator' | 'proof';
 
+type MediaKind = 'tune' | 'book';
+
 type Props = {
   visible: boolean;
   mediaId: string;
   mediaTitle: string;
+  mediaKind?: MediaKind;
   rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   onClose: () => void;
   onSubmitted?: () => void;
@@ -41,6 +44,7 @@ export function ClaimSheet({
   visible,
   mediaId,
   mediaTitle,
+  mediaKind = 'tune',
   rightsStatus,
   onClose,
   onSubmitted,
@@ -106,8 +110,9 @@ export function ClaimSheet({
     }
   };
 
+  const noun = mediaKind === 'book' ? 'book' : 'tune';
   const titleByStep: Record<Step, string> = {
-    intent: 'This is my tune',
+    intent: `This is my ${noun}`,
     login: 'Sign in to continue',
     creator: 'Enable creator mode',
     proof: intent === 'takedown' ? `Take down "${mediaTitle}"` : `Claim "${mediaTitle}"`,
@@ -145,9 +150,13 @@ export function ClaimSheet({
             {step === 'intent' && (
               <>
                 <Text style={styles.copy}>
-                  {rightsStatus === 'permitted'
-                    ? 'This tune has permission from its rights holder and is playable. Tips are held until the artist joins Tuneable and claims them. What would you like to do?'
-                    : 'This tune is awaiting rights clearance. What would you like to do?'}
+                  {mediaKind === 'book'
+                    ? rightsStatus === 'permitted'
+                      ? 'This book has permission from its rights holder. Tips are held until the author joins Tuneable and claims them. What would you like to do?'
+                      : 'This book is awaiting its author on Tuneable. What would you like to do?'
+                    : rightsStatus === 'permitted'
+                      ? 'This tune has permission from its rights holder and is playable. Tips are held until the artist joins Tuneable and claims them. What would you like to do?'
+                      : 'This tune is awaiting rights clearance. What would you like to do?'}
                 </Text>
                 <Pressable
                   style={[styles.choice, styles.choiceKeep]}
@@ -170,7 +179,7 @@ export function ClaimSheet({
                   <View style={styles.choiceText}>
                     <Text style={styles.choiceTitle}>Take it down</Text>
                     <Text style={styles.choiceSub}>
-                      Verify you're the rights holder, remove this tune from
+                      Verify you're the rights holder, remove this {noun} from
                       Tuneable, and refund active tips to supporters.
                     </Text>
                   </View>
@@ -216,13 +225,13 @@ export function ClaimSheet({
               <>
                 <Text style={styles.copy}>
                   {intent === 'takedown'
-                    ? 'Provide proof of ownership to take this tune down:'
-                    : 'Provide proof of ownership to claim this tune:'}
+                    ? `Provide proof of ownership to take this ${noun} down:`
+                    : `Provide proof of ownership to claim this ${noun}:`}
                 </Text>
                 {intent === 'takedown' ? (
                   <View style={styles.warnBox}>
                     <Text style={styles.warnText}>
-                      If approved, this tune will be removed and active tips refunded.
+                      If approved, this {noun} will be removed and active tips refunded.
                       You will not receive tip revenue from a takedown.
                     </Text>
                   </View>
@@ -232,7 +241,11 @@ export function ClaimSheet({
                   style={styles.input}
                   value={proofText}
                   onChangeText={setProofText}
-                  placeholder="Describe your role and links to profiles, DistroKid, ISRC, etc."
+                  placeholder={
+                    mediaKind === 'book'
+                      ? 'Describe your role and links to publisher pages, ISBN records, or author profiles.'
+                      : 'Describe your role and links to profiles, DistroKid, ISRC, etc.'
+                  }
                   placeholderTextColor={colors.textMuted}
                   multiline
                   maxLength={2000}
