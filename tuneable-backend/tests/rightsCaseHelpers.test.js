@@ -155,6 +155,31 @@ describe('buildOutreachContent', () => {
     expect(content.text.startsWith('Hey Thomas')).toBe(true);
   });
 
+  it('puts the sender invite code on the founding link', () => {
+    const content = buildOutreachContent({
+      template: 'claim_keep_invite',
+      media,
+      party,
+      format: 'link',
+      inviteCode: 'ab12c',
+    });
+    expect(content.registerUrl).toBe(
+      'https://tuneable.stream/creator/register?from=rights&tune=abc&invite=AB12C'
+    );
+    expect(content.text).toContain('invite=AB12C');
+  });
+
+  it('omits an invite param when the code is not five characters', () => {
+    const content = buildOutreachContent({
+      template: 'claim_keep_invite',
+      media,
+      party,
+      format: 'instagram',
+      inviteCode: 'nope',
+    });
+    expect(content.registerUrl).not.toContain('invite=');
+  });
+
   it('builds a copy-link message with both CTAs', () => {
     const content = buildOutreachContent({
       template: 'claim_keep_invite',

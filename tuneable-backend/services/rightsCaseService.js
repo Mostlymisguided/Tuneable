@@ -510,6 +510,16 @@ async function updateCase(id, patch, actorId) {
   return getCase(rightsCase._id);
 }
 
+async function inviteCodeForActor(actorId) {
+  if (!actorId) return null;
+  const User = require('../models/User');
+  const actor = await User.findById(actorId).select('personalInviteCode personalInviteCodes');
+  if (!actor || typeof actor.getPrimaryInviteCode !== 'function') return null;
+  const code = actor.getPrimaryInviteCode();
+  if (!code || String(code).trim().length !== 5) return null;
+  return String(code).trim().toUpperCase();
+}
+
 async function addOutreach(id, payload, actorId) {
   const rightsCase = await RightsCase.findById(id).populate('mediaId', MEDIA_SELECT);
   if (!rightsCase) {
@@ -523,6 +533,7 @@ async function addOutreach(id, payload, actorId) {
   const template = OUTREACH_TEMPLATES.includes(payload.template) ? payload.template : 'custom';
   const frontendUrl = process.env.FRONTEND_URL || 'https://tuneable.stream';
   const customMessage = payload.customMessage || payload.body || '';
+  const inviteCode = await inviteCodeForActor(actorId);
 
   if (channel === 'email' && direction === 'outbound') {
     const to = (payload.to || primaryEmailFromParty(rightsCase.party) || '').trim();
@@ -539,6 +550,7 @@ async function addOutreach(id, payload, actorId) {
       customMessage,
       frontendUrl,
       format: 'email',
+      inviteCode,
     });
     const subject = payload.subject || content.subject;
 
@@ -577,6 +589,7 @@ async function addOutreach(id, payload, actorId) {
       customMessage,
       frontendUrl,
       format,
+      inviteCode,
     });
     const body = (payload.body || content.text || '').trim();
     if (!body) {
@@ -727,7 +740,7 @@ async function openFromCopyrightReport(report, media) {
   });
 }
 
-async function previewOutreach({ caseId, template, customMessage, format = 'email' }) {
+async function previewOutreach({ caseId, template, customMessage, format = 'email', actorId = null }) {
   const rightsCase = await RightsCase.findById(caseId).populate('mediaId', MEDIA_SELECT);
   if (!rightsCase) {
     const error = new Error('Rights case not found');
@@ -735,6 +748,7 @@ async function previewOutreach({ caseId, template, customMessage, format = 'emai
     throw error;
   }
   const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
+  const inviteCode = await inviteCodeForActor(actorId);
   return {
     ...buildOutreachContent({
       template,
@@ -743,6 +757,7 @@ async function previewOutreach({ caseId, template, customMessage, format = 'emai
       customMessage,
       frontendUrl: process.env.FRONTEND_URL || 'https://tuneable.stream',
       format: chosenFormat,
+      inviteCode,
     }),
     instagramHandle: primaryInstagramFromParty(rightsCase.party) || null,
   };

@@ -276,10 +276,17 @@ function tuneUrlFromMedia(media, frontendUrl = 'https://tuneable.stream') {
   return media?.uuid ? `${base}/tune/${media.uuid}` : base;
 }
 
-function creatorRegisterUrl(media, frontendUrl = 'https://tuneable.stream') {
+function normalizeInviteCode(inviteCode) {
+  const code = typeof inviteCode === 'string' ? inviteCode.trim().toUpperCase() : '';
+  return /^[A-Z0-9]{5}$/.test(code) ? code : '';
+}
+
+function creatorRegisterUrl(media, frontendUrl = 'https://tuneable.stream', inviteCode = null) {
   const base = frontendBase(frontendUrl);
   const params = new URLSearchParams({ from: 'rights' });
   if (media?.uuid) params.set('tune', String(media.uuid));
+  const code = normalizeInviteCode(inviteCode);
+  if (code) params.set('invite', code);
   return `${base}/creator/register?${params.toString()}`;
 }
 
@@ -290,12 +297,13 @@ function buildOutreachContent({
   customMessage = '',
   frontendUrl = 'https://tuneable.stream',
   format = 'email',
+  inviteCode = null,
 }) {
   const title = media?.title || 'your work';
   const greetName = party?.displayName || 'there';
   const artistLine = artistLineFromMedia(media);
   const tuneUrl = tuneUrlFromMedia(media, frontendUrl);
-  const registerUrl = creatorRegisterUrl(media, frontendUrl);
+  const registerUrl = creatorRegisterUrl(media, frontendUrl, inviteCode);
   const yesCta = 'Reply YES to this email and we will make it playable so you can start receiving those tips.';
   const founderCta = `Or become a founding artist here: ${registerUrl}`;
   const listingLine = `Check it out: ${tuneUrl}`;

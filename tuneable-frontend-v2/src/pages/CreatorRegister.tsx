@@ -682,6 +682,18 @@ const CreatorRegister: React.FC = () => {
 
         {foundingStatus.open && !alreadyFounding && (
           <div className="space-y-4 mb-6">
+            {inviteCodeValid && parentInviteCode.length === 5 ? (
+              <p className="text-sm text-gray-200">
+                {inviterUsername ? (
+                  <>Invited by <strong className="text-white">@{inviterUsername}</strong>. </>
+                ) : (
+                  <>Your invite is already applied. </>
+                )}
+                You are eligible. The share is still claimed when you upload.
+              </p>
+            ) : isValidatingCode && parentInviteCode.length === 5 ? (
+              <p className="text-sm text-gray-300">Checking your invite…</p>
+            ) : (
             <div>
               <label className="block text-white font-medium mb-2" htmlFor="founding-invite-code">
                 Invite code
@@ -703,19 +715,14 @@ const CreatorRegister: React.FC = () => {
                 placeholder="ABCDE"
               />
               <p className="text-sm mt-2 text-gray-300">
-                {isValidatingCode ? (
-                  'Checking invite…'
-                ) : inviteCodeValid && inviterUsername ? (
-                  <>Invited by <strong className="text-white">@{inviterUsername}</strong>. You are eligible. The share is still claimed when you upload.</>
-                ) : inviteCodeValid && parentInviteCode ? (
-                  <>Invite code {parentInviteCode} is valid. You are eligible. The share is still claimed when you upload.</>
-                ) : inviteCodeValid === false ? (
+                {inviteCodeValid === false ? (
                   'That invite code is invalid. You can still finish signup, or request a share below.'
                 ) : (
                   'Have a code from another creator? Enter it here. A link with ?invite= is filled in for you.'
                 )}
               </p>
             </div>
+            )}
 
             {foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && (
               <p className="text-sm text-amber-200">
@@ -723,7 +730,7 @@ const CreatorRegister: React.FC = () => {
               </p>
             )}
 
-            {!foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && (
+            {!foundingEligible && !inviteLocked && !(inviteCodeValid && parentInviteCode.length === 5) && !(isValidatingCode && parentInviteCode.length === 5) && (
               <div className="rounded-lg border border-white/10 bg-black/20 p-4 space-y-3">
                 <p className="text-sm text-gray-200">
                   No invite? Request a founding share. Approval makes you eligible. It does not assign the share.
