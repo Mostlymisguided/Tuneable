@@ -23,7 +23,7 @@ import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../uti
 import { isAdmin } from '../utils/permissionHelpers';
 import { formatBpmLabel } from '../utils/bpm';
 
-type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox' | 'youtube';
+type ImportSource = 'spotify' | 'soundcloud' | 'rekordbox' | 'youtube' | 'deezer';
 type ImportStep = 'connect' | 'summary' | 'review' | 'done';
 type MatchStatus = 'in_library' | 'on_catalog' | 'possible_match' | 'new';
 type IdentityConfidence = 'verified' | 'catalog' | 'likely' | 'unverified';
@@ -178,12 +178,20 @@ const SOURCE_META: Record<ImportSource, {
     accentHover: 'hover:bg-red-500',
     badge: 'bg-red-700',
   },
+  deezer: {
+    label: 'Deezer',
+    likesLabel: 'Deezer playlist or favourites',
+    accent: 'bg-violet-600',
+    accentHover: 'hover:bg-violet-500',
+    badge: 'bg-violet-600',
+  },
 };
 
 function parseSource(value: string | null): ImportSource {
   if (value === 'soundcloud') return 'soundcloud';
   if (value === 'rekordbox') return 'rekordbox';
   if (value === 'youtube') return 'youtube';
+  if (value === 'deezer') return 'deezer';
   return 'spotify';
 }
 
@@ -301,6 +309,7 @@ const LibraryImport: React.FC = () => {
   const [isParsingXml, setIsParsingXml] = useState(false);
   const rekordboxFileInputRef = React.useRef<HTMLInputElement>(null);
   const [youtubePlaylistUrl, setYoutubePlaylistUrl] = useState('');
+  const [deezerUrl, setDeezerUrl] = useState('');
   const [spotifyOauthAvailable, setSpotifyOauthAvailable] = useState(false);
   const [spotifyRequest, setSpotifyRequest] = useState<{
     status: 'pending' | 'allowlisted' | 'rejected';
@@ -316,6 +325,7 @@ const LibraryImport: React.FC = () => {
   const meta = SOURCE_META[source];
   const isRekordbox = source === 'rekordbox';
   const isYouTube = source === 'youtube';
+  const isDeezer = source === 'deezer';
   const isConnected = source === 'spotify'
     ? spotifyConnected
     : source === 'soundcloud'
@@ -491,7 +501,7 @@ const LibraryImport: React.FC = () => {
   }, [source, adminUser, user]);
 
   const connectSource = () => {
-    if (source === 'rekordbox' || isYouTube) return;
+    if (source === 'rekordbox' || isYouTube || isDeezer) return;
     try {
       sessionStorage.removeItem(importAutoScanStorageKey(source));
     } catch {
@@ -628,6 +638,40 @@ const LibraryImport: React.FC = () => {
       return;
     }
 
+    if (source === 'deezer') {
+      const url = deezerUrl.trim();
+      if (!url) {
+        toast.error('Paste a public Deezer playlist or profile URL');
+        return;
+      }
+      setIsLoading(true);
+      setProgressMessage('Starting Deezer scan…');
+      setProgressCurrent(0);
+      setProgressTotal(0);
+      try {
+        const capped = Math.min(MAX_SCAN_LIMIT, Math.max(1, scanLimit));
+        setLimit(capped);
+        const started = await userAPI.startDeezerImportPreview(url, capped);
+        const data = await userAPI.waitForImportJob(started.jobId, applyJobProgress, {
+          timeoutMs: 20 * 60 * 1000,
+        });
+        setItems(data.items || []);
+        setSummary(data.summary || null);
+        setTipAmounts({});
+        setTipMode('fixed');
+        setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+        setStep('summary');
+      } catch (error: any) {
+        toast.error(error?.response?.data?.error || error?.message || 'Failed to scan Deezer');
+      } finally {
+        setIsLoading(false);
+        setProgressMessage(null);
+        setProgressCurrent(0);
+        setProgressTotal(0);
+      }
+      return;
+    }
+
     if (!isConnected) {
       connectSource();
       return;
@@ -671,7 +715,7 @@ const LibraryImport: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox || isYouTube) return;
+    if (!shouldAutoScan || !isConnected || step !== 'connect' || isRekordbox || isYouTube || isDeezer) return;
     if (autoScanStartedRef.current || isLoading) return;
     try {
       if (sessionStorage.getItem(importAutoScanStorageKey(source))) return;
@@ -691,7 +735,7 @@ const LibraryImport: React.FC = () => {
     void scanLikes(DEFAULT_SCAN_LIMIT);
     // scanLikes is recreated each render; autoScanStartedRef prevents a loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldAutoScan, isConnected, step, isRekordbox, isYouTube, isLoading, source]);
+  }, [shouldAutoScan, isConnected, step, isRekordbox, isYouTube, isDeezer, isLoading, source]);
 
   const runExecuteJob = async (payload: Array<Record<string, unknown>>, tip: number) => {
     if (executeLockRef.current) return;
@@ -707,6 +751,8 @@ const LibraryImport: React.FC = () => {
           ? await userAPI.startSoundCloudImportExecute(payload, tip)
           : source === 'youtube'
             ? await userAPI.startYouTubeImportExecute(payload, tip)
+          : source === 'deezer'
+            ? await userAPI.startDeezerImportExecute(payload, tip)
           : await userAPI.startSpotifyImportExecute(payload, tip);
       const result = await userAPI.waitForImportJob<{
         tipped: number;
@@ -1216,7 +1262,9 @@ const LibraryImport: React.FC = () => {
               )
               : isYouTube
                 ? 'Paste a public YouTube playlist URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm. Admins can correct artist and title when there is no confident match.'
-                : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
+                : isDeezer
+                  ? 'Paste a public Deezer playlist or profile link. Tracks are matched by ISRC, then you tip to add them to your library.'
+                  : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
           </p>
           {source === 'spotify' ? (
             <p className="text-sm text-gray-500 mt-2 max-w-2xl">
@@ -1229,7 +1277,7 @@ const LibraryImport: React.FC = () => {
         {step === 'connect' && (
           <div className="space-y-4">
             <div className="flex gap-2 flex-wrap">
-              {(['spotify', 'soundcloud', 'youtube'] as ImportSource[]).map((s) => {
+              {(['spotify', 'soundcloud', 'youtube', 'deezer'] as ImportSource[]).map((s) => {
                 const sMeta = SOURCE_META[s];
                 const connected = s === 'spotify' ? spotifyConnected : soundcloudConnected;
                 const active = source === s;
@@ -1253,7 +1301,9 @@ const LibraryImport: React.FC = () => {
                         <div className="text-xs text-gray-400">
                           {s === 'youtube'
                             ? 'Public playlist'
-                            : connected ? 'Connected' : 'Not connected'}
+                            : s === 'deezer'
+                              ? 'Public playlist or profile'
+                              : connected ? 'Connected' : 'Not connected'}
                         </div>
                       </div>
                     </div>
@@ -1297,6 +1347,8 @@ const LibraryImport: React.FC = () => {
                       ? 'Catalog-only: title, artist, BPM, key, duration, and cover art from local files. No MP3s uploaded.'
                       : isYouTube
                         ? 'Paste a public playlist URL. We match tracks against MusicBrainz and skip unreliable channels.'
+                        : isDeezer
+                          ? 'Paste a public playlist, or your profile link to import favourite tracks.'
                         : isConnected
                         ? 'We\'ll match against the Tuneable catalog and skip mixes/sets'
                         : `Connect ${meta.label} to scan your likes`}
@@ -1452,6 +1504,35 @@ const LibraryImport: React.FC = () => {
                   ) : (
                     <p className="text-xs text-gray-500 text-center">
                       Confident MusicBrainz matches are ready to import. Weaker matches go to review. Junk/lyric channels are skipped.{adminUser ? ' Unmatched titles stay in review so you can correct artist and title.' : ''}
+                    </p>
+                  )}
+                </div>
+              ) : isDeezer ? (
+                <div className="space-y-3">
+                  <label className="text-sm text-gray-400 block">
+                    Deezer playlist or profile URL
+                    <input
+                      type="url"
+                      value={deezerUrl}
+                      onChange={(e) => setDeezerUrl(e.target.value)}
+                      placeholder="https://www.deezer.com/playlist/… or https://link.deezer.com/s/…"
+                      className="mt-1 w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void scanLikes(DEFAULT_SCAN_LIMIT)}
+                    disabled={isLoading || !deezerUrl.trim()}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
+                  >
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                    {isLoading ? 'Matching…' : 'Scan Deezer'}
+                  </button>
+                  {isLoading && progressMessage ? (
+                    <p className="text-xs text-gray-400">{progressMessage}</p>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center">
+                      In Deezer, use Share → Copy link on a playlist, or on your profile to import favourite tracks. The playlist (or your favourites) must be public.
                     </p>
                   )}
                 </div>
@@ -1883,7 +1964,7 @@ const LibraryImport: React.FC = () => {
                     disabled={isLoading || isExecuting}
                     className="text-purple-300 hover:text-purple-200 underline disabled:opacity-50"
                   >
-                    {isLoading ? 'Scanning…' : `Load ${Math.min(SCAN_STEP, MAX_SCAN_LIMIT - limit)} more likes`}
+                    {isLoading ? 'Scanning…' : `Load ${Math.min(SCAN_STEP, MAX_SCAN_LIMIT - limit)} more ${isDeezer ? 'tracks' : 'likes'}`}
                   </button>
                 ) : null}
                 {!isRekordbox ? (
@@ -1908,7 +1989,7 @@ const LibraryImport: React.FC = () => {
             {showAdvancedLimit && !isRekordbox && (
               <div className="bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-wrap items-end gap-3">
                 <label className="text-sm text-gray-400">
-                  {isYouTube ? 'Tracks to scan' : 'Likes to scan'} (max {MAX_SCAN_LIMIT})
+                  {isYouTube || isDeezer ? 'Tracks to scan' : 'Likes to scan'} (max {MAX_SCAN_LIMIT})
                   <input
                     type="number"
                     min={1}

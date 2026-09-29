@@ -82,7 +82,7 @@ const metadataEnrichmentSchema = new mongoose.Schema({
 
   importSource: {
     type: String,
-    enum: ['soundcloud_likes', 'spotify_likes', 'library_import', 'manual', 'other', 'backfill'],
+    enum: ['soundcloud_likes', 'spotify_likes', 'deezer_playlist', 'deezer_likes', 'library_import', 'manual', 'other', 'backfill'],
     default: 'library_import',
     index: true,
   },

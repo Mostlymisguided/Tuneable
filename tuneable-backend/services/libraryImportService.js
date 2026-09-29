@@ -71,6 +71,7 @@ function identityConfidenceSourceFrom({ matchStatus, matchType, crossRef }) {
     if (sources.includes('musicbrainz')) return 'isrc-musicbrainz';
     return 'isrc';
   }
+  if (crossRef?.status === 'deezer_catalog') return 'deezer';
   if (crossRef?.status === 'musicbrainz_verified') return 'musicbrainz';
   if (crossRef?.status === 'musicbrainz_likely') return 'musicbrainz-likely';
   if (crossRef?.status === 'spotify_catalog' || (
@@ -366,6 +367,9 @@ function trackKey(track, source) {
   }
   if (source === 'youtube') {
     return String(track.externalIds?.youtube || track.id || `${track.title}-${track.artist}`);
+  }
+  if (source === 'deezer') {
+    return String(track.externalIds?.deezer || track.id || `${track.title}-${track.artist}`);
   }
   return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
 }
@@ -1344,17 +1348,65 @@ async function executeYouTubePlaylistImport(userId, opts) {
   return executeLibraryImport(userId, { ...opts, importSource });
 }
 
+/**
+ * Deezer metadata + ISRC come from a licensed catalog, so they are treated as verified
+ * identity as-is (like Spotify). MusicBrainz links by ISRC after import.
+ */
+function deezerCrossRef(track) {
+  const isrc = normalizeIsrc(track.externalIds?.isrc);
+  if (!isrc) return { status: 'none', identityConfidence: 'unverified', sources: [] };
+  return {
+    status: 'deezer_catalog',
+    identityConfidence: 'verified',
+    isrc,
+    sources: ['deezer'],
+  };
+}
+
+async function previewDeezerImport(userId, url, opts = {}) {
+  const deezerService = require('./deezerService');
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
+
+  const user = await User.findById(userId).select('preferences balance role');
+  if (!user) {
+    const err = new Error('User not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const fetched = await deezerService.fetchPublicTracks(url, { limit: opts.limit, onProgress });
+  const tracks = fetched.tracks.map((track) => ({ ...track, crossRef: deezerCrossRef(track) }));
+  const withIsrc = tracks.filter((t) => t.crossRef.status === 'deezer_catalog').length;
+
+  return previewImportFromTracks(userId, 'deezer', tracks, user, {
+    scanned: fetched.scanned,
+    playlistTitle: fetched.title,
+    deezerKind: fetched.kind,
+    crossRefVerified: withIsrc,
+    crossRefWithIsrc: withIsrc,
+    crossRefNoIsrc: tracks.length - withIsrc,
+  }, onProgress);
+}
+
+async function executeDeezerImport(userId, opts) {
+  const fromItems = opts.items?.find((item) => item?.externalMedia?.importSource)?.externalMedia?.importSource;
+  const importSource = fromItems === 'deezer_likes' ? 'deezer_likes' : 'deezer_playlist';
+  return executeLibraryImport(userId, { ...opts, importSource });
+}
+
 module.exports = {
   previewSpotifyImport,
   previewSoundCloudImport,
   previewRekordboxImport,
   previewYouTubePlaylistImport,
   previewYouTubeLikesImport,
+  previewDeezerImport,
   listRekordboxPlaylists,
   executeSpotifyImport,
   executeSoundCloudImport,
   executeRekordboxImport,
   executeYouTubePlaylistImport,
+  executeDeezerImport,
   rematchYouTubeImportItem,
   executeLibraryImport,
   convertRekordboxTrack,

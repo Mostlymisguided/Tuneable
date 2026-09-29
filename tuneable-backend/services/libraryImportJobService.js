@@ -155,6 +155,11 @@ function startPreviewJob(userId, source, { limit, crossRefMode, xmlContent, play
             onProgress,
           });
         }
+      } else if (source === 'deezer') {
+        preview = await libraryImportService.previewDeezerImport(userId, playlistUrl, {
+          limit,
+          onProgress,
+        });
       } else {
         preview = await libraryImportService.previewSpotifyImport(userId, limit, { onProgress });
       }
@@ -204,6 +209,8 @@ function startExecuteJob(userId, source, { items, defaultTip, createParties, par
         results = await libraryImportService.executeSoundCloudImport(userId, { items, defaultTip, onProgress });
       } else if (source === 'youtube') {
         results = await libraryImportService.executeYouTubePlaylistImport(userId, { items, defaultTip, onProgress });
+      } else if (source === 'deezer') {
+        results = await libraryImportService.executeDeezerImport(userId, { items, defaultTip, onProgress });
       } else {
         results = await libraryImportService.executeSpotifyImport(userId, { items, defaultTip, onProgress });
       }

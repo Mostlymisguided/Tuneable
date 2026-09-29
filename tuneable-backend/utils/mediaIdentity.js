@@ -5,7 +5,7 @@
 
 const { normalizeIsrc, mediaPrimaryArtistName } = require('./mediaMatchUtils');
 
-const IDENTITY_EXTERNAL_KEYS = ['spotify', 'soundcloud', 'youtube', 'musicbrainz', 'rekordbox'];
+const IDENTITY_EXTERNAL_KEYS = ['spotify', 'soundcloud', 'youtube', 'deezer', 'musicbrainz', 'rekordbox'];
 
 function asObject(value) {
   if (!value) return {};
@@ -61,6 +61,7 @@ function collectIdentity(input = {}, sourceHint = null) {
   let spotify = firstNonEmpty(ids.spotify);
   let soundcloud = firstNonEmpty(ids.soundcloud);
   let youtube = firstNonEmpty(ids.youtube);
+  let deezer = firstNonEmpty(ids.deezer);
   const musicbrainz = firstNonEmpty(ids.musicbrainz);
   const rekordbox = firstNonEmpty(ids.rekordbox);
 
@@ -75,6 +76,10 @@ function collectIdentity(input = {}, sourceHint = null) {
   if (!youtube && sourceLooksLike(source, 'youtube')) {
     youtube = firstNonEmpty(input.id, input.key);
   }
+  if (!deezer && sourceLooksLike(source, 'deezer')) {
+    const candidate = firstNonEmpty(input.id, input.key);
+    if (candidate && /^\d+$/.test(candidate)) deezer = candidate;
+  }
   if (!spotify) spotify = spotifyTrackIdFromUrl(sources.spotify);
 
   const artist = typeof input.artist === 'string'
@@ -85,6 +90,7 @@ function collectIdentity(input = {}, sourceHint = null) {
     spotify,
     soundcloud,
     youtube,
+    deezer,
     musicbrainz,
     rekordbox,
     isrc: normalizeIsrc(input.isrc || ids.isrc),
@@ -127,6 +133,7 @@ function buildIdentityOrQuery(identity) {
   if (identity.spotify) or.push({ 'externalIds.spotify': identity.spotify });
   if (identity.soundcloud) or.push({ 'externalIds.soundcloud': String(identity.soundcloud) });
   if (identity.youtube) or.push({ 'externalIds.youtube': identity.youtube });
+  if (identity.deezer) or.push({ 'externalIds.deezer': String(identity.deezer) });
   if (identity.musicbrainz) or.push({ 'externalIds.musicbrainz': identity.musicbrainz });
   if (identity.rekordbox) or.push({ 'externalIds.rekordbox': identity.rekordbox });
   if (identity.isrc) {

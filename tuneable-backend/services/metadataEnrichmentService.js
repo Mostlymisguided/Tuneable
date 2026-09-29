@@ -214,6 +214,9 @@ function resolveImportSourceUrl(media, importSource) {
     return sources.spotify
       || (externalIds.spotify ? `https://open.spotify.com/track/${externalIds.spotify}` : null);
   }
+  if ((importSource === 'deezer_playlist' || importSource === 'deezer_likes') && sources.deezer) {
+    return sources.deezer;
+  }
   if (sources.soundcloud) return sources.soundcloud;
   if (sources.spotify) {
     return sources.spotify
@@ -600,6 +603,100 @@ async function processAlreadyLinked(item, media, alreadyMb) {
   return item;
 }
 
+/**
+ * Pick the best MusicBrainz recording for an ISRC hit list. One ISRC can map to
+ * several recordings (or be misassigned), so title/artist still has to agree.
+ * @returns {{ candidate: object, confidence: 'high'|'low' } | null}
+ */
+function pickIsrcCandidate(original, recordings, isrc) {
+  const scored = (recordings || [])
+    .map((track) => {
+      const { score, matchType } = scoreCandidate(original, track);
+      return {
+        musicbrainzId: track.id || track.externalIds?.musicbrainz,
+        title: track.title,
+        artist: track.artist,
+        artists: track.artists || [],
+        featuring: track.featuring || [],
+        album: track.album || null,
+        duration: track.duration || 0,
+        releaseDate: track.releaseDate || null,
+        releaseYear: track.releaseYear || null,
+        releaseDatePrecision: track.releaseDatePrecision || null,
+        isrc,
+        tags: [],
+        genres: [],
+        score,
+        matchType: `isrc+${matchType}`,
+      };
+    })
+    .filter((c) => c.musicbrainzId)
+    .sort((a, b) => b.score - a.score);
+
+  const best = scored[0];
+  if (!best) return null;
+  const titleAgrees = !/title-mismatch|no-title/.test(best.matchType);
+  const artistAgrees = !/artist-mismatch/.test(best.matchType);
+  return {
+    candidate: best,
+    candidates: scored.slice(0, 5),
+    confidence: titleAgrees && artistAgrees ? 'high' : 'low',
+  };
+}
+
+/**
+ * ISRC → MusicBrainz exact lookup. Returns null to fall back to title/artist search.
+ * Media already verified by a licensed catalog (Deezer / Spotify) keeps its title and
+ * artist; MusicBrainz only contributes the recording link, release date, and tags.
+ */
+async function processViaIsrc(item, media, original, isrc) {
+  let recordings;
+  try {
+    await throttleMusicBrainz();
+    recordings = await musicbrainzService.searchByIsrc(isrc, 5);
+  } catch (err) {
+    console.warn('MB ISRC lookup failed:', isrc, err.message);
+    return null;
+  }
+  const picked = pickIsrcCandidate(original, recordings, isrc);
+  if (!picked) return null;
+
+  const detailed = await enrichCandidateDetails(picked.candidate);
+  item.candidates = [
+    { ...detailed, score: picked.candidate.score, matchType: picked.candidate.matchType, detailsFetched: true },
+    ...picked.candidates.slice(1),
+  ];
+  item.confidence = picked.confidence;
+  item.suggestion = suggestionFromCandidate(detailed);
+
+  if (picked.confidence !== 'high') {
+    item.status = 'needs_review';
+    item.processedAt = new Date();
+    item.error = null;
+    await item.save();
+    return item;
+  }
+
+  const keepCatalogIdentity = media.identityConfidence === 'verified';
+  await applySuggestionToMedia(media, item.suggestion, {
+    applyIdentity: !keepCatalogIdentity,
+    applyTags: false,
+  });
+  if (keepCatalogIdentity) {
+    item.suggestion = {
+      ...item.suggestion,
+      title: media.title,
+      artist: mediaPrimaryArtistName(media),
+      album: media.album || item.suggestion.album,
+    };
+  }
+  item.status = (item.suggestion.tags || []).length > 0 ? 'needs_review' : 'auto_applied';
+  item.processedAt = new Date();
+  item.error = null;
+  await item.save();
+  return item;
+}
+
 async function processEnrichmentItem(itemOrId) {
   const item = typeof itemOrId === 'object' && itemOrId?._id
     ? itemOrId
@@ -637,6 +734,12 @@ async function processEnrichmentItem(itemOrId) {
     const alreadyMb = mapToObject(media.externalIds).musicbrainz;
     if (alreadyMb) {
       return processAlreadyLinked(item, media, alreadyMb);
+    }
+
+    const isrc = normalizeIsrc(media.isrc || mapToObject(media.externalIds).isrc);
+    if (isrc) {
+      const viaIsrc = await processViaIsrc(item, media, original, isrc);
+      if (viaIsrc) return viaIsrc;
     }
 
     const query = buildSearchQuery(original.title, original.artist);
@@ -1202,6 +1305,7 @@ module.exports = {
   chooseCandidate,
   previewCandidate,
   scoreCandidate,
+  pickIsrcCandidate,
   filterNewTags,
   hydrateSuggestionArtists,
   suggestionHasStructuredArtists,

@@ -1981,6 +1981,19 @@ export const userAPI = {
     return response.data as { jobId: string; status: string };
   },
 
+  startDeezerImportPreview: async (url: string, limit = 50) => {
+    const response = await api.post('/users/me/import/deezer/preview/start', { url, limit });
+    return response.data as { jobId: string; status: string };
+  },
+
+  startDeezerImportExecute: async (
+    items: Array<Record<string, unknown>>,
+    defaultTip?: number
+  ) => {
+    const response = await api.post('/users/me/import/deezer/execute/start', { items, defaultTip });
+    return response.data as { jobId: string; status: string };
+  },
+
   rematchYouTubeImportItem: async (payload: {
     key: string;
     title: string;

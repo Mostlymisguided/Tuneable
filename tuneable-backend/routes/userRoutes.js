@@ -2057,10 +2057,11 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
     };
 
     const spotifyImportAccess = require('../services/spotifyImportAccess');
-    const [spotifyImported, soundcloudImported, youtubeImported, spotifyAccess] = await Promise.all([
+    const [spotifyImported, soundcloudImported, youtubeImported, deezerImported, spotifyAccess] = await Promise.all([
       countFor('spotify_likes', 'spotify'),
       countFor('soundcloud_likes', 'soundcloud'),
       countFor(['youtube_playlist', 'youtube_likes'], 'youtube'),
+      countFor(['deezer_playlist', 'deezer_likes'], 'deezer'),
       spotifyImportAccess.getSpotifyImportAccess(user),
     ]);
 
@@ -2081,6 +2082,11 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
         imported: youtubeImported,
         playlistImport: true,
         likesImport: false,
+      },
+      deezer: {
+        connected: false,
+        imported: deezerImported,
+        playlistImport: true,
       },
     });
   } catch (error) {
@@ -2292,6 +2298,43 @@ router.post('/me/import/youtube/execute/start', authMiddleware, async (req, res)
   } catch (error) {
     console.error('YouTube import execute start error:', error);
     res.status(500).json({ error: error.message || 'Failed to start YouTube import' });
+  }
+});
+
+// @route   POST /api/users/me/import/deezer/preview/start
+// @desc    Start async Deezer public playlist / profile favourites preview (poll GET /me/import/jobs/:jobId)
+// @access  Private
+router.post('/me/import/deezer/preview/start', authMiddleware, async (req, res) => {
+  try {
+    const url = req.body?.url || req.body?.playlistUrl || req.query.url;
+    const limit = req.body?.limit ?? req.query.limit;
+    if (!url) {
+      return res.status(400).json({ error: 'url is required' });
+    }
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'deezer', {
+      playlistUrl: url,
+      limit,
+    });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('Deezer import preview start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start Deezer scan' });
+  }
+});
+
+// @route   POST /api/users/me/import/deezer/execute/start
+// @desc    Start async Deezer import/tip job
+// @access  Private
+router.post('/me/import/deezer/execute/start', authMiddleware, async (req, res) => {
+  try {
+    const { items, defaultTip } = req.body || {};
+    const libraryImportJobService = require('../services/libraryImportJobService');
+    const { jobId } = libraryImportJobService.startExecuteJob(req.user._id, 'deezer', { items, defaultTip });
+    res.status(202).json({ jobId, status: 'queued' });
+  } catch (error) {
+    console.error('Deezer import execute start error:', error);
+    res.status(500).json({ error: error.message || 'Failed to start Deezer import' });
   }
 });
 

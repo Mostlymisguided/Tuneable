@@ -713,6 +713,7 @@ mediaSchema.index({ "externalIds.iTunes": 1 }); // Index for iTunes lookups
 mediaSchema.index({ "externalIds.rssGuid": 1 }); // Index for RSS GUID lookups
 mediaSchema.index({ "externalIds.soundcloud": 1 }); // Index for SoundCloud import matching
 mediaSchema.index({ "externalIds.spotify": 1 }); // Index for Spotify import matching
+mediaSchema.index({ "externalIds.deezer": 1 }); // Index for Deezer import matching
 mediaSchema.index(
   { isbn: 1 },
   {
