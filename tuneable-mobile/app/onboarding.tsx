@@ -37,9 +37,9 @@ const INTRO_FACTS: {
   label: string;
   hint: string;
 }[] = [
-  { icon: 'heart', label: 'Tip', hint: 'Supports them' },
+  { icon: 'heart', label: 'Tip', hint: 'Supports creators' },
   { icon: 'sparkles', label: 'TuneBytes', hint: 'Earn perks' },
-  { icon: 'trophy', label: 'Champion', hint: 'Top tipper' },
+  { icon: 'trophy', label: 'Champion', hint: 'Top tips' },
 ];
 
 function parseStep(value: string | string[] | undefined): OnboardingStep {

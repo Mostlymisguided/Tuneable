@@ -255,9 +255,9 @@ const Onboarding: React.FC = () => {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { icon: Heart, label: 'Tip', hint: 'Supports them' },
+                { icon: Heart, label: 'Tip', hint: 'Supports creators' },
                 { icon: Sparkles, label: 'TuneBytes', hint: 'Earn perks' },
-                { icon: Trophy, label: 'Champion', hint: 'Top tipper' },
+                { icon: Trophy, label: 'Champion', hint: 'Top tips' },
               ].map(({ icon: Icon, label, hint }) => (
                 <div
                   key={label}
