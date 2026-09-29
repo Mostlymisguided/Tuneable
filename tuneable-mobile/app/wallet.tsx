@@ -34,6 +34,24 @@ WebBrowser.maybeCompleteAuthSession();
 
 const useStoreIap = shouldUseStoreIap();
 
+function isWalletIapSku(productId: string): boolean {
+  return (WALLET_IAP_SKUS as readonly string[]).includes(productId);
+}
+
+function storeTransactionId(purchase: Purchase): string {
+  if ('transactionId' in purchase && purchase.transactionId) {
+    return String(purchase.transactionId);
+  }
+  return purchase.id;
+}
+
+function purchasesFromRequest(result: unknown): Purchase[] {
+  if (!result) return [];
+  if (Array.isArray(result)) return result as Purchase[];
+  if (typeof result === 'object' && 'productId' in result) return [result as Purchase];
+  return [];
+}
+
 export default function WalletScreen() {
   const { user, isAuthenticated, isLoading: authLoading, refreshUser, updateBalance } =
     useAuth();
@@ -49,7 +67,9 @@ export default function WalletScreen() {
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
   const [iapReady, setIapReady] = useState(false);
   const [iapError, setIapError] = useState<string | null>(null);
-  const verifyingRef = useRef(false);
+  const verifyChain = useRef(Promise.resolve());
+  const inFlightTxnIds = useRef(new Set<string>());
+  const settledTxnIds = useRef(new Set<string>());
 
   const finalizeStripeSuccess = useCallback(
     async (amountPounds: number, sessionId?: string) => {
@@ -85,54 +105,75 @@ export default function WalletScreen() {
     [refreshUser, updateBalance]
   );
 
-  const handleVerifiedPurchase = useCallback(
-    async (purchase: Purchase) => {
-      if (verifyingRef.current) return;
-      const iap = getExpoIap();
-      if (!iap) return;
-
-      verifyingRef.current = true;
-      setLoading(true);
-      setStatusMessage('Verifying purchase…');
-      try {
-        const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-        const result = await paymentAPI.verifyIapPurchase({
-          platform,
-          productId: purchase.productId,
-          transactionId: purchase.id,
-          purchaseToken: purchase.purchaseToken,
-          packageName:
-            Platform.OS === 'android' ? 'stream.tuneable.app' : undefined,
-        });
-
-        if (typeof result.balance === 'number') {
-          updateBalance(result.balance);
-        } else {
-          await refreshUser();
-        }
-
-        await iap.finishTransaction({ purchase, isConsumable: true });
-
-        setStatusMessage(
-          result.alreadyProcessed
-            ? `Already credited £${result.creditPounds.toFixed(2)}.`
-            : `Added £${result.creditPounds.toFixed(2)} to your wallet.`
-        );
-      } catch (err: unknown) {
-        console.error(err);
-        const message =
-          (err as { response?: { data?: { error?: string } } })?.response?.data
-            ?.error ||
-          (err instanceof Error ? err.message : 'Could not verify purchase');
-        Alert.alert('Top-up failed', message);
-        setStatusMessage(null);
-      } finally {
-        verifyingRef.current = false;
-        setLoading(false);
+  const enqueueVerify = useCallback(
+    (purchase: Purchase) => {
+      if (!isWalletIapSku(purchase.productId)) return;
+      const txnId = storeTransactionId(purchase);
+      if (!txnId || inFlightTxnIds.current.has(txnId) || settledTxnIds.current.has(txnId)) {
+        return;
       }
+
+      inFlightTxnIds.current.add(txnId);
+      verifyChain.current = verifyChain.current
+        .catch(() => undefined)
+        .then(async () => {
+          const iap = getExpoIap();
+          if (!iap) return;
+
+          setLoading(true);
+          setStatusMessage('Verifying purchase…');
+          try {
+            const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+            const result = await paymentAPI.verifyIapPurchase({
+              platform,
+              productId: purchase.productId,
+              transactionId: txnId,
+              purchaseToken: purchase.purchaseToken,
+              packageName:
+                Platform.OS === 'android' ? 'stream.tuneable.app' : undefined,
+            });
+
+            if (typeof result.balance === 'number') {
+              updateBalance(result.balance);
+            } else {
+              await refreshUser();
+            }
+
+            settledTxnIds.current.add(txnId);
+            await iap.finishTransaction({ purchase, isConsumable: true });
+
+            setStatusMessage(
+              result.alreadyProcessed
+                ? `Already credited £${result.creditPounds.toFixed(2)}.`
+                : `Added £${result.creditPounds.toFixed(2)} to your wallet.`
+            );
+          } catch (err: unknown) {
+            console.error(err);
+            const response = (
+              err as { response?: { status?: number; data?: { error?: string } } }
+            )?.response;
+            const message =
+              response?.data?.error ||
+              (response?.status && response.status >= 500
+                ? `Tuneable couldn't confirm your purchase right now (error ${response.status}). Your Apple payment is kept, so reopen Wallet in a minute and we'll retry crediting it.`
+                : err instanceof Error
+                  ? err.message
+                  : 'Could not verify purchase');
+            Alert.alert('Top-up failed', message);
+            setStatusMessage(null);
+          } finally {
+            setLoading(false);
+          }
+        })
+        .finally(() => {
+          inFlightTxnIds.current.delete(txnId);
+        });
     },
     [refreshUser, updateBalance]
   );
+
+  const enqueueVerifyRef = useRef(enqueueVerify);
+  enqueueVerifyRef.current = enqueueVerify;
 
   useEffect(() => {
     if (!useStoreIap) return;
@@ -153,25 +194,37 @@ export default function WalletScreen() {
     let updateSub: { remove: () => void } | null = null;
     let errorSub: { remove: () => void } | null = null;
 
+    updateSub = iap.purchaseUpdatedListener((purchase) => {
+      enqueueVerifyRef.current(purchase);
+    });
+    errorSub = iap.purchaseErrorListener((error) => {
+      if (error.code === iap.ErrorCode.UserCancelled) {
+        setLoading(false);
+        setStatusMessage('Purchase canceled.');
+        return;
+      }
+      console.error('IAP error', error);
+      setLoading(false);
+      setStatusMessage(null);
+      Alert.alert('Purchase failed', error.message || 'Store error');
+    });
+
     (async () => {
       try {
         await iap.initConnection();
         if (cancelled) return;
 
-        updateSub = iap.purchaseUpdatedListener((purchase) => {
-          void handleVerifiedPurchase(purchase);
-        });
-        errorSub = iap.purchaseErrorListener((error) => {
-          if (error.code === iap.ErrorCode.UserCancelled) {
-            setLoading(false);
-            setStatusMessage('Purchase canceled.');
-            return;
+        if (
+          Platform.OS === 'ios' &&
+          typeof iap.getPendingTransactionsIOS === 'function'
+        ) {
+          const pending = await iap.getPendingTransactionsIOS();
+          if (!cancelled) {
+            for (const purchase of pending || []) {
+              enqueueVerifyRef.current(purchase);
+            }
           }
-          console.error('IAP error', error);
-          setLoading(false);
-          setStatusMessage(null);
-          Alert.alert('Purchase failed', error.message || 'Store error');
-        });
+        }
 
         const products = await iap.fetchProducts({
           skus: [...WALLET_IAP_SKUS],
@@ -201,7 +254,7 @@ export default function WalletScreen() {
       errorSub?.remove();
       void iap.endConnection();
     };
-  }, [handleVerifiedPurchase]);
+  }, []);
 
   useEffect(() => {
     if (useStoreIap) return;
@@ -235,19 +288,57 @@ export default function WalletScreen() {
       return;
     }
     setLoading(true);
-    setStatusMessage(null);
+    setStatusMessage('Waiting for Apple…');
     try {
-      await iap.requestPurchase({
+      if (
+        Platform.OS === 'ios' &&
+        typeof iap.getPendingTransactionsIOS === 'function'
+      ) {
+        const pending = (await iap.getPendingTransactionsIOS()) || [];
+        const unfinished = pending.filter((purchase) =>
+          isWalletIapSku(purchase.productId)
+        );
+        if (unfinished.length > 0) {
+          setStatusMessage('Finishing your previous Apple purchase…');
+          for (const purchase of unfinished) enqueueVerify(purchase);
+          if (inFlightTxnIds.current.size === 0) {
+            setLoading(false);
+          }
+          return;
+        }
+      }
+
+      const result = await iap.requestPurchase({
         request: {
           apple: { sku: productId },
           google: { skus: [productId] },
         },
         type: 'in-app',
       });
+      const purchases = purchasesFromRequest(result).filter((purchase) =>
+        isWalletIapSku(purchase.productId)
+      );
+      if (purchases.length > 0) {
+        for (const purchase of purchases) enqueueVerify(purchase);
+        if (inFlightTxnIds.current.size === 0) {
+          setLoading(false);
+        }
+        return;
+      }
+      if (inFlightTxnIds.current.size === 0) {
+        setLoading(false);
+        setStatusMessage(null);
+      }
     } catch (err: unknown) {
       setLoading(false);
+      const code = (err as { code?: string })?.code;
+      if (code === iap.ErrorCode.UserCancelled) {
+        setStatusMessage('Purchase canceled.');
+        return;
+      }
       const message =
         err instanceof Error ? err.message : 'Failed to start purchase';
+      setStatusMessage(null);
       Alert.alert('Top-up failed', message);
     }
   };
