@@ -82,7 +82,13 @@ export default function NotificationsScreen() {
           gen === listGen.current &&
           Number.isFinite(response.unreadCount)
         ) {
-          setUnreadCount(response.unreadCount);
+          // Opening the inbox counts as seeing it; rows keep their dots until the next visit.
+          setUnreadCount(0);
+          if (response.unreadCount > 0) {
+            void notificationAPI
+              .markAllRead()
+              .catch(() => useNotificationStore.getState().refreshUnreadCount());
+          }
         }
       } catch (err) {
         const message = getApiErrorMessage(err, 'Could not load notifications.');
