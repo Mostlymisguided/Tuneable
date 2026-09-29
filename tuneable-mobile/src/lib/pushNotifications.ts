@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { router, type Href } from 'expo-router';
+import { api } from '@/src/api/client';
 import { notificationAPI } from '@/src/api/notifications';
 import { userAPI } from '@/src/api/user';
 import { useNotificationStore } from '@/src/stores/notificationStore';
@@ -98,6 +99,29 @@ export async function disablePushOnThisDevice(): Promise<void> {
     await userAPI.unregisterPushDevice(token);
   }
   await userAPI.updateNotificationPreferences({ push: false });
+}
+
+/** Stop this device receiving the signed-out account's pushes. Never prompts. */
+export async function unregisterPushOnSignOut(authToken: string | null): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch {
+    // Badge permission can be missing
+  }
+  if (!authToken) return;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    const easProjectId = projectId();
+    if (status !== 'granted' || !easProjectId) return;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId: easProjectId })).data;
+    await api.delete('/users/me/push-devices', {
+      data: { token },
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+  } catch {
+    // Signing in elsewhere reassigns the token server-side anyway
+  }
 }
 
 /** Re-register if the OS already granted permission (no prompt). */

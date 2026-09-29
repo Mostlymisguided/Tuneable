@@ -20,7 +20,7 @@ import {
 } from '@/src/auth/storage';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
-import { syncPushTokenIfGranted } from '@/src/lib/pushNotifications';
+import { syncPushTokenIfGranted, unregisterPushOnSignOut } from '@/src/lib/pushNotifications';
 import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
 import { useNotificationStore } from '@/src/stores/notificationStore';
 
@@ -63,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   tokenRef.current = token;
 
   const logout = useCallback(async () => {
+    const pushUnregister = unregisterPushOnSignOut(tokenRef.current);
     setToken(null);
     setUser(null);
     useBlockedUsersStore.getState().clear();
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void usePodcastPlayerStore.getState().clear().catch(() => undefined);
     }, 800);
     await Promise.race([
-      clearSession().catch(() => undefined),
+      Promise.all([clearSession().catch(() => undefined), pushUnregister]),
       new Promise<void>((resolve) => {
         setTimeout(resolve, 2000);
       }),

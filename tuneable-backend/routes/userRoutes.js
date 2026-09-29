@@ -730,6 +730,12 @@ router.post('/me/push-devices', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // A device token belongs to whoever signed in last on that device.
+    await User.updateMany(
+      { _id: { $ne: user._id }, 'pushDevices.token': token },
+      { $pull: { pushDevices: { token } } }
+    );
+
     if (!Array.isArray(user.pushDevices)) user.pushDevices = [];
     const existing = user.pushDevices.find((device) => device.token === token);
     if (existing) {
