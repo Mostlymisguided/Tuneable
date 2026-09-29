@@ -39,6 +39,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  applyUser: (next: User) => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
   handleOAuthCallback: (token: string) => Promise<User>;
   applySession: (token: string, user: User) => Promise<User>;
@@ -160,13 +161,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applySession]
   );
 
-  const refreshUser = useCallback(async () => {
-    const { user: fresh } = await authAPI.getProfile();
+  const applyUser = useCallback(async (fresh: User) => {
     setUser(fresh);
     if (tokenRef.current) {
       await saveSession(tokenRef.current, JSON.stringify(fresh));
     }
   }, []);
+
+  const refreshUser = useCallback(async () => {
+    const { user: fresh } = await authAPI.getProfile();
+    await applyUser(fresh);
+  }, [applyUser]);
 
   const updateBalance = useCallback((newBalancePence: number) => {
     setUser((prev) => {
@@ -208,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       deleteAccount,
       refreshUser,
+      applyUser,
       updateBalance,
       handleOAuthCallback,
       applySession,
@@ -221,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       deleteAccount,
       refreshUser,
+      applyUser,
       updateBalance,
       handleOAuthCallback,
       applySession,

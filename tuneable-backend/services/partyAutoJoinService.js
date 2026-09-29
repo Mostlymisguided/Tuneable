@@ -67,6 +67,7 @@ async function autoJoinLocationParties(user) {
     }
 
     const joinedParties = [];
+    const newMemberships = [];
     const locationFilters = [];
 
     // Create location filters for city, region, and country levels
@@ -193,11 +194,13 @@ async function autoJoinLocationParties(user) {
                 if (!user.joinedParties) {
                     user.joinedParties = [];
                 }
-                user.joinedParties.push({
+                const membership = {
                     partyId: party._id,
                     joinedAt: new Date(),
                     role: 'partier'
-                });
+                };
+                user.joinedParties.push(membership);
+                newMemberships.push(membership);
 
                 // Add user to party's partiers array
                 if (!party.partiers) {
@@ -217,9 +220,13 @@ async function autoJoinLocationParties(user) {
         }
     }
 
-    // Save user with updated joinedParties
-    if (joinedParties.length > 0) {
-        await user.save();
+    // Push memberships only. A full user.save() here can overwrite a profile
+    // update that finished while party lookup was still running.
+    if (newMemberships.length > 0) {
+        await User.updateOne(
+            { _id: user._id },
+            { $push: { joinedParties: { $each: newMemberships } } }
+        );
     }
 
     return joinedParties;

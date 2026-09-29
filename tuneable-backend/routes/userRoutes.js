@@ -3417,6 +3417,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     // Handle location updates
     // Support both new format (homeLocation/secondaryLocation) and legacy (locations)
     let shouldBackfillBidLocations = false;
+    let shouldAutoJoinLocationParties = false;
     const homeLocationChanged = homeLocation !== undefined || (locations && locations.primary !== undefined);
     if (homeLocationChanged) {
       const locationData = homeLocation || locations?.primary;
@@ -3447,18 +3448,10 @@ router.put('/profile', authMiddleware, async (req, res) => {
         shouldBackfillBidLocations =
           !hadStampableBidLocation && isStampableLocation(user.homeLocation);
         
-        // Auto-join location parties if location changed and has countryCode
-        if (locationChanged && user.homeLocation.countryCode) {
-          try {
-            const { autoJoinLocationParties } = require('../services/partyAutoJoinService');
-            await autoJoinLocationParties(user);
-            // Reload user to get updated joinedParties
-            await user.populate('joinedParties.partyId');
-          } catch (error) {
-            console.error('Error auto-joining location parties:', error);
-            // Don't fail profile update if auto-join fails
-          }
-        }
+        // Join matching location parties after the profile is saved.
+        shouldAutoJoinLocationParties = Boolean(
+          locationChanged && user.homeLocation?.countryCode
+        );
       }
     }
     
@@ -3615,6 +3608,15 @@ router.put('/profile', authMiddleware, async (req, res) => {
         .catch((error) => {
           console.error('Error backfilling bid location snapshots:', error);
         });
+    }
+
+    // Location-party lookup can scan and create several parties. The home
+    // place is already saved, so finish joining after the response.
+    if (shouldAutoJoinLocationParties) {
+      const { autoJoinLocationParties } = require('../services/partyAutoJoinService');
+      autoJoinLocationParties(user).catch((error) => {
+        console.error('Error auto-joining location parties:', error);
+      });
     }
 
     const updatedUser = await User.findById(user._id).select('-password');

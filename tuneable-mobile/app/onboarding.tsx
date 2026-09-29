@@ -54,7 +54,7 @@ export default function OnboardingScreen() {
   const params = useLocalSearchParams<{ step?: string }>();
   const {
     user,
-    refreshUser,
+    applyUser,
     isAuthenticated,
     isLoading: authLoading,
   } = useAuth();
@@ -162,9 +162,16 @@ export default function OnboardingScreen() {
     setSaving(true);
     setError(null);
     try {
-      await authAPI.updateProfile({ homeLocation });
-      await refreshUser();
-      await finishOnboarding();
+      const { user: updated } = await authAPI.updateProfile({
+        homeLocation,
+        onboarding: {
+          completedAt: new Date().toISOString(),
+          importPromptSeenAt: new Date().toISOString(),
+          importSkipped: true,
+        },
+      });
+      await applyUser(updated);
+      router.replace('/(tabs)');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save home location.'));
     } finally {
@@ -176,14 +183,14 @@ export default function OnboardingScreen() {
     setSaving(true);
     setError(null);
     try {
-      await authAPI.updateProfile({
+      const { user: updated } = await authAPI.updateProfile({
         onboarding: {
           completedAt: new Date().toISOString(),
           importPromptSeenAt: new Date().toISOString(),
           importSkipped: true,
         },
       });
-      await refreshUser();
+      await applyUser(updated);
       router.replace('/(tabs)');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to complete setup.'));
