@@ -1,12 +1,13 @@
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, AppState, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext';
+import { WelcomeLanding } from '@/src/components/WelcomeLanding';
 import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
@@ -27,6 +28,14 @@ export const unstable_settings = {
 };
 
 SplashScreen.preventAutoHideAsync();
+
+const styles = StyleSheet.create({
+  signedOutCover: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 55,
+    backgroundColor: colors.background,
+  },
+});
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -145,7 +154,29 @@ function RootNavigator() {
       </Stack>
       <AppTabBar />
       <PlayerDock />
+      <SignedOutCover />
       <AppToast />
+    </View>
+  );
+}
+
+/** Welcome screen drawn over the signed-in stack. Leaving that stack with a
+ * redirect or reset unmounts the native tabs while they are on screen and
+ * freezes iOS. */
+function SignedOutCover() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const root = (useSegments() as string[])[0];
+  const onAuthRoute =
+    root === 'index' ||
+    root === 'login' ||
+    root === 'register' ||
+    root === 'auth';
+
+  if (isLoading || isAuthenticated || onAuthRoute) return null;
+
+  return (
+    <View style={styles.signedOutCover}>
+      <WelcomeLanding />
     </View>
   );
 }
