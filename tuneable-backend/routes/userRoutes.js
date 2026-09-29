@@ -1591,7 +1591,9 @@ router.delete('/me', authMiddleware, async (req, res) => {
     user.spotifyAccessToken = undefined;
     user.spotifyRefreshToken = undefined;
 
-    user.email = undefined;
+    // Production unique indexes on email / personalInviteCode are not sparse,
+    // so unsetting them collides with other users that lack a value.
+    user.email = `${anonymizedUsername}_${user._id}@deleted.tuneable.invalid`;
     user.password = undefined;
     user.cellPhone = undefined;
     user.givenName = '';
@@ -1599,7 +1601,8 @@ router.delete('/me', authMiddleware, async (req, res) => {
     user.profilePic =
       'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
     user.username = anonymizedUsername;
-    user.personalInviteCode = undefined;
+    // Never 5 chars, so findByInviteCode can't resolve it
+    user.personalInviteCode = `DELETED_${user._id}`;
     if (Array.isArray(user.personalInviteCodes)) {
       user.personalInviteCodes.forEach((ic) => {
         ic.isActive = false;
@@ -1637,7 +1640,8 @@ router.delete('/me', authMiddleware, async (req, res) => {
         const user = await User.findById(req.user._id);
         if (user) {
           user.username = `deleted_${Date.now().toString(36)}`;
-          user.email = undefined;
+          user.email = `${user.username}_${user._id}@deleted.tuneable.invalid`;
+          user.personalInviteCode = `DELETED_${user._id}`;
           user.isActive = false;
           user.deletedAt = new Date();
           await user.save();
