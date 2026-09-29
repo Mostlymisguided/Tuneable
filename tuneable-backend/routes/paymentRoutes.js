@@ -379,7 +379,9 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
       storeTransactionId: verified.storeTransactionId,
     });
   } catch (error) {
-    const status = error.status || 500;
+    // The Render/Cloudflare edge replaces 502/503 bodies, which hides the
+    // store error from the app. 424 passes through with the JSON intact.
+    const status = error.status >= 502 ? 424 : error.status || 500;
     console.error('IAP verify error:', error.message);
     res.status(status).json({ error: error.message || 'IAP verification failed' });
   }

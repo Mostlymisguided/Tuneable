@@ -45,37 +45,78 @@ function decodeAppleJwsPayload(jws) {
   }
 }
 
+function normalizeApplePrivateKey(raw) {
+  let privateKey = String(raw || '').trim();
+  if (
+    (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+    (privateKey.startsWith("'") && privateKey.endsWith("'"))
+  ) {
+    privateKey = privateKey.slice(1, -1).trim();
+  }
+  return privateKey.replace(/\\n/g, '\n').trim();
+}
+
 function createAppleApiToken() {
   const keyId = process.env.APPLE_IAP_KEY_ID;
   const issuerId = process.env.APPLE_IAP_ISSUER_ID;
   const bundleId = process.env.APPLE_IAP_BUNDLE_ID || 'stream.tuneable.app';
-  let privateKey = process.env.APPLE_IAP_PRIVATE_KEY || '';
+  const privateKey = normalizeApplePrivateKey(process.env.APPLE_IAP_PRIVATE_KEY);
 
   if (!keyId || !issuerId || !privateKey) {
     return null;
   }
 
-  // Allow \n-escaped keys in .env
-  privateKey = privateKey.replace(/\\n/g, '\n');
+  if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {
+    const err = new Error(
+      'APPLE_IAP_PRIVATE_KEY is not a valid .p8. Paste the full file, including the BEGIN PRIVATE KEY and END PRIVATE KEY lines, and keep the line breaks (or write them as \\n).'
+    );
+    err.status = 503;
+    throw err;
+  }
 
   const now = Math.floor(Date.now() / 1000);
-  return jwt.sign(
-    {
-      iss: issuerId,
-      iat: now,
-      exp: now + 60 * 20,
-      aud: 'appstoreconnect-v1',
-      bid: bundleId,
-    },
-    privateKey,
-    {
-      algorithm: 'ES256',
-      header: { alg: 'ES256', kid: keyId, typ: 'JWT' },
-    }
-  );
+  try {
+    return jwt.sign(
+      {
+        iss: issuerId,
+        iat: now,
+        exp: now + 60 * 20,
+        aud: 'appstoreconnect-v1',
+        bid: bundleId,
+      },
+      privateKey,
+      {
+        algorithm: 'ES256',
+        header: { alg: 'ES256', kid: keyId, typ: 'JWT' },
+      }
+    );
+  } catch {
+    const err = new Error(
+      'APPLE_IAP_PRIVATE_KEY could not sign the App Store request. Re-paste the .p8 and check the line breaks.'
+    );
+    err.status = 503;
+    throw err;
+  }
 }
 
-async function fetchAppleTransaction(transactionId, useSandbox) {
+function appleApiError(response, triedBothEnvironments) {
+  const status = response.status;
+  const code = response.data?.errorCode;
+  let hint = '';
+  if (status === 401) {
+    hint =
+      ' Apple rejected the API key. Check APPLE_IAP_KEY_ID, APPLE_IAP_ISSUER_ID, APPLE_IAP_BUNDLE_ID (stream.tuneable.app), and that APPLE_IAP_PRIVATE_KEY is the matching .p8.';
+  } else if (status === 404 && triedBothEnvironments) {
+    hint = ' Apple could not find that transaction in production or sandbox.';
+  }
+  const err = new Error(
+    `Apple App Store Server API error (${status}${code ? `, ${code}` : ''}): ${JSON.stringify(response.data)}.${hint}`
+  );
+  err.status = 502;
+  return err;
+}
+
+async function fetchAppleTransaction(transactionId, useSandbox, didFallback = false) {
   const token = createAppleApiToken();
   if (!token) return null;
 
@@ -87,16 +128,12 @@ async function fetchAppleTransaction(transactionId, useSandbox) {
     validateStatus: () => true,
   });
 
-  if (response.status === 404 && !useSandbox) {
-    return fetchAppleTransaction(transactionId, true);
+  if (response.status === 404 && !didFallback) {
+    return fetchAppleTransaction(transactionId, !useSandbox, true);
   }
 
   if (response.status !== 200) {
-    const err = new Error(
-      `Apple App Store Server API error (${response.status}): ${JSON.stringify(response.data)}`
-    );
-    err.status = 502;
-    throw err;
+    throw appleApiError(response, didFallback || response.status !== 404);
   }
 
   const signedTransaction = response.data?.signedTransactionInfo;
@@ -154,15 +191,15 @@ async function verifyApplePurchase({ productId, transactionId, purchaseToken, re
     };
   }
 
-  // 1) App Store Server API via transaction id (from client or JWS payload)
-  let resolvedTxnId = transactionId;
-  if (!resolvedTxnId && purchaseToken) {
-    const decoded = decodeAppleJwsPayload(purchaseToken);
-    resolvedTxnId = decoded?.transactionId || decoded?.originalTransactionId;
-  }
+  // 1) App Store Server API. Prefer the transaction id inside the StoreKit 2 JWS,
+  // then re-fetch that transaction from Apple before crediting.
+  const decoded = purchaseToken ? decodeAppleJwsPayload(purchaseToken) : null;
+  const jwsTxnId = decoded?.transactionId || decoded?.originalTransactionId;
+  const resolvedTxnId = jwsTxnId || transactionId;
+  const preferSandbox = decoded?.environment === 'Sandbox';
 
   if (resolvedTxnId && createAppleApiToken()) {
-    const payload = await fetchAppleTransaction(resolvedTxnId, false);
+    const payload = await fetchAppleTransaction(resolvedTxnId, preferSandbox);
     if (payload.bundleId && payload.bundleId !== bundleId) {
       const err = new Error(`Apple bundleId mismatch: ${payload.bundleId}`);
       err.status = 400;
