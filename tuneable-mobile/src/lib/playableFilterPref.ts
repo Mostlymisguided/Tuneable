@@ -10,7 +10,7 @@ export type PlayableOnlyScope = keyof typeof KEYS;
 
 export const PLAYABLE_ONLY_DEFAULTS: Record<PlayableOnlyScope, boolean> = {
   chart: true,
-  library: false,
+  library: true,
 };
 
 function parseStored(raw: string | null, fallback: boolean): boolean {
