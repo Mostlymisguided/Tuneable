@@ -3,6 +3,7 @@
  * scoped to media, tag, or artist; optionally filtered by Mapbox place.
  */
 
+const NodeCache = require('node-cache');
 const Bid = require('../models/Bid');
 const Media = require('../models/Media');
 const { resolveTagFromSlug, collectTagVariants, generateSlug, mediaBpmQuery } = require('./tagProfileService');
@@ -697,12 +698,65 @@ async function loadScopedPlaceTitles(userObjectId, userIdStr, location, options 
   return { location, tags: tags || [], media, placeTitle };
 }
 
+const CHAMPION_TITLES_FRESH_MS = 5 * 60 * 1000;
+
+/** Entries outlive freshness so stale titles can be served while a refresh runs. */
+const championTitlesCache = new NodeCache({ stdTTL: 60 * 60, checkperiod: 10 * 60, useClones: false });
+const championTitlesInFlight = new Map();
+
+function championTitlesCacheKey(userId, options) {
+  return JSON.stringify([
+    userId,
+    options.mediaLimit ?? null,
+    options.checkMediaLimit ?? null,
+    options.locationPlaceId ?? null,
+    options.tagLimit ?? null,
+    options.checkTagLimit ?? null,
+    options.badgeLimit ?? null,
+  ]);
+}
+
+function refreshChampionTitles(key, userId, options) {
+  const existing = championTitlesInFlight.get(key);
+  if (existing) return existing;
+
+  const run = computeUserChampionTitles(userId, options)
+    .then((value) => {
+      if (value) championTitlesCache.set(key, { value, fetchedAt: Date.now() });
+      return value;
+    })
+    .finally(() => {
+      championTitlesInFlight.delete(key);
+    });
+  championTitlesInFlight.set(key, run);
+  return run;
+}
+
 /**
- * Champion titles (#1–#3) held by a user.
+ * Champion titles (#1–#3) held by a user, cached per user + options.
+ * Stale entries are returned immediately and refreshed in the background.
+ */
+async function getUserChampionTitles(userId, options = {}) {
+  const key = championTitlesCacheKey(userId, options);
+  const cached = championTitlesCache.get(key);
+
+  if (cached) {
+    if (Date.now() - cached.fetchedAt > CHAMPION_TITLES_FRESH_MS) {
+      refreshChampionTitles(key, userId, options).catch((error) => {
+        console.error('Background champion titles refresh failed:', error);
+      });
+    }
+    return cached.value;
+  }
+
+  return refreshChampionTitles(key, userId, options);
+}
+
+/**
  * Global tags + media first; if the row is not full, fill from home-location
  * combined titles and place-only (#1 #London) badges.
  */
-async function getUserChampionTitles(userId, options = {}) {
+async function computeUserChampionTitles(userId, options = {}) {
   const mediaLimit = Math.min(Math.max(parseInt(options.mediaLimit, 10) || 10, 1), 30);
   const checkMediaLimit = Math.min(Math.max(parseInt(options.checkMediaLimit, 10) || 40, 5), 100);
   const badgeLimit = Math.min(

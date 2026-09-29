@@ -52,30 +52,27 @@ export default function ProfileScreen() {
       setError(null);
       const userId = user.uuid || user.id;
 
-      const shell = (async () => {
-        try {
-          const [profileRes, rankingsRes, championsRes] = await Promise.all([
-            userAPI.getProfileById(userId),
-            userAPI.getTuneBytesTagRankings(userId, 5).catch(() => ({
-              tuneBytesTagRankings: [],
-            })),
-            userAPI
-              .getChampionTitles(userId, {
-                mediaLimit: 8,
-                checkMediaLimit: 40,
-                badgeLimit: 8,
-              })
-              .catch(() => ({ tags: [], media: [], badges: [] })),
-          ]);
-          setProfileUser(profileRes.user);
-          setRankings(rankingsRes.tuneBytesTagRankings ?? []);
-          setChampionBadges(championBadgesFromResponse(championsRes));
-        } catch (err) {
+      const profileLoad = userAPI
+        .getProfileById(userId)
+        .then((res) => setProfileUser(res.user))
+        .catch((err) => {
           setError(err instanceof Error ? err.message : 'Failed to load profile');
-        } finally {
-          setBadgesLoading(false);
-        }
-      })();
+        });
+      const rankingsLoad = userAPI
+        .getTuneBytesTagRankings(userId, 5)
+        .then((res) => setRankings(res.tuneBytesTagRankings ?? []))
+        .catch(() => {});
+      const championsLoad = userAPI
+        .getChampionTitles(userId, {
+          mediaLimit: 8,
+          checkMediaLimit: 40,
+          badgeLimit: 8,
+        })
+        .then((res) => setChampionBadges(championBadgesFromResponse(res)))
+        .catch(() => {});
+      const badgesLoad = Promise.all([rankingsLoad, championsLoad]).finally(() => {
+        setBadgesLoading(false);
+      });
 
       const libraryLoad = (async () => {
         try {
@@ -89,7 +86,7 @@ export default function ProfileScreen() {
       })();
 
       try {
-        await Promise.all([shell, libraryLoad]);
+        await Promise.all([profileLoad, badgesLoad, libraryLoad]);
       } finally {
         setRefreshing(false);
       }

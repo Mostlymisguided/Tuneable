@@ -67,26 +67,21 @@ export default function PublicUserProfileScreen() {
         }
       })();
 
-      const badgesLoad = (async () => {
-        try {
-          const [rankingsRes, championsRes] = await Promise.all([
-            userAPI.getTuneBytesTagRankings(id, 5).catch(() => ({
-              tuneBytesTagRankings: [],
-            })),
-            userAPI
-              .getChampionTitles(id, {
-                mediaLimit: 8,
-                checkMediaLimit: 40,
-                badgeLimit: 8,
-              })
-              .catch(() => ({ tags: [], media: [], badges: [] })),
-          ]);
-          setRankings(rankingsRes.tuneBytesTagRankings ?? []);
-          setChampionBadges(championBadgesFromResponse(championsRes));
-        } finally {
-          setBadgesLoading(false);
-        }
-      })();
+      const rankingsLoad = userAPI
+        .getTuneBytesTagRankings(id, 5)
+        .then((res) => setRankings(res.tuneBytesTagRankings ?? []))
+        .catch(() => {});
+      const championsLoad = userAPI
+        .getChampionTitles(id, {
+          mediaLimit: 8,
+          checkMediaLimit: 40,
+          badgeLimit: 8,
+        })
+        .then((res) => setChampionBadges(championBadgesFromResponse(res)))
+        .catch(() => {});
+      const badgesLoad = Promise.all([rankingsLoad, championsLoad]).finally(() => {
+        setBadgesLoading(false);
+      });
 
       const libraryLoad = (async () => {
         try {
