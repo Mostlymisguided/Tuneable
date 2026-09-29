@@ -4,13 +4,38 @@ const WalletTransaction = require('../models/WalletTransaction');
 const Bid = require('../models/Bid');
 const { sendPaymentNotification } = require('../utils/emailService');
 
+function isTransientTransactionError(err) {
+  if (!err) return false;
+  if (err.code === 112) return true; // WriteConflict
+  if (typeof err.hasErrorLabel === 'function') {
+    return (
+      err.hasErrorLabel('TransientTransactionError') ||
+      err.hasErrorLabel('UnknownTransactionCommitResult')
+    );
+  }
+  return Array.isArray(err.errorLabels) && err.errorLabels.includes('TransientTransactionError');
+}
+
 /**
  * Credit wallet after a verified store purchase (Apple / Google).
- * Idempotent on storeTransactionId.
+ * Idempotent on storeTransactionId. Retries transient write conflicts
+ * (e.g. the same purchase verified twice at once).
  *
  * @returns {{ balance, transaction, alreadyProcessed }}
  */
-async function creditIapTopUp({
+async function creditIapTopUp(params) {
+  const maxAttempts = 4;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await creditIapTopUpOnce(params);
+    } catch (err) {
+      if (attempt >= maxAttempts || !isTransientTransactionError(err)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 50 * attempt + Math.random() * 100));
+    }
+  }
+}
+
+async function creditIapTopUpOnce({
   userId,
   creditPence,
   paymentMethod,
