@@ -87,6 +87,12 @@
       },
       "router": {}
     },
-    "owner": "tuneable"
+    "owner": "tuneable",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/51cc8dd9-277c-4cf6-8a61-5e306a3b2388"
+    }
   }
 }

@@ -13,6 +13,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://tuneable.stream"
@@ -20,6 +21,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://tuneable.stream"
       }
