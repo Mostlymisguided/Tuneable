@@ -25,7 +25,12 @@ import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
+import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import {
+  isInsufficientBalanceError,
+  openWalletForTipTopUp,
+} from '@/src/lib/tipBalance';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import {
   episodeCoverArt,
@@ -319,16 +324,18 @@ export default function PodcastEpisodeProfileScreen() {
       return;
     }
     if (Math.round(amount * 100) > (user.balance ?? 0)) {
-      setSupportError(
-        `Insufficient balance (${formatPoundsFromPence(user.balance)} available)`
-      );
+      openWalletForTipTopUp();
       return;
     }
     setTipping(true);
     try {
       await placeTip(amount);
     } catch (err) {
-      setSupportError(err instanceof Error ? err.message : 'Tip failed');
+      if (isInsufficientBalanceError(err)) {
+        openWalletForTipTopUp();
+        return;
+      }
+      setSupportError(getApiErrorMessage(err, 'Tip failed'));
     } finally {
       setTipping(false);
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import { router } from 'expo-router';
 import { useAuth } from '@/src/auth/AuthContext';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { LEGAL_URLS } from '@/src/components/LegalLinks';
@@ -31,7 +32,13 @@ import {
   isKnownElement,
   normalizeTipChipForDisplay,
 } from '@/src/lib/elementNormalizer';
+import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatPoundsFromPence } from '@/src/lib/format';
+import {
+  isInsufficientBalanceError,
+  TIP_TOP_UP_MESSAGE,
+} from '@/src/lib/tipBalance';
+import { showToast } from '@/src/stores/toastStore';
 import { formatLocationLabel } from '@/src/lib/location';
 import {
   buildTipStatChips,
@@ -125,6 +132,34 @@ export function TipSheet({
   );
   const [canAskLocation, setCanAskLocation] = useState(canRequestLocationPermission);
   const [enablingLocation, setEnablingLocation] = useState(false);
+  const pendingWalletNav = useRef(false);
+  const walletNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (walletNavTimer.current) clearTimeout(walletNavTimer.current);
+    };
+  }, []);
+
+  const flushWalletNav = () => {
+    if (!pendingWalletNav.current) return;
+    pendingWalletNav.current = false;
+    if (walletNavTimer.current) {
+      clearTimeout(walletNavTimer.current);
+      walletNavTimer.current = null;
+    }
+    router.push('/wallet');
+  };
+
+  const sendToWalletTopUp = () => {
+    showToast(TIP_TOP_UP_MESSAGE, 'error');
+    pendingWalletNav.current = true;
+    onClose();
+    if (walletNavTimer.current) clearTimeout(walletNavTimer.current);
+    // The tip sheet is a native modal. Wait for it to dismiss so it does not
+    // cover the wallet screen. onDismiss covers iOS; the timer covers Android.
+    walletNavTimer.current = setTimeout(flushWalletNav, 320);
+  };
 
   const resolvedMediaId = useMemo(() => {
     if (mediaId) return mediaId;
@@ -320,16 +355,11 @@ export function TipSheet({
         finishAndClose();
       }
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { message?: string } | undefined)?.message ||
-          err.message;
-        setError(msg || 'Tip failed');
-      } else if (err instanceof Error && err.message) {
-        setError(err.message);
-      } else {
-        setError('Tip failed');
+      if (isInsufficientBalanceError(err)) {
+        sendToWalletTopUp();
+        return;
       }
+      setError(getApiErrorMessage(err, 'Tip failed'));
     } finally {
       setSubmitting(false);
     }
@@ -384,9 +414,7 @@ export function TipSheet({
     }
     const neededPence = Math.round(amount * 100);
     if (neededPence > liveBalancePence) {
-      setError(
-        `Insufficient balance (${formatPoundsFromPence(liveBalancePence)} available)`
-      );
+      sendToWalletTopUp();
       return;
     }
 
@@ -413,6 +441,7 @@ export function TipSheet({
       visible={visible}
       animationType="slide"
       transparent
+      onDismiss={flushWalletNav}
       onRequestClose={handleClose}>
       <KeyboardAvoidingView
         style={styles.flex}
