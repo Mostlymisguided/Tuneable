@@ -137,7 +137,8 @@ export default function UploadScreen() {
 
       <ScrollView
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
         {!allowed ? (
           <View style={styles.gateCard}>
             <Text style={styles.gateTitle}>Creators only</Text>

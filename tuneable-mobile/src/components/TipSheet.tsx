@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -16,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router } from 'expo-router';
 import { useAuth } from '@/src/auth/AuthContext';
+import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { LEGAL_URLS } from '@/src/components/LegalLinks';
 import { mediaAPI } from '@/src/api/media';
@@ -63,6 +65,8 @@ export type TipMediaLike = {
   partyBids?: TipBidLike[] | null;
   minimumBid?: number | null;
 } | null;
+
+const TIP_KEYBOARD_ACCESSORY_ID = 'tip-sheet-keyboard-done';
 
 type Props = {
   visible: boolean;
@@ -446,10 +450,20 @@ export function TipSheet({
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={styles.backdrop} onPress={handleClose} />
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => {
+            if (Keyboard.isVisible()) {
+              Keyboard.dismiss();
+              return;
+            }
+            handleClose();
+          }}
+        />
         <View style={styles.sheet}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.sheetContent}>
             {phase === 'agree' ? (
@@ -534,6 +548,7 @@ export function TipSheet({
                   onChangeText={onChangeText}
                   editable={!submitting}
                   selectTextOnFocus
+                  inputAccessoryViewID={TIP_KEYBOARD_ACCESSORY_ID}
                 />
               </View>
               <Pressable
@@ -783,6 +798,7 @@ export function TipSheet({
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+      <KeyboardDoneAccessory nativeID={TIP_KEYBOARD_ACCESSORY_ID} />
     </Modal>
   );
 }

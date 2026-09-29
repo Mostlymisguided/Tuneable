@@ -14,6 +14,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
+import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
 import { Screen } from '@/src/components/Screen';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { paymentAPI } from '@/src/api/payments';
@@ -33,6 +34,7 @@ import { colors } from '@/src/theme/colors';
 WebBrowser.maybeCompleteAuthSession();
 
 const useStoreIap = shouldUseStoreIap();
+const AMOUNT_KEYBOARD_ACCESSORY_ID = 'wallet-amount-keyboard-done';
 
 function isWalletIapSku(productId: string): boolean {
   return (WALLET_IAP_SKUS as readonly string[]).includes(productId);
@@ -406,6 +408,7 @@ export default function WalletScreen() {
     <Screen style={styles.pad}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         contentContainerStyle={styles.scrollContent}>
       <View style={styles.headerRow}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
@@ -482,6 +485,7 @@ export default function WalletScreen() {
                 value={customAmount}
                 onChangeText={setCustomAmount}
                 editable={!loading}
+                inputAccessoryViewID={AMOUNT_KEYBOARD_ACCESSORY_ID}
               />
             </View>
             <Pressable
@@ -516,6 +520,7 @@ export default function WalletScreen() {
 
       {statusMessage ? <Text style={styles.status}>{statusMessage}</Text> : null}
       </ScrollView>
+      <KeyboardDoneAccessory nativeID={AMOUNT_KEYBOARD_ACCESSORY_ID} />
     </Screen>
   );
 }

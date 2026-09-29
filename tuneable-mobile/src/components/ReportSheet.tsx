@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -14,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '@/src/auth/AuthContext';
+import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
 import { reportAPI, type ReportType } from '@/src/api/reports';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { showToast } from '@/src/stores/toastStore';
@@ -98,6 +100,8 @@ const USER_CATEGORIES: Category[] = [
     description: 'Something else needs attention',
   },
 ];
+
+const KEYBOARD_ACCESSORY_ID = 'report-sheet-keyboard-done';
 
 type Props = {
   visible: boolean;
@@ -189,13 +193,26 @@ export function ReportSheet({
     }
   };
 
+  const handleBackdropPress = () => {
+    if (Keyboard.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    onClose();
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={styles.backdrop} onPress={handleBackdropPress}>
+          <Pressable
+            style={styles.sheet}
+            onPress={(e) => {
+              e.stopPropagation();
+              Keyboard.dismiss();
+            }}>
             <View style={styles.handle} />
             <View style={styles.header}>
               <Text style={styles.title}>Report</Text>
@@ -209,6 +226,7 @@ export function ReportSheet({
 
             <ScrollView
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               contentContainerStyle={styles.scroll}>
               {categories.map((item) => {
                 const active = item.value === category;
@@ -235,6 +253,7 @@ export function ReportSheet({
                 placeholderTextColor={colors.textMuted}
                 multiline
                 editable={!submitting}
+                inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
               />
 
               {selected?.requiresEmail ? (
@@ -248,7 +267,9 @@ export function ReportSheet({
                     placeholderTextColor={colors.textMuted}
                     autoCapitalize="none"
                     keyboardType="email-address"
+                    returnKeyType="done"
                     editable={!submitting}
+                    inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
                   />
                 </>
               ) : null}
@@ -271,6 +292,7 @@ export function ReportSheet({
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
+      <KeyboardDoneAccessory nativeID={KEYBOARD_ACCESSORY_ID} />
     </Modal>
   );
 }

@@ -17,6 +17,7 @@ import { Redirect, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
+import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
 import { Screen } from '@/src/components/Screen';
 import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { authAPI } from '@/src/api/auth';
@@ -33,6 +34,7 @@ import {
 } from '@/src/types/user';
 
 const MAX_PIC_BYTES = 5 * 1024 * 1024;
+const NUMERIC_KEYBOARD_ACCESSORY_ID = 'edit-profile-numeric-keyboard-done';
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 
 const SOCIAL_FIELDS = [
@@ -421,6 +423,7 @@ export default function EditProfileScreen() {
               keyboardType="phone-pad"
               placeholder="+44 7700 900000"
               placeholderTextColor={colors.textMuted}
+              inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
             />
           </Field>
 
@@ -433,6 +436,7 @@ export default function EditProfileScreen() {
               keyboardType="decimal-pad"
               placeholder={DEFAULT_TIP_POUNDS.toFixed(2)}
               placeholderTextColor={colors.textMuted}
+              inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
             />
             <Text style={styles.hint}>
               Used when you add a tune to your library. Minimum £0.01.
@@ -514,6 +518,7 @@ export default function EditProfileScreen() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      <KeyboardDoneAccessory nativeID={NUMERIC_KEYBOARD_ACCESSORY_ID} />
     </Screen>
   );
 }

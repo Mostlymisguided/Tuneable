@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -145,10 +146,20 @@ export function TagClaimSheet({
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => {
+            if (Keyboard.isVisible()) {
+              Keyboard.dismiss();
+              return;
+            }
+            onClose();
+          }}
+        />
         <View style={styles.sheet}>
           <ScrollView
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             contentContainerStyle={styles.content}>
             <View style={styles.header}>
               <Ionicons name="pricetag" size={18} color={colors.accentLight} />
