@@ -38,7 +38,7 @@ const INTRO_FACTS: {
   hint: string;
 }[] = [
   { icon: 'heart', label: 'Tip', hint: 'Supports them' },
-  { icon: 'stats-chart', label: 'Charts', hint: 'Your tip counts' },
+  { icon: 'sparkles', label: 'TuneBytes', hint: 'Earn perks' },
   { icon: 'trophy', label: 'Champion', hint: 'Top tipper' },
 ];
 

@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
-  BarChart3,
   Heart,
   Loader2,
   MapPin,
   Mic,
   Music,
   Navigation,
+  Sparkles,
   Trophy,
 } from 'lucide-react';
 import { toast } from '../utils/toast';
@@ -256,7 +256,7 @@ const Onboarding: React.FC = () => {
             <div className="grid grid-cols-3 gap-2">
               {[
                 { icon: Heart, label: 'Tip', hint: 'Supports them' },
-                { icon: BarChart3, label: 'Charts', hint: 'Your tip counts' },
+                { icon: Sparkles, label: 'TuneBytes', hint: 'Earn perks' },
                 { icon: Trophy, label: 'Champion', hint: 'Top tipper' },
               ].map(({ icon: Icon, label, hint }) => (
                 <div
