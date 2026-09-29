@@ -1615,6 +1615,7 @@ router.delete('/me', authMiddleware, async (req, res) => {
       });
     }
 
+    user.pushDevices = [];
     user.isActive = false;
     user.deletedAt = new Date();
     user.balance = 0;
@@ -1648,6 +1649,7 @@ router.delete('/me', authMiddleware, async (req, res) => {
           user.username = `deleted_${Date.now().toString(36)}`;
           user.email = `${user.username}_${user._id}@deleted.tuneable.invalid`;
           user.personalInviteCode = `DELETED_${user._id}`;
+          user.pushDevices = [];
           user.isActive = false;
           user.deletedAt = new Date();
           await user.save();
