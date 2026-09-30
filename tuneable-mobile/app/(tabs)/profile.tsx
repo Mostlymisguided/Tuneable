@@ -276,6 +276,10 @@ export default function ProfileScreen() {
           setSettingsOpen(false);
           router.push('/edit-profile');
         }}
+        onChangePassword={() => {
+          setSettingsOpen(false);
+          router.push('/change-password');
+        }}
         onUpload={() => {
           setSettingsOpen(false);
           router.push('/upload');

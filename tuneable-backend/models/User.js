@@ -3,6 +3,12 @@ const bcrypt = require('bcrypt');
 const { uuidv7 } = require('uuidv7');
 const { mapboxLocationFields } = require('./mapboxLocationFields');
 
+const { stripSensitiveUserFields } = require('../utils/userSanitizer');
+
+function hashResetToken(token) {
+  return require('crypto').createHash('sha256').update(String(token)).digest('hex');
+}
+
 const userSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
   username: { type: String, required: true, unique: true },
@@ -223,9 +229,11 @@ const userSchema = new mongoose.Schema({
   emailVerificationToken: { type: String },
   emailVerificationExpires: { type: Date },
   
-  // Password reset
+  // Password reset (SHA-256 of the emailed token)
   passwordResetToken: { type: String },
   passwordResetExpires: { type: Date },
+  // Tokens issued before this instant are rejected (see utils/sessionRevocation)
+  passwordChangedAt: { type: Date },
   
   // Email unsubscribe
   unsubscribeToken: { type: String },
@@ -371,6 +379,7 @@ const userSchema = new mongoose.Schema({
       ret.hasPushDevice = Array.isArray(ret.pushDevices) && ret.pushDevices.length > 0;
       delete ret.pushDevices;
       delete ret.blockedUsers;
+      stripSensitiveUserFields(ret);
       return ret;
     },
   },
@@ -401,7 +410,22 @@ userSchema.pre('save', async function(next) {
 
 // Method to compare passwords
 userSchema.methods.comparePassword = async function(candidatePassword) {
+  if (!this.password || typeof candidatePassword !== 'string') return false;
   return bcrypt.compare(candidatePassword, this.password);
+};
+
+/**
+ * Sets a new password and revokes every token issued before now.
+ * Caller must save the document.
+ */
+userSchema.methods.setPassword = function(newPassword) {
+  this.password = newPassword;
+  this.passwordChangedAt = new Date();
+  this.passwordResetToken = undefined;
+  this.passwordResetExpires = undefined;
+  this.failedLoginAttempts = 0;
+  this.accountLockedUntil = null;
+  this.lastFailedLoginAttempt = null;
 };
 
 // Static method to find a user by userId
@@ -480,7 +504,7 @@ userSchema.methods.generateEmailVerificationToken = function() {
 userSchema.methods.generatePasswordResetToken = function() {
   const crypto = require('crypto');
   const token = crypto.randomBytes(32).toString('hex');
-  this.passwordResetToken = token;
+  this.passwordResetToken = hashResetToken(token);
   this.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
   return token;
 };
@@ -499,14 +523,19 @@ userSchema.methods.verifyEmail = function(token) {
 
 // Reset password with token
 userSchema.methods.resetPassword = function(token, newPassword) {
-  if (this.passwordResetToken === token && 
+  const stored = Buffer.from(String(this.passwordResetToken || ''));
+  const supplied = Buffer.from(hashResetToken(token));
+  if (stored.length === supplied.length &&
+      require('crypto').timingSafeEqual(stored, supplied) &&
       this.passwordResetExpires > Date.now()) {
-    this.password = newPassword;
-    this.passwordResetToken = undefined;
-    this.passwordResetExpires = undefined;
+    this.setPassword(newPassword);
     return true;
   }
   return false;
+};
+
+userSchema.statics.findByPasswordResetToken = function(token) {
+  return this.findOne({ passwordResetToken: hashResetToken(token) });
 };
 
 // Generate unsubscribe token

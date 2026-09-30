@@ -8,6 +8,7 @@
 const notificationService = require('../services/notificationService');
 const WalletTransaction = require('../models/WalletTransaction');
 const { WELCOME_CREDIT_PENCE } = require('./welcomeCreditHelper');
+const { stripSensitiveUserFields } = require('./userSanitizer');
 const {
   computeWelcomeExpiryDate,
   WELCOME_CREDIT_EXPIRY_MONTHS,
@@ -92,7 +93,10 @@ function withWelcomeCreditOffer(user) {
   obj.welcomeCreditOffer = getWelcomeCreditOffer(user);
   obj.hasPushDevice = Array.isArray(obj.pushDevices) && obj.pushDevices.length > 0;
   delete obj.pushDevices;
-  return obj;
+  if (typeof user.isSelected === 'function' && user.isSelected('password')) {
+    obj.hasPassword = Boolean(user.password);
+  }
+  return stripSensitiveUserFields(obj);
 }
 
 async function hasCompletedWelcomeGrant(userId) {

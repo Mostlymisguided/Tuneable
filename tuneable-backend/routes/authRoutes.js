@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const { isTokenRevoked } = require('../utils/sessionRevocation');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
@@ -173,10 +174,11 @@ async function extractUserFromToken(req) {
     const mongoose = require('mongoose');
     let user;
     if (decoded.userId.includes('-')) {
-      user = await User.findOne({ uuid: decoded.userId }).select('_id uuid');
+      user = await User.findOne({ uuid: decoded.userId }).select('_id uuid passwordChangedAt');
     } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
-      user = await User.findById(decoded.userId).select('_id uuid');
+      user = await User.findById(decoded.userId).select('_id uuid passwordChangedAt');
     }
+    if (isTokenRevoked(decoded, user)) return null;
     
     return user ? { _id: user._id.toString(), uuid: user.uuid } : null;
   } catch (err) {

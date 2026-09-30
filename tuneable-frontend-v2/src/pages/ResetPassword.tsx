@@ -3,6 +3,14 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { authAPI } from '../lib/api';
+import {
+  PASSWORD_HINT,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PLACEHOLDER,
+  passwordApiErrorMessage,
+  passwordLengthError,
+} from '../utils/passwordPolicy';
 
 const inputClass =
   'block w-full h-11 rounded-lg border border-white/10 bg-zinc-900/80 px-3.5 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none transition-colors focus:border-white/30 focus:ring-1 focus:ring-white/20';
@@ -50,8 +58,9 @@ const ResetPassword: React.FC = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+    const lengthError = passwordLengthError(formData.password);
+    if (lengthError) {
+      toast.error(lengthError);
       return;
     }
 
@@ -72,10 +81,9 @@ const ResetPassword: React.FC = () => {
       setSubmitted(true);
       toast.success('Password reset successfully!');
     } catch (error: any) {
-      const errorMsg = error.response?.data?.error || 'Failed to reset password';
-      toast.error(errorMsg);
+      toast.error(passwordApiErrorMessage(error, 'Failed to reset password'));
 
-      if (error.response?.status === 400) {
+      if (error.response?.data?.code === 'RESET_TOKEN_INVALID') {
         setTimeout(() => {
           navigate('/forgot-password');
         }, 2000);
@@ -123,10 +131,12 @@ const ResetPassword: React.FC = () => {
                     value={formData.password}
                     onChange={handleChange}
                     className={`${inputClass} pr-10`}
-                    placeholder="At least 6 characters"
+                    placeholder={PASSWORD_PLACEHOLDER}
                     required
                     autoComplete="new-password"
-                    minLength={6}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
+                    aria-describedby="password-hint"
                   />
                   <button
                     type="button"
@@ -137,6 +147,9 @@ const ResetPassword: React.FC = () => {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <p id="password-hint" className="mt-1.5 text-xs text-zinc-500">
+                  {PASSWORD_HINT}
+                </p>
               </div>
               <div>
                 <label htmlFor="confirmPassword" className="mb-1.5 block text-xs font-medium text-zinc-400">
@@ -153,7 +166,8 @@ const ResetPassword: React.FC = () => {
                     placeholder="Confirm password"
                     required
                     autoComplete="new-password"
-                    minLength={6}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
                   />
                   <button
                     type="button"

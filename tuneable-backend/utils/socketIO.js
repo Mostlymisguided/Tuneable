@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { resolvePartyIdValue } = require('./idResolver');
+const { isTokenRevoked } = require('./sessionRevocation');
 
 let io = null;
 
@@ -32,14 +33,15 @@ const verifyTokenAndGetUser = async (token) => {
     let user;
     if (decoded.userId && decoded.userId.includes('-')) {
       // UUID format - look up by uuid field
-      user = await User.findOne({ uuid: decoded.userId }).select('_id uuid username');
+      user = await User.findOne({ uuid: decoded.userId }).select('_id uuid username passwordChangedAt');
     } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
       // Legacy ObjectId format - look up by _id for backward compatibility
-      user = await User.findById(decoded.userId).select('_id uuid username');
+      user = await User.findById(decoded.userId).select('_id uuid username passwordChangedAt');
     } else {
       return null;
     }
 
+    if (isTokenRevoked(decoded, user)) return null;
     return user;
   } catch (error) {
     console.error('Token verification error:', error.message);

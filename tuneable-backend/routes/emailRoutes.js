@@ -5,13 +5,29 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { 
   sendEmailVerification, 
   sendPasswordReset, 
+  sendPasswordChangedNotification,
   sendWelcomeEmail,
   sendOwnershipNotification,
   sendClaimStatusNotification,
   sendInviteEmail
 } = require('../utils/emailService');
 
+const rateLimit = require('../middleware/rateLimit');
+const { validateNewPassword } = require('../utils/passwordPolicy');
+
 const router = express.Router();
+
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const resetRequestIpLimit = rateLimit({ name: 'reset-request-ip', windowMs: FIFTEEN_MINUTES, max: 10 });
+const resetRequestEmailLimit = rateLimit({
+  name: 'reset-request-email',
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  perIp: false,
+  key: (req) => String(req.body?.email || '').trim(),
+  message: 'A reset link was sent recently. Please check your inbox (and spam folder) before trying again.',
+});
+const resetConfirmLimit = rateLimit({ name: 'reset-confirm', windowMs: FIFTEEN_MINUTES, max: 10 });
 
 // @route   POST /api/email/verify/send
 // @desc    Send email verification
@@ -93,6 +109,8 @@ router.post('/verify/confirm', [
 // @desc    Request password reset
 // @access  Public
 router.post('/password-reset/request', [
+  resetRequestIpLimit,
+  resetRequestEmailLimit,
   body('email').isEmail().withMessage('Valid email is required')
 ], async (req, res) => {
   try {
@@ -103,23 +121,24 @@ router.post('/password-reset/request', [
 
     const { email } = req.body;
     const user = await User.findOne({ email: email.toLowerCase().trim() });
-    
-    if (!user) {
-      // Don't reveal if email exists or not for security
-      return res.json({ message: 'If an account with that email exists, a password reset link has been sent' });
+
+    // Same response whether or not the account exists or the send succeeds,
+    // so this endpoint can't be used to discover registered emails.
+    const genericResponse = { message: 'If an account with that email exists, a password reset link has been sent' };
+
+    if (!user || user.isActive === false) {
+      return res.json(genericResponse);
     }
 
-    // Generate reset token
     const token = user.generatePasswordResetToken();
     await user.save();
 
-    // Send reset email
     const emailSent = await sendPasswordReset(user, token);
     if (!emailSent) {
-      return res.status(500).json({ error: 'Failed to send password reset email' });
+      console.error(`Password reset email failed to send for user ${user._id}`);
     }
 
-    res.json({ message: 'If an account with that email exists, a password reset link has been sent' });
+    res.json(genericResponse);
   } catch (error) {
     console.error('Error requesting password reset:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -130,8 +149,9 @@ router.post('/password-reset/request', [
 // @desc    Confirm password reset
 // @access  Public
 router.post('/password-reset/confirm', [
-  body('token').notEmpty().withMessage('Reset token is required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  resetConfirmLimit,
+  body('token').isString().notEmpty().withMessage('Reset token is required'),
+  body('newPassword').isString().withMessage('Password is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -140,18 +160,25 @@ router.post('/password-reset/confirm', [
     }
 
     const { token, newPassword } = req.body;
-    const user = await User.findOne({ passwordResetToken: token });
+    const user = await User.findByPasswordResetToken(token);
     
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires <= Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired reset token', code: 'RESET_TOKEN_INVALID' });
+    }
+
+    const policyError = await validateNewPassword(newPassword, { username: user.username, email: user.email });
+    if (policyError) {
+      return res.status(400).json({ error: policyError, code: 'WEAK_PASSWORD' });
     }
 
     const reset = user.resetPassword(token, newPassword);
     if (!reset) {
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
+      return res.status(400).json({ error: 'Invalid or expired reset token', code: 'RESET_TOKEN_INVALID' });
     }
 
     await user.save();
+
+    sendPasswordChangedNotification(user).catch(() => {});
 
     res.json({ message: 'Password reset successfully' });
   } catch (error) {

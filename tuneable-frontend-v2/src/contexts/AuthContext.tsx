@@ -43,6 +43,8 @@ export interface User {
   globalUserBidAvg?: number;
   globalUserBids?: number;
   emailVerified?: boolean;
+  /** False for accounts that only sign in with Google/Facebook/Apple etc. */
+  hasPassword?: boolean;
   welcomeCreditOffer?: {
     status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
     amountPence: number;
@@ -128,6 +130,8 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   updateBalance: (newBalance: number) => void;
   handleOAuthCallback: (token: string) => Promise<User>;
+  /** Swap in a new JWT for this session, e.g. after a password change. */
+  replaceToken: (token: string) => void;
   isLoading: boolean;
 }
 
@@ -185,6 +189,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Verify token is still valid by fetching profile
             const response = await authAPI.getProfile();
             setUser(response.user);
+            localStorage.setItem('user', JSON.stringify(response.user));
           } catch (error) {
             // Token is invalid, clear storage
             localStorage.removeItem('token');
@@ -279,6 +284,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const replaceToken = useCallback((newToken: string) => {
+    setToken(newToken);
+    localStorage.setItem('token', newToken);
+  }, []);
+
   const updateBalance = (newBalance: number) => {
     if (user) {
       const updatedUser = { ...user, balance: newBalance };
@@ -296,6 +306,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshUser,
     updateBalance,
     handleOAuthCallback,
+    replaceToken,
     isLoading,
   };
 

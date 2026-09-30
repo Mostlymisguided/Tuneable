@@ -97,4 +97,24 @@ export const authAPI = {
     const response = await api.post<{ message?: string }>('/email/verify/send');
     return response.data;
   },
+
+  requestPasswordReset: async (email: string): Promise<{ message?: string }> => {
+    const response = await api.post<{ message?: string }>(
+      '/email/password-reset/request',
+      { email }
+    );
+    return response.data;
+  },
+
+  /** Signs out other sessions; returns a fresh token for this one. */
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string; token: string }> => {
+    const response = await api.post<{ message: string; token: string }>(
+      '/users/me/password',
+      { currentPassword, newPassword }
+    );
+    return response.data;
+  },
 };

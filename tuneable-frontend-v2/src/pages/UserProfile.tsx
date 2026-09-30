@@ -103,6 +103,7 @@ const CollapsibleBadgeWrap: React.FC<{
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
+import PasswordSecuritySection from '../components/PasswordSecuritySection';
 import MediaChampions from '../components/MediaChampions';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -380,7 +381,7 @@ const UserProfile: React.FC = () => {
   
   // Settings mode - controlled by query params
   const isSettingsMode = searchParams.get('settings') === 'true';
-  const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator') || 'profile';
+  const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator' | 'security') || 'profile';
   const creatorVerificationStatus = (user as any)?.creatorProfile?.verificationStatus as string | undefined;
   const hasCreatorSettingsTab = ['verified', 'pending', 'rejected'].includes(creatorVerificationStatus || '');
   const activeSettingsTab = settingsTab === 'creator' && !hasCreatorSettingsTab ? 'profile' : settingsTab;
@@ -719,7 +720,7 @@ const UserProfile: React.FC = () => {
     setSearchParams({ settings: 'true', tab: 'profile' });
   };
 
-  const handleSettingsTabChange = (tab: 'profile' | 'notifications' | 'creator') => {
+  const handleSettingsTabChange = (tab: 'profile' | 'notifications' | 'creator' | 'security') => {
     setSearchParams({ settings: 'true', tab });
   };
 
@@ -3453,6 +3454,16 @@ const UserProfile: React.FC = () => {
                 >
                   Preferences
                 </button>
+                <button
+                  onClick={() => handleSettingsTabChange('security')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeSettingsTab === 'security'
+                      ? 'border-purple-500 text-purple-400'
+                      : 'border-transparent text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Security
+                </button>
               </nav>
             </div>
 
@@ -4010,6 +4021,8 @@ const UserProfile: React.FC = () => {
                 ) : null}
               </div>
             )}
+
+            {activeSettingsTab === 'security' && <PasswordSecuritySection />}
 
             {activeSettingsTab === 'notifications' && (
               <div className="card p-6">

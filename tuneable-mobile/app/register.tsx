@@ -26,6 +26,13 @@ import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import {
+  IOS_PASSWORD_RULES,
+  PASSWORD_HINT,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_PLACEHOLDER,
+  passwordLengthError,
+} from '@/src/lib/passwordPolicy';
+import {
   isAppleSignInAvailable,
   signInWithApple,
 } from '@/src/lib/appleAuth';
@@ -149,8 +156,9 @@ export default function RegisterScreen() {
       setError('Fill in username, email, and password.');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    const lengthError = passwordLengthError(password);
+    if (lengthError) {
+      setError(lengthError);
       return;
     }
     if (password !== confirmPassword) {
@@ -329,7 +337,9 @@ export default function RegisterScreen() {
                 autoCapitalize="none"
                 autoComplete="new-password"
                 textContentType="newPassword"
-                placeholder="At least 6 characters"
+                passwordRules={IOS_PASSWORD_RULES}
+                maxLength={PASSWORD_MAX_LENGTH}
+                placeholder={PASSWORD_PLACEHOLDER}
                 placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={setPassword}
@@ -349,6 +359,9 @@ export default function RegisterScreen() {
                 />
               </Pressable>
             </View>
+            <Text style={{ marginTop: 6, color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
+              {PASSWORD_HINT}
+            </Text>
 
             <Text style={authStyles.label}>Confirm password</Text>
             <TextInput

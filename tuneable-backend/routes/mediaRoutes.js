@@ -1634,10 +1634,11 @@ router.get('/:mediaId/copy-access', async (req, res) => {
           authHeader.slice(7),
           process.env.JWT_SECRET || 'defaultsecretkey'
         );
+        const { isTokenRevoked } = require('../utils/sessionRevocation');
         const user = decoded.userId && String(decoded.userId).includes('-')
-          ? await User.findOne({ uuid: decoded.userId }).select('_id')
-          : await User.findById(decoded.userId).select('_id');
-        userId = user?._id || null;
+          ? await User.findOne({ uuid: decoded.userId }).select('_id passwordChangedAt')
+          : await User.findById(decoded.userId).select('_id passwordChangedAt');
+        userId = user && !isTokenRevoked(decoded, user) ? user._id : null;
       } catch (_error) {
         userId = null;
       }

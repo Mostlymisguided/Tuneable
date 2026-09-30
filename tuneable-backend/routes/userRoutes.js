@@ -233,7 +233,10 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 const userPurgeService = require('../services/userPurgeService');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
-const { sendUserRegistrationNotification, sendEmailVerification } = require('../utils/emailService');
+const { sendUserRegistrationNotification, sendEmailVerification, sendPasswordChangedNotification } = require('../utils/emailService');
+const rateLimit = require('../middleware/rateLimit');
+const { validateNewPassword } = require('../utils/passwordPolicy');
+const { isTokenRevoked } = require('../utils/sessionRevocation');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
@@ -241,6 +244,10 @@ const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
 const router = express.Router();
 const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
+
+// Generous because whole venues can share one Wi-Fi IP; per-account lockout still applies.
+const loginIpLimit = rateLimit({ name: 'login-ip', windowMs: 15 * 60 * 1000, max: 30 });
+const changePasswordLimit = rateLimit({ name: 'change-password', windowMs: 15 * 60 * 1000, max: 10 });
 
 // Configure upload using R2 or local fallback
 const upload = createProfilePictureUpload();
@@ -358,15 +365,13 @@ router.post(
   [
     check('username').notEmpty().withMessage('Username is required'),
     check('email').isEmail().withMessage('Valid email is required'),
-    check('password')
-      .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters long'),
+    check('password').isString().withMessage('Password is required'),
     // check('inviteCode')
     //   .isLength(4)
     //   .withMessage('Invite Code must be 4 characters long'),
   ],
   async (req, res) => {
-    console.log('Incoming registration request:', req.body);
+    console.log('Incoming registration request:', { username: req.body?.username, email: req.body?.email });
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -375,6 +380,11 @@ router.post(
     }
     try {
       const { username, email, password, cellPhone, givenName, familyName, homeLocation, locations, parentInviteCode } = req.body;
+
+      const passwordError = await validateNewPassword(password, { username, email });
+      if (passwordError) {
+        return res.status(400).json({ error: passwordError, code: 'WEAK_PASSWORD' });
+      }
 
       // Invite is optional — if provided it must be valid (attribution / credits)
       const invite = await resolveInviteForSignup(parentInviteCode);
@@ -502,7 +512,7 @@ router.post(
       user.profilePic = profilePic;
       await user.save();
       
-      console.log('User registered successfully:', user);
+      console.log('User registered successfully:', user.username, user.uuid);
 
       // Auto-join new user to Global Party
       try {
@@ -562,6 +572,7 @@ router.post(
 router.post(
   '/login',
   [
+    loginIpLimit,
     check('password').notEmpty().withMessage('Password is required'),
     body().custom((_, { req }) => {
       const identifier = (req.body.identifier || req.body.email || '').trim();
@@ -686,7 +697,7 @@ router.post(
 // Get user profile
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
     // Calculate user statistics
@@ -705,6 +716,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
     const { attachFoundingProfileFields } = require('../utils/foundingCreators');
     const userWithStats = withWelcomeCreditOffer(await attachFoundingProfileFields({
       ...user.toObject(),
+      hasPassword: Boolean(user.password),
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
@@ -713,6 +725,57 @@ router.get('/profile', authMiddleware, async (req, res) => {
     res.json({ message: 'User profile', user: userWithStats });
   } catch (error) {
     res.status(500).json({ error: 'Error ing user profile', details: error.message });
+  }
+});
+
+// Change password while signed in. Signs out every other session; the caller
+// gets a fresh token. Accounts without a password use the emailed reset link.
+router.post('/me/password', authMiddleware, changePasswordLimit, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+      return res.status(400).json({ error: 'Current and new password are required' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (!user.password) {
+      return res.status(400).json({
+        error: 'Your account doesn\u2019t have a password yet. Use the emailed link to set one.',
+        code: 'NO_PASSWORD',
+      });
+    }
+
+    // 400 rather than 401 so clients don't treat it as an expired session.
+    if (!(await user.comparePassword(currentPassword))) {
+      return res.status(400).json({ error: 'Current password is incorrect', code: 'INVALID_CURRENT_PASSWORD' });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ error: 'New password must be different from your current one', code: 'SAME_PASSWORD' });
+    }
+
+    const policyError = await validateNewPassword(newPassword, { username: user.username, email: user.email });
+    if (policyError) {
+      return res.status(400).json({ error: policyError, code: 'WEAK_PASSWORD' });
+    }
+
+    user.setPassword(newPassword);
+    await user.save();
+
+    const token = jwt.sign({
+      userId: user.uuid,
+      email: user.email,
+      username: user.username,
+    }, SECRET_KEY, { expiresIn: '24h' });
+
+    sendPasswordChangedNotification(user).catch(() => {});
+
+    res.json({ message: 'Password changed. Other devices have been signed out.', token });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 });
 
@@ -3958,9 +4021,12 @@ router.get('/:userId/profile', async (req, res) => {
           const decoded = jwt.verify(token, SECRET_KEY);
           // Fetch user by UUID or ObjectId
           if (decoded.userId && decoded.userId.includes('-')) {
-            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role blockedUsers');
+            authenticatedUser = await User.findOne({ uuid: decoded.userId }).select('_id uuid username email role blockedUsers passwordChangedAt');
           } else if (mongoose.Types.ObjectId.isValid(decoded.userId)) {
-            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role blockedUsers');
+            authenticatedUser = await User.findById(decoded.userId).select('_id uuid username email role blockedUsers passwordChangedAt');
+          }
+          if (isTokenRevoked(decoded, authenticatedUser)) {
+            authenticatedUser = null;
           }
         }
       } catch (tokenError) {

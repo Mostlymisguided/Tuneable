@@ -287,6 +287,12 @@ export const authAPI = {
     const response = await api.post('/email/password-reset/confirm', { token, newPassword });
     return response.data;
   },
+
+  /** Signs out other sessions; returns a fresh token for this one. */
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const response = await api.post('/users/me/password', { currentPassword, newPassword });
+    return response.data as { message: string; token: string };
+  },
 };
 
 // Payment API

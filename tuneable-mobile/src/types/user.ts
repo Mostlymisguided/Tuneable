@@ -17,6 +17,8 @@ export interface User {
   role: string[];
   isActive: boolean;
   emailVerified?: boolean;
+  /** False for accounts that only sign in with Google/Facebook/Apple. */
+  hasPassword?: boolean;
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string;

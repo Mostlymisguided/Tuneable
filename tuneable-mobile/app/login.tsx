@@ -213,10 +213,12 @@ export default function LoginScreen() {
 
             <Pressable
               onPress={() =>
-                void WebBrowser.openBrowserAsync(
-                  'https://tuneable.stream/forgot-password'
-                )
+                router.push({
+                  pathname: '/forgot-password',
+                  params: identifier.includes('@') ? { email: identifier.trim() } : {},
+                })
               }
+              disabled={busy}
               hitSlop={6}
               style={{ alignSelf: 'flex-end', marginTop: 10 }}>
               <Text style={authStyles.switchAuthLink}>Forgot password?</Text>

@@ -15,6 +15,12 @@ import {
 import axios from 'axios';
 import { Browser } from '@capacitor/browser';
 import { authAPI } from '../lib/api';
+import {
+  PASSWORD_HINT,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_PLACEHOLDER,
+  passwordLengthError,
+} from '../utils/passwordPolicy';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
 import {
   isAppleWebSignInConfigured,
@@ -444,8 +450,9 @@ const AuthPage: React.FC = () => {
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters long');
+    const lengthError = passwordLengthError(formData.password);
+    if (lengthError) {
+      toast.error(lengthError);
       return;
     }
 
@@ -472,7 +479,9 @@ const AuthPage: React.FC = () => {
       setFieldErrors({ email: '', username: '' });
       
       // Set field-specific errors - check field first, then message
-      if (errorField === 'email') {
+      if (errorResponse.code === 'WEAK_PASSWORD') {
+        toast.error(errorMessage);
+      } else if (errorField === 'email') {
         setFieldErrors(prev => ({ 
           ...prev, 
           email: 'This email is already registered.' 
@@ -793,7 +802,9 @@ const AuthPage: React.FC = () => {
                 autoComplete="new-password"
                 required
                 className={`${inputClass} pr-10`}
-                placeholder="At least 6 characters"
+                placeholder={PASSWORD_PLACEHOLDER}
+                maxLength={PASSWORD_MAX_LENGTH}
+                aria-describedby="registerPasswordHint"
                 value={formData.password}
                 onChange={handleChange}
               />
@@ -806,6 +817,9 @@ const AuthPage: React.FC = () => {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            <p id="registerPasswordHint" className="mt-1.5 text-xs text-zinc-500">
+              {PASSWORD_HINT}
+            </p>
           </div>
 
           <div>

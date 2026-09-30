@@ -36,6 +36,7 @@ type Props = {
   onWallet: () => void;
   onUpload?: () => void;
   onEditProfile: () => void;
+  onChangePassword: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => Promise<void>;
 };
@@ -51,6 +52,7 @@ export function ProfileSettingsSheet({
   onWallet,
   onUpload,
   onEditProfile,
+  onChangePassword,
   onSignOut,
   onDeleteAccount,
 }: Props) {
@@ -177,6 +179,14 @@ export function ProfileSettingsSheet({
             disabled={disabled}>
             <Ionicons name="create-outline" size={20} color={colors.accentLight} />
             <Text style={styles.rowText}>Edit profile</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.row}
+            onPress={() => runAfterSheetCloses(onChangePassword)}
+            disabled={disabled}>
+            <Ionicons name="key-outline" size={20} color={colors.accentLight} />
+            <Text style={styles.rowText}>Password</Text>
           </Pressable>
 
           {Platform.OS !== 'web' ? <PushNotificationsRow disabled={disabled} /> : null}

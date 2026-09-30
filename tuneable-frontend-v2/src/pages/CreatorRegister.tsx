@@ -4,6 +4,13 @@ import { toast } from '../utils/toast';
 import { creatorAPI, authAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import {
+  PASSWORD_HINT,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PLACEHOLDER,
+  passwordLengthError,
+} from '../utils/passwordPolicy';
+import {
   ARTIST_INVITE_AFFILIATE_PERCENT,
   FOUNDING_CREATOR_CAP,
   FOUNDING_UPLOAD_QUOTA_MB,
@@ -230,7 +237,7 @@ const CreatorRegister: React.FC = () => {
 
   const isAccountValid = () => (
     accountData.email.trim().length > 0 &&
-    accountData.password.length >= 6 &&
+    passwordLengthError(accountData.password) === null &&
     accountData.password === accountData.confirmPassword &&
     accountData.username.trim().length > 0
   );
@@ -512,9 +519,11 @@ const CreatorRegister: React.FC = () => {
                 value={accountData.password}
                 onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
                 className="w-full pl-10 pr-10 py-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                placeholder="Password (min 6 characters)"
+                placeholder={PASSWORD_PLACEHOLDER}
+                autoComplete="new-password"
                 required
-                minLength={6}
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
               />
               <button
                 type="button"
@@ -524,6 +533,7 @@ const CreatorRegister: React.FC = () => {
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
+            <p className="text-xs text-gray-400 mt-1">{PASSWORD_HINT}</p>
           </div>
 
           <div>

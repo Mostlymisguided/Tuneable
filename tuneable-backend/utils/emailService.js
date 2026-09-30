@@ -518,6 +518,50 @@ async function sendPasswordReset(user, resetToken) {
   }
 }
 
+// Security notice after a password is set, changed or reset. Not unsubscribable.
+async function sendPasswordChangedNotification(user) {
+  if (!user?.email) return false;
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: user.email,
+      subject: 'Your Tuneable password was changed',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">Password changed</h2>
+
+          <p>Hi ${user.username},</p>
+
+          <p>The password for your Tuneable account was changed on ${new Date().toUTCString()}.
+          Any other devices signed in to your account have been signed out.</p>
+
+          <p><strong>If this was you</strong>, there's nothing else to do.</p>
+
+          <p><strong>If this wasn't you</strong>, reset your password straight away and reply to this email so we can help secure your account:</p>
+
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${FRONTEND_URL}/forgot-password"
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+              Reset Password
+            </a>
+          </div>
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Error sending password changed email:', error);
+      return false;
+    }
+
+    console.log('✅ Password changed email sent:', data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error sending password changed email:', error.message);
+    return false;
+  }
+}
+
 // Send welcome email to new users
 async function sendWelcomeEmail(user) {
   try {
@@ -1248,6 +1292,7 @@ module.exports = {
   sendHighValueBidNotification,
   sendEmailVerification,
   sendPasswordReset,
+  sendPasswordChangedNotification,
   sendWelcomeEmail,
   sendOwnershipNotification,
   sendClaimStatusNotification,

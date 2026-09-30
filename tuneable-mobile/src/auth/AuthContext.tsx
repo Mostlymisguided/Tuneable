@@ -43,6 +43,8 @@ interface AuthContextValue {
   updateBalance: (newBalancePence: number) => void;
   handleOAuthCallback: (token: string) => Promise<User>;
   applySession: (token: string, user: User) => Promise<User>;
+  /** Swap in a new JWT for this session, e.g. after a password change. */
+  replaceToken: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -169,6 +171,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const replaceToken = useCallback(async (newToken: string) => {
+    tokenRef.current = newToken;
+    setToken(newToken);
+    const storedUser = await loadUserJson();
+    if (storedUser) {
+      await saveSession(newToken, storedUser);
+    }
+  }, []);
+
   const refreshUser = useCallback(async () => {
     const { user: fresh } = await authAPI.getProfile();
     await applyUser(fresh);
@@ -218,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateBalance,
       handleOAuthCallback,
       applySession,
+      replaceToken,
     }),
     [
       user,
@@ -232,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateBalance,
       handleOAuthCallback,
       applySession,
+      replaceToken,
     ]
   );
 
