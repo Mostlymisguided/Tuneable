@@ -17,7 +17,11 @@ type Supporter = {
   total: number;
   uuid?: string;
   _id?: string;
+  /** Blocked by the viewer: shown without name, avatar, or profile link. */
+  anonymous?: boolean;
 };
+
+const ANONYMOUS_LABEL = 'Supporter';
 
 export type ChampionSupporter = {
   totalAmount?: number;
@@ -88,8 +92,8 @@ export function MiniSupportersBar({
 }: Props) {
   const isBlocked = useBlockedUsersStore((s) => s.isBlocked);
 
-  const supporters = useMemo(() => {
-    const raw =
+  const supporters = useMemo((): Supporter[] => {
+    const raw: Supporter[] =
       champions && champions.length > 0
         ? champions
             .filter((c) => c.user?.username)
@@ -106,8 +110,11 @@ export function MiniSupportersBar({
             })
         : aggregateSupporters(bids);
 
-    return raw.filter(
-      (s) => !isBlocked(s.id, s.uuid, s._id, s.username)
+    // Blocked supporters stay in place so totals and podium ranks match the chart.
+    return raw.map((s) =>
+      isBlocked(s.id, s.uuid, s._id, s.username)
+        ? { ...s, username: ANONYMOUS_LABEL, profilePic: undefined, anonymous: true }
+        : s
     );
   }, [bids, champions, isBlocked]);
 
@@ -177,6 +184,7 @@ export function MiniSupportersBar({
           <Pressable
             key={s.id}
             style={styles.chip}
+            disabled={s.anonymous}
             onPress={() => router.push(`/user/${s.id}`)}>
             <Image
               source={{ uri: s.profilePic || DEFAULT_PROFILE_PIC }}
@@ -191,7 +199,9 @@ export function MiniSupportersBar({
                 <Ionicons name="trophy" size={9} color={podiumColor(rank)} />
               </View>
             ) : null}
-            <Text style={styles.username} numberOfLines={1}>
+            <Text
+              style={[styles.username, s.anonymous && styles.anonymousName]}
+              numberOfLines={1}>
               {s.username}
             </Text>
             <Text style={styles.amount}>{formatPoundsFromPence(s.total)}</Text>
@@ -237,6 +247,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 10,
     flexShrink: 1,
+  },
+  anonymousName: {
+    color: colors.textMuted,
+    fontStyle: 'italic',
   },
   amount: {
     color: '#86efac',

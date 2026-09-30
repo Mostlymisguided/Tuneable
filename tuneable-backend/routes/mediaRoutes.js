@@ -8,6 +8,7 @@ const Claim = require('../models/Claim');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
+const { getBlockedUserIds, isBlockedBetween } = require('../utils/userBlocks');
 const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
@@ -1714,10 +1715,12 @@ router.get('/:mediaId/profile', async (req, res) => {
       });
 
     // Fetch recent comments
+    const commentBlockIds = req.user ? [...(await getBlockedUserIds(req.user._id))] : [];
     const recentComments = await Comment.find({ 
       mediaId: media._id,
       parentCommentId: null,
-      isDeleted: false 
+      isDeleted: false,
+      ...(commentBlockIds.length ? { userId: { $nin: commentBlockIds } } : {}),
     })
       .populate('userId', 'username profilePic uuid')
       .sort({ createdAt: -1 })
@@ -2916,23 +2919,23 @@ router.get('/:mediaId/comments', async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Fetch comments
-    const comments = await Comment.find({ 
+    const blockedIds = req.user ? [...(await getBlockedUserIds(req.user._id))] : [];
+    const commentQuery = {
       mediaId: media._id,
       parentCommentId: null,
-      isDeleted: false 
-    })
+      isDeleted: false,
+      ...(blockedIds.length ? { userId: { $nin: blockedIds } } : {}),
+    };
+
+    // Fetch comments
+    const comments = await Comment.find(commentQuery)
       .populate('userId', 'username profilePic uuid')
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
 
     // Get total count
-    const totalComments = await Comment.countDocuments({ 
-      mediaId: media._id,
-      parentCommentId: null,
-      isDeleted: false 
-    });
+    const totalComments = await Comment.countDocuments(commentQuery);
 
     res.json({
       message: 'Comments fetched successfully',
@@ -2972,6 +2975,16 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
     let media = await findMediaByParam(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
+    }
+
+    if (parentCommentId) {
+      const parent = await Comment.findById(parentCommentId).select('userId');
+      if (parent?.userId && (await isBlockedBetween(userId, parent.userId))) {
+        return res.status(403).json({
+          error: 'You cannot reply to this comment',
+          code: 'USER_BLOCKED',
+        });
+      }
     }
 
     // Create comment with mediaId

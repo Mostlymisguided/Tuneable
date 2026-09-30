@@ -610,6 +610,7 @@ userSchema.virtual('primaryInviteCode').get(function() {
 // Index for invite code lookups
 userSchema.index({ 'personalInviteCodes.code': 1 });
 userSchema.index({ 'playbackQueue.mediaId': 1 });
+userSchema.index({ blockedUsers: 1 });
 // Note: personalInviteCode already has unique: true which creates an index automatically
 userSchema.index(
   { foundingSeatNumber: 1 },

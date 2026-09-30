@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Media = require('../models/Media');
 const WalletTransaction = require('../models/WalletTransaction');
 const { createNotification } = require('./notificationService');
+const { assertNotBlocked } = require('../utils/userBlocks');
 
 const OPEN_STATUSES = ['open'];
 const PLEDGEABLE_STATUSES = ['open', 'funded', 'scheduled'];
@@ -151,7 +152,15 @@ async function createConversation({ proposer, title, description, topic, goalAmo
 
   const resolved = [];
   for (const raw of participants) {
-    resolved.push(await resolveParticipantInput(raw));
+    const participant = await resolveParticipantInput(raw);
+    if (participant.userId) {
+      await assertNotBlocked(
+        proposer._id,
+        participant.userId,
+        `You cannot invite ${participant.displayName} to a conversation`
+      );
+    }
+    resolved.push(participant);
   }
 
   const conversation = new Conversation({

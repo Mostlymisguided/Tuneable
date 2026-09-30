@@ -237,6 +237,7 @@ const { sendUserRegistrationNotification, sendEmailVerification, sendPasswordCha
 const rateLimit = require('../middleware/rateLimit');
 const { validateNewPassword } = require('../utils/passwordPolicy');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
+const { getBlockState, isBlockedBetween } = require('../utils/userBlocks');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
@@ -2608,6 +2609,9 @@ router.get('/:userId/tune-library', optionalAuthMiddleware, async (req, res) => 
       select: '_id uuid username profilePic',
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
+    if (req.user && (await isBlockedBetween(req.user._id, user._id))) {
+      return res.json({ library: [], total: 0 });
+    }
     const result = await fetchTuneLibraryForUser(user, {
       authenticated: Boolean(req.user),
       viewerUserId: req.user?._id || null,
@@ -4020,6 +4024,30 @@ router.get('/:userId/profile', async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    const { blockedByMe, blockedMe } = req.user
+      ? await getBlockState(req.user._id, user._id)
+      : { blockedByMe: false, blockedMe: false };
+    if (blockedMe) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (blockedByMe) {
+      // Enough to render the header and an Unblock action, nothing more.
+      return res.json({
+        message: 'User profile fetched successfully',
+        user: {
+          _id: user._id,
+          id: user.uuid || String(user._id),
+          uuid: user.uuid,
+          username: user.username,
+          profilePic: user.profilePic,
+        },
+        blockedByMe: true,
+        stats: { totalBids: 0, totalAmountBid: 0, averageBidAmount: 0, uniqueSongsCount: 0 },
+        topBids: [],
+        mediaWithBids: [],
+      });
+    }
     
     // Convert to plain object to ensure all fields are accessible
     // Use toObject() with { flattenMaps: true } to handle nested objects properly
@@ -4247,12 +4275,6 @@ router.get('/:userId/profile', async (req, res) => {
       userResponseKeys: Object.keys(userResponse)
     });
     
-    const blockedByMe = Boolean(
-      req.user?.blockedUsers?.some(
-        (blockedId) => blockedId?.toString() === userObj._id.toString()
-      )
-    );
-
     res.json({
       message: 'User profile fetched successfully',
       user: userResponse,

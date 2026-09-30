@@ -8,6 +8,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
+const { isBlockedBetween } = require('../utils/userBlocks');
 const {
   normalizeCollectiveType,
   normalizeVenueKind,
@@ -181,6 +182,10 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    if (await isBlockedBetween(inviterId, targetUser._id)) {
+      return res.status(403).json({ error: 'You cannot invite this user', code: 'USER_BLOCKED' });
+    }
     
     // Check if user is already a member
     if (collective.isMember(targetUser._id)) {
@@ -252,6 +257,10 @@ router.post('/:slug/invite-member', authMiddleware, async (req, res) => {
     
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (await isBlockedBetween(inviterId, targetUser._id)) {
+      return res.status(403).json({ error: 'You cannot invite this user', code: 'USER_BLOCKED' });
     }
     
     // Check if user is already a member

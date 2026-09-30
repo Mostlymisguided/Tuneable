@@ -8,6 +8,21 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Media = require('../models/Media');
 const { sendNotification, sendUnreadCount } = require('../utils/socketIO');
+const { isBlockedBetween } = require('../utils/userBlocks');
+
+// Types where relatedUserId is the member who caused the notification. Admin and
+// system notices also set relatedUserId, so they must stay out of this list.
+const USER_INITIATED_TYPES = new Set([
+  'bid_received',
+  'champion_title_stolen',
+  'comment_reply',
+  'label_invite',
+  'collective_invite',
+  'conversation_invite',
+  'conversation_pledge',
+  'conversation_accepted',
+  'conversation_declined',
+]);
 
 /**
  * Create a notification for a user
@@ -74,6 +89,14 @@ const createNotification = async (params) => {
           return null; // Don't create notification if user has disabled it
         }
       }
+    }
+
+    if (
+      relatedUserId &&
+      USER_INITIATED_TYPES.has(type) &&
+      (await isBlockedBetween(userId, relatedUserId))
+    ) {
+      return null;
     }
 
     // Create notification in database
