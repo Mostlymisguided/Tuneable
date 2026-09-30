@@ -6,6 +6,7 @@ function isHtmlNavigation(request, url) {
   if (
     path.startsWith('/api') ||
     path.startsWith('/assets') ||
+    path.startsWith('/.well-known') ||
     path === '/sitemap.xml' ||
     path === '/robots.txt' ||
     /\.[a-z0-9]+$/i.test(path)

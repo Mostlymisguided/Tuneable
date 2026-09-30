@@ -16,7 +16,7 @@ let io = null;
 // Map of userId -> socket connections
 const userSockets = new Map();
 
-const SECRET_KEY = process.env.JWT_SECRET || 'defaultsecretkey';
+const { getJwtSecret } = require('../config/jwtSecret');
 
 /**
  * Verify JWT token and get user
@@ -27,7 +27,7 @@ const verifyTokenAndGetUser = async (token) => {
   try {
     if (!token) return null;
 
-    const decoded = jwt.verify(token, SECRET_KEY);
+    const decoded = jwt.verify(token, getJwtSecret());
     
     // Fetch user by UUID (new approach) or fallback to _id (legacy support)
     let user;

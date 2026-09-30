@@ -243,7 +243,15 @@ const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('.
 const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
 const router = express.Router();
-const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
+const SECRET_KEY = require('../config/jwtSecret').getJwtSecret();
+
+const loginThrottle = require('../utils/loginThrottle');
+
+let dummyPasswordHashPromise = null;
+function getDummyPasswordHash() {
+  dummyPasswordHashPromise ||= bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+  return dummyPasswordHashPromise;
+}
 
 // Generous because whole venues can share one Wi-Fi IP; per-account lockout still applies.
 const loginIpLimit = rateLimit({ name: 'login-ip', windowMs: 15 * 60 * 1000, max: 30 });
@@ -595,77 +603,43 @@ router.post(
       const identifier = (req.body.identifier || req.body.email || '').trim();
       const { password } = req.body;
       
+      // Known and unknown accounts must be indistinguishable here: same
+      // responses, same counters, and a bcrypt comparison either way.
       const user = await User.findByLoginIdentifier(identifier);
-      if (!user) {
-        console.log(`Login attempt failed: User not found for identifier: ${identifier}`);
-        return res.status(401).json({ error: 'Invalid email, password or username' });
+      const throttleKey = loginThrottle.pairKey({ user, identifier, ip: req.ip });
+
+      const lockedUntil = loginThrottle.getPairLock(throttleKey) || loginThrottle.getAccountLock(user);
+      if (lockedUntil) {
+        return res.status(423).json(loginThrottle.lockedResponse(lockedUntil));
       }
 
-      // Check if user is active
-      if (!user.isActive) {
-        console.log(`Login attempt failed: Inactive user: ${identifier}`);
-        return res.status(401).json({ error: 'Account is inactive. Please contact support.' });
-      }
+      const isPasswordValid = user?.password
+        ? await user.comparePassword(password)
+        : await bcrypt.compare(String(password), await getDummyPasswordHash()).then(() => false);
 
-      // ✅ If locked time has passed, automatically unlock account
-      if (user.accountLockedUntil && user.accountLockedUntil <= new Date()) {
-        user.failedLoginAttempts = 0;
-        user.accountLockedUntil = null;
-        // ✅ Restore account to active if it was suspended
-        if (!user.isActive) {
-          user.isActive = true;
-          console.log(`✅ Automatically unlocked and reactivated account for user ${user._id} (lock expired)`);
-        }
-        await user.save();
-      }
-
-      // Check if account is locked (after auto-unlock check)
-      if (user.accountLockedUntil && user.accountLockedUntil > new Date()) {
-        const minutesRemaining = Math.ceil((user.accountLockedUntil - new Date()) / 60000);
-        return res.status(423).json({ 
-          error: `Account temporarily locked. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`,
-          lockedUntil: user.accountLockedUntil,
-          minutesRemaining: minutesRemaining
-        });
-      }
-
-      // Compare password
-      const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
-        console.log(`Login attempt failed: Invalid password for identifier: ${identifier}`);
-        
-        // Increment failed login attempts
-        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-        user.lastFailedLoginAttempt = new Date();
-        
-        // Lock account after 6 failed attempts
-        if (user.failedLoginAttempts >= 6) {
-          // Lock account for 30 minutes
-          const lockoutDuration = 30 * 60 * 1000; // 30 minutes
-          user.accountLockedUntil = new Date(Date.now() + lockoutDuration);
+        console.log('Login attempt failed: invalid credentials');
+        const pair = loginThrottle.recordPairFailure(throttleKey);
+        if (user) {
+          loginThrottle.recordAccountFailure(user);
           await user.save();
-          
-          return res.status(423).json({ 
-            error: 'Account locked due to too many failed login attempts. Please try again in 30 minutes.',
-            lockedUntil: user.accountLockedUntil,
-            minutesRemaining: 30,
-            failedAttempts: user.failedLoginAttempts
-          });
         }
-        
-        // Save failed attempt count
-        await user.save();
-        
-        // Return error with remaining attempts
-        const remainingAttempts = 6 - user.failedLoginAttempts;
-        return res.status(401).json({ 
+        if (pair.lockedUntil) {
+          return res.status(423).json(loginThrottle.lockedResponse(pair.lockedUntil));
+        }
+        return res.status(401).json({
           error: 'Invalid email, password or username',
-          failedAttempts: user.failedLoginAttempts,
-          remainingAttempts: remainingAttempts
+          failedAttempts: pair.failedAttempts,
+          remainingAttempts: pair.remainingAttempts,
         });
       }
-      
-      // Successful login - reset failed attempts
+
+      // Only reveal suspension to someone who knows the password.
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'Account is inactive. Please contact support.', code: 'ACCOUNT_INACTIVE' });
+      }
+
+      loginThrottle.clearPair(throttleKey);
       user.failedLoginAttempts = 0;
       user.accountLockedUntil = null;
       user.lastFailedLoginAttempt = null;
@@ -4009,8 +3983,6 @@ router.get('/:userId/profile', async (req, res) => {
   try {
     // Optionally check for authentication token - don't fail if missing
     // This allows public access while still detecting if user is viewing their own profile
-    const jwt = require('jsonwebtoken');
-    const SECRET_KEY = process.env.JWT_SECRET || 'defaultsecretkey';
     
     let authenticatedUser = null;
     const authHeader = req.headers.authorization;

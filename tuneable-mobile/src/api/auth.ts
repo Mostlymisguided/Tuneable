@@ -106,6 +106,18 @@ export const authAPI = {
     return response.data;
   },
 
+  /** Signs out every session, including this device's. */
+  confirmPasswordReset: async (
+    token: string,
+    newPassword: string
+  ): Promise<{ message?: string }> => {
+    const response = await api.post<{ message?: string }>(
+      '/email/password-reset/confirm',
+      { token, newPassword }
+    );
+    return response.data;
+  },
+
   /** Signs out other sessions; returns a fresh token for this one. */
   changePassword: async (
     currentPassword: string,

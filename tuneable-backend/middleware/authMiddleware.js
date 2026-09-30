@@ -2,8 +2,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("../models/User"); // Import User model
 const { isTokenRevoked } = require("../utils/sessionRevocation");
-
-const SECRET_KEY = process.env.JWT_SECRET || "defaultsecretkey";
+const { getJwtSecret } = require("../config/jwtSecret");
 
 module.exports = async (req, res, next) => {
     const authHeader = req.headers.authorization;
@@ -19,7 +18,7 @@ module.exports = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, SECRET_KEY);
+        const decoded = jwt.verify(token, getJwtSecret());
 
         // Fetch user by UUID (new approach) or fallback to _id (legacy support)
         let user;

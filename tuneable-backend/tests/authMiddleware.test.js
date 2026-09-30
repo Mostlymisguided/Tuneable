@@ -1,78 +1,85 @@
+/**
+ * Run: npx jest tests/authMiddleware.test.js
+ */
+
 const jwt = require('jsonwebtoken');
-const authMiddleware = require('../middleware/authMiddleware'); // Adjust the path as necessary
-const httpMocks = require('node-mocks-http');
-const mongoose = require('mongoose');
+const User = require('../models/User');
+const authMiddleware = require('../middleware/authMiddleware');
+const { getJwtSecret } = require('../config/jwtSecret');
 
-jest.mock('../db', () => ({
-    connectDB: jest.fn(() => Promise.resolve()), // Mock connectDB
-    disconnectDB: jest.fn(() => Promise.resolve()), // Mock disconnectDB
-  }));  
+function mockRes() {
+  return {
+    statusCode: 200,
+    body: undefined,
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+}
 
-describe('Auth Middleware', () => {
-  const validToken = jwt.sign({ id: 'user123', name: 'Test User' }, 'secretKey', { expiresIn: '1h' }); // Use your actual secret key
-  const expiredToken = jwt.sign({ id: 'user123', name: 'Test User' }, 'secretKey', { expiresIn: '-1h' });
+function reqWith(token) {
+  return { headers: token ? { authorization: `Bearer ${token}` } : {} };
+}
 
-  it('should attach user to req if token is valid', async () => {
-    const req = httpMocks.createRequest({
-      headers: {
-        authorization: `Bearer ${validToken}`,
-      },
-    });
-    const res = httpMocks.createResponse();
+function mockUserLookup(user) {
+  jest.spyOn(User, 'findOne').mockReturnValue({ select: () => Promise.resolve(user) });
+}
+
+const uuid = '0191f3a2-1111-7222-8333-944455556666';
+
+describe('authMiddleware', () => {
+  let logSpy;
+  beforeEach(() => { logSpy = jest.spyOn(console, 'log').mockImplementation(() => {}); });
+  afterEach(() => { jest.restoreAllMocks(); logSpy.mockRestore(); });
+
+  it('rejects requests without a token', async () => {
+    const res = mockRes();
     const next = jest.fn();
+    await authMiddleware(reqWith(null), res, next);
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
 
-    await authMiddleware(req, res, next);
+  it('rejects tokens signed with another secret', async () => {
+    const res = mockRes();
+    const next = jest.fn();
+    await authMiddleware(reqWith(jwt.sign({ userId: uuid }, 'defaultsecretkey')), res, next);
+    expect(res.statusCode).toBe(401);
+    expect(next).not.toHaveBeenCalled();
+  });
 
+  it('rejects expired tokens', async () => {
+    const res = mockRes();
+    const next = jest.fn();
+    const token = jwt.sign({ userId: uuid }, getJwtSecret(), { expiresIn: '-1h' });
+    await authMiddleware(reqWith(token), res, next);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('attaches the user for a valid token', async () => {
+    const user = { _id: 'abc', uuid, username: 'listener', isActive: true };
+    mockUserLookup(user);
+    const req = reqWith(jwt.sign({ userId: uuid }, getJwtSecret()));
+    const next = jest.fn();
+    await authMiddleware(req, mockRes(), next);
     expect(next).toHaveBeenCalled();
-    expect(req.user).toBeDefined();
-    expect(req.user.id).toBe('user123');
+    expect(req.user).toBe(user);
   });
 
-  it('should return 401 if token is missing', async () => {
-    const req = httpMocks.createRequest();
-    const res = httpMocks.createResponse();
+  it('rejects tokens issued before the last password change', async () => {
+    const iat = Math.floor(Date.now() / 1000) - 60;
+    mockUserLookup({ _id: 'abc', uuid, isActive: true, passwordChangedAt: new Date() });
+    const res = mockRes();
     const next = jest.fn();
-
-    await authMiddleware(req, res, next);
-
+    await authMiddleware(reqWith(jwt.sign({ userId: uuid, iat }, getJwtSecret())), res, next);
     expect(res.statusCode).toBe(401);
-    expect(res._getData()).toBe('Authorization token missing'); // Adjust error message if necessary
+    expect(res.body.code).toBe('SESSION_REVOKED');
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it('should return 401 if token is invalid', async () => {
-    const req = httpMocks.createRequest({
-      headers: {
-        authorization: 'Bearer invalidToken',
-      },
-    });
-    const res = httpMocks.createResponse();
-    const next = jest.fn();
-
-    await authMiddleware(req, res, next);
-
-    expect(res.statusCode).toBe(401);
-    expect(res._getData()).toBe('Invalid token'); // Adjust error message if necessary
-  });
-
-  it('should return 401 if token is expired', async () => {
-    const req = httpMocks.createRequest({
-      headers: {
-        authorization: `Bearer ${expiredToken}`,
-      },
-    });
-    const res = httpMocks.createResponse();
-    const next = jest.fn();
-
-    await authMiddleware(req, res, next);
-
-    expect(res.statusCode).toBe(401);
-    expect(res._getData()).toBe('Token expired'); // Adjust error message if necessary
+  it('blocks inactive accounts', async () => {
+    mockUserLookup({ _id: 'abc', uuid, isActive: false });
+    const res = mockRes();
+    await authMiddleware(reqWith(jwt.sign({ userId: uuid }, getJwtSecret())), res, jest.fn());
+    expect(res.statusCode).toBe(403);
   });
 });
-
-afterAll(async () => {
-    await mongoose.connection.close();
-    const { disconnectDB } = require('../db');
-    await disconnectDB(); // Call the mocked disconnectDB
-  });
-  

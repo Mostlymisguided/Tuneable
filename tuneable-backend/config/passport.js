@@ -9,7 +9,7 @@ const axios = require('axios');
 const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 
-const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
+const SECRET_KEY = require('./jwtSecret').getJwtSecret();
 
 /** Persist Google tokens without wiping an existing refresh token. */
 function applyGoogleOAuthTokens(user, accessToken, refreshToken, youtubeImport) {

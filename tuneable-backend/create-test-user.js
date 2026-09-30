@@ -32,7 +32,7 @@ async function createTestUser() {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
+      require('./config/jwtSecret').getJwtSecret(),
       { expiresIn: '7d' }
     );
     

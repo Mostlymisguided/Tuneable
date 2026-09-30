@@ -6,6 +6,11 @@
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
+# iOS universal links (tuneable-mobile ios.associatedDomains).
+/.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
 # Missing hashed files must not be stored as HTML (see public/assets/404.html).
 /assets/404.html
   Cache-Control: no-store

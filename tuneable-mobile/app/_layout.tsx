@@ -133,6 +133,7 @@ function RootNavigator() {
         <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="change-password" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="forgot-password" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="reset-password" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="wallet" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
@@ -173,6 +174,7 @@ function SignedOutCover() {
     root === 'login' ||
     root === 'register' ||
     root === 'forgot-password' ||
+    root === 'reset-password' ||
     root === 'auth';
 
   if (isLoading || isAuthenticated || onAuthRoute) return null;

@@ -7,7 +7,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
 
 const router = express.Router();
-const SECRET_KEY = process.env.JWT_SECRET || 'JWT Secret failed to fly';
+const SECRET_KEY = require('../config/jwtSecret').getJwtSecret();
 
 /** Append query params to a URL that may already include a query string. */
 function appendQueryParams(url, params) {

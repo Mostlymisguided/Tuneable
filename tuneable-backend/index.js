@@ -4,6 +4,7 @@ const db = require('./db'); // Import the database connection module
 const { initializeSocketIO } = require('./utils/socketIO'); // Import Socket.IO setup for notifications and party updates
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 require('dotenv').config({ path: envFile });
+require('./config/jwtSecret').assertJwtSecretConfigured();
 
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('MONGO_URI:', process.env.MONGO_URI);
@@ -182,6 +183,9 @@ app.set('trust proxy', 1);
 // MemoryStore is process-local. saveUninitialized:false so health checks / anonymous
 // API traffic do not accumulate sessions until RSS exceeds the Render cap.
 const sessionStore = new session.MemoryStore();
+if (!process.env.SESSION_SECRET) {
+  console.warn('⚠️  SESSION_SECRET is not set; OAuth session cookies are signed with a public default. Set it to a long random string.');
+}
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'your-session-secret-key',
   resave: false,

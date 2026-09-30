@@ -575,14 +575,18 @@ const AuthPage: React.FC = () => {
           <div className="flex items-start gap-2">
             <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-400" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-zinc-100">Account temporarily locked</p>
+              <p className="text-sm font-medium text-zinc-100">Too many sign-in attempts</p>
               <p className="mt-1 text-xs text-zinc-400">
-                Too many failed login attempts. Please try again after {(() => {
+                Please try again after {(() => {
                   const now = new Date();
                   const minutesRemaining = Math.ceil((accountLockedUntil!.getTime() - now.getTime()) / 60000);
                   void countdownTick;
                   return minutesRemaining > 0 ? `${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}` : 'less than a minute';
-                })()}.
+                })()}, or{' '}
+                <Link to="/forgot-password" className="text-zinc-100 underline-offset-2 hover:underline">
+                  reset your password
+                </Link>
+                .
               </p>
             </div>
           </div>

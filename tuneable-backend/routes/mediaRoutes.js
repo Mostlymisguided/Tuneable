@@ -1630,10 +1630,8 @@ router.get('/:mediaId/copy-access', async (req, res) => {
       try {
         const jwt = require('jsonwebtoken');
         const User = require('../models/User');
-        const decoded = jwt.verify(
-          authHeader.slice(7),
-          process.env.JWT_SECRET || 'defaultsecretkey'
-        );
+        const { getJwtSecret } = require('../config/jwtSecret');
+        const decoded = jwt.verify(authHeader.slice(7), getJwtSecret());
         const { isTokenRevoked } = require('../utils/sessionRevocation');
         const user = decoded.userId && String(decoded.userId).includes('-')
           ? await User.findOne({ uuid: decoded.userId }).select('_id passwordChangedAt')

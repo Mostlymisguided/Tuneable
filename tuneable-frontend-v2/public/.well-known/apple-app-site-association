@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["A8NY8WUF6Q.stream.tuneable.app"],
+        "components": [
+          {
+            "/": "/reset-password",
+            "?": { "token": "?*" },
+            "comment": "Password reset links from email"
+          }
+        ]
+      }
+    ]
+  }
+}
