@@ -1,11 +1,11 @@
 // Mirrors tuneable-backend/utils/passwordPolicy.js. Length is the only hard
 // rule; the server warns (422 PASSWORD_WARNINGS) about common, personal and
 // breached passwords, and accepts them once resubmitted with acceptPasswordWarnings.
-export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_LENGTH = 6;
 export const PASSWORD_MAX_LENGTH = 128;
 
 export const PASSWORD_HINT =
-  'At least 8 characters. Longer beats complicated: try four random words, like “lantern otter velvet cactus”. A password manager is even better. Avoid song lyrics and titles.';
+  'At least 6 characters. Longer beats complicated: try four random words, like “lantern otter velvet cactus”. A password manager is even better. Avoid song lyrics and titles.';
 
 export const PASSWORD_PLACEHOLDER = `At least ${PASSWORD_MIN_LENGTH} characters`;
 

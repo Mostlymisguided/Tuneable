@@ -7,7 +7,7 @@
 
 const crypto = require('crypto');
 
-const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MIN_LENGTH = 6;
 // bcrypt only reads the first 72 bytes; the cap stops absurd inputs, not weak ones.
 const PASSWORD_MAX_LENGTH = 128;
 

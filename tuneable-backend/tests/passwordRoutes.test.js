@@ -120,7 +120,7 @@ describe('POST /api/users/me/password', () => {
     expect(res.body.code).toBe('INVALID_CURRENT_PASSWORD');
   });
 
-  it('rejects passwords under 8 characters', async () => {
+  it('rejects passwords under 6 characters', async () => {
     const send = signedIn(makeUser());
     const res = await send({ currentPassword: PASSWORD, newPassword: 'short', acceptPasswordWarnings: true });
     expect(res.status).toBe(400);
