@@ -13,6 +13,7 @@ import {
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import axios from 'axios';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import {
@@ -82,6 +83,7 @@ export default function RegisterScreen() {
   >(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [passwordWarnings, setPasswordWarnings] = useState<string[] | null>(null);
   const validateSeq = useRef(0);
 
   useEffect(() => {
@@ -150,8 +152,11 @@ export default function RegisterScreen() {
     return true;
   };
 
-  const onSubmit = async () => {
+  const onSubmit = async (acceptWarnings = false) => {
     setError(null);
+    if (!acceptWarnings) {
+      setPasswordWarnings(null);
+    }
     if (!assertInviteOk()) return;
     if (!username.trim() || !email.trim() || !password) {
       setError('Fill in username, email, and password.');
@@ -172,18 +177,25 @@ export default function RegisterScreen() {
       if (optionalInvite && inviteStatus !== 'valid') {
         await validateInvite(optionalInvite);
       }
-      const nextUser = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
-        register({
-          username,
-          email,
-          password,
-          ...(optionalInvite ? { parentInviteCode: optionalInvite } : {}),
-          acceptPasswordWarnings,
-        })
-      );
-      if (!nextUser) return;
+      const nextUser = await register({
+        username,
+        email,
+        password,
+        ...(optionalInvite ? { parentInviteCode: optionalInvite } : {}),
+        acceptPasswordWarnings: acceptWarnings,
+      });
       router.replace(getPostAuthHref(nextUser));
     } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const data = err.response?.data as
+          | { code?: string; warnings?: string[]; error?: string }
+          | undefined;
+        if (data?.code === 'PASSWORD_WARNINGS' && data.warnings?.length && !acceptWarnings) {
+          setPasswordWarnings(data.warnings);
+          setSubmitting(false);
+          return;
+        }
+      }
       setError(getApiErrorMessage(err, 'Registration failed.'));
     } finally {
       setSubmitting(false);
@@ -382,6 +394,41 @@ export default function RegisterScreen() {
               editable={!busy}
             />
 
+            {passwordWarnings && passwordWarnings.length > 0 ? (
+              <View style={styles.warningBox}>
+                <View style={styles.warningHeader}>
+                  <Ionicons name="warning-outline" size={20} color="#FF9F1C" />
+                  <Text style={styles.warningTitle}>Weak password</Text>
+                </View>
+                {passwordWarnings.map((warning, idx) => (
+                  <Text key={idx} style={styles.warningText}>
+                    {warning}
+                  </Text>
+                ))}
+                <Text style={styles.warningAdvice}>
+                  A few random words would be safer.
+                </Text>
+                <View style={styles.warningActions}>
+                  <Pressable
+                    style={styles.warningBtnSecondary}
+                    onPress={() => setPasswordWarnings(null)}
+                    disabled={busy}>
+                    <Text style={styles.warningBtnSecondaryText}>Choose another</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.warningBtnPrimary, busy && authStyles.disabled]}
+                    onPress={() => void onSubmit(true)}
+                    disabled={busy}>
+                    {submitting ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.warningBtnPrimaryText}>Use anyway</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
             {error ? <Text style={authStyles.error}>{error}</Text> : null}
 
             <Pressable
@@ -456,5 +503,64 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     color: colors.danger,
+  },
+  warningBox: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: 'rgba(255, 159, 28, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 159, 28, 0.3)',
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  warningTitle: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF9F1C',
+  },
+  warningText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
+    marginBottom: 8,
+  },
+  warningAdvice: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textMuted,
+    marginBottom: 16,
+  },
+  warningActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  warningBtnSecondary: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+  },
+  warningBtnSecondaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  warningBtnPrimary: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+  },
+  warningBtnPrimaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
