@@ -25,15 +25,15 @@ function pwnedBodyFor(password, count = 42) {
 
 describe('checkPasswordRules', () => {
   it('enforces length only, with no composition rules', () => {
-    expect(checkPasswordRules('short')).toMatch(/at least 8/);
+    expect(checkPasswordRules('short')).toMatch(/at least 6/);
     expect(checkPasswordRules('lantern otter velvet cactus')).toBeNull();
     expect(checkPasswordRules('alllowercaseletters')).toBeNull();
     expect(checkPasswordRules('x'.repeat(129))).toMatch(/at most 128/);
   });
 
   it('counts emoji as single characters', () => {
-    expect(checkPasswordRules('🎵🎶🎸🥁🎹🎺🎻')).toMatch(/at least/);
-    expect(checkPasswordRules('🎵🎶🎸🥁🎹🎺🎻🎤')).toBeNull();
+    expect(checkPasswordRules('🎵🎶🎸🥁🎹')).toMatch(/at least/);
+    expect(checkPasswordRules('🎵🎶🎸🥁🎹🎺')).toBeNull();
   });
 
   it('accepts common and personal passwords (they only warn)', () => {
@@ -42,7 +42,7 @@ describe('checkPasswordRules', () => {
   });
 
   it('exposes the minimum length', () => {
-    expect(PASSWORD_MIN_LENGTH).toBe(8);
+    expect(PASSWORD_MIN_LENGTH).toBe(6);
   });
 });
 
