@@ -6,6 +6,7 @@ export type RegisterBody = {
   email: string;
   password: string;
   parentInviteCode?: string;
+  acceptPasswordWarnings?: boolean;
 };
 
 export type ValidateInviteResponse = {
@@ -109,11 +110,12 @@ export const authAPI = {
   /** Signs out every session, including this device's. */
   confirmPasswordReset: async (
     token: string,
-    newPassword: string
+    newPassword: string,
+    acceptPasswordWarnings = false
   ): Promise<{ message?: string }> => {
     const response = await api.post<{ message?: string }>(
       '/email/password-reset/confirm',
-      { token, newPassword }
+      { token, newPassword, acceptPasswordWarnings }
     );
     return response.data;
   },
@@ -121,11 +123,12 @@ export const authAPI = {
   /** Signs out other sessions; returns a fresh token for this one. */
   changePassword: async (
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
+    acceptPasswordWarnings = false
   ): Promise<{ message: string; token: string }> => {
     const response = await api.post<{ message: string; token: string }>(
       '/users/me/password',
-      { currentPassword, newPassword }
+      { currentPassword, newPassword, acceptPasswordWarnings }
     );
     return response.data;
   },

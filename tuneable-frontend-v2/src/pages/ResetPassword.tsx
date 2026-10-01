@@ -10,6 +10,7 @@ import {
   PASSWORD_PLACEHOLDER,
   passwordApiErrorMessage,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '../utils/passwordPolicy';
 
 const inputClass =
@@ -77,7 +78,10 @@ const ResetPassword: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await authAPI.confirmPasswordReset(token, formData.password);
+      const result = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+        authAPI.confirmPasswordReset(token, formData.password, acceptPasswordWarnings)
+      );
+      if (!result) return;
       setSubmitted(true);
       toast.success('Password reset successfully!');
     } catch (error: any) {

@@ -13,7 +13,7 @@ const {
 } = require('../utils/emailService');
 
 const rateLimit = require('../middleware/rateLimit');
-const { validateNewPassword } = require('../utils/passwordPolicy');
+const { checkNewPassword } = require('../utils/passwordPolicy');
 
 const router = express.Router();
 
@@ -166,9 +166,13 @@ router.post('/password-reset/confirm', [
       return res.status(400).json({ error: 'Invalid or expired reset token', code: 'RESET_TOKEN_INVALID' });
     }
 
-    const policyError = await validateNewPassword(newPassword, { username: user.username, email: user.email });
-    if (policyError) {
-      return res.status(400).json({ error: policyError, code: 'WEAK_PASSWORD' });
+    const passwordProblem = await checkNewPassword(
+      newPassword,
+      { username: user.username, email: user.email },
+      req.body.acceptPasswordWarnings
+    );
+    if (passwordProblem) {
+      return res.status(passwordProblem.status).json(passwordProblem.body);
     }
 
     const reset = user.resetPassword(token, newPassword);

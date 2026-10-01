@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { normalizeTagList } = require('../utils/tagNormalizer');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const { parseMusicBrainzArtistCredit } = require('../utils/artistParser');
 
@@ -130,18 +130,7 @@ function mapMusicBrainzTags(mbTags, { minCount = 1, limit = 8 } = {}) {
     .filter((t) => !/^\d{4}$/.test(t.name)) // bare years
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
-  const seen = new Set();
-  const out = [];
-  for (const tag of ranked) {
-    const normalized = normalizeTagForStorage(tag.name);
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(normalized);
-    if (out.length >= limit) break;
-  }
-  return out;
+  return normalizeTagList(ranked.map((t) => t.name), limit);
 }
 
 function mapRecordingToTrack(recording) {

@@ -8,8 +8,10 @@ const User = require('../models/User');
 const {
   PASSWORD_MIN_LENGTH,
   checkPasswordRules,
+  getPasswordWarnings,
   isPasswordBreached,
-  validateNewPassword,
+  assessNewPassword,
+  checkNewPassword,
 } = require('../utils/passwordPolicy');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
 const { stripSensitiveUserFields } = require('../utils/userSanitizer');
@@ -34,21 +36,28 @@ describe('checkPasswordRules', () => {
     expect(checkPasswordRules('🎵🎶🎸🥁🎹🎺🎻🎤')).toBeNull();
   });
 
-  it('rejects common and repeated-character passwords', () => {
-    expect(checkPasswordRules('password123')).toMatch(/too common/);
-    expect(checkPasswordRules('Pass-Word 123')).toMatch(/too common/);
-    expect(checkPasswordRules('aaaaaaaaaa')).toMatch(/too easy/);
-  });
-
-  it('rejects passwords containing the username or email name', () => {
-    const ctx = { username: 'DJ_Shadow', email: 'josh.davis@example.com' };
-    expect(checkPasswordRules('djshadow-rocks', ctx)).toMatch(/username or email/);
-    expect(checkPasswordRules('JoshDavis2026', ctx)).toMatch(/username or email/);
-    expect(checkPasswordRules('lantern otter velvet', ctx)).toBeNull();
+  it('accepts common and personal passwords (they only warn)', () => {
+    expect(checkPasswordRules('password123')).toBeNull();
+    expect(checkPasswordRules('aaaaaaaaaa')).toBeNull();
   });
 
   it('exposes the minimum length', () => {
     expect(PASSWORD_MIN_LENGTH).toBe(8);
+  });
+});
+
+describe('getPasswordWarnings', () => {
+  it('warns about common and repeated-character passwords', () => {
+    expect(getPasswordWarnings('password123')[0]).toMatch(/very common/);
+    expect(getPasswordWarnings('Pass-Word 123')[0]).toMatch(/very common/);
+    expect(getPasswordWarnings('aaaaaaaaaa')[0]).toMatch(/easy to guess/);
+  });
+
+  it('warns about passwords containing the username or email name', () => {
+    const ctx = { username: 'DJ_Shadow', email: 'josh.davis@example.com' };
+    expect(getPasswordWarnings('djshadow-rocks', ctx)[0]).toMatch(/username or email/);
+    expect(getPasswordWarnings('JoshDavis2026', ctx)[0]).toMatch(/username or email/);
+    expect(getPasswordWarnings('lantern otter velvet', ctx)).toEqual([]);
   });
 });
 
@@ -72,13 +81,32 @@ describe('isPasswordBreached', () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     await expect(isPasswordBreached('whatever phrase')).resolves.toBeNull();
-    await expect(validateNewPassword('lantern otter velvet cactus')).resolves.toBeNull();
+    await expect(assessNewPassword('lantern otter velvet cactus')).resolves.toEqual({ error: null, warnings: [] });
     console.warn.mockRestore();
   });
 
-  it('validateNewPassword reports breached passwords', async () => {
+  it('assessNewPassword warns about breached passwords', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true, text: async () => pwnedBodyFor('correct horse battery staple') });
-    await expect(validateNewPassword('correct horse battery staple')).resolves.toMatch(/data breach/);
+    const { error, warnings } = await assessNewPassword('correct horse battery staple');
+    expect(error).toBeNull();
+    expect(warnings[0]).toMatch(/data breach/);
+  });
+});
+
+describe('checkNewPassword', () => {
+  const realFetch = global.fetch;
+  beforeEach(() => { global.fetch = jest.fn().mockResolvedValue({ ok: true, text: async () => '' }); });
+  afterEach(() => { global.fetch = realFetch; });
+
+  it('blocks only on length', async () => {
+    await expect(checkNewPassword('short', {}, true)).resolves.toMatchObject({ status: 400, body: { code: 'WEAK_PASSWORD' } });
+  });
+
+  it('returns warnings until the user accepts them', async () => {
+    const first = await checkNewPassword('password123', {});
+    expect(first).toMatchObject({ status: 422, body: { code: 'PASSWORD_WARNINGS' } });
+    expect(first.body.warnings.length).toBeGreaterThan(0);
+    await expect(checkNewPassword('password123', {}, true)).resolves.toBeNull();
   });
 });
 

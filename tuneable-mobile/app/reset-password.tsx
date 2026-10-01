@@ -23,6 +23,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_PLACEHOLDER,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '@/src/lib/passwordPolicy';
 import { colors } from '@/src/theme/colors';
 
@@ -52,7 +53,10 @@ export default function ResetPasswordScreen() {
     }
     setSubmitting(true);
     try {
-      await authAPI.confirmPasswordReset(token, newPassword);
+      const result = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+        authAPI.confirmPasswordReset(token, newPassword, acceptPasswordWarnings)
+      );
+      if (!result) return;
       // The reset revokes every existing session, including this device's.
       if (isAuthenticated) await logout().catch(() => undefined);
       setDone(true);

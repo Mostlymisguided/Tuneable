@@ -9,6 +9,7 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_PLACEHOLDER,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '../utils/passwordPolicy';
 import {
   ARTIST_INVITE_AFFILIATE_PERCENT,
@@ -256,14 +257,18 @@ const CreatorRegister: React.FC = () => {
 
       setIsCreatingAccount(true);
       try {
-        await registerUser({
-          email: accountData.email,
-          password: accountData.password,
-          username: accountData.username,
-          ...(parentInviteCode.length === 5 && inviteCodeValid !== false
-            ? { parentInviteCode }
-            : {}),
-        });
+        const newUser = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+          registerUser({
+            email: accountData.email,
+            password: accountData.password,
+            username: accountData.username,
+            ...(parentInviteCode.length === 5 && inviteCodeValid !== false
+              ? { parentInviteCode }
+              : {}),
+            acceptPasswordWarnings,
+          })
+        );
+        if (!newUser) return;
 
         toast.success('Account created successfully!');
         // Authenticated flow: step 2 is music details.

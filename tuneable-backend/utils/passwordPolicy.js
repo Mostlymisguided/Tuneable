@@ -1,8 +1,8 @@
 /**
  * Password rules shared by registration, reset and change.
  *
- * Follows NIST SP 800-63B: length plus a known-bad check, no composition rules
- * ("must include a symbol") and no forced rotation.
+ * Length is the only hard rule. Common, personal and breached passwords produce
+ * warnings the user can override. No composition rules, no forced rotation.
  */
 
 const crypto = require('crypto');
@@ -32,11 +32,10 @@ function normalise(value) {
 }
 
 /**
- * Synchronous checks. Returns an error message, or null when acceptable.
- * @param {string} password
- * @param {{ username?: string, email?: string }} [context]
+ * The only hard requirements: present, 8+ characters, not absurdly long.
+ * @returns {string|null} error message, or null when acceptable
  */
-function checkPasswordRules(password, context = {}) {
+function checkPasswordRules(password) {
   if (typeof password !== 'string' || password.length === 0) {
     return 'Password is required';
   }
@@ -46,13 +45,22 @@ function checkPasswordRules(password, context = {}) {
   if (password.length > PASSWORD_MAX_LENGTH) {
     return `Password must be at most ${PASSWORD_MAX_LENGTH} characters`;
   }
+  return null;
+}
 
+/**
+ * Advice the user may ignore.
+ * @param {string} password
+ * @param {{ username?: string, email?: string }} [context]
+ * @returns {string[]}
+ */
+function getPasswordWarnings(password, context = {}) {
+  const warnings = [];
   const flat = normalise(password);
   if (COMMON_PASSWORDS.has(password.toLowerCase()) || COMMON_PASSWORDS.has(flat)) {
-    return 'That password is too common. Try a few random words instead.';
-  }
-  if (flat.length > 0 && new Set(flat).size === 1) {
-    return 'That password is too easy to guess. Try a few random words instead.';
+    warnings.push('That password is very common, so it\u2019s one of the first an attacker would try.');
+  } else if (flat.length > 0 && new Set(flat).size === 1) {
+    warnings.push('That password is very easy to guess.');
   }
 
   const personal = [
@@ -60,10 +68,9 @@ function checkPasswordRules(password, context = {}) {
     normalise(String(context.email || '').split('@')[0]),
   ].filter((s) => s.length >= 4);
   if (personal.some((s) => flat.includes(s))) {
-    return 'Your password shouldn\u2019t contain your username or email.';
+    warnings.push('That password contains your username or email, which makes it easier to guess.');
   }
-
-  return null;
+  return warnings;
 }
 
 /**
@@ -94,16 +101,36 @@ async function isPasswordBreached(password) {
 }
 
 /**
- * Full check for a password a user is choosing now. Fails open on the breach
- * lookup so an outage never blocks sign-up.
- * @returns {Promise<string|null>} error message, or null when acceptable
+ * Full assessment of a password a user is choosing now. The breach lookup
+ * fails open so an outage never blocks sign-up.
+ * @returns {Promise<{ error: string|null, warnings: string[] }>}
  */
-async function validateNewPassword(password, context = {}) {
-  const ruleError = checkPasswordRules(password, context);
-  if (ruleError) return ruleError;
+async function assessNewPassword(password, context = {}) {
+  const error = checkPasswordRules(password);
+  if (error) return { error, warnings: [] };
 
+  const warnings = getPasswordWarnings(password, context);
   if (await isPasswordBreached(password)) {
-    return 'That password has appeared in a known data breach. Please choose a different one \u2014 a few random words works well.';
+    warnings.unshift('That password has appeared in a known data breach, so attackers already have it on their lists.');
+  }
+  return { error: null, warnings };
+}
+
+/**
+ * Route helper. Warnings are only returned until the client resubmits with
+ * `acceptPasswordWarnings: true`, so the user sees them once and decides.
+ * @returns {Promise<{ status: number, body: object }|null>} null when the password may be used
+ */
+async function checkNewPassword(password, context, acceptWarnings) {
+  const { error, warnings } = await assessNewPassword(password, context);
+  if (error) {
+    return { status: 400, body: { error, code: 'WEAK_PASSWORD' } };
+  }
+  if (warnings.length && acceptWarnings !== true) {
+    return {
+      status: 422,
+      body: { error: warnings[0], warnings, code: 'PASSWORD_WARNINGS' },
+    };
   }
   return null;
 }
@@ -112,6 +139,8 @@ module.exports = {
   PASSWORD_MIN_LENGTH,
   PASSWORD_MAX_LENGTH,
   checkPasswordRules,
+  getPasswordWarnings,
   isPasswordBreached,
-  validateNewPassword,
+  assessNewPassword,
+  checkNewPassword,
 };

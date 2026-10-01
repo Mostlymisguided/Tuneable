@@ -120,11 +120,24 @@ describe('POST /api/users/me/password', () => {
     expect(res.body.code).toBe('INVALID_CURRENT_PASSWORD');
   });
 
-  it('rejects weak new passwords', async () => {
+  it('rejects passwords under 8 characters', async () => {
     const send = signedIn(makeUser());
-    const res = await send({ currentPassword: PASSWORD, newPassword: 'password123' });
+    const res = await send({ currentPassword: PASSWORD, newPassword: 'short', acceptPasswordWarnings: true });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('WEAK_PASSWORD');
+  });
+
+  it('warns about a common password, then accepts it once acknowledged', async () => {
+    const user = makeUser();
+    const send = signedIn(user);
+    const warned = await send({ currentPassword: PASSWORD, newPassword: 'password123' });
+    expect(warned.status).toBe(422);
+    expect(warned.body.code).toBe('PASSWORD_WARNINGS');
+    expect(user.password).toBe(passwordHash);
+
+    const ok = await send({ currentPassword: PASSWORD, newPassword: 'password123', acceptPasswordWarnings: true });
+    expect(ok.status).toBe(200);
+    expect(user.password).toBe('password123');
   });
 
   it('changes the password, revokes older sessions and returns a token that still works', async () => {

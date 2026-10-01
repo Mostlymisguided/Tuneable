@@ -236,22 +236,17 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
   }
 
   // Seed tags/genres onto catalog rows that have none (SoundCloud genre pass-through)
-  const { normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+  const { normalizeTagList, tagsMatch } = require('../utils/tagNormalizer');
   const incomingTags = Array.isArray(externalMedia.tags) ? externalMedia.tags : [];
   const incomingGenres = Array.isArray(externalMedia.genres) ? externalMedia.genres : [];
   if (incomingTags.length > 0) {
     if (!media.tags || media.tags.length === 0) {
-      media.tags = incomingTags
-        .map((t) => normalizeTagForStorage(t))
-        .filter(Boolean)
-        .slice(0, 24);
+      media.tags = normalizeTagList(incomingTags, 24);
       changed = true;
     } else {
       const merged = [...media.tags];
       let tagsChanged = false;
-      for (const raw of incomingTags) {
-        const normalized = normalizeTagForStorage(raw);
-        if (!normalized) continue;
+      for (const normalized of normalizeTagList(incomingTags)) {
         if (merged.some((t) => tagsMatch(t, normalized))) continue;
         merged.push(normalized);
         tagsChanged = true;
@@ -263,10 +258,7 @@ async function mergeExternalIdsOntoMedia(mediaId, externalMedia) {
     }
   }
   if (incomingGenres.length > 0 && (!media.genres || media.genres.length === 0)) {
-    media.genres = incomingGenres
-      .map((t) => normalizeTagForStorage(t))
-      .filter(Boolean)
-      .slice(0, 12);
+    media.genres = normalizeTagList(incomingGenres, 12);
     changed = true;
   }
 

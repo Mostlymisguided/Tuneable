@@ -35,6 +35,7 @@ interface AuthContextValue {
     email: string;
     password: string;
     parentInviteCode?: string;
+    acceptPasswordWarnings?: boolean;
   }) => Promise<User>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
       parentInviteCode?: string;
+      acceptPasswordWarnings?: boolean;
     }) => {
       const code = input.parentInviteCode?.trim().toUpperCase();
       const { token: newToken, user: newUser } = await authAPI.register({
@@ -158,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: input.email.trim(),
         password: input.password,
         ...(code ? { parentInviteCode: code } : {}),
+        acceptPasswordWarnings: input.acceptPasswordWarnings,
       });
       return applySession(newToken, newUser);
     },

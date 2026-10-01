@@ -24,7 +24,7 @@ const {
 const { resolvePartyId } = require('../utils/idResolver'); // Re-enabled to handle "global" slug
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const { sendPartyCreationNotification, sendHighValueBidNotification } = require('../utils/emailService');
-const { normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { normalizeTagForStorage, normalizeTagList } = require('../utils/tagNormalizer');
 const { applyTipChipsToMedia, classifyTipChips } = require('../utils/elementNormalizer');
 const {
     fetchAllTimeGlobalChart,
@@ -202,7 +202,7 @@ router.post('/', adminMiddleware, async (req, res) => {
         mediaSource: mediaSource || 'youtube',
         minimumBid: minimumBid || 0.33,
         tags: Array.isArray(tags)
-          ? tags.map((t) => normalizeTagForStorage(t)).filter(Boolean)
+          ? normalizeTagList(tags)
           : [],
         description: description || '',
       });

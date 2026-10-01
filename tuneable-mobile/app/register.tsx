@@ -31,6 +31,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_PLACEHOLDER,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '@/src/lib/passwordPolicy';
 import {
   isAppleSignInAvailable,
@@ -171,12 +172,16 @@ export default function RegisterScreen() {
       if (optionalInvite && inviteStatus !== 'valid') {
         await validateInvite(optionalInvite);
       }
-      const nextUser = await register({
-        username,
-        email,
-        password,
-        ...(optionalInvite ? { parentInviteCode: optionalInvite } : {}),
-      });
+      const nextUser = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+        register({
+          username,
+          email,
+          password,
+          ...(optionalInvite ? { parentInviteCode: optionalInvite } : {}),
+          acceptPasswordWarnings,
+        })
+      );
+      if (!nextUser) return;
       router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       setError(getApiErrorMessage(err, 'Registration failed.'));

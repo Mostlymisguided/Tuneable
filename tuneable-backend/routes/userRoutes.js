@@ -235,7 +235,7 @@ const userPurgeService = require('../services/userPurgeService');
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
 const { sendUserRegistrationNotification, sendEmailVerification, sendPasswordChangedNotification } = require('../utils/emailService');
 const rateLimit = require('../middleware/rateLimit');
-const { validateNewPassword } = require('../utils/passwordPolicy');
+const { checkNewPassword } = require('../utils/passwordPolicy');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
 const { getBlockState, isBlockedBetween } = require('../utils/userBlocks');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
@@ -390,9 +390,9 @@ router.post(
     try {
       const { username, email, password, cellPhone, givenName, familyName, homeLocation, locations, parentInviteCode } = req.body;
 
-      const passwordError = await validateNewPassword(password, { username, email });
-      if (passwordError) {
-        return res.status(400).json({ error: passwordError, code: 'WEAK_PASSWORD' });
+      const passwordProblem = await checkNewPassword(password, { username, email }, req.body.acceptPasswordWarnings);
+      if (passwordProblem) {
+        return res.status(passwordProblem.status).json(passwordProblem.body);
       }
 
       // Invite is optional — if provided it must be valid (attribution / credits)
@@ -731,9 +731,13 @@ router.post('/me/password', authMiddleware, changePasswordLimit, async (req, res
       return res.status(400).json({ error: 'New password must be different from your current one', code: 'SAME_PASSWORD' });
     }
 
-    const policyError = await validateNewPassword(newPassword, { username: user.username, email: user.email });
-    if (policyError) {
-      return res.status(400).json({ error: policyError, code: 'WEAK_PASSWORD' });
+    const passwordProblem = await checkNewPassword(
+      newPassword,
+      { username: user.username, email: user.email },
+      req.body.acceptPasswordWarnings
+    );
+    if (passwordProblem) {
+      return res.status(passwordProblem.status).json(passwordProblem.body);
     }
 
     user.setPassword(newPassword);

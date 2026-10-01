@@ -119,6 +119,7 @@ interface RegisterData {
   familyName?: string;
   homeLocation?: ResolvedLocation | null;
   secondaryLocation?: ResolvedLocation | null;
+  acceptPasswordWarnings?: boolean;
 }
 
 interface AuthContextType {

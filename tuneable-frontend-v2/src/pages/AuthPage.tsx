@@ -20,6 +20,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_PLACEHOLDER,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '../utils/passwordPolicy';
 import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
 import {
@@ -464,7 +465,10 @@ const AuthPage: React.FC = () => {
       if (!registerData.parentInviteCode) {
         delete (registerData as { parentInviteCode?: string }).parentInviteCode;
       }
-      const newUser = await register(registerData);
+      const newUser = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+        register({ ...registerData, acceptPasswordWarnings })
+      );
+      if (!newUser) return;
       toast.success('Registration successful!');
       navigate(getPostAuthPath(newUser, returnPathParam));
     } catch (error: any) {

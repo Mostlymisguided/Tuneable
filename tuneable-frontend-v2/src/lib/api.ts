@@ -283,14 +283,14 @@ export const authAPI = {
     return response.data;
   },
 
-  confirmPasswordReset: async (token: string, newPassword: string) => {
-    const response = await api.post('/email/password-reset/confirm', { token, newPassword });
+  confirmPasswordReset: async (token: string, newPassword: string, acceptPasswordWarnings = false) => {
+    const response = await api.post('/email/password-reset/confirm', { token, newPassword, acceptPasswordWarnings });
     return response.data;
   },
 
   /** Signs out other sessions; returns a fresh token for this one. */
-  changePassword: async (currentPassword: string, newPassword: string) => {
-    const response = await api.post('/users/me/password', { currentPassword, newPassword });
+  changePassword: async (currentPassword: string, newPassword: string, acceptPasswordWarnings = false) => {
+    const response = await api.post('/users/me/password', { currentPassword, newPassword, acceptPasswordWarnings });
     return response.data as { message: string; token: string };
   },
 };

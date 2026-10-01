@@ -10,6 +10,7 @@ import {
   PASSWORD_PLACEHOLDER,
   passwordApiErrorMessage,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '../utils/passwordPolicy';
 
 const PasswordSecuritySection: React.FC = () => {
@@ -49,7 +50,10 @@ const PasswordSecuritySection: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const result = await authAPI.changePassword(currentPassword, newPassword);
+      const result = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+        authAPI.changePassword(currentPassword, newPassword, acceptPasswordWarnings)
+      );
+      if (!result) return;
       replaceToken(result.token);
       setCurrentPassword('');
       setNewPassword('');

@@ -12,7 +12,7 @@ const {
   parseArtistString,
 } = require('../utils/artistParser');
 const {
-  normalizeTagForStorage,
+  normalizeTagList: normalizeTagListShared,
   tagsMatch,
 } = require('../utils/tagNormalizer');
 const {
@@ -160,29 +160,15 @@ function snapshotMedia(media) {
 }
 
 function normalizeTagList(tags, limit = MAX_TAGS) {
-  if (!Array.isArray(tags)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const raw of tags) {
-    const normalized = normalizeTagForStorage(raw);
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(normalized);
-    if (out.length >= limit) break;
-  }
-  return out;
+  return normalizeTagListShared(tags, limit);
 }
 
 function mergeTagLists(existing, incoming, limit = MAX_TAGS) {
   const merged = Array.isArray(existing) ? [...existing] : [];
-  for (const raw of incoming || []) {
-    const normalized = normalizeTagForStorage(raw);
-    if (!normalized) continue;
+  for (const normalized of normalizeTagListShared(incoming)) {
+    if (merged.length >= limit) break;
     if (merged.some((t) => tagsMatch(t, normalized))) continue;
     merged.push(normalized);
-    if (merged.length >= limit) break;
   }
   return merged;
 }
@@ -191,13 +177,10 @@ function mergeTagLists(existing, incoming, limit = MAX_TAGS) {
 function filterNewTags(existing, incoming, limit = MAX_TAGS) {
   const have = Array.isArray(existing) ? existing : [];
   const out = [];
-  for (const raw of incoming || []) {
-    const normalized = normalizeTagForStorage(raw);
-    if (!normalized) continue;
-    if (have.some((t) => tagsMatch(t, normalized))) continue;
-    if (out.some((t) => tagsMatch(t, normalized))) continue;
-    out.push(normalized);
+  for (const normalized of normalizeTagListShared(incoming)) {
     if (out.length >= limit) break;
+    if (have.some((t) => tagsMatch(t, normalized))) continue;
+    out.push(normalized);
   }
   return out;
 }

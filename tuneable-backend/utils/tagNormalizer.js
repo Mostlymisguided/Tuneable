@@ -78,7 +78,56 @@ const TAG_ALIASES = {
   rnb: 'R&B',
   randb: 'R&B',
   rb: 'R&B',
+  rhythmandblues: 'R&B',
+  rhythmblues: 'R&B',
+
+  // Genres where "&" is part of the name (kept whole by splitCompoundTag)
+  rockroll: 'Rock & Roll',
+  rockandroll: 'Rock & Roll',
+  rocknroll: 'Rock & Roll',
+  countrywestern: 'Country & Western',
+  countryandwestern: 'Country & Western',
+  stagescreen: 'Stage & Screen',
+  stageandscreen: 'Stage & Screen',
 };
+
+const PRIMARY_TAG_SEPARATORS = /\s*[/,;]\s*/;
+const SECONDARY_TAG_SEPARATORS = /\s+[&+]\s+/;
+
+function isAliasedTag(tag) {
+  return Boolean(TAG_ALIASES[normalizeTagForMatching(tag)]);
+}
+
+/**
+ * Split a compound genre string into its parts, e.g.
+ * "Hip-Hop & Rap" -> ["Hip-Hop", "Rap"], "R&B/Soul" -> ["R&B", "Soul"].
+ * Known aliases ("Drum & Bass", "Singer/Songwriter", "R & B") stay whole,
+ * and unspaced "&" (R&B, D&B) is never a separator.
+ * Returns raw parts — pass each through normalizeTagForStorage.
+ * @param {string} tag
+ * @returns {string[]}
+ */
+function splitCompoundTag(tag) {
+  if (!tag || typeof tag !== 'string') return [];
+  const trimmed = tag.trim();
+  if (!trimmed) return [];
+  if (isAliasedTag(trimmed)) return [trimmed];
+
+  const parts = [];
+  for (const piece of trimmed.split(PRIMARY_TAG_SEPARATORS)) {
+    const p = piece.trim();
+    if (!p) continue;
+    if (isAliasedTag(p)) {
+      parts.push(p);
+      continue;
+    }
+    for (const sub of p.split(SECONDARY_TAG_SEPARATORS)) {
+      const s = sub.trim();
+      if (s) parts.push(s);
+    }
+  }
+  return parts;
+}
 
 /**
  * Capitalize tag for display: Title Case per word, with acronym + stylization exceptions.
@@ -198,6 +247,27 @@ function findMatchingTags(tag, tagList) {
 }
 
 /**
+ * Split compound tags, normalize for storage, and de-duplicate (fuzzy).
+ * @param {Array<string>} tags
+ * @param {number} [limit]
+ * @returns {Array<string>}
+ */
+function normalizeTagList(tags, limit = Infinity) {
+  if (!Array.isArray(tags)) return [];
+  const out = [];
+  for (const raw of tags) {
+    for (const part of splitCompoundTag(raw)) {
+      const normalized = normalizeTagForStorage(part);
+      if (!normalized) continue;
+      if (out.some((t) => tagsMatch(t, normalized))) continue;
+      out.push(normalized);
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}
+
+/**
  * Stable match key for grouping (aliases collapse to the same key)
  * @param {string} tag
  * @returns {string}
@@ -210,6 +280,8 @@ function getTagMatchKey(tag) {
 module.exports = {
   normalizeTagForMatching,
   normalizeTagForStorage,
+  normalizeTagList,
+  splitCompoundTag,
   capitalizeTag,
   getCanonicalTag,
   getTagMatchKey,

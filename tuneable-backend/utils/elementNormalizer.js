@@ -10,6 +10,7 @@
 const {
   normalizeTagForMatching,
   normalizeTagForStorage,
+  splitCompoundTag,
   capitalizeTag,
   tagsMatch,
 } = require('./tagNormalizer');
@@ -228,11 +229,19 @@ function classifyTipChips(chips) {
     return { tags, elements };
   }
 
+  const parts = [];
   for (const raw of chips) {
     if (typeof raw !== 'string') continue;
     const trimmed = raw.trim();
     if (!trimmed) continue;
+    if (isKnownElement(trimmed)) {
+      parts.push(trimmed);
+    } else {
+      parts.push(...splitCompoundTag(trimmed));
+    }
+  }
 
+  for (const trimmed of parts) {
     const matchKey = normalizeElementForMatching(trimmed);
     const preferTag = PREFER_TAG_MATCH_KEYS.has(matchKey);
 

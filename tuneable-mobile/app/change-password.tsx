@@ -24,6 +24,7 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_PLACEHOLDER,
   passwordLengthError,
+  submitWithPasswordWarnings,
 } from '@/src/lib/passwordPolicy';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
@@ -66,7 +67,10 @@ export default function ChangePasswordScreen() {
 
     setSaving(true);
     try {
-      const result = await authAPI.changePassword(currentPassword, newPassword);
+      const result = await submitWithPasswordWarnings((acceptPasswordWarnings) =>
+        authAPI.changePassword(currentPassword, newPassword, acceptPasswordWarnings)
+      );
+      if (!result) return;
       await replaceToken(result.token);
       showToast('Password changed. Other devices have been signed out.');
       router.back();

@@ -8,7 +8,7 @@ const Bid = require('../models/Bid');
 const Party = require('../models/Party');
 const { DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
-const { normalizeTagForStorage } = require('../utils/tagNormalizer');
+const { normalizeTagList } = require('../utils/tagNormalizer');
 const { applyTipChipsToMedia } = require('../utils/elementNormalizer');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
@@ -157,7 +157,7 @@ async function placeGlobalBid(userId, {
         tags: seededChips.tags,
         elements: seededChips.elements,
         genres: Array.isArray(genres)
-          ? genres.map((g) => normalizeTagForStorage(g)).filter(Boolean)
+          ? normalizeTagList(genres)
           : [],
         category: category || 'Music',
         album: album || null,

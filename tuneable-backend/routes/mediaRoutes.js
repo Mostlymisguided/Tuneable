@@ -27,7 +27,7 @@ const {
   resolveBpmKey,
 } = require('../utils/libraryXml');
 const { canUploadMedia, canEditMedia, canDeleteMedia, isAdmin } = require('../utils/permissionHelpers');
-const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
+const { getCanonicalTag, normalizeTagList, tagsMatch } = require('../utils/tagNormalizer');
 const {
   applyTipChipsToMedia,
   normalizeElementList,
@@ -665,7 +665,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     } = req.body;
 
     // Resolve display metadata before upload so R2 keys are human-readable
-    const parsedTags = tags ? tags.split(',').map(t => normalizeTagForStorage(t.trim())).filter(t => t) : [];
+    const parsedTags = typeof tags === 'string' ? normalizeTagList([tags]) : [];
     const finalTitle = title || extractedMetadata?.title || 'Untitled';
     const finalArtistName = artistName?.trim() || extractedMetadata?.artist || user.creatorProfile?.artistName || user.username;
     const providedArtists = parseArtistsPayload(req.body.artists);
@@ -2143,22 +2143,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
         if (field === 'tags') {
           if (Array.isArray(value)) {
-            value = Array.from(
-              new Set(
-                value
-                  .map(tag => typeof tag === 'string' ? normalizeTagForStorage(tag.trim()) : '')
-                  .filter(Boolean)
-              )
-            );
+            value = normalizeTagList(value.filter(tag => typeof tag === 'string'));
           } else if (typeof value === 'string') {
-            value = Array.from(
-              new Set(
-                value
-                  .split(',')
-                  .map(tag => normalizeTagForStorage(tag.trim()))
-                  .filter(Boolean)
-              )
-            );
+            value = normalizeTagList([value]);
           } else {
             value = [];
           }
