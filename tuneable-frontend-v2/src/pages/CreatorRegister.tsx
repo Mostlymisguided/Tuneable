@@ -50,6 +50,70 @@ const fallbackFoundingStatus = (): FoundingProgramStatus => ({
   affiliatePercent: ARTIST_INVITE_AFFILIATE_PERCENT,
 });
 
+const FoundingSharesMeter: React.FC<{ remaining: number; cap: number }> = ({ remaining, cap }) => {
+  const [displayed, setDisplayed] = useState(0);
+  const [filled, setFilled] = useState(false);
+
+  useEffect(() => {
+    const start = performance.now();
+    const from = 0;
+    const duration = 1200;
+    let frame = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayed(Math.round(from + (remaining - from) * eased));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    const fillTimer = setTimeout(() => setFilled(true), 50);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(fillTimer);
+    };
+  }, [remaining, cap]);
+
+  const claimed = Math.max(0, cap - remaining);
+  const claimedPct = cap > 0 ? (claimed / cap) * 100 : 0;
+  const remainingPct = 100 - claimedPct;
+
+  return (
+    <div
+      className="group relative overflow-hidden rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-900/40 via-black/40 to-purple-900/30 p-5 shadow-lg shadow-amber-900/20 transition-all duration-300 hover:border-amber-400/70 hover:shadow-amber-700/30"
+      title={`${claimed.toLocaleString()} claimed · ${remaining.toLocaleString()} remaining`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-300">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
+          </span>
+          Live
+        </span>
+        <span className="text-xs text-gray-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          {claimed.toLocaleString()} claimed
+        </span>
+      </div>
+
+      <div className="flex items-baseline gap-2">
+        <span className="text-4xl font-extrabold tabular-nums bg-gradient-to-r from-amber-200 via-amber-400 to-orange-400 bg-clip-text text-transparent">
+          {displayed.toLocaleString()}
+        </span>
+        <span className="text-gray-300 text-sm">
+          of <span className="font-semibold text-white">{cap.toLocaleString()}</span> founding shares left
+        </span>
+      </div>
+
+      <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-amber-300 via-amber-500 to-orange-500 transition-[width] duration-[1200ms] ease-out"
+          style={{ width: filled ? `${remainingPct}%` : '0%' }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const CreatorRegister: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -687,13 +751,22 @@ const CreatorRegister: React.FC = () => {
           <Award className="h-6 w-6 mr-2 text-amber-400" />
           Founding Creators
         </h3>
-        <p className="text-gray-300 mb-6">
-          {alreadyFounding
-            ? 'You already have a founding share. We will issue shares where possible.'
-            : foundingStatus.open
-              ? `${foundingStatus.remaining.toLocaleString()} of ${foundingStatus.cap.toLocaleString()} shares left. A share is claimed when you upload your own music, and only if you have an invite or an approved request. We will issue shares where possible.`
-              : `All ${foundingStatus.cap.toLocaleString()} founding shares are claimed. You can still become a creator and upload your music.`}
-        </p>
+        {alreadyFounding ? (
+          <p className="text-gray-300 mb-6">You already have a founding share.</p>
+        ) : foundingStatus.open ? (
+          <>
+            <div className="mb-5">
+              <FoundingSharesMeter remaining={foundingStatus.remaining} cap={foundingStatus.cap} />
+            </div>
+            <p className="text-gray-300 mb-6">
+              A share is claimed when you upload your own music, and only if you have an invite or an approved request.
+            </p>
+          </>
+        ) : (
+          <p className="text-gray-300 mb-6">
+            All {foundingStatus.cap.toLocaleString()} founding shares are claimed. You can still become a creator and upload your music.
+          </p>
+        )}
 
         {foundingStatus.open && !alreadyFounding && (
           <div className="space-y-4 mb-6">
@@ -795,7 +868,7 @@ const CreatorRegister: React.FC = () => {
           <p>
             Founding creators who invite an artist earn <strong className="text-white">{foundingStatus.affiliatePercent}%</strong> of that artist&apos;s paid tips for the first year after that artist is verified, taken from Tuneable&apos;s share, on music they upload themselves. The founding creator&apos;s own profile must be complete and verified before that share is paid.
           </p>
-          <p>We will issue shares where possible.</p>
+          <p>Shares will be issued where legally possible.</p>
         </div>
       </div>
     </div>
