@@ -1,4 +1,5 @@
 import { api } from './client';
+import { AUDIO_FORMAT_MIME, getAudioUploadFormat } from '@/src/lib/audioUpload';
 import type {
   ChartMediaItem,
   MediaChampionsResponse,
@@ -60,14 +61,18 @@ export type UploadMediaResponse = {
   media: ChartMediaItem;
 };
 
-const UPLOAD_TIMEOUT_MS = 120000;
+// WAV uploads can be up to 100MB, which takes minutes on mobile data.
+const UPLOAD_TIMEOUT_MS = 600000;
 
 function appendAudioFile(form: FormData, file: AudioFileAsset) {
-  const name = file.name.endsWith('.mp3') ? file.name : `${file.name}.mp3`;
+  const format = getAudioUploadFormat(file.name, file.mimeType) ?? 'mp3';
+  const ext = format === 'wav' ? /\.(wav|wave)$/i : /\.mp3$/i;
+  const name = ext.test(file.name) ? file.name : `${file.name}.${format}`;
   form.append('audioFile', {
     uri: file.uri,
     name,
-    type: file.mimeType || 'audio/mpeg',
+    // The backend checks extension and MIME together, so send the canonical type.
+    type: AUDIO_FORMAT_MIME[format],
   } as unknown as Blob);
 }
 

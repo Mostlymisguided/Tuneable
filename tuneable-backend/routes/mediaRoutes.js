@@ -577,7 +577,7 @@ router.post('/library-xml/enrich/execute', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/media/upload
-// @desc    Upload media file (MP3) - Creator/Admin only
+// @desc    Upload media file (MP3 or WAV) - Creator/Admin only
 // @access  Private (Verified creators and admins)
 router.post('/upload', authMiddleware, mixedUpload.fields([
   { name: 'audioFile', maxCount: 1 },
@@ -1050,7 +1050,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 });
 
 // @route   POST /api/media/:mediaId/attach-upload
-// @desc    Replace the MP3 on media that already has hosted audio
+// @desc    Replace the MP3/WAV on media that already has hosted audio
 // @access  Private (admin or media editor, with rights confirmation)
 router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields([
   { name: 'audioFile', maxCount: 1 },
@@ -1076,11 +1076,16 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
 
     const audioFile = req.files?.audioFile?.[0];
     if (!audioFile) {
-      return res.status(400).json({ error: 'MP3 audio file is required' });
+      return res.status(400).json({ error: 'MP3 or WAV audio file is required' });
     }
     if (!audioFile.buffer?.length) {
       return res.status(400).json({ error: 'Uploaded audio file is empty' });
     }
+    const audioCheck = checkUploadAudioFile(audioFile);
+    if (audioCheck.error) {
+      return res.status(400).json({ error: audioCheck.error });
+    }
+    const audioFormat = audioCheck.format;
 
     const adminPermitted = isAdmin(user) && requestedRightsStatus === 'permitted';
     let permission = null;
@@ -1139,7 +1144,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       const audioKey = buildReadableAudioKey({
         title: media.title,
         artist: media.artist,
-        ext: path.extname(audioFile.originalname) || '.mp3',
+        ext: audioFormat.ext,
         uuid: media.uuid || media._id.toString(),
         fallbackBasename: path.basename(audioFile.originalname, path.extname(audioFile.originalname)),
       });
@@ -1148,7 +1153,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         Bucket: process.env.R2_BUCKET_NAME,
         Key: audioKey,
         Body: audioFile.buffer,
-        ContentType: 'audio/mpeg',
+        ContentType: audioFormat.contentType,
         ContentDisposition: 'inline',
         ACL: 'public-read',
         CacheControl: 'public, max-age=31536000',
@@ -1189,9 +1194,11 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         ? permittedRightsFields(userId)
         : (clearRights ? clearedRightsFields(userId) : pendingRightsFields(userId, isAdmin(user) ? 'operator_attach' : null))
     );
-    if (!media.mediaType?.includes('mp3')) {
-      media.mediaType = [...(media.mediaType || []), 'mp3'];
-    }
+    const otherUploadType = audioFormat.mediaType === 'wav' ? 'mp3' : 'wav';
+    media.mediaType = [
+      ...(media.mediaType || []).filter((t) => t !== otherUploadType && t !== audioFormat.mediaType),
+      audioFormat.mediaType,
+    ];
 
     const existingOwner = media.mediaOwners?.find(
       (o) => o.userId && o.userId.toString() === userId.toString()

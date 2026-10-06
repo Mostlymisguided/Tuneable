@@ -12,7 +12,7 @@ import ProductionStackEditor from '../components/ProductionStackEditor';
 import AiToolsEditor from '../components/AiToolsEditor';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
-import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
+import { AUDIO_FILE_ACCEPT, getAudioUploadRejection, titleFromAudioFileName } from '../lib/audioUpload';
 import { roundBpm } from '../utils/bpm';
 import { FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
 
@@ -251,17 +251,10 @@ const CreatorUpload: React.FC = () => {
       return;
     }
 
-    const typeError = getAudioUploadRejection(selectedFile.name, selectedFile.type);
+    const typeError = getAudioUploadRejection(selectedFile.name, selectedFile.type, selectedFile.size);
     if (typeError) {
       if (fileInputRef.current) fileInputRef.current.value = '';
       toast.error(typeError);
-      return;
-    }
-
-    // Validate file size (50MB max)
-    const maxSize = 50 * 1024 * 1024;
-    if (selectedFile.size > maxSize) {
-      toast.error('File size must be less than 50MB');
       return;
     }
 
@@ -269,7 +262,7 @@ const CreatorUpload: React.FC = () => {
     
     // Auto-fill title from filename if empty
     if (!formData.title) {
-      const filename = selectedFile.name.replace('.mp3', '').replace(/_/g, ' ');
+      const filename = titleFromAudioFileName(selectedFile.name).replace(/_/g, ' ');
       setFormData(prev => ({ ...prev, title: filename }));
     }
 
@@ -781,7 +774,7 @@ const CreatorUpload: React.FC = () => {
                     Click to select audio file
                   </p>
                   <p className="text-gray-400 text-sm">
-                    or drag and drop (Max 50MB)
+                    or drag and drop (MP3 up to 50MB, WAV up to 100MB)
                   </p>
                 </div>
               )}
@@ -1733,7 +1726,7 @@ const CreatorUpload: React.FC = () => {
           <div className="mt-6 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
             <h4 className="text-white font-semibold mb-2 text-sm">📌 Upload Guidelines</h4>
             <ul className="text-gray-300 text-sm space-y-1">
-              <li>• MP3 for now (max 50MB). WAV and FLAC coming in version 1.1</li>
+              <li>• MP3 (max 50MB) or WAV (max 100MB). FLAC coming soon</li>
               <li>• You'll be automatically verified as the artist</li>
               <li>• Your track will be available on Tuneable immediately</li>
               <li>• You can edit metadata after upload</li>

@@ -1369,14 +1369,10 @@ const TuneProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const typeError = getAudioUploadRejection(file.name, file.type);
+    const typeError = getAudioUploadRejection(file.name, file.type, file.size);
     if (typeError) {
       toast.error(typeError);
       if (audioFileInputRef.current) audioFileInputRef.current.value = '';
-      return;
-    }
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error('Audio file must be less than 50MB');
       return;
     }
     setAttachAudioFile(file);
@@ -4135,7 +4131,7 @@ const TuneProfile: React.FC = () => {
                       <span>Replace audio</span>
                     </button>
                     <p className="text-xs text-gray-400 mt-1">
-                      Upload a new audio file (MP3) to replace the current file used for playback.
+                      Upload a new audio file (MP3 or WAV) to replace the current file used for playback.
                     </p>
                   </div>
                 )}

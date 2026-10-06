@@ -25,11 +25,10 @@ import { mediaId } from '@/src/lib/media';
 import {
   AUDIO_PICKER_TYPES,
   getAudioUploadRejection,
+  titleFromAudioFileName,
 } from '@/src/lib/audioUpload';
 import { LEGAL_URLS } from '@/src/components/LegalLinks';
 import { colors } from '@/src/theme/colors';
-
-const MAX_BYTES = 50 * 1024 * 1024;
 
 function formatBytes(size: number | null | undefined): string {
   if (size == null || !Number.isFinite(size) || size <= 0) return '';
@@ -71,13 +70,9 @@ export default function UploadScreen() {
 
       const asset = result.assets[0];
       const name = asset.name || 'track.mp3';
-      const rejection = getAudioUploadRejection(name, asset.mimeType);
+      const rejection = getAudioUploadRejection(name, asset.mimeType, asset.size);
       if (rejection) {
         setError(rejection);
-        return;
-      }
-      if (asset.size != null && asset.size > MAX_BYTES) {
-        setError('File must be 50MB or smaller.');
         return;
       }
 
@@ -89,7 +84,7 @@ export default function UploadScreen() {
       });
 
       if (!title.trim()) {
-        setTitle(name.replace(/\.mp3$/i, ''));
+        setTitle(titleFromAudioFileName(name));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not pick file');
@@ -155,7 +150,7 @@ export default function UploadScreen() {
         ) : (
           <>
             <Text style={styles.lede}>
-              Upload an audio file (max 50MB). It becomes playable as soon as processing finishes.
+              Upload an MP3 (max 50MB) or WAV (max 100MB). It becomes playable as soon as processing finishes.
             </Text>
 
             {user && !user.emailVerified ? (
@@ -177,7 +172,7 @@ export default function UploadScreen() {
                 {file?.size ? (
                   <Text style={styles.fileSize}>{formatBytes(file.size)}</Text>
                 ) : (
-                  <Text style={styles.fileHint}>MP3 · up to 50MB</Text>
+                  <Text style={styles.fileHint}>MP3 up to 50MB · WAV up to 100MB</Text>
                 )}
               </View>
               <Ionicons name="folder-open-outline" size={20} color={colors.textMuted} />

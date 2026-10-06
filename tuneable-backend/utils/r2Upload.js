@@ -4,42 +4,87 @@ const multerS3 = require('multer-s3');
 const path = require('path');
 const { buildReadableAudioKey, buildReadableCoverKey } = require('./readableUploadKey');
 
-const LOSSLESS_EXTS = new Set(['.wav', '.wave', '.flac']);
-const LOSSLESS_MIMES = new Set([
+const MB = 1024 * 1024;
+const MP3_MAX_BYTES = 50 * MB;
+const WAV_MAX_BYTES = 100 * MB;
+/** Multer limit for audio fields; per-format caps are enforced by checkUploadAudioFile. */
+const MAX_AUDIO_UPLOAD_BYTES = WAV_MAX_BYTES;
+
+const WAV_MIMES = new Set([
   'audio/wav',
   'audio/x-wav',
   'audio/wave',
   'audio/vnd.wave',
-  'audio/flac',
-  'audio/x-flac',
+  'audio/x-pn-wav',
 ]);
+const FLAC_EXTS = new Set(['.flac']);
+const FLAC_MIMES = new Set(['audio/flac', 'audio/x-flac']);
 
-const LOSSLESS_UPLOAD_COMING_SOON =
-  'WAV and FLAC (lossless) uploads are coming in version 1.1';
+const FLAC_UPLOAD_COMING_SOON = 'FLAC uploads are coming soon. Please upload MP3 or WAV.';
 
-function isLosslessAudioFile(file) {
+const AUDIO_UPLOAD_FORMATS = {
+  mp3: { mediaType: 'mp3', contentType: 'audio/mpeg', ext: '.mp3', maxBytes: MP3_MAX_BYTES },
+  wav: { mediaType: 'wav', contentType: 'audio/wav', ext: '.wav', maxBytes: WAV_MAX_BYTES },
+};
+
+/** @returns {'mp3' | 'wav' | null} */
+function detectUploadAudioFormat(file) {
   const ext = path.extname(file.originalname || '').toLowerCase();
   const mime = (file.mimetype || '').toLowerCase();
-  return LOSSLESS_EXTS.has(ext) || LOSSLESS_MIMES.has(mime);
+  if (ext === '.mp3' && (mime === 'audio/mpeg' || mime === 'audio/mp3')) return 'mp3';
+  // Some pickers report WAV as octet-stream or leave the type blank.
+  const wavMimeOk = WAV_MIMES.has(mime) || mime === '' || mime === 'application/octet-stream';
+  if ((ext === '.wav' || ext === '.wave') && wavMimeOk) return 'wav';
+  return null;
 }
 
-function isMp3AudioFile(file) {
+function getUploadAudioFormat(file) {
+  const format = detectUploadAudioFormat(file);
+  return format ? AUDIO_UPLOAD_FORMATS[format] : null;
+}
+
+function isFlacAudioFile(file) {
   const ext = path.extname(file.originalname || '').toLowerCase();
   const mime = (file.mimetype || '').toLowerCase();
-  const extOk = ext === '.mp3';
-  const mimeOk = mime === 'audio/mpeg' || mime === 'audio/mp3';
-  return extOk && mimeOk;
+  return FLAC_EXTS.has(ext) || FLAC_MIMES.has(mime);
 }
 
-/** Multer fileFilter helper: MP3 only; WAV/FLAC get a 1.1 coming-soon error. */
-function filterMp3AudioFile(file, cb, fallbackMessage = 'Only MP3 files are allowed') {
-  if (isMp3AudioFile(file)) {
+function hasWavHeader(buffer) {
+  return Boolean(
+    buffer
+    && buffer.length >= 12
+    && buffer.toString('ascii', 0, 4) === 'RIFF'
+    && buffer.toString('ascii', 8, 12) === 'WAVE'
+  );
+}
+
+/** Multer fileFilter helper: MP3 or WAV; FLAC gets a coming-soon error. */
+function filterUploadAudioFile(file, cb, fallbackMessage = 'Only MP3 or WAV files are allowed') {
+  if (detectUploadAudioFormat(file)) {
     return cb(null, true);
   }
-  if (isLosslessAudioFile(file)) {
-    return cb(new Error(LOSSLESS_UPLOAD_COMING_SOON));
+  if (isFlacAudioFile(file)) {
+    return cb(new Error(FLAC_UPLOAD_COMING_SOON));
   }
   return cb(new Error(fallbackMessage));
+}
+
+/**
+ * Post-upload check for in-memory audio: per-format size cap and WAV header.
+ * @returns {{ error: string } | { format: typeof AUDIO_UPLOAD_FORMATS.mp3 }}
+ */
+function checkUploadAudioFile(file) {
+  const format = getUploadAudioFormat(file);
+  if (!format) {
+    return { error: 'Only MP3 or WAV files are allowed' };
+  }
+  if (file.size > format.maxBytes) {
+    return { error: `${format.mediaType.toUpperCase()} files must be ${format.maxBytes / MB}MB or smaller` };
+  }
+  if (format.mediaType === 'wav' && file.buffer && !hasWavHeader(file.buffer)) {
+    return { error: 'This file is not a valid WAV file' };
+  }
+  return { format };
 }
 
 // Check if R2 is configured
@@ -306,8 +351,7 @@ const createMediaUpload = () => {
         bucket: process.env.R2_BUCKET_NAME,
         acl: 'public-read',
         contentType: (req, file, cb) => {
-          // Explicitly set audio/mpeg for MP3 files
-          cb(null, 'audio/mpeg');
+          cb(null, getUploadAudioFormat(file)?.contentType || 'audio/mpeg');
         },
         metadata: function (req, file, cb) {
           cb(null, {
@@ -327,9 +371,9 @@ const createMediaUpload = () => {
           cb(null, filename);
         }
       }),
-      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+      limits: { fileSize: MAX_AUDIO_UPLOAD_BYTES },
       fileFilter: (req, file, cb) => {
-        filterMp3AudioFile(file, cb, 'Only MP3 files are allowed for MVP');
+        filterUploadAudioFile(file, cb);
       }
     });
   } else {
@@ -356,9 +400,9 @@ const createMediaUpload = () => {
           cb(null, key.replace(/^media-uploads\//, ''));
         }
       }),
-      limits: { fileSize: 50 * 1024 * 1024 },
+      limits: { fileSize: MAX_AUDIO_UPLOAD_BYTES },
       fileFilter: (req, file, cb) => {
-        filterMp3AudioFile(file, cb, 'Only MP3 files are allowed for MVP');
+        filterUploadAudioFile(file, cb);
       }
     });
   }
@@ -465,6 +509,9 @@ module.exports = {
   createMediaUpload,
   createCoverArtUpload,
   createLabelProfilePictureUpload,
-  filterMp3AudioFile,
+  filterUploadAudioFile,
+  getUploadAudioFormat,
+  checkUploadAudioFile,
+  MAX_AUDIO_UPLOAD_BYTES,
 };
 
