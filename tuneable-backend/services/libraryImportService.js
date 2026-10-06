@@ -366,13 +366,14 @@ function trackKey(track, source) {
   return String(track.externalIds?.spotify || track.id || `${track.title}-${track.artist}`);
 }
 
+const YOUTUBE_IMPORT_SOURCES = new Set(['youtube', 'youtube_playlist', 'youtube_video', 'youtube_likes']);
+
 function isYoutubeSource(source) {
-  return source === 'youtube' || source === 'youtube_playlist' || source === 'youtube_likes';
+  return YOUTUBE_IMPORT_SOURCES.has(source);
 }
 
 function isYoutubeImportSource(importSource, item) {
-  const src = importSource || item?.externalMedia?.importSource;
-  return src === 'youtube_playlist' || src === 'youtube_likes' || src === 'youtube';
+  return YOUTUBE_IMPORT_SOURCES.has(importSource || item?.externalMedia?.importSource);
 }
 
 async function previewImportFromTracks(userId, source, tracks, user, extraSummary = {}, onProgress = null) {
@@ -1180,19 +1181,24 @@ function filterYouTubePreview(preview, extraSummary = {}, { keepUnmatched = fals
   };
 }
 
-function unparsedSkipsToTracks(skipped, importSource) {
+function unparsedSkipsToTracks(skipped, importSource, sourceLabel) {
   return (skipped || [])
     .filter((row) => row.reason !== 'junk_channel' && row.reason !== 'unavailable')
-    .map((row) => unparsedSkipToImportTrack(row, { importSource: importSource || 'youtube_playlist' }));
+    .map((row) => unparsedSkipToImportTrack(row, {
+      importSource: importSource || 'youtube_playlist',
+      ...(sourceLabel ? { sourceLabel } : {}),
+    }));
 }
 
 async function previewYouTubeFetchedTracks(userId, user, fetched, extraSummary, onProgress) {
   const report = typeof onProgress === 'function' ? onProgress : () => {};
   const youtubeImportMatchService = require('./youtubeImportMatchService');
   const keepUnmatched = isAdmin(user);
-  const importSource = extraSummary?.likesImport ? 'youtube_likes' : 'youtube_playlist';
+  const importSource = extraSummary?.likesImport
+    ? 'youtube_likes'
+    : (fetched.importSource || 'youtube_playlist');
   const tracks = keepUnmatched
-    ? [...(fetched.tracks || []), ...unparsedSkipsToTracks(fetched.skipped, importSource)]
+    ? [...(fetched.tracks || []), ...unparsedSkipsToTracks(fetched.skipped, importSource, fetched.sourceLabel)]
     : (fetched.tracks || []);
 
   report({
@@ -1233,6 +1239,8 @@ async function previewYouTubeFetchedTracks(userId, user, fetched, extraSummary, 
     mbNone: enriched.stats.none,
     playlistId: fetched.playlistId,
     playlistTitle: fetched.playlistTitle,
+    youtubeKind: fetched.kind || 'playlist',
+    videoId: fetched.videoId || null,
     ...extraSummary,
   }, { keepUnmatched });
 }
@@ -1305,7 +1313,7 @@ async function previewYouTubePlaylistImport(userId, playlistUrl, opts = {}) {
     throw err;
   }
 
-  const fetched = await youtubePlaylistService.fetchPublicPlaylist(playlistUrl, {
+  const fetched = await youtubePlaylistService.fetchPublicTracks(playlistUrl, {
     limit: opts.limit,
     onProgress: opts.onProgress,
   });
@@ -1334,9 +1342,8 @@ async function previewYouTubeLikesImport(userId, opts = {}) {
 
 async function executeYouTubePlaylistImport(userId, opts) {
   const fromItems = opts.items?.find((item) => item?.externalMedia?.importSource)?.externalMedia?.importSource;
-  const importSource = opts.importSource === 'youtube_likes' || fromItems === 'youtube_likes'
-    ? 'youtube_likes'
-    : 'youtube_playlist';
+  const specific = new Set(['youtube_likes', 'youtube_video']);
+  const importSource = [opts.importSource, fromItems].find((src) => specific.has(src)) || 'youtube_playlist';
   return executeLibraryImport(userId, { ...opts, importSource });
 }
 

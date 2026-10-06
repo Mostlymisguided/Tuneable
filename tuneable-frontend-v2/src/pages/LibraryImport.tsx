@@ -173,7 +173,7 @@ const SOURCE_META: Record<ImportSource, {
   },
   youtube: {
     label: 'YouTube',
-    likesLabel: 'YouTube playlist',
+    likesLabel: 'YouTube playlist or video',
     accent: 'bg-red-600',
     accentHover: 'hover:bg-red-500',
     badge: 'bg-red-700',
@@ -607,11 +607,11 @@ const LibraryImport: React.FC = () => {
     if (source === 'youtube') {
       const playlistUrl = youtubePlaylistUrl.trim();
       if (!playlistUrl) {
-        toast.error('Paste a public YouTube playlist URL');
+        toast.error('Paste a public YouTube playlist or video URL');
         return;
       }
       setIsLoading(true);
-      setProgressMessage('Starting YouTube playlist scan…');
+      setProgressMessage('Starting YouTube scan…');
       setProgressCurrent(0);
       setProgressTotal(0);
       try {
@@ -628,7 +628,7 @@ const LibraryImport: React.FC = () => {
         setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
         setStep('summary');
       } catch (error: any) {
-        toast.error(error?.response?.data?.error || error?.message || 'Failed to scan YouTube playlist');
+        toast.error(error?.response?.data?.error || error?.message || 'Failed to scan YouTube link');
       } finally {
         setIsLoading(false);
         setProgressMessage(null);
@@ -1261,7 +1261,7 @@ const LibraryImport: React.FC = () => {
                 </>
               )
               : isYouTube
-                ? 'Paste a public YouTube playlist URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm. Admins can correct artist and title when there is no confident match.'
+                ? 'Paste a public YouTube playlist or video URL. Confident MusicBrainz matches are ready to import; weaker ones need a quick confirm. Admins can correct artist and title when there is no confident match.'
                 : isDeezer
                   ? 'Paste a public Deezer playlist or profile link. Tracks are matched by ISRC, then you tip to add them to your library.'
                   : 'Scan your likes, see what\'s playable vs awaiting audio, then tip to add them to your library.'}
@@ -1300,7 +1300,7 @@ const LibraryImport: React.FC = () => {
                         <div className="font-semibold">{sMeta.label}</div>
                         <div className="text-xs text-gray-400">
                           {s === 'youtube'
-                            ? 'Public playlist'
+                            ? 'Public playlist or video'
                             : s === 'deezer'
                               ? 'Public playlist or profile'
                               : connected ? 'Connected' : 'Not connected'}
@@ -1346,7 +1346,7 @@ const LibraryImport: React.FC = () => {
                     {isRekordbox
                       ? 'Catalog-only: title, artist, BPM, key, duration, and cover art from local files. No MP3s uploaded.'
                       : isYouTube
-                        ? 'Paste a public playlist URL. We match tracks against MusicBrainz and skip unreliable channels.'
+                        ? 'Paste a public playlist or video URL. We match tracks against MusicBrainz and skip unreliable channels.'
                         : isDeezer
                           ? 'Paste a public playlist, or your profile link to import favourite tracks.'
                         : isConnected
@@ -1481,12 +1481,12 @@ const LibraryImport: React.FC = () => {
               ) : isYouTube ? (
                 <div className="space-y-3">
                   <label className="text-sm text-gray-400 block">
-                    Public playlist URL
+                    Public playlist or video URL
                     <input
                       type="url"
                       value={youtubePlaylistUrl}
                       onChange={(e) => setYoutubePlaylistUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/playlist?list=…"
+                      placeholder="https://www.youtube.com/playlist?list=… or https://youtu.be/…"
                       className="mt-1 w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white"
                     />
                   </label>
@@ -1497,7 +1497,7 @@ const LibraryImport: React.FC = () => {
                     className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg font-medium flex items-center justify-center gap-2"
                   >
                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                    {isLoading ? 'Matching…' : 'Scan playlist'}
+                    {isLoading ? 'Matching…' : 'Scan YouTube'}
                   </button>
                   {isLoading && progressMessage ? (
                     <p className="text-xs text-gray-400">{progressMessage}</p>

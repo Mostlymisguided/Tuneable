@@ -1,154 +1,62 @@
-const axios = require('axios');
-const he = require('he');
-const { recordQuotaUsage, QUOTA_COSTS } = require('./quotaTracker');
+const youtubePublicService = require('./youtubePublicService');
 const {
   parseYouTubePlaylistId,
-  parseIso8601Duration,
+  parseYouTubeImportTarget,
   parseYouTubeTrackIdentity,
   youtubeWatchUrl,
 } = require('../utils/youtubePlaylistUtils');
 
-const YOUTUBE_API = 'https://www.googleapis.com/youtube/v3';
-const PAGE_SIZE = 50;
 const MAX_PLAYLIST_ITEMS = 200;
 const LIKED_PLAYLIST_ID = 'LL';
 
-function thumbnailFromSnippet(snippet, videoId) {
-  const thumbs = snippet?.thumbnails || {};
-  const url = thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url;
-  if (url) return url;
-  return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
-}
-
-async function youtubeApiGet(path, params, { apiKey, user } = {}) {
-  const url = `${YOUTUBE_API}/${path}`;
-  if (user) {
-    const googleTokenService = require('./googleTokenService');
-    return googleTokenService.googleGet(user, url, { params, timeout: 20000 });
-  }
-  if (!apiKey) {
-    const err = new Error('YouTube API is not configured');
-    err.status = 503;
-    throw err;
-  }
-  return axios.get(url, {
-    params: { ...params, key: apiKey },
-    timeout: 20000,
-  });
-}
-
-async function fetchPlaylistPage({ playlistId, pageToken, apiKey, user }) {
-  const response = await youtubeApiGet('playlistItems', {
-    part: 'snippet,contentDetails,status',
-    playlistId,
-    maxResults: PAGE_SIZE,
-    pageToken: pageToken || undefined,
-  }, { apiKey, user });
-  await recordQuotaUsage(QUOTA_COSTS.PLAYLIST_ITEMS, 'youtubePlaylistItems', {
-    playlistId,
-    count: response.data.items?.length || 0,
-  });
-  return response.data;
-}
-
-async function fetchVideoDurations(videoIds, { apiKey, user } = {}) {
-  const durations = {};
-  if (!videoIds.length) return durations;
-
-  for (let i = 0; i < videoIds.length; i += PAGE_SIZE) {
-    const batch = videoIds.slice(i, i + PAGE_SIZE);
-    const response = await youtubeApiGet('videos', {
-      part: 'contentDetails,status',
-      id: batch.join(','),
-    }, { apiKey, user });
-    const quotaCost = Math.ceil(batch.length / PAGE_SIZE) * QUOTA_COSTS.VIDEOS_LIST_CONTENT_DETAILS;
-    await recordQuotaUsage(quotaCost, 'youtubePlaylistVideoDetails', {
-      videoCount: batch.length,
-    });
-    for (const item of response.data.items || []) {
-      const privacy = item.status?.privacyStatus;
-      const embeddable = item.status?.embeddable !== false;
-      if (privacy && privacy !== 'public' && privacy !== 'unlisted') continue;
-      durations[item.id] = {
-        duration: parseIso8601Duration(item.contentDetails?.duration),
-        embeddable,
-      };
-    }
-  }
-  return durations;
-}
-
-function convertPlaylistRows(rawItems, durationMap, { importSource, sourceLabel }) {
+/**
+ * Turn normalized video rows ({ videoId, title, channelTitle, coverArt, duration, available })
+ * into import tracks, or skip rows with a reason.
+ */
+function convertVideoRows(rows, { importSource, sourceLabel }) {
   const tracks = [];
   const skipped = [];
-  const parsedRows = [];
 
-  for (const item of rawItems) {
-    const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
-    const privacy = item.status?.privacyStatus || item.snippet?.status?.privacyStatus;
-    if (!videoId) continue;
-    if (privacy && privacy !== 'public' && privacy !== 'unlisted') continue;
-    const title = he.decode(item.snippet?.title || '');
-    if (!title || title === 'Private video' || title === 'Deleted video') continue;
-    const channelTitle = he.decode(item.snippet?.videoOwnerChannelTitle || item.snippet?.channelTitle || '');
-    const identity = parseYouTubeTrackIdentity({ title, channelTitle });
-    parsedRows.push({
-      videoId,
-      title,
-      channelTitle,
-      coverArt: thumbnailFromSnippet(item.snippet, videoId),
-      identity,
-    });
-  }
-
-  for (const row of parsedRows) {
-    const details = durationMap[row.videoId];
-    if (!details) {
-      skipped.push({
-        videoId: row.videoId,
-        title: row.title,
-        reason: 'unavailable',
-        channelTitle: row.channelTitle,
-        coverArt: row.coverArt,
-      });
+  for (const row of rows) {
+    if (!row?.videoId || !row.title) continue;
+    const base = {
+      videoId: row.videoId,
+      title: row.title,
+      channelTitle: row.channelTitle,
+      coverArt: row.coverArt,
+    };
+    if (row.available === false) {
+      skipped.push({ ...base, reason: 'unavailable' });
       continue;
     }
-    if (row.identity.status === 'junk') {
-      skipped.push({
-        videoId: row.videoId,
-        title: row.title,
-        reason: row.identity.reason || 'junk_channel',
-        channelTitle: row.channelTitle,
-        coverArt: row.coverArt,
-        duration: details.duration || 0,
-      });
+
+    const identity = parseYouTubeTrackIdentity({ title: row.title, channelTitle: row.channelTitle });
+    if (identity.status === 'junk') {
+      skipped.push({ ...base, reason: identity.reason || 'junk_channel', duration: row.duration || 0 });
       continue;
     }
-    if (row.identity.status !== 'parsed') {
+    if (identity.status !== 'parsed') {
       skipped.push({
-        videoId: row.videoId,
-        title: row.title,
-        reason: row.identity.reason || 'unparsed',
-        channelTitle: row.channelTitle,
-        coverArt: row.coverArt,
-        duration: details.duration || 0,
-        channelQuality: row.identity.channelQuality,
+        ...base,
+        reason: identity.reason || 'unparsed',
+        duration: row.duration || 0,
+        channelQuality: identity.channelQuality,
       });
       continue;
     }
 
     tracks.push({
       id: row.videoId,
-      title: row.identity.title,
-      artist: row.identity.artist,
+      title: identity.title,
+      artist: identity.artist,
       coverArt: row.coverArt,
-      duration: details.duration || 0,
+      duration: row.duration || 0,
       album: null,
       sourceLabel,
       category: 'Music',
       importSource,
-      channelQuality: row.identity.channelQuality,
-      originalTitle: row.identity.originalTitle,
+      channelQuality: identity.channelQuality,
+      originalTitle: identity.originalTitle,
       originalArtist: row.channelTitle,
       externalIds: { youtube: row.videoId },
       sources: { youtube: youtubeWatchUrl(row.videoId) },
@@ -160,104 +68,79 @@ function convertPlaylistRows(rawItems, durationMap, { importSource, sourceLabel 
   return { tracks, skipped };
 }
 
-async function fetchPlaylistTracks(playlistId, {
-  limit = 50,
-  onProgress,
-  apiKey,
-  user,
-  importSource,
-  sourceLabel,
-  fetchingMessage,
-  emptyError,
-} = {}) {
-  const capped = Math.min(Math.max(parseInt(limit, 10) || 50, 1), MAX_PLAYLIST_ITEMS);
-  const report = typeof onProgress === 'function' ? onProgress : () => {};
-  report({
-    stage: 'fetching',
-    message: fetchingMessage || 'Fetching YouTube playlist…',
-    current: 0,
-    total: capped,
-  });
+async function fetchPlaylistTracks(playlistId, { limit, report }) {
+  report({ stage: 'fetching', message: 'Fetching YouTube playlist…', current: 0, total: limit });
 
-  const rawItems = [];
-  let pageToken = null;
-  let playlistTitle = null;
-  try {
-    do {
-      const page = await fetchPlaylistPage({ playlistId, pageToken, apiKey, user });
-      if (!playlistTitle) {
-        playlistTitle = page.items?.[0]?.snippet?.channelTitle || null;
-      }
-      rawItems.push(...(page.items || []));
-      pageToken = page.nextPageToken || null;
-      report({
-        stage: 'fetching',
-        message: `Fetched ${Math.min(rawItems.length, capped)} item${rawItems.length === 1 ? '' : 's'}…`,
-        current: Math.min(rawItems.length, capped),
-        total: capped,
-      });
-    } while (pageToken && rawItems.length < capped);
-  } catch (error) {
-    if (error.code === 'PROVIDER_REAUTH_REQUIRED' || error.status === 503) throw error;
-    const status = error.response?.status;
-    if (status === 404 || status === 403) {
-      const err = new Error(emptyError || 'Playlist is private, deleted, or not found. Paste a public playlist URL.');
-      err.status = 400;
-      throw err;
-    }
-    throw error;
+  const playlist = await youtubePublicService.fetchPlaylist(playlistId, {
+    limit,
+    onPage: (count) => report({
+      stage: 'fetching',
+      message: `Fetched ${count} item${count === 1 ? '' : 's'}…`,
+      current: count,
+      total: limit,
+    }),
+  });
+  if (playlist.rows.length === 0) {
+    const err = new Error('That YouTube playlist is empty.');
+    err.status = 400;
+    throw err;
   }
 
-  const sliced = rawItems.slice(0, capped);
-  const videoIds = sliced
-    .map((item) => item.contentDetails?.videoId || item.snippet?.resourceId?.videoId)
-    .filter(Boolean);
-  const durationMap = await fetchVideoDurations(videoIds, { apiKey, user });
-  const { tracks, skipped } = convertPlaylistRows(sliced, durationMap, { importSource, sourceLabel });
-
-  report({
-    stage: 'fetching',
-    message: `Parsed ${tracks.length} track${tracks.length === 1 ? '' : 's'}`,
-    current: tracks.length,
-    total: tracks.length,
-  });
-
+  const importSource = 'youtube_playlist';
+  const sourceLabel = 'YouTube Playlist';
+  const { tracks, skipped } = convertVideoRows(playlist.rows, { importSource, sourceLabel });
   return {
+    kind: 'playlist',
     playlistId,
-    playlistTitle,
-    scanned: sliced.length,
+    videoId: null,
+    playlistTitle: playlist.title,
+    importSource,
+    sourceLabel,
+    scanned: playlist.rows.length,
+    tracks,
+    skipped,
+  };
+}
+
+async function fetchVideoTrack(videoId, { report }) {
+  report({ stage: 'fetching', message: 'Fetching YouTube video…', current: 0, total: 1 });
+  const row = await youtubePublicService.fetchVideo(videoId);
+
+  const importSource = 'youtube_video';
+  const sourceLabel = 'YouTube';
+  const { tracks, skipped } = convertVideoRows([row], { importSource, sourceLabel });
+  return {
+    kind: 'video',
+    playlistId: null,
+    videoId,
+    playlistTitle: row.title,
+    importSource,
+    sourceLabel,
+    scanned: 1,
     tracks,
     skipped,
   };
 }
 
 /**
- * Fetch a public YouTube playlist and convert items to Tuneable import tracks.
+ * Fetch a public YouTube playlist or single video (no Data API key) as import tracks.
  */
-async function fetchPublicPlaylist(playlistUrlOrId, { limit = 50, onProgress } = {}) {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) {
-    const err = new Error('YouTube API is not configured');
-    err.status = 503;
-    throw err;
-  }
+async function fetchPublicTracks(urlOrId, { limit = 50, onProgress } = {}) {
+  const report = typeof onProgress === 'function' ? onProgress : () => {};
+  const capped = Math.min(Math.max(parseInt(limit, 10) || 50, 1), MAX_PLAYLIST_ITEMS);
+  const target = parseYouTubeImportTarget(urlOrId);
 
-  const playlistId = parseYouTubePlaylistId(playlistUrlOrId);
-  if (!playlistId) {
-    const err = new Error('Could not parse a YouTube playlist URL or ID');
-    err.status = 400;
-    throw err;
-  }
+  const fetched = target.kind === 'video'
+    ? await fetchVideoTrack(target.id, { report })
+    : await fetchPlaylistTracks(target.id, { limit: capped, report });
 
-  return fetchPlaylistTracks(playlistId, {
-    limit,
-    onProgress,
-    apiKey,
-    importSource: 'youtube_playlist',
-    sourceLabel: 'YouTube Playlist',
-    fetchingMessage: 'Fetching YouTube playlist…',
-    emptyError: 'Playlist is private, deleted, or not found. Paste a public playlist URL.',
+  report({
+    stage: 'fetching',
+    message: `Parsed ${fetched.tracks.length} track${fetched.tracks.length === 1 ? '' : 's'}`,
+    current: fetched.tracks.length,
+    total: fetched.tracks.length,
   });
+  return fetched;
 }
 
 const YOUTUBE_LIKES_IMPORT_DISABLED_MESSAGE =
@@ -279,10 +162,10 @@ async function fetchLikedVideos() {
 }
 
 module.exports = {
-  fetchPublicPlaylist,
+  fetchPublicTracks,
   fetchLikedVideos,
   parseYouTubePlaylistId,
-  convertPlaylistRows,
+  convertVideoRows,
   MAX_PLAYLIST_ITEMS,
   LIKED_PLAYLIST_ID,
   YOUTUBE_LIKES_IMPORT_DISABLED_MESSAGE,

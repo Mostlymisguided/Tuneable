@@ -4,6 +4,11 @@ const {
 
 const PLAYLIST_ID_RE = /^[A-Za-z0-9_-]{10,}$/;
 const LIST_QUERY_RE = /[?&]list=([A-Za-z0-9_-]+)/;
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const VIDEO_PATH_RE = /^\/(?:shorts|embed|live|v|e)\/([A-Za-z0-9_-]{11})(?:[/?#]|$)/;
+const YOUTUBE_HOST_RE = /(?:^|\.)(?:youtube\.com|youtube-nocookie\.com|youtu\.be)$/i;
+// Auto-generated mixes (RD…) and account-private lists (LL liked, WL watch later) can't be read publicly
+const UNREADABLE_LIST_RE = /^(?:RD|LL$|WL$|LM$)/;
 
 const JUNK_CHANNEL_RE = /lyric\s*video|lyrics?(?:\s*video|\s*channel)?|nightcore|sped\s*up|slowed(?:\s*\+\s*reverb)?|8d\s*audio|karaoke|backing\s*track|piano\s*cover|guitar\s*cover|drum\s*cover|tutorial|reaction|no\s*copyright|ncs(?:\s*release|\s*audio)?|audio\s*library|tiktok(?:\s*version|\s*audio)?|just\s*dance|mashup\s*compilation|copyright\s*free/i;
 
@@ -36,6 +41,63 @@ function parseYouTubePlaylistId(input) {
 
   const match = raw.match(LIST_QUERY_RE);
   return match && PLAYLIST_ID_RE.test(match[1]) ? match[1] : null;
+}
+
+function parseYouTubeUrl(raw) {
+  try {
+    const url = new URL(/^[a-z]+:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return YOUTUBE_HOST_RE.test(url.hostname) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseYouTubeVideoId(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  if (VIDEO_ID_RE.test(raw)) return raw;
+
+  const url = parseYouTubeUrl(raw);
+  if (!url) return null;
+  if (/youtu\.be$/i.test(url.hostname)) {
+    const id = url.pathname.slice(1).split('/')[0];
+    return VIDEO_ID_RE.test(id) ? id : null;
+  }
+  const v = url.searchParams.get('v');
+  if (v && VIDEO_ID_RE.test(v)) return v;
+  return url.pathname.match(VIDEO_PATH_RE)?.[1] || null;
+}
+
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+/**
+ * Decide whether a pasted YouTube link is a playlist or a single video.
+ * A watch URL that also carries a readable `list=` is treated as the playlist.
+ * @returns {{ kind: 'playlist'|'video', id: string }}
+ */
+function parseYouTubeImportTarget(input) {
+  const raw = String(input || '').trim();
+  if (!raw) throw badRequest('Paste a YouTube playlist or video URL.');
+
+  const looksLikeUrl = raw.includes('/') || raw.includes('?') || raw.includes('.');
+  if (looksLikeUrl && !parseYouTubeUrl(raw)) {
+    throw badRequest('That is not a YouTube link. Paste a youtube.com or youtu.be URL.');
+  }
+
+  const videoId = parseYouTubeVideoId(raw);
+  const playlistId = videoId === raw ? null : parseYouTubePlaylistId(raw);
+  const listParam = parseYouTubeUrl(raw)?.searchParams.get('list') || '';
+
+  if (playlistId && !UNREADABLE_LIST_RE.test(playlistId)) return { kind: 'playlist', id: playlistId };
+  if (videoId) return { kind: 'video', id: videoId };
+  if (playlistId || UNREADABLE_LIST_RE.test(listParam)) {
+    throw badRequest('Mixes, Liked videos and Watch later are private to your account. Paste a public playlist or a video URL.');
+  }
+  throw badRequest('Could not find a playlist or video in that YouTube link.');
 }
 
 function stripVideoDecorations(title) {
@@ -172,6 +234,8 @@ function unparsedSkipToImportTrack(skip, {
 module.exports = {
   parseIso8601Duration,
   parseYouTubePlaylistId,
+  parseYouTubeVideoId,
+  parseYouTubeImportTarget,
   stripVideoDecorations,
   classifyYouTubeChannel,
   parseYouTubeTrackIdentity,

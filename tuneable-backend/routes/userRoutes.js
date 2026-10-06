@@ -2114,7 +2114,7 @@ router.get('/me/import-stats', authMiddleware, async (req, res) => {
     const [spotifyImported, soundcloudImported, youtubeImported, deezerImported, spotifyAccess] = await Promise.all([
       countFor('spotify_likes', 'spotify'),
       countFor('soundcloud_likes', 'soundcloud'),
-      countFor(['youtube_playlist', 'youtube_likes'], 'youtube'),
+      countFor(['youtube_playlist', 'youtube_video', 'youtube_likes'], 'youtube'),
       countFor(['deezer_playlist', 'deezer_likes'], 'deezer'),
       spotifyImportAccess.getSpotifyImportAccess(user),
     ]);
@@ -2312,7 +2312,7 @@ router.post('/me/import/spotify/request', authMiddleware, async (req, res) => {
 });
 
 // @route   POST /api/users/me/import/youtube/preview/start
-// @desc    Start async YouTube likes or public playlist preview (poll GET /me/import/jobs/:jobId)
+// @desc    Start async YouTube public playlist or single-video preview (poll GET /me/import/jobs/:jobId)
 // @access  Private
 router.post('/me/import/youtube/preview/start', authMiddleware, async (req, res) => {
   try {
@@ -2325,7 +2325,7 @@ router.post('/me/import/youtube/preview/start', authMiddleware, async (req, res)
     const playlistUrl = req.body?.playlistUrl || req.body?.url || req.query.playlistUrl;
     const limit = req.body?.limit ?? req.query.limit;
     if (!playlistUrl) {
-      return res.status(400).json({ error: 'playlistUrl is required' });
+      return res.status(400).json({ error: 'Paste a YouTube playlist or video URL' });
     }
     const libraryImportJobService = require('../services/libraryImportJobService');
     const { jobId } = libraryImportJobService.startPreviewJob(req.user._id, 'youtube', {

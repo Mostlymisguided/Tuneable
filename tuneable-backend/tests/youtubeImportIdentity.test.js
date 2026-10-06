@@ -10,7 +10,7 @@ const {
   stripMusicBrainzFromExternal,
 } = require('../utils/youtubeImportIdentity');
 const { unparsedSkipToImportTrack } = require('../utils/youtubePlaylistUtils');
-const { convertPlaylistRows } = require('../services/youtubePlaylistService');
+const { convertVideoRows } = require('../services/youtubePlaylistService');
 
 function unmatchedItem(overrides = {}) {
   return {
@@ -185,18 +185,18 @@ describe('unparsedSkipToImportTrack', () => {
   });
 });
 
-describe('convertPlaylistRows unparsed skips', () => {
+describe('convertVideoRows unparsed skips', () => {
   it('keeps duration and cover art on unparsed skips', () => {
-    const { tracks, skipped } = convertPlaylistRows([
+    const { tracks, skipped } = convertVideoRows([
       {
-        contentDetails: { videoId: 'abcd1234567' },
-        snippet: {
-          title: 'my summer mix 2024',
-          channelTitle: 'randomuploader99',
-          thumbnails: { high: { url: 'https://img.example/1.jpg' } },
-        },
+        videoId: 'abcd1234567',
+        title: 'my summer mix 2024',
+        channelTitle: 'randomuploader99',
+        coverArt: 'https://img.example/1.jpg',
+        duration: 180,
+        available: true,
       },
-    ], { abcd1234567: { duration: 180, embeddable: true } }, {
+    ], {
       importSource: 'youtube_playlist',
       sourceLabel: 'YouTube Playlist',
     });
