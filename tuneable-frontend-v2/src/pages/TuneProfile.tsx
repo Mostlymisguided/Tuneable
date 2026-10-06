@@ -52,6 +52,9 @@ import {
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
+import axios from 'axios';
+import UploadProgress from '../components/UploadProgress';
+import { useUploadProgress } from '../hooks/useUploadProgress';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -422,6 +425,7 @@ const TuneProfile: React.FC = () => {
   const [attachAudioFile, setAttachAudioFile] = useState<File | null>(null);
   const [attachAudioRightsConfirmed, setAttachAudioRightsConfirmed] = useState(false);
   const [isAttachingAudio, setIsAttachingAudio] = useState(false);
+  const attachProgress = useUploadProgress();
 
   // WebPlayer integration
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } = useWebPlayerStore();
@@ -1383,6 +1387,7 @@ const TuneProfile: React.FC = () => {
     setAttachAudioFile(null);
     setAttachAudioRightsConfirmed(false);
     setIsAttachingAudio(false);
+    attachProgress.reset();
     if (audioFileInputRef.current) {
       audioFileInputRef.current.value = '';
     }
@@ -1396,11 +1401,13 @@ const TuneProfile: React.FC = () => {
     }
 
     setIsAttachingAudio(true);
+    const signal = attachProgress.start(attachAudioFile.size);
     try {
       const response = await mediaAPI.attachUpload(
         media?._id || mediaId,
         attachAudioFile,
-        { uploaderRole: 'owner', replaceExisting: true }
+        { uploaderRole: 'owner', replaceExisting: true },
+        { signal, onUploadProgress: attachProgress.onUploadProgress }
       );
       if (response.media) {
         setMedia(enrichMediaWithPlayability(response.media));
@@ -1410,9 +1417,14 @@ const TuneProfile: React.FC = () => {
       toast.success('Audio replaced — playback updated');
       closeAttachAudioModal();
     } catch (err: any) {
-      console.error('Error replacing audio:', err);
-      toast.error(err.response?.data?.error || 'Failed to replace audio');
+      if (axios.isCancel(err)) {
+        toast.info('Upload cancelled');
+      } else {
+        console.error('Error replacing audio:', err);
+        toast.error(err.response?.data?.error || 'Failed to replace audio');
+      }
       setIsAttachingAudio(false);
+      attachProgress.reset();
     }
   };
 
@@ -4377,6 +4389,13 @@ const TuneProfile: React.FC = () => {
               </div>
             </div>
 
+            <UploadProgress
+              progress={attachProgress}
+              fileName={attachAudioFile?.name}
+              onCancel={attachProgress.cancel}
+              className="mb-4"
+            />
+
             <div className="flex space-x-3">
               <button
                 type="button"
@@ -4395,7 +4414,9 @@ const TuneProfile: React.FC = () => {
                 {isAttachingAudio ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Uploading...</span>
+                    <span className="tabular-nums">
+                      {attachProgress.phase === 'processing' ? 'Processing…' : `Uploading ${attachProgress.percent}%`}
+                    </span>
                   </>
                 ) : (
                   <>

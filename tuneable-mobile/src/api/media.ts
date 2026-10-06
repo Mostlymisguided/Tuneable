@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import { api } from './client';
 import { AUDIO_FORMAT_MIME, getAudioUploadFormat } from '@/src/lib/audioUpload';
 import type {
@@ -165,7 +166,8 @@ export const mediaAPI = {
   /** Create a new media item from an MP3 upload (creators/admins). */
   uploadMedia: async (
     file: AudioFileAsset,
-    fields: UploadMediaFields
+    fields: UploadMediaFields,
+    request?: Pick<AxiosRequestConfig, 'onUploadProgress' | 'signal'>
   ): Promise<UploadMediaResponse> => {
     const form = new FormData();
     appendAudioFile(form, file);
@@ -185,7 +187,7 @@ export const mediaAPI = {
     const response = await api.post<UploadMediaResponse>(
       '/media/upload',
       form,
-      { timeout: UPLOAD_TIMEOUT_MS }
+      { timeout: UPLOAD_TIMEOUT_MS, ...request }
     );
     return response.data;
   },

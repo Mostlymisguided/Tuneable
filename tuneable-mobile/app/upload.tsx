@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import {
   titleFromAudioFileName,
 } from '@/src/lib/audioUpload';
 import { LEGAL_URLS } from '@/src/components/LegalLinks';
+import { UploadProgressBar, type UploadPhase } from '@/src/components/UploadProgressBar';
 import { colors } from '@/src/theme/colors';
 
 function formatBytes(size: number | null | undefined): string {
@@ -45,7 +46,11 @@ export default function UploadScreen() {
   const [tags, setTags] = useState('');
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ phase: UploadPhase; loaded: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const allowed = canUploadMedia(user);
 
@@ -95,18 +100,40 @@ export default function UploadScreen() {
     if (!file || !canSubmit) return;
     setUploading(true);
     setError(null);
+    const fallbackTotal = file.size ?? 0;
+    setProgress({ phase: 'uploading', loaded: 0, total: fallbackTotal });
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const res = await mediaAPI.uploadMedia(file, {
-        title: title.trim(),
-        artistName: artistName.trim() || undefined,
-        tags: tags.trim() || undefined,
-      });
+      const res = await mediaAPI.uploadMedia(
+        file,
+        {
+          title: title.trim(),
+          artistName: artistName.trim() || undefined,
+          tags: tags.trim() || undefined,
+        },
+        {
+          signal: controller.signal,
+          onUploadProgress: (event) => {
+            const total = event.total || fallbackTotal;
+            setProgress({
+              phase: total > 0 && event.loaded >= total ? 'processing' : 'uploading',
+              loaded: event.loaded,
+              total,
+            });
+          },
+        },
+      );
       const id = mediaId(res.media);
       if (!id) throw new Error('Upload succeeded but media id was missing');
       Alert.alert('Uploaded', 'Your track is live and playable.', [
         { text: 'View tune', onPress: () => router.replace(`/tune/${id}`) },
       ]);
     } catch (err) {
+      if (axios.isCancel(err)) {
+        setError('Upload cancelled.');
+        return;
+      }
       let message = 'Upload failed';
       if (axios.isAxiosError(err)) {
         const data = err.response?.data as { error?: string; message?: string } | undefined;
@@ -116,7 +143,9 @@ export default function UploadScreen() {
       }
       setError(message);
     } finally {
+      abortRef.current = null;
       setUploading(false);
+      setProgress(null);
     }
   };
 
@@ -232,12 +261,26 @@ export default function UploadScreen() {
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
+            {progress ? (
+              <UploadProgressBar
+                phase={progress.phase}
+                loaded={progress.loaded}
+                total={progress.total}
+                onCancel={() => abortRef.current?.abort()}
+              />
+            ) : null}
+
             <Pressable
               style={[styles.submitBtn, !canSubmit && styles.submitDisabled]}
               disabled={!canSubmit}
               onPress={() => void onSubmit()}>
               {uploading ? (
-                <ActivityIndicator color="#fff" />
+                <View style={styles.submitBusy}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.submitText}>
+                    {progress?.phase === 'processing' ? 'Processing…' : 'Uploading…'}
+                  </Text>
+                </View>
               ) : (
                 <Text style={styles.submitText}>Upload track</Text>
               )}
@@ -379,6 +422,11 @@ const styles = StyleSheet.create({
   },
   submitDisabled: {
     opacity: 0.45,
+  },
+  submitBusy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   submitText: {
     color: '#fff',

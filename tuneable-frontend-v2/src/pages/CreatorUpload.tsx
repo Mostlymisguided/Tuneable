@@ -10,6 +10,8 @@ import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import AiToolsEditor from '../components/AiToolsEditor';
+import UploadProgress from '../components/UploadProgress';
+import { useUploadProgress } from '../hooks/useUploadProgress';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection, titleFromAudioFileName } from '../lib/audioUpload';
@@ -94,7 +96,7 @@ const CreatorUpload: React.FC = () => {
   const [isParsingLibrary, setIsParsingLibrary] = useState(false);
   const [libraryMatchLabel, setLibraryMatchLabel] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const uploadProgress = useUploadProgress();
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [adminRightsMode, setAdminRightsMode] = useState<'cleared' | 'permitted'>('cleared');
   const [permission, setPermission] = useState({
@@ -549,7 +551,7 @@ const CreatorUpload: React.FC = () => {
     }
 
     setIsUploading(true);
-    setUploadProgress(0);
+    const uploadSignal = uploadProgress.start(file.size);
 
     try {
       const uploadData = new FormData();
@@ -656,12 +658,8 @@ const CreatorUpload: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / (progressEvent.total || 1)
-          );
-          setUploadProgress(percentCompleted);
-        }
+        signal: uploadSignal,
+        onUploadProgress: uploadProgress.onUploadProgress,
       });
 
       const founding = response.data.foundingCreator;
@@ -683,11 +681,15 @@ const CreatorUpload: React.FC = () => {
       }
       
     } catch (error: any) {
-      console.error('Upload error:', error);
-      toast.error(error.response?.data?.error || 'Upload failed');
+      if (axios.isCancel(error)) {
+        toast.info('Upload cancelled');
+      } else {
+        console.error('Upload error:', error);
+        toast.error(error.response?.data?.error || 'Upload failed');
+      }
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
+      uploadProgress.reset();
     }
   };
 
@@ -1562,22 +1564,6 @@ const CreatorUpload: React.FC = () => {
             </div>
           </div>
 
-          {/* Upload Progress */}
-          {isUploading && (
-            <div className="mt-8 bg-purple-900/20 border border-purple-500/30 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-medium">Uploading...</span>
-                <span className="text-purple-400 font-bold">{uploadProgress}%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 h-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Rights Confirmation */}
           <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-lg p-6">
             {isAdmin && (
@@ -1694,6 +1680,13 @@ const CreatorUpload: React.FC = () => {
             </div>
           </div>
 
+          <UploadProgress
+            progress={uploadProgress}
+            fileName={file?.name}
+            onCancel={uploadProgress.cancel}
+            className="mt-8"
+          />
+
           {/* Action Buttons */}
           <div className="flex space-x-4 mt-8">
             <button
@@ -1711,7 +1704,9 @@ const CreatorUpload: React.FC = () => {
               {isUploading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Uploading...</span>
+                  <span className="tabular-nums">
+                    {uploadProgress.phase === 'processing' ? 'Processing…' : `Uploading ${uploadProgress.percent}%`}
+                  </span>
                 </>
               ) : (
                 <>

@@ -20,7 +20,16 @@ export default {
           800: '#6b21a8',
           900: '#581c87',
         }
-      }
+      },
+      keyframes: {
+        'upload-shimmer': {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+      },
+      animation: {
+        'upload-shimmer': 'upload-shimmer 1.6s linear infinite',
+      },
     },
   },
   plugins: [],

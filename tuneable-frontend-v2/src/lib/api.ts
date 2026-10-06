@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosRequestConfig } from 'axios';
 
 // Define types directly to avoid import issues
 interface User {
@@ -684,7 +684,8 @@ export const mediaAPI = {
       permissionFromEmail?: string;
       permissionFromInstagram?: string;
       permissionNote?: string;
-    }
+    },
+    request?: Pick<AxiosRequestConfig, 'onUploadProgress' | 'signal'>
   ) => {
     const formData = new FormData();
     formData.append('audioFile', audioFile);
@@ -716,6 +717,7 @@ export const mediaAPI = {
     }
     const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      ...request,
     });
     return response.data;
   },
