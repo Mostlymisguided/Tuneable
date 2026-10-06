@@ -12,7 +12,13 @@ const { getBlockedUserIds, isBlockedBetween } = require('../utils/userBlocks');
 const { isValidObjectId } = require('../utils/validators');
 // const { transformResponse } = require('../utils/uuidTransform'); // Removed - using ObjectIds directly
 // const { resolveId } = require('../utils/idResolver'); // Removed - using ObjectIds directly
-const { createCoverArtUpload, getPublicUrl, filterMp3AudioFile } = require('../utils/r2Upload');
+const {
+  createCoverArtUpload,
+  getPublicUrl,
+  filterUploadAudioFile,
+  checkUploadAudioFile,
+  MAX_AUDIO_UPLOAD_BYTES,
+} = require('../utils/r2Upload');
 const { buildReadableAudioKey, buildReadableCoverKey } = require('../utils/readableUploadKey');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
 const { normalizeLanguageInput } = require('../utils/language');
@@ -42,7 +48,13 @@ const {
   applyRightsStatus,
   isValidRightsStatus,
   isVerifiedOriginalUpload,
+  demoteUnclaimedOwners,
 } = require('../utils/mediaRights');
+const {
+  parsePermittedPermission,
+  permittedHistoryEntry,
+  openPermittedRightsCase,
+} = require('../utils/permittedUpload');
 const {
   assertWithinUploadQuota,
   tryClaimFoundingSeat,
@@ -377,12 +389,12 @@ const coverArtUpload = createCoverArtUpload();
 const mixedUpload = multer({
   storage: multer.memoryStorage(),
   limits: { 
-    fileSize: 50 * 1024 * 1024, // 50MB max
+    fileSize: MAX_AUDIO_UPLOAD_BYTES,
     files: 3 // audio + cover art + optional library XML
   },
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'audioFile') {
-      return filterMp3AudioFile(file, cb, 'Only MP3 files are allowed for audio');
+      return filterUploadAudioFile(file, cb, 'Only MP3 or WAV files are allowed for audio');
     } else if (file.fieldname === 'coverArtFile') {
       // Only image files for cover art
       if (file.mimetype.startsWith('image/')) {
@@ -418,7 +430,7 @@ const coverArtUploadSingle = multer({
 // Memory storage for attach-upload (needs buffer for manual R2 PutObject)
 const attachAudioUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: MAX_AUDIO_UPLOAD_BYTES },
   fileFilter: (req, file, cb) => {
     if (file.fieldname === 'libraryXmlFile') {
       const ext = path.extname(file.originalname).toLowerCase();
@@ -428,7 +440,7 @@ const attachAudioUpload = multer({
       return cb(new Error('Only XML files are allowed for library metadata'));
     }
 
-    return filterMp3AudioFile(file, cb, 'Only MP3 files are allowed');
+    return filterUploadAudioFile(file, cb);
   },
 });
 
@@ -596,6 +608,15 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     
     const audioFile = req.files.audioFile[0];
     const coverArtFile = req.files.coverArtFile ? req.files.coverArtFile[0] : null;
+
+    const audioCheck = checkUploadAudioFile(audioFile);
+    if (audioCheck.error) {
+      return res.status(400).json({ error: audioCheck.error });
+    }
+    const audioFormat = audioCheck.format;
+    if (coverArtFile && coverArtFile.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Cover art must be 5MB or smaller' });
+    }
     
     console.log(`🎵 Processing upload: ${audioFile.originalname} (${audioFile.size} bytes)`);
     if (coverArtFile) {
@@ -606,7 +627,14 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     const isAdminPermittedUpload = isAdmin(user) && (
       req.body.rightsStatus === 'permitted'
     );
-    if (!isAdminPermittedUpload) {
+    let permission = null;
+    if (isAdminPermittedUpload) {
+      const parsed = parsePermittedPermission(req.body);
+      if (parsed.error) {
+        return res.status(400).json({ error: parsed.error });
+      }
+      permission = parsed.permission;
+    } else {
       const quotaCheck = await assertWithinUploadQuota(user, audioFile.size);
       if (!quotaCheck.ok) {
         return res.status(quotaCheck.status).json({
@@ -661,7 +689,6 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       composer,
       producer,
       label,
-      rightsStatus: requestedRightsStatus,
     } = req.body;
 
     // Resolve display metadata before upload so R2 keys are human-readable
@@ -696,7 +723,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       const audioKey = buildReadableAudioKey({
         title: finalTitle,
         artist: finalArtistName,
-        ext: path.extname(audioFile.originalname) || '.mp3',
+        ext: audioFormat.ext,
         fallbackBasename: path.basename(audioFile.originalname, path.extname(audioFile.originalname)),
       });
 
@@ -704,7 +731,8 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         Bucket: process.env.R2_BUCKET_NAME,
         Key: audioKey,
         Body: audioFile.buffer,
-        ContentType: 'audio/mpeg',
+        ContentType: audioFormat.contentType,
+        ContentDisposition: 'inline',
         ACL: 'public-read',
         CacheControl: 'public, max-age=31536000'
       });
@@ -790,6 +818,12 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     const finalReleaseDate = releaseDate ? new Date(releaseDate) : (mappedMetadata.releaseDate || null);
     const finalReleaseYear = extractReleaseYear(finalReleaseDate, releaseYear ? parseInt(releaseYear) : null);
     
+    // The uploader's home is not the artist's home on a permitted upload.
+    const useUploaderLocation = !isAdminPermittedUpload
+      && user.homeLocation && Object.keys(user.homeLocation).length > 0;
+    const useUploaderSecondaryLocation = !isAdminPermittedUpload
+      && user.secondaryLocation && Object.keys(user.secondaryLocation).length > 0;
+
     // Create Media entry with extracted and manual metadata
     const media = new Media({
       // Basic information (user input takes priority)
@@ -799,15 +833,9 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       releaseYear: finalReleaseYear,
       
       // Location fields - auto-populate from user's locations if present
-      primaryLocation: user.homeLocation && Object.keys(user.homeLocation).length > 0 
-        ? { ...user.homeLocation } 
-        : undefined,
-      secondaryLocation: user.secondaryLocation && Object.keys(user.secondaryLocation).length > 0 
-        ? { ...user.secondaryLocation } 
-        : undefined,
-      locationSource: user.homeLocation && Object.keys(user.homeLocation).length > 0
-        ? 'uploader'
-        : undefined,
+      primaryLocation: useUploaderLocation ? { ...user.homeLocation } : undefined,
+      secondaryLocation: useUploaderSecondaryLocation ? { ...user.secondaryLocation } : undefined,
+      locationSource: useUploaderLocation ? 'uploader' : undefined,
       
       // Creators (parsed from artist string or use extracted metadata)
       artist: artistArray.length > 0 ? artistArray : (mappedMetadata.artist || toCreatorSubdocs([{
@@ -855,7 +883,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       sources: { upload: fileUrl },
       contentType: ['music'],
       contentForm: ['tune'],
-      mediaType: ['mp3'],
+      mediaType: [audioFormat.mediaType],
       fileSize: audioFile.size,
       
       // System fields
@@ -872,7 +900,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       // rightsConfirmedBy / rightsConfirmedAt. Creator self-upload is cleared.
       // Admins can mark permitted (off-platform permission, artist not on
       // Tuneable yet) — playable, but not stamped as the admin's own work.
-      ...(isAdmin(user) && requestedRightsStatus === 'permitted'
+      ...(isAdminPermittedUpload
         ? permittedRightsFields(userId)
         : {
             rightsCleared: true,
@@ -882,7 +910,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
           }),
       
       // Auto-assign ownership to uploader unless this is an admin permitted upload
-      mediaOwners: (isAdmin(user) && requestedRightsStatus === 'permitted')
+      ...(isAdminPermittedUpload
+        ? { ownershipHistory: [permittedHistoryEntry(permission, userId)] }
+        : {}),
+
+      mediaOwners: isAdminPermittedUpload
         ? []
         : [{
             userId: userId,
@@ -903,6 +935,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     
     await media.save();
     await refreshGearStatsForStack(media.productionStack);
+
+    const rightsCase = permission
+      ? await openPermittedRightsCase(media, permission, userId)
+      : null;
 
     // First qualifying original upload claims a Founding Creator seat (cap 1111).
     let foundingClaim = null;
@@ -983,7 +1019,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       console.log('✅ Set default cover art for media');
     }
     
-    console.log(`✅ Creator ${user.username} uploaded: ${title} (${media.uuid})`);
+    if (permission) {
+      console.log(`✅ Admin ${user.username} uploaded permitted track for ${permission.fromName}: ${finalTitle} (${media.uuid})`);
+    } else {
+      console.log(`✅ Creator ${user.username} uploaded: ${finalTitle} (${media.uuid})`);
+    }
     
     res.status(201).json({
       message: 'Media uploaded successfully',
@@ -993,8 +1033,10 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
         title: media.title,
         artist: media.artist,
         coverArt: media.coverArt,
-        sources: media.sources
+        sources: media.sources,
+        rightsStatus: media.rightsStatus,
       },
+      rightsCaseId: rightsCase ? rightsCase._id : null,
       foundingCreator: foundingClaim ? {
         status: foundingClaim.status,
         seatNumber: foundingClaim.seatNumber || null,
@@ -1040,7 +1082,17 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       return res.status(400).json({ error: 'Uploaded audio file is empty' });
     }
 
-    const fullUser = await User.findById(userId);
+    const adminPermitted = isAdmin(user) && requestedRightsStatus === 'permitted';
+    let permission = null;
+    if (adminPermitted) {
+      const parsed = parsePermittedPermission(req.body);
+      if (parsed.error) {
+        return res.status(400).json({ error: parsed.error });
+      }
+      permission = parsed.permission;
+    }
+
+    const fullUser = adminPermitted ? null : await User.findById(userId);
     if (fullUser) {
       const quotaCheck = await assertWithinUploadQuota(fullUser, audioFile.size);
       if (!quotaCheck.ok) {
@@ -1109,7 +1161,6 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
 
     const isThirdParty = uploaderRole === 'third_party';
-    const adminPermitted = isAdmin(user) && requestedRightsStatus === 'permitted';
     const clearRights = adminPermitted
       ? false
       : shouldClearRightsOnAttach({
@@ -1122,11 +1173,10 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     const verificationMethod = isThirdParty ? 'third_party_claim' : 'attach_upload';
     const verificationNotes = isThirdParty
       ? (rightsDisclaimer || 'Third-party upload with rights disclaimer')
-      : (adminPermitted
-        ? 'Admin attach with off-platform permission — awaiting artist claim'
-        : (clearRights
-          ? 'Audio attached to existing catalog entry'
-          : 'Operator attach — rights pending artist claim'));
+      : (clearRights
+        ? 'Audio attached to existing catalog entry'
+        : 'Operator attach — rights pending artist claim');
+    const previousRightsStatus = media.rightsStatus || null;
 
     if (!media.sources || typeof media.sources.set !== 'function') {
       media.sources = new Map(Object.entries(media.sources || {}));
@@ -1146,7 +1196,11 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     const existingOwner = media.mediaOwners?.find(
       (o) => o.userId && o.userId.toString() === userId.toString()
     );
-    if (!existingOwner) {
+    if (adminPermitted) {
+      demoteUnclaimedOwners(media);
+      media.ownershipHistory = media.ownershipHistory || [];
+      media.ownershipHistory.push(permittedHistoryEntry(permission, userId, previousRightsStatus));
+    } else if (!existingOwner) {
       media.mediaOwners = media.mediaOwners || [];
       media.mediaOwners.push({
         userId,
@@ -1214,6 +1268,10 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
 
     await media.save();
 
+    const rightsCase = permission
+      ? await openPermittedRightsCase(media, permission, userId)
+      : null;
+
     let foundingClaim = null;
     if (isVerifiedOriginalUpload(media)) {
       try {
@@ -1233,7 +1291,9 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     res.json({
       message: clearRights
         ? 'Audio attached successfully — media is now playable'
-        : 'Audio attached — listing stays catalog-only until a rights holder claims it',
+        : (adminPermitted
+          ? 'Audio attached as permitted — playable, tips held until the artist claims it'
+          : 'Audio attached — listing stays catalog-only until a rights holder claims it'),
       media: {
         _id: media._id,
         uuid: media.uuid,
@@ -1242,6 +1302,7 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
         rightsCleared: media.rightsCleared,
         ...enrichMediaWithPlayability({ ...media.toObject(), sources: sourcesObj }, playabilityOptionsFromRequest(req)),
       },
+      rightsCaseId: rightsCase ? rightsCase._id : null,
       foundingCreator: foundingClaim ? {
         status: foundingClaim.status,
         seatNumber: foundingClaim.seatNumber || null,

@@ -680,6 +680,10 @@ export const mediaAPI = {
       key?: string;
       libraryXmlFile?: File;
       rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
+      permissionFromName?: string;
+      permissionFromEmail?: string;
+      permissionFromInstagram?: string;
+      permissionNote?: string;
     }
   ) => {
     const formData = new FormData();
@@ -705,6 +709,10 @@ export const mediaAPI = {
     }
     if (options?.rightsStatus) {
       formData.append('rightsStatus', options.rightsStatus);
+    }
+    for (const field of ['permissionFromName', 'permissionFromEmail', 'permissionFromInstagram', 'permissionNote'] as const) {
+      const value = options?.[field]?.trim();
+      if (value) formData.append(field, value);
     }
     const response = await api.post(`/media/${mediaId}/attach-upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

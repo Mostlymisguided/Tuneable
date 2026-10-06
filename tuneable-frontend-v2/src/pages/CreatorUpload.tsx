@@ -97,6 +97,12 @@ const CreatorUpload: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [adminRightsMode, setAdminRightsMode] = useState<'cleared' | 'permitted'>('cleared');
+  const [permission, setPermission] = useState({
+    fromName: '',
+    fromEmail: '',
+    fromInstagram: '',
+    note: '',
+  });
   const [labelSuggestions, setLabelSuggestions] = useState<any[]>([]);
   const [isSearchingLabels, setIsSearchingLabels] = useState(false);
   const [showLabelSuggestions, setShowLabelSuggestions] = useState(false);
@@ -155,6 +161,8 @@ const CreatorUpload: React.FC = () => {
   
   // Check if user is verified creator or admin
   const isAdmin = user && (user as any).role?.includes('admin');
+  const isPermittedUpload = Boolean(isAdmin) && adminRightsMode === 'permitted';
+  const permissionComplete = permission.fromName.trim().length > 0 && permission.note.trim().length >= 10;
   const isCreator = user && (user as any).role?.includes('creator');
 
   useEffect(() => {
@@ -542,6 +550,11 @@ const CreatorUpload: React.FC = () => {
       return;
     }
 
+    if (isPermittedUpload && !permissionComplete) {
+      toast.error('Add who gave permission and how they gave it');
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -634,8 +647,12 @@ const CreatorUpload: React.FC = () => {
       if (formData.label) uploadData.append('label', formData.label);
       if (formData.language) uploadData.append('language', formData.language);
       if (libraryXmlFile) uploadData.append('libraryXmlFile', libraryXmlFile);
-      if (isAdmin && adminRightsMode === 'permitted') {
+      if (isPermittedUpload) {
         uploadData.append('rightsStatus', 'permitted');
+        uploadData.append('permissionFromName', permission.fromName.trim());
+        uploadData.append('permissionNote', permission.note.trim());
+        if (permission.fromEmail.trim()) uploadData.append('permissionFromEmail', permission.fromEmail.trim());
+        if (permission.fromInstagram.trim()) uploadData.append('permissionFromInstagram', permission.fromInstagram.trim());
       }
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -1598,6 +1615,67 @@ const CreatorUpload: React.FC = () => {
                     Playable now. Tips are held until they join and claim the listing.
                   </span>
                 </label>
+                {isPermittedUpload && (
+                  <div className="ml-7 mt-3 space-y-3">
+                    <div>
+                      <label htmlFor="permission-from-name" className="block text-sm text-white font-medium mb-1">
+                        Who gave permission? *
+                      </label>
+                      <input
+                        id="permission-from-name"
+                        type="text"
+                        value={permission.fromName}
+                        onChange={(e) => setPermission((p) => ({ ...p, fromName: e.target.value }))}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                        placeholder="Artist or rights holder name"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="permission-from-email" className="block text-sm text-white font-medium mb-1">
+                          Their email
+                        </label>
+                        <input
+                          id="permission-from-email"
+                          type="email"
+                          value={permission.fromEmail}
+                          onChange={(e) => setPermission((p) => ({ ...p, fromEmail: e.target.value }))}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                          placeholder="For the claim invite"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="permission-from-instagram" className="block text-sm text-white font-medium mb-1">
+                          Their Instagram
+                        </label>
+                        <input
+                          id="permission-from-instagram"
+                          type="text"
+                          value={permission.fromInstagram}
+                          onChange={(e) => setPermission((p) => ({ ...p, fromInstagram: e.target.value }))}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                          placeholder="@handle"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="permission-note" className="block text-sm text-white font-medium mb-1">
+                        How and when did they give permission? *
+                      </label>
+                      <textarea
+                        id="permission-note"
+                        rows={2}
+                        value={permission.note}
+                        onChange={(e) => setPermission((p) => ({ ...p, note: e.target.value }))}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                        placeholder="e.g. Sent me the files on WhatsApp on 1 Oct 2026 and said to put them up"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Saved to the rights record so the track stays playable and they can be invited to claim it.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </fieldset>
             )}
             <div className="flex items-start space-x-3">
@@ -1634,7 +1712,7 @@ const CreatorUpload: React.FC = () => {
             </button>
             <button
               onClick={handleUpload}
-              disabled={isUploading || !file || !formData.title.trim() || !rightsConfirmed}
+              disabled={isUploading || !file || !formData.title.trim() || !rightsConfirmed || (isPermittedUpload && !permissionComplete)}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2"
             >
               {isUploading ? (
