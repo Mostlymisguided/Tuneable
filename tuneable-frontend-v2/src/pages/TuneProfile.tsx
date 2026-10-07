@@ -419,7 +419,7 @@ const TuneProfile: React.FC = () => {
   const [isUploadingCoverArt, setIsUploadingCoverArt] = useState(false);
   const [isRemovingCoverArt, setIsRemovingCoverArt] = useState(false);
 
-  // Replace hosted audio on a tune the editor already owns
+  // Add or replace hosted audio (admins and media editors)
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [showAttachAudioModal, setShowAttachAudioModal] = useState(false);
   const [attachAudioFile, setAttachAudioFile] = useState<File | null>(null);
@@ -548,12 +548,13 @@ const TuneProfile: React.FC = () => {
     return canDeleteMedia(user, media);
   };
 
-  const canReplaceAudio = () => {
+  const canAttachAudio = () => {
     if (!user || !media) return false;
-    const sources = normalizeSources(media.sources);
-    if (!sources.upload) return false;
     return canEditTune();
   };
+
+  const hasExistingAudio = () =>
+    !!media && (!!normalizeSources(media.sources).upload || !!media.hasHostedAudio);
 
   // Helper function to get country code from country name
   const getCountryCode = (countryName: string): string => {
@@ -1361,11 +1362,11 @@ const TuneProfile: React.FC = () => {
   const handleAttachAudioClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast.info('Please log in to replace audio');
+      toast.info('Please log in to add audio');
       navigate('/login');
       return;
     }
-    if (!canReplaceAudio()) return;
+    if (!canAttachAudio()) return;
     setShowAttachAudioModal(true);
   };
 
@@ -1400,6 +1401,7 @@ const TuneProfile: React.FC = () => {
       return;
     }
 
+    const replacing = hasExistingAudio();
     setIsAttachingAudio(true);
     const signal = attachProgress.start(attachAudioFile.size);
     try {
@@ -1414,14 +1416,14 @@ const TuneProfile: React.FC = () => {
       } else {
         await fetchMediaProfile();
       }
-      toast.success('Audio replaced — playback updated');
+      toast.success(response.message || (replacing ? 'Audio replaced — playback updated' : 'Audio added'));
       closeAttachAudioModal();
     } catch (err: any) {
       if (axios.isCancel(err)) {
         toast.info('Upload cancelled');
       } else {
-        console.error('Error replacing audio:', err);
-        toast.error(err.response?.data?.error || 'Failed to replace audio');
+        console.error('Error attaching audio:', err);
+        toast.error(err.response?.data?.error || (replacing ? 'Failed to replace audio' : 'Failed to add audio'));
       }
       setIsAttachingAudio(false);
       attachProgress.reset();
@@ -4121,7 +4123,7 @@ const TuneProfile: React.FC = () => {
                   </p>
                 </div>
 
-                {canReplaceAudio() && (
+                {canAttachAudio() && (
                   <div>
                     <label className="block text-white font-medium mb-2">Audio file</label>
                     {normalizeSources(media.sources).upload ? (
@@ -4140,10 +4142,12 @@ const TuneProfile: React.FC = () => {
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
                     >
                       <Upload className="h-4 w-4" />
-                      <span>Replace audio</span>
+                      <span>{hasExistingAudio() ? 'Replace audio' : 'Add audio'}</span>
                     </button>
                     <p className="text-xs text-gray-400 mt-1">
-                      Upload a new audio file (MP3 or WAV) to replace the current file used for playback.
+                      {hasExistingAudio()
+                        ? 'Upload a new audio file (MP3 or WAV) to replace the current file used for playback.'
+                        : 'Upload an audio file (MP3 or WAV) so this tune can play on Tuneable.'}
                     </p>
                   </div>
                 )}
@@ -4324,12 +4328,13 @@ const TuneProfile: React.FC = () => {
         </div>
       )}
 
-      {/* Replace audio on a tune that already has a hosted file */}
       {showAttachAudioModal && media && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000] p-4">
           <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl md:text-2xl font-bold text-white">Replace audio</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-white">
+                {hasExistingAudio() ? 'Replace audio' : 'Add audio'}
+              </h2>
               <button
                 onClick={closeAttachAudioModal}
                 disabled={isAttachingAudio}
@@ -4340,7 +4345,9 @@ const TuneProfile: React.FC = () => {
             </div>
 
             <p className="text-gray-300 text-sm mb-4">
-              {`Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`}
+              {hasExistingAudio()
+                ? `Replace the audio file for "${media.title}". The previous file will no longer be used for playback.`
+                : `Add an audio file for "${media.title}" so it can play on Tuneable.`}
             </p>
 
             <div className="mb-4">
@@ -4421,7 +4428,7 @@ const TuneProfile: React.FC = () => {
                 ) : (
                   <>
                     <Upload className="h-5 w-5" />
-                    <span>Replace</span>
+                    <span>{hasExistingAudio() ? 'Replace' : 'Add audio'}</span>
                   </>
                 )}
               </button>

@@ -1050,7 +1050,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
 });
 
 // @route   POST /api/media/:mediaId/attach-upload
-// @desc    Replace the MP3/WAV on media that already has hosted audio
+// @desc    Add or replace the MP3/WAV on existing media (e.g. a YouTube-only catalog entry)
 // @access  Private (admin or media editor, with rights confirmation)
 router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields([
   { name: 'audioFile', maxCount: 1 },
@@ -1116,17 +1116,15 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
       return res.status(404).json({ error: 'Media not found' });
     }
 
-    const hasExistingUpload = !!(media.sources?.get?.('upload') || media.sources?.upload);
-    const allowReplace = replaceExisting === 'true' || replaceExisting === true;
-    if (!hasExistingUpload || !allowReplace) {
-      return res.status(403).json({
-        error: 'Audio cannot be attached to an existing catalog entry. Upload a new track if you have the rights.',
-      });
+    const canAttach = isAdmin(user) || canEditMedia(user, media);
+    if (!canAttach) {
+      return res.status(403).json({ error: 'Not authorized to add audio to this media' });
     }
 
-    const canReplace = isAdmin(user) || canEditMedia(user, media);
-    if (!canReplace) {
-      return res.status(403).json({ error: 'Not authorized to replace audio on this media' });
+    const hasExistingUpload = !!(media.sources?.get?.('upload') || media.sources?.upload);
+    const allowReplace = replaceExisting === 'true' || replaceExisting === true;
+    if (hasExistingUpload && !allowReplace) {
+      return res.status(409).json({ error: 'This media already has an uploaded audio file' });
     }
 
     let fileUrl;
