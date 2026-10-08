@@ -4,6 +4,9 @@ import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import { Crown } from 'lucide-react';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import { useBlockedUsersStore } from '../stores/blockedUsersStore';
+
+const ANONYMOUS_LABEL = 'Supporter';
 
 interface Bid {
   userId?: {
@@ -12,6 +15,8 @@ interface Bid {
     uuid?: string;
     username: string;
     profilePic?: string;
+    /** Set by the server when either side has blocked the other. */
+    anonymous?: boolean;
   };
   amount?: number;
   _doc?: any; // some bids may come via doc wrapper
@@ -26,6 +31,7 @@ export interface ChampionSupporter {
     uuid?: string;
     username: string;
     profilePic?: string | null;
+    anonymous?: boolean;
   };
 }
 
@@ -49,8 +55,9 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   className,
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const blockedIds = useBlockedUsersStore((s) => s.ids);
 
-  const supporters = useMemo(() => {
+  const rawSupporters = useMemo(() => {
     if (champions && champions.length > 0) {
       return champions
         .filter((c) => c.user?.username)
@@ -64,6 +71,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
               uuid: user.uuid,
               username: user.username,
               profilePic: user.profilePic || undefined,
+              anonymous: user.anonymous,
             },
             total: c.totalAmount || 0,
             count: c.bidCount || 0,
@@ -90,6 +98,19 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
 
     return Object.values(map).sort((a, b) => b.total - a.total);
   }, [bids, champions]);
+
+  // Blocked supporters stay in place so totals and podium ranks match the chart.
+  const supporters = useMemo(() => {
+    const blocked = new Set(blockedIds);
+    return rawSupporters.map((s) => ({
+      ...s,
+      anonymous:
+        Boolean(s.user.anonymous) ||
+        [s.user._id, s.user.id, s.user.uuid, s.user.username].some(
+          (value) => Boolean(value && blocked.has(String(value)))
+        ),
+    }));
+  }, [rawSupporters, blockedIds]);
 
   const podiumRankById = useMemo(() => {
     const m = new Map<string, number>();
@@ -122,16 +143,11 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
         {visible.map((s) => {
           const id = s.id;
           const rank = podiumRankById.get(id);
-          return (
-            <Link
-              key={id}
-              to={getUserProfileUrl(s.user)}
-              className="flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 hover:bg-purple-400 transition-colors flex-shrink-0"
-              title={`${penceToPounds(s.total)} (${s.count} tips)`}
-            >
+          const content = (
+            <>
               <img
-                src={s.user.profilePic || DEFAULT_PROFILE_PIC}
-                alt={s.user.username}
+                src={s.anonymous ? DEFAULT_PROFILE_PIC : s.user.profilePic || DEFAULT_PROFILE_PIC}
+                alt={s.anonymous ? ANONYMOUS_LABEL : s.user.username}
                 className="h-4 w-4 md:h-6 md:w-6 rounded-full object-cover flex-shrink-0"
                 onError={(e) => {
                   e.currentTarget.src = DEFAULT_PROFILE_PIC;
@@ -149,8 +165,29 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
                   />
                 </span>
               )}
-              <span className="text-[10px] md:text-sm text-white whitespace-nowrap">{s.user.username}</span>
+              <span
+                className={`text-[10px] md:text-sm whitespace-nowrap ${s.anonymous ? 'text-gray-400 italic' : 'text-white'}`}
+              >
+                {s.anonymous ? ANONYMOUS_LABEL : s.user.username}
+              </span>
               <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
+            </>
+          );
+          const chipClass =
+            'flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 transition-colors flex-shrink-0';
+          const title = `${penceToPounds(s.total)} (${s.count} tips)`;
+          return s.anonymous ? (
+            <span key={id} className={chipClass} title={title}>
+              {content}
+            </span>
+          ) : (
+            <Link
+              key={id}
+              to={getUserProfileUrl(s.user)}
+              className={`${chipClass} hover:bg-purple-400`}
+              title={title}
+            >
+              {content}
             </Link>
           );
         })}

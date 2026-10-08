@@ -1323,9 +1323,32 @@ export type ImportJobStatus = {
   updatedAt?: string;
 };
 
+export type BlockedUser = {
+  id: string;
+  uuid?: string;
+  _id?: string;
+  username?: string;
+  profilePic?: string;
+};
+
 export const userAPI = {
   getProfile: async (userId: string) => {
     const response = await api.get(`/users/${encodeURIComponent(userId)}/profile`);
+    return response.data;
+  },
+
+  getBlockedUsers: async (): Promise<{ blocked: BlockedUser[] }> => {
+    const response = await api.get('/users/me/blocked');
+    return response.data;
+  },
+
+  blockUser: async (userId: string): Promise<{ blocked: boolean; userId?: string }> => {
+    const response = await api.post(`/users/${encodeURIComponent(userId)}/block`);
+    return response.data;
+  },
+
+  unblockUser: async (userId: string): Promise<{ blocked: boolean; userId?: string }> => {
+    const response = await api.delete(`/users/${encodeURIComponent(userId)}/block`);
     return response.data;
   },
 

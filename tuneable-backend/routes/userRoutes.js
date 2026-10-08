@@ -237,7 +237,7 @@ const { sendUserRegistrationNotification, sendEmailVerification, sendPasswordCha
 const rateLimit = require('../middleware/rateLimit');
 const { checkNewPassword } = require('../utils/passwordPolicy');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
-const { getBlockState, isBlockedBetween } = require('../utils/userBlocks');
+const { getBlockState, getBlockedUserIds, isBlockedBetween } = require('../utils/userBlocks');
 const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
@@ -6237,13 +6237,15 @@ router.get('/search', authMiddleware, async (req, res) => {
     }
     
     const searchRegex = new RegExp(search.trim(), 'i');
+    const blockedIds = [...(await getBlockedUserIds(req.user._id))];
     const users = await User.find({
       $or: [
         { username: searchRegex },
         { email: searchRegex },
         { 'creatorProfile.artistName': searchRegex }
       ],
-      isActive: true
+      isActive: true,
+      ...(blockedIds.length ? { _id: { $nin: blockedIds } } : {}),
     })
     .select('_id username profilePic uuid creatorProfile.artistName')
     .limit(parseInt(limit))

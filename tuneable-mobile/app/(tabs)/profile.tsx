@@ -280,6 +280,10 @@ export default function ProfileScreen() {
           setSettingsOpen(false);
           router.push('/change-password');
         }}
+        onBlockedUsers={() => {
+          setSettingsOpen(false);
+          router.push('/blocked-users');
+        }}
         onUpload={() => {
           setSettingsOpen(false);
           router.push('/upload');

@@ -3,11 +3,14 @@ type UserPathFields = {
   uuid?: string | null;
   _id?: string | null;
   id?: string | null;
+  /** Server-masked blocked user: username is a placeholder, not theirs. */
+  anonymous?: boolean;
 };
 
 function identifierOf(user: UserPathFields | string | null | undefined): string {
   if (!user) return '';
   if (typeof user === 'string') return user;
+  if (user.anonymous) return user.uuid || user._id || user.id || '';
   return user.username || user.uuid || user._id || user.id || '';
 }
 

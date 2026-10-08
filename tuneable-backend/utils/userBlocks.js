@@ -65,9 +65,57 @@ async function assertNotBlocked(userA, userB, message = 'You cannot interact wit
   }
 }
 
+const ANONYMOUS_USERNAME = 'Supporter';
+const DEFAULT_PROFILE_PIC = 'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
+const USER_ID_KEYS = ['_id', 'id', 'uuid', 'userId', 'user_uuid', 'userId_uuid'];
+const IDENTITY_KEYS = [
+  'email',
+  'givenName',
+  'familyName',
+  'bio',
+  'artistName',
+  'creatorProfile',
+  'socialMedia',
+  'homeLocation',
+  'secondaryLocation',
+];
+
+function isIdLike(value) {
+  return typeof value === 'string' || value instanceof mongoose.Types.ObjectId;
+}
+
+/**
+ * Replaces the name and avatar of every blocked user in a plain JSON payload
+ * with an anonymous placeholder, in place. Ids are kept so tip totals and
+ * ranks still add up; the profile endpoint already 404s for blocked viewers.
+ * Matches populated user refs and flattened rows such as Bid.username.
+ */
+function maskBlockedUsers(value, blockedIds) {
+  if (!blockedIds || blockedIds.size === 0 || !value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    value.forEach((item) => maskBlockedUsers(item, blockedIds));
+    return value;
+  }
+  if (typeof value.username === 'string') {
+    const hit = USER_ID_KEYS.some((key) => isIdLike(value[key]) && blockedIds.has(String(value[key])));
+    if (hit) {
+      value.username = ANONYMOUS_USERNAME;
+      if ('profilePic' in value) value.profilePic = DEFAULT_PROFILE_PIC;
+      for (const key of IDENTITY_KEYS) delete value[key];
+      value.anonymous = true;
+    }
+  }
+  for (const child of Object.values(value)) {
+    if (child && typeof child === 'object') maskBlockedUsers(child, blockedIds);
+  }
+  return value;
+}
+
 module.exports = {
   isBlockedBetween,
   getBlockState,
   getBlockedUserIds,
   assertNotBlocked,
+  maskBlockedUsers,
+  ANONYMOUS_USERNAME,
 };

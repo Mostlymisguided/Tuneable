@@ -37,6 +37,7 @@ type Props = {
   onUpload?: () => void;
   onEditProfile: () => void;
   onChangePassword: () => void;
+  onBlockedUsers: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => Promise<void>;
 };
@@ -53,6 +54,7 @@ export function ProfileSettingsSheet({
   onUpload,
   onEditProfile,
   onChangePassword,
+  onBlockedUsers,
   onSignOut,
   onDeleteAccount,
 }: Props) {
@@ -187,6 +189,14 @@ export function ProfileSettingsSheet({
             disabled={disabled}>
             <Ionicons name="key-outline" size={20} color={colors.accentLight} />
             <Text style={styles.rowText}>Password</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.row}
+            onPress={() => runAfterSheetCloses(onBlockedUsers)}
+            disabled={disabled}>
+            <Ionicons name="ban-outline" size={20} color={colors.accentLight} />
+            <Text style={styles.rowText}>Blocked users</Text>
           </Pressable>
 
           {Platform.OS !== 'web' ? <PushNotificationsRow disabled={disabled} /> : null}

@@ -17,7 +17,7 @@ type Supporter = {
   total: number;
   uuid?: string;
   _id?: string;
-  /** Blocked by the viewer: shown without name, avatar, or profile link. */
+  /** Blocked either way: shown without name, avatar, or profile link. */
   anonymous?: boolean;
 };
 
@@ -31,6 +31,7 @@ export type ChampionSupporter = {
     uuid?: string;
     username: string;
     profilePic?: string | null;
+    anonymous?: boolean;
   };
 };
 
@@ -69,6 +70,7 @@ function aggregateSupporters(bids: Bid[]): Supporter[] {
         total: 0,
         uuid: user.uuid,
         _id: user._id,
+        anonymous: user.anonymous,
       };
     }
     map[id].total += amount;
@@ -90,9 +92,10 @@ export function MiniSupportersBar({
   totalCount,
   onStackPress,
 }: Props) {
-  const isBlocked = useBlockedUsersStore((s) => s.isBlocked);
+  const blockedIds = useBlockedUsersStore((s) => s.ids);
 
   const supporters = useMemo((): Supporter[] => {
+    const blocked = new Set(blockedIds);
     const raw: Supporter[] =
       champions && champions.length > 0
         ? champions
@@ -106,17 +109,19 @@ export function MiniSupportersBar({
                 total: c.totalAmount || 0,
                 uuid: user.uuid,
                 _id: user._id,
+                anonymous: user.anonymous,
               };
             })
         : aggregateSupporters(bids);
 
     // Blocked supporters stay in place so totals and podium ranks match the chart.
     return raw.map((s) =>
-      isBlocked(s.id, s.uuid, s._id, s.username)
+      s.anonymous ||
+      [s.id, s.uuid, s._id, s.username].some((value) => Boolean(value && blocked.has(value)))
         ? { ...s, username: ANONYMOUS_LABEL, profilePic: undefined, anonymous: true }
         : s
     );
-  }, [bids, champions, isBlocked]);
+  }, [bids, champions, blockedIds]);
 
   const podiumRankById = useMemo(() => {
     const m = new Map<string, number>();

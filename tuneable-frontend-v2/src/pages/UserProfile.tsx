@@ -29,7 +29,8 @@ import {
   Undo2,
   Crown,
   Camera,
-  Trash2
+  Trash2,
+  Ban
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 
@@ -104,6 +105,8 @@ import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
 import PasswordSecuritySection from '../components/PasswordSecuritySection';
+import BlockedUsersSection from '../components/BlockedUsersSection';
+import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 import MediaChampions from '../components/MediaChampions';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -418,6 +421,10 @@ const UserProfile: React.FC = () => {
 
   // Report modal state
   const [showReportModal, setShowReportModal] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [isBlockBusy, setIsBlockBusy] = useState(false);
+  const markBlocked = useBlockedUsersStore((s) => s.markBlocked);
+  const markUnblocked = useBlockedUsersStore((s) => s.markUnblocked);
   const [editForm, setEditForm] = useState({
     username: '',
     givenName: '',
@@ -852,6 +859,14 @@ const UserProfile: React.FC = () => {
       setUser(response.user);
       setStats(response.stats);
       setMediaWithBids(response.mediaWithBids);
+      setBlockedByMe(Boolean(response.blockedByMe));
+      if (response.blockedByMe) {
+        setTuneBytesTagRankings([]);
+        setChampionBadges([]);
+        setLabelAffiliations([]);
+        setCollectiveMemberships([]);
+        return;
+      }
       loadTuneBytesTagRankings();
       loadChampionTitles();
       loadLabelAffiliations();
@@ -1970,6 +1985,41 @@ const UserProfile: React.FC = () => {
     }
   };
 
+  const handleToggleBlock = async () => {
+    if (!user) return;
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    const targetId = user.uuid || user._id;
+    if (!targetId) return;
+    const aliases = [user.uuid, user._id, user.username];
+    if (!blockedByMe) {
+      if (!window.confirm(`Block @${user.username}? You will no longer see their profile activity. You can unblock them later.`)) {
+        return;
+      }
+    }
+    try {
+      setIsBlockBusy(true);
+      if (blockedByMe) {
+        await userAPI.unblockUser(targetId);
+        markUnblocked(targetId, aliases);
+        toast.success(`Unblocked @${user.username}`);
+        setBlockedByMe(false);
+        await fetchUserProfile();
+      } else {
+        await userAPI.blockUser(targetId);
+        markBlocked(targetId, aliases);
+        toast.success(`Blocked @${user.username}`);
+        setBlockedByMe(true);
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || (blockedByMe ? 'Failed to unblock user' : 'Failed to block user'));
+    } finally {
+      setIsBlockBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -2016,6 +2066,19 @@ const UserProfile: React.FC = () => {
               >
                 <Flag className="h-4 w-4" />
                 <span className="hidden sm:inline">Report</span>
+              </button>
+            )}
+
+            {!isOwnProfile && currentUser && (
+              <button
+                onClick={() => void handleToggleBlock()}
+                disabled={isBlockBusy}
+                className={`px-3 md:px-4 py-2 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed ${
+                  blockedByMe ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-900/60 hover:bg-red-800'
+                }`}
+              >
+                {isBlockBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
+                <span className="hidden sm:inline">{blockedByMe ? 'Unblock' : 'Block'}</span>
               </button>
             )}
             
@@ -2371,7 +2434,19 @@ const UserProfile: React.FC = () => {
         </div>
 
         {/* Conditional Rendering: Settings Mode vs Normal Mode */}
-        {!isSettingsMode ? (
+        {blockedByMe && !isOwnProfile ? (
+          <div className="card p-6 text-center">
+            <p className="text-white font-semibold mb-1">You blocked this user</p>
+            <p className="text-gray-400 text-sm mb-4">Their library and activity are hidden while they are blocked.</p>
+            <button
+              onClick={() => void handleToggleBlock()}
+              disabled={isBlockBusy}
+              className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isBlockBusy ? 'Working…' : 'Unblock'}
+            </button>
+          </div>
+        ) : !isSettingsMode ? (
           <>
         {/* View Mode Tabs - Only show for own profile */}
         {isOwnProfile && (
@@ -3462,7 +3537,7 @@ const UserProfile: React.FC = () => {
                       : 'border-transparent text-gray-400 hover:text-white'
                   }`}
                 >
-                  Security
+                  Security & Privacy
                 </button>
               </nav>
             </div>
@@ -4022,7 +4097,12 @@ const UserProfile: React.FC = () => {
               </div>
             )}
 
-            {activeSettingsTab === 'security' && <PasswordSecuritySection />}
+            {activeSettingsTab === 'security' && (
+              <>
+                <PasswordSecuritySection />
+                <BlockedUsersSection />
+              </>
+            )}
 
             {activeSettingsTab === 'notifications' && (
               <div className="card p-6">

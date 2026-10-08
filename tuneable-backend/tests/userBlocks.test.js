@@ -70,6 +70,7 @@ const {
   getBlockState,
   getBlockedUserIds,
   assertNotBlocked,
+  maskBlockedUsers,
 } = require('../utils/userBlocks');
 const { createNotification } = require('../services/notificationService');
 
@@ -116,6 +117,61 @@ describe('userBlocks', () => {
       code: 'USER_BLOCKED',
     });
     await expect(assertNotBlocked(alice, carol)).resolves.toBeUndefined();
+  });
+});
+
+describe('maskBlockedUsers', () => {
+  const blocked = new Set([String(bob)]);
+
+  test('masks populated user refs but keeps ids and amounts', () => {
+    const payload = {
+      media: {
+        _id: 'media-1',
+        title: 'Song',
+        bids: [
+          {
+            _id: 'bid-1',
+            amount: 500,
+            userId: {
+              _id: String(bob),
+              uuid: 'bob-uuid',
+              username: 'bob',
+              profilePic: 'https://x/bob.png',
+              homeLocation: { city: 'Leeds' },
+            },
+          },
+          {
+            _id: 'bid-2',
+            amount: 300,
+            userId: { _id: String(carol), username: 'carol', profilePic: 'https://x/carol.png' },
+          },
+        ],
+      },
+    };
+    maskBlockedUsers(payload, blocked);
+    const [bobBid, carolBid] = payload.media.bids;
+    expect(bobBid.amount).toBe(500);
+    expect(bobBid.userId).toMatchObject({ _id: String(bob), uuid: 'bob-uuid', username: 'Supporter', anonymous: true });
+    expect(bobBid.userId.profilePic).toMatch(/default-profile\.png$/);
+    expect(bobBid.userId.homeLocation).toBeUndefined();
+    expect(carolBid.userId).toEqual({ _id: String(carol), username: 'carol', profilePic: 'https://x/carol.png' });
+    expect(payload.media.title).toBe('Song');
+  });
+
+  test('masks flattened rows such as unpopulated bids and champion aggregates', () => {
+    const rows = [
+      { _id: 'bid-3', userId: String(bob), username: 'bob', amount: 100 },
+      { userId: String(bob), username: 'bob', profilePic: 'p', totalAmount: 900 },
+    ];
+    maskBlockedUsers(rows, blocked);
+    expect(rows[0]).toMatchObject({ username: 'Supporter', amount: 100, anonymous: true });
+    expect(rows[1]).toMatchObject({ username: 'Supporter', totalAmount: 900, anonymous: true });
+  });
+
+  test('is a no-op without blocks', () => {
+    const payload = { userId: { _id: String(bob), username: 'bob' } };
+    maskBlockedUsers(payload, new Set());
+    expect(payload.userId.username).toBe('bob');
   });
 });
 

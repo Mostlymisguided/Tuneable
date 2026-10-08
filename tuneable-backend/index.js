@@ -36,6 +36,7 @@ const tagRoutes = require('./routes/tagRoutes'); // Tag profile pages
 const artistRoutes = require('./routes/artistRoutes'); // Artist champions
 const collectiveRoutes = require('./routes/collectiveRoutes'); // Import collective routes
 const notificationRoutes = require('./routes/notificationRoutes'); // Import notification routes
+const maskBlockedUsers = require('./middleware/maskBlockedUsers');
 
 // Use environment variable for port or default to 8000
 const PORT = process.env.PORT || 8000;
@@ -424,14 +425,14 @@ console.log('Webhook route registered directly on app (raw body preserved).');
 console.log('Registering API routes...');
 app.use('/api/search', searchRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/parties', partyRoutes); // Unified party and playlist functionality
-app.use('/api/media', mediaRoutes); // Media routes (top-tunes, etc.)
-app.use('/api/songs', mediaRoutes); // Backward compatibility - routes to same Media handlers
+app.use('/api/parties', maskBlockedUsers, partyRoutes); // Unified party and playlist functionality
+app.use('/api/media', maskBlockedUsers, mediaRoutes); // Media routes (top-tunes, etc.)
+app.use('/api/songs', maskBlockedUsers, mediaRoutes); // Backward compatibility - routes to same Media handlers
 app.use('/api/payments', paymentRoutes);
 app.use('/api/youtube', youtubeRoutes);
 app.use('/api/auth', authRoutes); // OAuth routes
-app.use('/api/podcasts', podcastRoutes); // Consolidated Podcast routes
-app.use('/api/books', bookRoutes);
+app.use('/api/podcasts', maskBlockedUsers, podcastRoutes); // Consolidated Podcast routes
+app.use('/api/books', maskBlockedUsers, bookRoutes);
 app.use('/api/bid-metrics', bidMetricsRoutes); // Bid metrics API routes
 app.use('/api/claims', require('./routes/claimRoutes')); // Tune ownership claims
 app.use('/api/rights', require('./routes/rightsRoutes')); // Rights-ops cases / outreach
@@ -440,8 +441,8 @@ app.use('/api/reports', reportRoutes); // Report routes
 app.use('/api/email', emailRoutes); // Email routes
 app.use('/api/labels', labelRoutes); // Label routes
 app.use('/api/gear', gearRoutes); // Production gear catalog
-app.use('/api/tags', tagRoutes); // Tag profile pages
-app.use('/api/artists', artistRoutes); // Artist champions
+app.use('/api/tags', maskBlockedUsers, tagRoutes); // Tag profile pages
+app.use('/api/artists', maskBlockedUsers, artistRoutes); // Artist champions
 app.use('/api/collectives', collectiveRoutes); // Collective routes
 app.use('/api/notifications', notificationRoutes); // Notification routes
 app.use('/api/conversations', require('./routes/conversationRoutes')); // Tuneable Conversations

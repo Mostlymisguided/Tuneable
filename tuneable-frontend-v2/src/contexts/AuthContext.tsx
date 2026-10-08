@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { authAPI, setAuthTokenGetter } from '../lib/api';
+import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import type { ResolvedLocation } from '../utils/locationHelpers';
@@ -209,6 +210,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initAuth();
   }, []);
+
+  const userKey = user?.uuid || user?._id || user?.id || null;
+  useEffect(() => {
+    if (userKey) void useBlockedUsersStore.getState().load();
+    else useBlockedUsersStore.getState().clear();
+  }, [userKey]);
 
   const clearPlayers = () => {
     useWebPlayerStore.getState().setCurrentMedia(null);

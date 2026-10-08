@@ -82,6 +82,8 @@ export interface ChartMediaItem {
       profilePic?: string;
       uuid?: string;
       homeLocation?: import('@/src/types/user').ResolvedLocation | null;
+      /** Set by the server when either side has blocked the other. */
+      anonymous?: boolean;
     };
   }>;
 }
