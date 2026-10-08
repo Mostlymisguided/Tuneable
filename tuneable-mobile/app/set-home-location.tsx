@@ -36,6 +36,7 @@ export default function SetHomeLocationScreen() {
   const [error, setError] = useState<string | null>(null);
   const busy = saving || requestingGps;
   const seededHome = useRef(false);
+  const gpsRequestId = useRef(0);
 
   useEffect(() => {
     if (seededHome.current || !hasHomeLocation(user?.homeLocation)) return;
@@ -48,10 +49,12 @@ export default function SetHomeLocationScreen() {
   }
 
   const requestDeviceLocation = async () => {
+    const requestId = ++gpsRequestId.current;
     setRequestingGps(true);
     setError(null);
     try {
       const location = await refreshCurrentLocation({ force: true });
+      if (requestId !== gpsRequestId.current) return;
       if (location) {
         setHomeLocation(location);
         setLocationFromGps(true);
@@ -66,7 +69,7 @@ export default function SetHomeLocationScreen() {
       }
       setError('Could not detect your location. Search for your city instead.');
     } finally {
-      setRequestingGps(false);
+      if (requestId === gpsRequestId.current) setRequestingGps(false);
     }
   };
 
@@ -146,11 +149,13 @@ export default function SetHomeLocationScreen() {
         <LocationAutocomplete
           value={homeLocation}
           onChange={(location) => {
+            gpsRequestId.current += 1;
+            setRequestingGps(false);
             setLocationFromGps(false);
             setHomeLocation(location);
           }}
           label="Home location"
-          disabled={busy}
+          disabled={saving}
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}

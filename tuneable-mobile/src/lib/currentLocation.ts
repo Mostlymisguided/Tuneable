@@ -72,6 +72,46 @@ export function getTipCurrentLocation(): ResolvedLocation | null {
   return null;
 }
 
+const LAST_KNOWN_MAX_AGE_MS = 10 * 60 * 1000;
+const LAST_KNOWN_ACCURACY_M = 5000;
+const POSITION_TIMEOUT_MS = 12000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
+ * Only city-level precision is needed. Android's getCurrentPositionAsync can
+ * wait indefinitely for a fresh fix, so prefer a recent cached fix and cap the wait.
+ */
+async function getDevicePosition(): Promise<Location.LocationObject | null> {
+  const recent = await Location.getLastKnownPositionAsync({
+    maxAge: LAST_KNOWN_MAX_AGE_MS,
+    requiredAccuracy: LAST_KNOWN_ACCURACY_M,
+  }).catch(() => null);
+  if (recent) return recent;
+
+  const fresh = await withTimeout(
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low }),
+    POSITION_TIMEOUT_MS
+  );
+  if (fresh) return fresh;
+
+  return Location.getLastKnownPositionAsync().catch(() => null);
+}
+
 /**
  * Request device location, reverse-geocode via Mapbox, and cache for tip stamps.
  */
@@ -96,9 +136,16 @@ export async function refreshCurrentLocation(options?: {
       return null;
     }
 
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
+    if (!(await Location.hasServicesEnabledAsync())) {
+      setStatus('unavailable', 'Location services are disabled');
+      return null;
+    }
+
+    const position = await getDevicePosition();
+    if (!position) {
+      setStatus('unavailable', 'Location timeout');
+      return null;
+    }
     const { longitude, latitude } = position.coords;
     const { location } = await locationAPI.reverse(longitude, latitude);
     if (!location?.placeId && !location?.city && !location?.country) {

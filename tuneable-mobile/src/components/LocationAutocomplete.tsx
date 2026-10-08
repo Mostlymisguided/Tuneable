@@ -45,6 +45,7 @@ export function LocationAutocomplete({
   const [isResolving, setIsResolving] = useState(false);
   const [focused, setFocused] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suggestRequestId = useRef(0);
 
   useEffect(() => {
     if (!focused) {
@@ -60,6 +61,7 @@ export function LocationAutocomplete({
 
   const runSuggest = (searchText: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    const requestId = ++suggestRequestId.current;
     if (searchText.trim().length < MIN_QUERY_LENGTH) {
       setSuggestions([]);
       setIsSearching(false);
@@ -69,11 +71,12 @@ export function LocationAutocomplete({
       setIsSearching(true);
       try {
         const response = await locationAPI.suggest(searchText.trim(), { limit: 6 });
+        if (requestId !== suggestRequestId.current) return;
         setSuggestions(response.suggestions || []);
       } catch {
-        setSuggestions([]);
+        if (requestId === suggestRequestId.current) setSuggestions([]);
       } finally {
-        setIsSearching(false);
+        if (requestId === suggestRequestId.current) setIsSearching(false);
       }
     }, DEBOUNCE_MS);
   };
@@ -94,6 +97,9 @@ export function LocationAutocomplete({
   };
 
   const onClear = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    suggestRequestId.current += 1;
+    setIsSearching(false);
     onChange(null);
     setQuery('');
     setSuggestions([]);
