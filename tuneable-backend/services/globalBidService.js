@@ -359,9 +359,8 @@ async function placeGlobalBid(userId, {
     console.error('Failed to create ledger entry for global bid:', bid._id, error);
   }
 
-  const { applyWalletSpend } = require('../utils/welcomeCreditHelper');
-  applyWalletSpend(user, bidAmountPence);
-  await user.save();
+  const { persistWalletSpend } = require('../utils/welcomeCreditHelper');
+  await persistWalletSpend(user, bidAmountPence, bid);
 
   setImmediate(() => {
     const tuneBytesService = require('./tuneBytesService');

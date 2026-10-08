@@ -40,6 +40,122 @@ function applyWalletSpend(user, amountPence) {
   };
 }
 
+function insufficientBalanceError(available) {
+  const err = new Error('Insufficient balance');
+  err.status = 400;
+  err.code = 'INSUFFICIENT_BALANCE';
+  err.available = available || 0;
+  return err;
+}
+
+/**
+ * Debit balance and welcome credit in one conditional update.
+ * Overlapping spends cannot both succeed against the same balance.
+ * Syncs the in-memory user and unmarks those paths so a later save cannot
+ * write a stale balance back.
+ */
+async function commitWalletSpend(user, amountPence) {
+  const User = require('../models/User');
+  const amount = Math.max(0, Math.round(Number(amountPence)) || 0);
+  const userId = user._id || user;
+  if (amount <= 0) {
+    return {
+      welcomeCreditAppliedPence: 0,
+      paidPence: 0,
+      balance: user.balance || 0,
+    };
+  }
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const current = attempt === 0
+      ? user
+      : await User.findById(userId).select('balance welcomeCreditRemainingPence');
+    if (!current) {
+      const err = new Error('User not found');
+      err.status = 404;
+      throw err;
+    }
+
+    const balance = current.balance || 0;
+    if (balance < amount) throw insufficientBalanceError(balance);
+
+    const welcomeCreditAppliedPence = peekWelcomeCreditApplied(current, amount);
+    const filter = { _id: userId, balance: { $gte: amount } };
+    const inc = { balance: -amount };
+    if (welcomeCreditAppliedPence > 0) {
+      filter.welcomeCreditRemainingPence = { $gte: welcomeCreditAppliedPence };
+      inc.welcomeCreditRemainingPence = -welcomeCreditAppliedPence;
+    }
+
+    const updated = await User.findOneAndUpdate(filter, { $inc: inc }, { new: true });
+    if (!updated) continue;
+
+    user.balance = updated.balance;
+    user.welcomeCreditRemainingPence = updated.welcomeCreditRemainingPence;
+    if (typeof user.unmarkModified === 'function') {
+      user.unmarkModified('balance');
+      user.unmarkModified('welcomeCreditRemainingPence');
+    }
+    return {
+      welcomeCreditAppliedPence,
+      paidPence: amount - welcomeCreditAppliedPence,
+      balance: updated.balance,
+    };
+  }
+
+  throw insufficientBalanceError(0);
+}
+
+/** Put a committed spend back. Used when the action it paid for did not save. */
+async function releaseWalletSpend(user, amountPence, welcomeCreditAppliedPence) {
+  const User = require('../models/User');
+  const amount = Math.max(0, Math.round(Number(amountPence)) || 0);
+  const welcome = Math.max(0, Math.round(Number(welcomeCreditAppliedPence)) || 0);
+  if (!user?._id || amount <= 0) return;
+  const inc = { balance: amount };
+  if (welcome > 0) inc.welcomeCreditRemainingPence = welcome;
+  const updated = await User.findByIdAndUpdate(user._id, { $inc: inc }, { new: true });
+  if (!updated) return;
+  user.balance = updated.balance;
+  user.welcomeCreditRemainingPence = updated.welcomeCreditRemainingPence;
+  if (typeof user.unmarkModified === 'function') {
+    user.unmarkModified('balance');
+    user.unmarkModified('welcomeCreditRemainingPence');
+  }
+}
+
+async function voidUnpaidBid(bid) {
+  if (!bid?._id) return;
+  const Bid = require('../models/Bid');
+  const Media = require('../models/Media');
+  await Bid.updateOne({ _id: bid._id, status: 'active' }, { status: 'refunded' });
+  if (bid.mediaId) {
+    await Media.updateOne({ _id: bid.mediaId }, { $pull: { bids: bid._id } });
+  }
+}
+
+/**
+ * Persist a wallet spend. If the balance lost a race, mark the bid refunded
+ * so it does not stay active unpaid.
+ */
+async function persistWalletSpend(user, amountPence, bid) {
+  try {
+    const spend = await commitWalletSpend(user, amountPence);
+    if (bid && Number(bid.welcomeCreditAppliedPence || 0) !== spend.welcomeCreditAppliedPence) {
+      const Bid = require('../models/Bid');
+      bid.welcomeCreditAppliedPence = spend.welcomeCreditAppliedPence;
+      await Bid.updateOne(
+        { _id: bid._id },
+        { welcomeCreditAppliedPence: spend.welcomeCreditAppliedPence }
+      );
+    }
+    return spend;
+  } catch (err) {
+    if (err.code === 'INSUFFICIENT_BALANCE') await voidUnpaidBid(bid);
+    throw err;
+  }
+}
+
 /**
  * Historically restored welcome credit on refund. That enabled promo recycle /
  * chart loops, so refunds now return as paid balance only.
@@ -152,6 +268,9 @@ module.exports = {
   getWelcomeCreditRemaining,
   peekWelcomeCreditApplied,
   applyWalletSpend,
+  commitWalletSpend,
+  persistWalletSpend,
+  releaseWalletSpend,
   restoreWelcomeCredit,
   balanceRefundInc,
   sumWelcomeCreditAppliedForBids,

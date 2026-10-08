@@ -229,35 +229,57 @@ async function placePledge({ conversationId, user, amountPounds, message }) {
   await assertWelcomeGenericSpend({ user: freshUser, amountPence });
 
   const balanceBefore = freshUser.balance;
-  const { applyWalletSpend } = require('../utils/welcomeCreditHelper');
-  const { welcomeCreditAppliedPence } = applyWalletSpend(freshUser, amountPence);
-  await freshUser.save();
+  const { commitWalletSpend, releaseWalletSpend } = require('../utils/welcomeCreditHelper');
+  const { welcomeCreditAppliedPence } = await commitWalletSpend(freshUser, amountPence);
 
-  await createWalletTx({
-    user: freshUser,
-    amountPence,
-    type: 'pledge',
-    description: `Pledge to conversation: ${conversation.title}`,
-    metadata: {
-      conversationId: conversation._id.toString(),
-      conversationUuid: conversation.uuid,
+  let pledgeRecorded = false;
+  try {
+    await createWalletTx({
+      user: freshUser,
+      amountPence,
+      type: 'pledge',
+      description: `Pledge to conversation: ${conversation.title}`,
+      metadata: {
+        conversationId: conversation._id.toString(),
+        conversationUuid: conversation.uuid,
+        welcomeCreditAppliedPence,
+      },
+      balanceBefore,
+    });
+    pledgeRecorded = true;
+
+    conversation.pledges.push({
+      uuid: uuidv7(),
+      userId: freshUser._id,
+      user_uuid: freshUser.uuid,
+      username: freshUser.username,
+      amount: amountPence,
       welcomeCreditAppliedPence,
-    },
-    balanceBefore,
-  });
-
-  conversation.pledges.push({
-    uuid: uuidv7(),
-    userId: freshUser._id,
-    user_uuid: freshUser.uuid,
-    username: freshUser.username,
-    amount: amountPence,
-    welcomeCreditAppliedPence,
-    status: 'active',
-    message: message?.trim()?.slice(0, 500) || undefined,
-  });
-  conversation.recalculateTotalPledged();
-  await conversation.save();
+      status: 'active',
+      message: message?.trim()?.slice(0, 500) || undefined,
+    });
+    conversation.recalculateTotalPledged();
+    await conversation.save();
+  } catch (err) {
+    await releaseWalletSpend(freshUser, amountPence, welcomeCreditAppliedPence);
+    if (pledgeRecorded) {
+      await createWalletTx({
+        user: freshUser,
+        amountPence,
+        type: 'pledge_refund',
+        description: `Pledge reversed: ${conversation.title}`,
+        metadata: {
+          conversationId: conversation._id.toString(),
+          conversationUuid: conversation.uuid,
+          reversedBecause: 'pledge_save_failed',
+        },
+        balanceBefore: balanceBefore - amountPence,
+      }).catch((refundErr) => {
+        console.error('Failed to record pledge reversal:', refundErr);
+      });
+    }
+    throw err;
+  }
 
   await maybePromoteToFunded(conversation);
 

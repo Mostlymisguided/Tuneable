@@ -1709,7 +1709,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         // Create bid record with denormalized fields and aggregate tracking
         // Store amount in pence (convert from pounds input)
-        const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
+        const { peekWelcomeCreditApplied, persistWalletSpend } = require('../utils/welcomeCreditHelper');
         const bid = new Bid({
             userId,
             partyId,
@@ -1977,9 +1977,7 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
           });
         });
         
-        // THEN update user balance (promo-first welcome credit)
-        applyWalletSpend(user, bidAmountPence);
-        await user.save();
+        await persistWalletSpend(user, bidAmountPence, bid);
 
         // Populate the response
         const populatedMedia = await Media.findById(media._id)
@@ -2322,7 +2320,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         }
         
         // Create bid record with denormalized fields and aggregate tracking
-        const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
+        const { peekWelcomeCreditApplied, persistWalletSpend } = require('../utils/welcomeCreditHelper');
         const bid = new Bid({
             userId,
             partyId,
@@ -2607,9 +2605,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
           });
         });
         
-        // THEN update user balance (promo-first welcome credit)
-        applyWalletSpend(user, bidAmountPence);
-        await user.save();
+        await persistWalletSpend(user, bidAmountPence, bid);
 
         // Get updated media with bids
         const updatedMedia = await Media.findById(actualMediaId)

@@ -124,7 +124,7 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
     
     // Create bid (using mediaId, not episodeId) - BidMetricsEngine will update aggregates
-    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
+    const { peekWelcomeCreditApplied, persistWalletSpend } = require('../utils/welcomeCreditHelper');
     const bid = new Bid({
       userId,
       partyId: globalParty._id,
@@ -167,9 +167,7 @@ router.post('/:episodeId/boost', authMiddleware, async (req, res) => {
       console.error('Failed to create ledger entry for podcast boost:', ledgerError);
     }
     
-    // Deduct user balance (promo-first welcome credit)
-    applyWalletSpend(user, bidAmountPence);
-    await user.save();
+    await persistWalletSpend(user, bidAmountPence, bid);
     
     // Allocate artist escrow (async)
     try {
@@ -303,7 +301,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
     
     // Create bid (using mediaId, not episodeId)
-    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
+    const { peekWelcomeCreditApplied, persistWalletSpend } = require('../utils/welcomeCreditHelper');
     const bid = new Bid({
       userId,
       partyId,
@@ -346,9 +344,7 @@ router.post('/:episodeId/party/:partyId/bid', authMiddleware, async (req, res) =
       console.error('Failed to create ledger entry for podcast party bid:', ledgerError);
     }
     
-    // Deduct user balance (promo-first welcome credit)
-    applyWalletSpend(user, amountInPence);
-    await user.save();
+    await persistWalletSpend(user, amountInPence, bid);
     
     // Allocate artist escrow (async)
     try {

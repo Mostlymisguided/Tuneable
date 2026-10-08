@@ -368,43 +368,13 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
     } else {
       console.log(`⚠️ Unhandled checkout session type: ${session.metadata?.type || 'no metadata'}`);
     }
-  } else if (event.type === 'charge.refunded') {
+  } else if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
     try {
-      const charge = event.data.object;
-      const paymentIntentId =
-        typeof charge.payment_intent === 'string'
-          ? charge.payment_intent
-          : charge.payment_intent?.id;
-      const fullyRefunded =
-        charge.refunded === true ||
-        (Number(charge.amount_refunded || 0) >= Number(charge.amount || 0) &&
-          Number(charge.amount || 0) > 0);
-
-      if (!paymentIntentId || !fullyRefunded) {
-        return res.json({ received: true });
-      }
-
-      const WalletTransaction = require('./models/WalletTransaction');
-      const tx = await WalletTransaction.findOne({
-        stripePaymentIntentId: paymentIntentId,
-        type: 'topup',
-        paymentMethod: 'stripe',
-      });
-
-      if (!tx) {
-        return res.json({ received: true });
-      }
-
-      if (tx.status === 'completed') {
-        tx.status = 'refunded';
-        await tx.save();
-      }
-
-      const { unconvertPromoEscrowIfNoPaidTopUp } = require('./services/welcomePromoEscrowService');
-      await unconvertPromoEscrowIfNoPaidTopUp(tx.userId);
-      console.log(`⚠️ Stripe charge refunded for top-up ${tx._id}; promo escrow unconvert checked`);
+      const { clawbackFromStripeEvent } = require('./services/stripeClawbackService');
+      await clawbackFromStripeEvent(event);
     } catch (refundErr) {
-      console.error('Failed to handle charge.refunded for promo escrow:', refundErr);
+      console.error(`Failed to claw back wallet credit for ${event.type}:`, refundErr);
+      return res.status(500).json({ error: 'Failed to process payment reversal' });
     }
     return res.json({ received: true });
   } else {

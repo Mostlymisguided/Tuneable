@@ -689,8 +689,10 @@ router.get('/profile', authMiddleware, async (req, res) => {
     // Add statistics to user object
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
     const { attachFoundingProfileFields } = require('../utils/foundingCreators');
+    const { stripSensitiveUserFields } = require('../utils/userSanitizer');
+    const safeUser = stripSensitiveUserFields(user.toObject());
     const userWithStats = withWelcomeCreditOffer(await attachFoundingProfileFields({
-      ...user.toObject(),
+      ...safeUser,
       hasPassword: Boolean(user.password),
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
@@ -3459,10 +3461,57 @@ function markDefaultTipPromptSeen(user) {
   }
 }
 
+const PROFILE_SOCIAL_KEYS = ['instagram', 'facebook', 'soundcloud', 'spotify', 'youtube', 'twitter'];
+
+function assignProfileText(user, field, value, maxLength) {
+  if (value === undefined) return null;
+  if (typeof value !== 'string') {
+    return { status: 400, body: { error: `${field} must be text`, field } };
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > maxLength) {
+    return { status: 400, body: { error: `${field} is too long`, field } };
+  }
+  user[field] = trimmed;
+  return null;
+}
+
+function assignSocialMedia(user, socialMedia) {
+  if (socialMedia === undefined) return null;
+  if (!socialMedia || typeof socialMedia !== 'object' || Array.isArray(socialMedia)) {
+    return { status: 400, body: { error: 'socialMedia must be an object', field: 'socialMedia' } };
+  }
+  if (!user.socialMedia) user.socialMedia = {};
+  for (const key of PROFILE_SOCIAL_KEYS) {
+    if (socialMedia[key] === undefined) continue;
+    const value = socialMedia[key];
+    if (value === null || value === '') {
+      user.socialMedia[key] = null;
+      continue;
+    }
+    if (typeof value !== 'string' || value.trim().length > 300) {
+      return { status: 400, body: { error: `Invalid ${key} link`, field: `socialMedia.${key}` } };
+    }
+    user.socialMedia[key] = value.trim();
+  }
+  return null;
+}
+
 // Update user profile (excluding profile picture)
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { profilePic, homeLocation, secondaryLocation, locations, username, onboarding, preferences, ...updatedFields } = req.body; // Extract special fields separately for validation
+    const {
+      homeLocation,
+      secondaryLocation,
+      locations,
+      username,
+      onboarding,
+      preferences,
+      givenName,
+      familyName,
+      cellPhone,
+      socialMedia,
+    } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -3674,8 +3723,13 @@ router.put('/profile', authMiddleware, async (req, res) => {
       }
     }
 
-    // Update other fields (excluding username which is already handled above)
-    Object.assign(user, updatedFields);
+    const nameError = assignProfileText(user, 'givenName', givenName, 80)
+      || assignProfileText(user, 'familyName', familyName, 80)
+      || assignProfileText(user, 'cellPhone', cellPhone, 32);
+    if (nameError) return res.status(nameError.status).json(nameError.body);
+
+    const socialError = assignSocialMedia(user, socialMedia);
+    if (socialError) return res.status(socialError.status).json(socialError.body);
     
     // Save user with validation
     try {
@@ -3916,8 +3970,10 @@ router.delete('/profile-pic', authMiddleware, async (req, res) => {
   }
 });
 
-// Temporary route to make a user admin (for testing)
-router.post('/make-admin/:userId', async (req, res) => {
+// @route   POST /api/users/make-admin/:userId
+// @desc    Grant the admin role. Requires an existing admin.
+// @access  Private (Admin)
+router.post('/make-admin/:userId', adminMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     
@@ -4159,28 +4215,7 @@ router.get('/:userId/profile', async (req, res) => {
       req.user._id?.toString() === userObj._id.toString() ||
       req.user.uuid === userObj.uuid
     );
-    
-    // If no authenticated user, check if the userId in the request matches the profile
-    // This allows users to see their own profile data even when not authenticated
-    // (though in practice, most profile views will be authenticated)
-    const profileOwnerViewingSelf = !req.user && (
-      userId === userObj.uuid || 
-      userId === userObj._id.toString()
-    );
-    
-    // Combine both checks - show social media if viewing own profile OR if no auth but IDs match
-    const shouldShowSocialMedia = isOwnProfile || profileOwnerViewingSelf;
 
-    // Build user object
-    // Debug: Check socialMedia field on user document
-    console.log('🔍 User document socialMedia:', {
-      hasSocialMedia: !!userObj.socialMedia,
-      socialMediaType: typeof userObj.socialMedia,
-      socialMediaValue: userObj.socialMedia,
-      socialMediaKeys: userObj.socialMedia ? Object.keys(userObj.socialMedia) : [],
-      fullUserObj: JSON.stringify(userObj, null, 2).substring(0, 500) // First 500 chars
-    });
-    
     // Explicitly access socialMedia - ensure it's included
     // Access from both the original user document and converted object
     const socialMediaFromDoc = user.socialMedia || {};
@@ -4193,32 +4228,16 @@ router.get('/:userId/profile', async (req, res) => {
       : (socialMediaFromDoc && typeof socialMediaFromDoc === 'object' && !Array.isArray(socialMediaFromDoc))
         ? { ...socialMediaFromDoc }
         : {};
-    
-    console.log('📦 Final socialMediaData:', socialMediaData);
-    console.log('📦 socialMediaFromDoc:', socialMediaFromDoc);
-    console.log('📦 socialMediaFromObj:', socialMediaFromObj);
-    console.log('📦 socialMediaData type check:', {
-      isObject: typeof socialMediaData === 'object',
-      isArray: Array.isArray(socialMediaData),
-      hasKeys: Object.keys(socialMediaData).length > 0,
-      keys: Object.keys(socialMediaData),
-      stringified: JSON.stringify(socialMediaData)
-    });
-    
+
     const userResponse = {
       id: userObj.uuid, // Use UUID as primary ID for external API
       uuid: userObj.uuid,
       _id: userObj._id,
       username: userObj.username,
       profilePic: userObj.profilePic,
-      email: userObj.email,
-      balance: userObj.balance,
-      personalInviteCode: userObj.personalInviteCode,
-      cellPhone: userObj.cellPhone || '',
       homeLocation: userObj.homeLocation || null,
       secondaryLocation: userObj.secondaryLocation || null,
       role: userObj.role,
-      isActive: userObj.isActive,
       createdAt: userObj.createdAt,
       updatedAt: userObj.updatedAt,
       globalUserAggregateRank: userAggregateRank,
@@ -4227,25 +4246,19 @@ router.get('/:userId/profile', async (req, res) => {
       tuneBytes: userObj.tuneBytes || 0,
       socialMedia: socialMediaData,
       creatorProfile: userObj.creatorProfile,
-      // Include preferences if viewing own profile
-      preferences: (isOwnProfile || profileOwnerViewingSelf) ? userObj.preferences : undefined,
     };
 
-    // If anonymous mode is enabled and not viewing own profile, hide names and social media
-    console.log('🔒 Anonymous mode check:', {
-      hasPreferences: !!userObj.preferences,
-      anonymousMode: userObj.preferences?.anonymousMode,
-      isOwnProfile: isOwnProfile,
-      profileOwnerViewingSelf: profileOwnerViewingSelf,
-      shouldShowSocialMedia: shouldShowSocialMedia,
-      reqUser: req.user ? { id: req.user._id, userId: req.user.userId, uuid: req.user.uuid } : null,
-      userObjId: userObj._id,
-      userObjUuid: userObj.uuid,
-      requestUserId: userId,
-      willHideSocialMedia: userObj.preferences?.anonymousMode && !shouldShowSocialMedia
-    });
-    
-    if (userObj.preferences?.anonymousMode && !shouldShowSocialMedia) {
+    if (isOwnProfile) {
+      userResponse.email = userObj.email;
+      userResponse.balance = userObj.balance;
+      userResponse.personalInviteCode = userObj.personalInviteCode;
+      userResponse.cellPhone = userObj.cellPhone || '';
+      userResponse.isActive = userObj.isActive;
+      userResponse.preferences = userObj.preferences;
+    }
+
+    // Anonymous mode hides names and social links from everyone except the signed-in owner.
+    if (userObj.preferences?.anonymousMode && !isOwnProfile) {
       // Remove givenName and familyName from response
       // They're not explicitly included above, but we'll ensure they're not
       delete userResponse.givenName;
@@ -4255,29 +4268,13 @@ router.get('/:userId/profile', async (req, res) => {
         delete userResponse.creatorProfile.artistName; // If artistName contains real name
       }
       // Hide social media links in anonymous mode (now top-level)
-      console.log('🔒 Hiding socialMedia due to anonymous mode');
       if (userResponse.socialMedia) {
         delete userResponse.socialMedia;
       }
     } else {
-      // Include names if not anonymous or viewing own profile
       if (userObj.givenName !== undefined) userResponse.givenName = userObj.givenName;
       if (userObj.familyName !== undefined) userResponse.familyName = userObj.familyName;
-      console.log('✅ SocialMedia will be included in response (anonymous mode disabled OR viewing own profile):', userResponse.socialMedia);
     }
-    
-    // Final check before sending
-    console.log('📤 Final userResponse before sending:', {
-      hasSocialMedia: !!userResponse.socialMedia,
-      socialMediaKeys: userResponse.socialMedia ? Object.keys(userResponse.socialMedia) : []
-    });
-
-    // Final verification before sending
-    console.log('📤 About to send response:', {
-      userResponseHasSocialMedia: !!userResponse.socialMedia,
-      userResponseSocialMediaValue: userResponse.socialMedia,
-      userResponseKeys: Object.keys(userResponse)
-    });
     
     res.json({
       message: 'User profile fetched successfully',

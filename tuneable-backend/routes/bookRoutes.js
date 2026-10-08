@@ -361,7 +361,7 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
     const userBidsPre = await Bid.find({ userId, status: 'active' }).lean();
     const userAggregatePre = userBidsPre.reduce((sum, b) => sum + (b.amount || 0), 0);
 
-    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
+    const { peekWelcomeCreditApplied, persistWalletSpend } = require('../utils/welcomeCreditHelper');
     const bid = new Bid({
       userId,
       partyId: globalParty._id,
@@ -403,8 +403,7 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
       console.error('Failed to create ledger entry for book boost:', ledgerError);
     }
 
-    applyWalletSpend(user, bidAmountPence);
-    await user.save();
+    await persistWalletSpend(user, bidAmountPence, bid);
 
     try {
       const artistEscrowService = require('../services/artistEscrowService');

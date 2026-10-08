@@ -3401,7 +3401,7 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     
     // Create bid using standard party bid flow
     const Bid = require('../models/Bid');
-    const { peekWelcomeCreditApplied, applyWalletSpend } = require('../utils/welcomeCreditHelper');
+    const { peekWelcomeCreditApplied, persistWalletSpend } = require('../utils/welcomeCreditHelper');
     // Store amount in pence (convert from pounds input)
     const bid = new Bid({
       userId,
@@ -3619,9 +3619,8 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up notifications:', error);
     }
 
-    // Update user balance (promo-first welcome credit) - AFTER ledger entry
-    applyWalletSpend(user, bidAmountPence);
-    await user.save();
+    // Atomic debit after the ledger snapshot. A lost race refunds the bid.
+    await persistWalletSpend(user, bidAmountPence, bid);
 
     // Settle TuneBytes after the response path. Idempotency is enforced by the
     // TuneBytes transaction model, so retries cannot award the bid twice.
