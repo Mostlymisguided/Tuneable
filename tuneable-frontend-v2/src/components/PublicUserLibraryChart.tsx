@@ -146,6 +146,8 @@ export interface PublicUserLibraryChartProps {
   onPlay: (item: LibraryItem, index: number, list: LibraryItem[]) => void;
   onTip: (item: LibraryItem) => void;
   emptyMessage?: string;
+  /** Creators are ranked by each track's total tips. Everyone else by their own tips. */
+  rankBy?: 'user' | 'track';
 }
 
 const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
@@ -155,6 +157,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
   onPlay,
   onTip,
   emptyMessage,
+  rankBy = 'user',
 }) => {
   const [showTagFilterCloud, setShowTagFilterCloud] = useState(false);
   const [showTimeFilter, setShowTimeFilter] = useState(false);
@@ -222,10 +225,13 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
     }
 
     return sortChartItems(list, chartSort, {
-      getDate: (item) => item.lastBidAt,
-      getTip: (item) => item.globalUserMediaAggregate || 0,
+      getDate: (item) => (rankBy === 'track' ? (item.createdAt || item.lastBidAt) : item.lastBidAt),
+      getTip: (item) =>
+        rankBy === 'track'
+          ? (item.globalMediaAggregate || 0)
+          : (item.globalUserMediaAggregate || 0),
     });
-  }, [items, selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, chartSort]);
+  }, [items, selectedTags, selectedTimePeriod, bpmFilterRange, searchQuery, chartSort, rankBy]);
 
   const chartRanks = useMemo(
     () => buildChartRankMap(filteredItems, (item) => item.mediaUuid || item.mediaId),

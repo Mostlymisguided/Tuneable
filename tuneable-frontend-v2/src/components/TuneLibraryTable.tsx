@@ -59,6 +59,7 @@ export interface LibraryItem {
   tuneBytesEarned: number;
   lastBidAt: string;
   firstBidAt?: string;
+  createdAt?: string | null;
   bids?: LibraryBid[];
 }
 

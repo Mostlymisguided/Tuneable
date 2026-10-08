@@ -1121,10 +1121,6 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
       .select('mediaId amount createdAt mediaTitle mediaArtist mediaCoverArt mediaDuration')
       .lean();
     
-    if (userBids.length === 0) {
-      return { library: [], total: 0 };
-    }
-    
     // Group bids by mediaId and calculate aggregates
     const mediaAggregates = {};
     
@@ -1162,6 +1158,46 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
         mediaAggregates[mediaId].firstBidAt = bid.createdAt;
       }
     });
+
+    // Creator profiles also list music they own, even when they have not tipped on it.
+    // A 0% mediaOwners row is a library-import curator placeholder, not ownership.
+    const profileRoles = Array.isArray(user?.role) ? user.role : [];
+    if (profileRoles.includes('creator')) {
+      const ownerMatchId = mongoose.Types.ObjectId.isValid(user._id)
+        ? new mongoose.Types.ObjectId(user._id)
+        : user._id;
+      const ownedMedia = await Media.find({
+        'mediaOwners.userId': ownerMatchId,
+        status: { $nin: ['deleted', 'vetoed'] },
+      })
+        .select('_id createdAt uploadedAt mediaOwners')
+        .lean();
+
+      ownedMedia.forEach((mediaDoc) => {
+        const mediaId = mediaDoc._id.toString();
+        const stake = (mediaDoc.mediaOwners || []).find((owner) =>
+          owner?.userId && String(owner.userId) === String(user._id)
+        );
+        if (!stake || Number(stake.percentage) === 0) return;
+        if (mediaAggregates[mediaId]) return;
+        const addedAt = mediaDoc.uploadedAt || mediaDoc.createdAt || new Date(0);
+        mediaAggregates[mediaId] = {
+          mediaId,
+          userBidTotal: 0,
+          bidCount: 0,
+          lastBidAt: addedAt,
+          firstBidAt: addedAt,
+          mediaTitle: null,
+          mediaArtist: null,
+          mediaCoverArt: null,
+          mediaDuration: null,
+        };
+      });
+    }
+
+    if (Object.keys(mediaAggregates).length === 0) {
+      return { library: [], total: 0 };
+    }
     
     // Get all unique media IDs
     const mediaIds = Object.keys(mediaAggregates)
@@ -1186,7 +1222,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
 
     const [mediaItems, tuneBytesByMedia, supporterStats, viewerTotals] = await Promise.all([
       Media.find({ _id: { $in: mediaIds } })
-        .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries')
+        .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries createdAt uploadedAt')
         .populate('podcastSeries', 'title')
         .populate('globalMediaAggregateTopUser', 'username uuid _id')
         .lean(),
@@ -1330,7 +1366,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
     const library = Object.values(mediaAggregates)
       .map(aggregate => {
         const media = mediaLookup[aggregate.mediaId];
-        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, slug, contentForm, sources;
+        let title, artist, coverArt, duration, bpm, releaseDate, releaseYear, primaryLocation, tags, globalMediaAggregate, mediaUuid, slug, contentForm, sources, createdAt;
         let playability = {};
 
         if (media) {
@@ -1349,6 +1385,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
           contentForm = media.contentForm || [];
           playability = enrichMediaWithPlayability(media, { authenticated });
           sources = playability.sources || {};
+          createdAt = media.createdAt || media.uploadedAt || aggregate.lastBidAt || null;
         } else {
           // Fallback: Media doc not found (deleted, migration, etc.) - use denormalized bid data
           console.warn('Media not found for mediaId:', aggregate.mediaId, '- using bid denormalized data');
@@ -1366,6 +1403,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
           slug = null;
           contentForm = [];
           sources = {};
+          createdAt = aggregate.lastBidAt || null;
         }
 
         try {
@@ -1384,7 +1422,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
             bids.push(bid);
           });
           const ownerKey = String(ownerId);
-          if (!includedSupporterIds.has(ownerKey)) {
+          if (!includedSupporterIds.has(ownerKey) && (aggregate.userBidTotal || 0) > 0) {
             const ownerBid = toSupporterBid(ownerId, aggregate.userBidTotal || 0);
             if (ownerBid) bids.push(ownerBid);
           }
@@ -1428,6 +1466,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
             supporterCount: supporterStat.supporterCount || bids.length,
             lastBidAt: aggregate.lastBidAt,
             firstBidAt: aggregate.firstBidAt,
+            createdAt,
             bids,
           };
         } catch (buildError) {
@@ -1537,7 +1576,7 @@ router.post('/me/welcome-credit/claim', authMiddleware, async (req, res) => {
 // @access  Private
 router.get('/me/tune-library', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('_id uuid username profilePic');
+    const user = await User.findById(req.user._id).select('_id uuid username profilePic role');
     if (!user) return res.status(404).json({ error: 'User not found' });
     const result = await fetchTuneLibraryForUser(user, {
       authenticated: true,
@@ -2612,7 +2651,7 @@ router.get('/:userId/tune-library', optionalAuthMiddleware, async (req, res) => 
   try {
     const { userId } = req.params;
     const user = await User.findByIdentifier(userId, {
-      select: '_id uuid username profilePic',
+      select: '_id uuid username profilePic role',
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (req.user && (await isBlockedBetween(req.user._id, user._id))) {

@@ -2828,7 +2828,12 @@ const UserProfile: React.FC = () => {
                 username={user?.username}
                 onPlay={handlePlayLibraryItem}
                 onTip={handleOpenLibraryTipModal}
-                emptyMessage={`${user?.username || 'This user'} hasn't tipped on anything yet.`}
+                rankBy={user?.role?.includes('creator') ? 'track' : 'user'}
+                emptyMessage={
+                  user?.role?.includes('creator')
+                    ? `${user?.username || 'This creator'} hasn't released anything yet.`
+                    : `${user?.username || 'This user'} hasn't tipped on anything yet.`
+                }
               />
             ) : (
               <>
@@ -2872,8 +2877,16 @@ const UserProfile: React.FC = () => {
             ) : getSortedLibrary().length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
-                <p>You haven't tipped on anything yet.</p>
-                <p className="text-sm mt-2">Start tipping on tunes and podcasts to build your library!</p>
+                <p>
+                  {user?.role?.includes('creator')
+                    ? "You haven't released or tipped on anything yet."
+                    : "You haven't tipped on anything yet."}
+                </p>
+                <p className="text-sm mt-2">
+                  {user?.role?.includes('creator')
+                    ? 'Music you own shows up here, along with anything you tip on.'
+                    : 'Start tipping on tunes and podcasts to build your library!'}
+                </p>
               </div>
             ) : (
               <TuneLibraryTable
