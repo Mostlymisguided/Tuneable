@@ -224,6 +224,12 @@ collectiveSchema.statics.findBySlug = function(slug) {
   return this.findOne({ slug, isActive: true });
 };
 
+// Email used to be unique. The schema allows repeats, but MongoDB keeps the old unique index.
+collectiveSchema.statics.repairSharedEmailIndex = function repairSharedEmailIndex() {
+  const { repairNonUniqueFieldIndex } = require('../utils/repairNonUniqueIndex');
+  return repairNonUniqueFieldIndex(this.collection, 'email');
+};
+
 // Static method to get top collectives by bid amount
 collectiveSchema.statics.getTopByBidAmount = function(limit = 10) {
   return this.find({ isActive: true, 'stats.globalCollectiveAggregate': { $gt: 0 } })

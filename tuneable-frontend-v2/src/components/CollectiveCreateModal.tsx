@@ -165,7 +165,11 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
       onClose();
     } catch (error: any) {
       console.error('Error creating collective:', error);
-      toast.error(error.response?.data?.error || 'Failed to create collective');
+      const data = error.response?.data;
+      const message = data?.error
+        ? (data.details ? `${data.error}: ${data.details}` : data.error)
+        : 'Failed to create collective';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

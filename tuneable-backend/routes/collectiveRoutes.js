@@ -11,13 +11,26 @@ const { createNotification } = require('../services/notificationService');
 const { isBlockedBetween } = require('../utils/userBlocks');
 const {
   normalizeCollectiveType,
-  normalizeVenueKind,
+  resolvedVenueKind,
   normalizeCollectiveLocation,
   venueLocationError,
+  collectiveSaveErrorResponse,
 } = require('../utils/collectiveVenue');
 
 // Configure upload for collective profile pictures (reuse label upload config)
 const profilePictureUpload = createLabelProfilePictureUpload();
+
+function uploadCollectivePicture(req, res, next) {
+  profilePictureUpload.single('profilePicture')(req, res, (err) => {
+    if (!err) return next();
+    console.error('Collective profile picture upload failed:', err);
+    const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+    const rejectedType = /only image files/i.test(err.message || '');
+    return res.status(tooLarge || rejectedType ? 400 : 500).json({
+      error: tooLarge ? 'Image must be smaller than 5MB' : (err.message || 'Failed to upload profile picture'),
+    });
+  });
+}
 
 // ========================================
 // PUBLIC ROUTES
@@ -531,7 +544,7 @@ router.get('/:slug/media', async (req, res) => {
 // ========================================
 
 // Create collective (with optional profile picture upload)
-router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
+router.post('/', authMiddleware, uploadCollectivePicture, async (req, res) => {
   try {
     const { name, description, email, website, genres, foundedYear, type, venueKind, location } = req.body;
 
@@ -581,7 +594,7 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
       genres: genres || [],
       foundedYear,
       type: collectiveType,
-      venueKind: collectiveType === 'venue' ? normalizeVenueKind(venueKind) : undefined,
+      venueKind: collectiveType === 'venue' ? resolvedVenueKind(venueKind) : undefined,
       profilePicture: profilePictureUrl,
       location: processedLocation,
       members: [{
@@ -598,7 +611,8 @@ router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), 
     res.status(201).json({ collective });
   } catch (error) {
     console.error('Error creating collective:', error);
-    res.status(500).json({ error: 'Failed to create collective', details: error.message });
+    const failure = collectiveSaveErrorResponse(error, 'create');
+    res.status(failure.status).json(failure.body);
   }
 });
 
@@ -632,7 +646,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     if (updates.venueKind !== undefined) {
       updates.venueKind = updates.type === 'venue' || collective.type === 'venue'
-        ? normalizeVenueKind(updates.venueKind)
+        ? resolvedVenueKind(updates.venueKind)
         : undefined;
     }
     
@@ -659,7 +673,8 @@ router.put('/:id', authMiddleware, async (req, res) => {
     res.json({ collective });
   } catch (error) {
     console.error('Error updating collective:', error);
-    res.status(500).json({ error: 'Failed to update collective' });
+    const failure = collectiveSaveErrorResponse(error, 'update');
+    res.status(failure.status).json(failure.body);
   }
 });
 

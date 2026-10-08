@@ -214,19 +214,20 @@ function formatLocationDisplay(props, context) {
   return props.place_formatted || props.full_address || name || '';
 }
 
+function contextEntryId(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return '';
+  // Geocoding v6 uses mapbox_id. Search Box retrieve uses id.
+  const raw = entry.mapbox_id || entry.id;
+  return typeof raw === 'string' ? raw.trim() : '';
+}
+
 function isContextEntry(entry) {
-  return Boolean(
-    entry
-    && typeof entry === 'object'
-    && !Array.isArray(entry)
-    && typeof entry.mapbox_id === 'string'
-    && entry.mapbox_id.trim()
-  );
+  return Boolean(contextEntryId(entry));
 }
 
 function ancestorFromContextEntry(placetype, entry) {
   const ancestor = {
-    placeId: entry.mapbox_id,
+    placeId: contextEntryId(entry),
     label: entry.name || entry.name_preferred || null,
     placetype,
   };
@@ -244,9 +245,10 @@ function collectAncestors(context) {
   const byId = new Map();
 
   for (const [placetype, entry] of Object.entries(ctx)) {
-    if (!isContextEntry(entry)) continue;
-    if (!byId.has(entry.mapbox_id)) {
-      byId.set(entry.mapbox_id, ancestorFromContextEntry(placetype, entry));
+    const id = contextEntryId(entry);
+    if (!id) continue;
+    if (!byId.has(id)) {
+      byId.set(id, ancestorFromContextEntry(placetype, entry));
     }
   }
 
@@ -254,9 +256,10 @@ function collectAncestors(context) {
   const seen = new Set();
   for (const placetype of CONTEXT_TYPE_ORDER) {
     const entry = ctx[placetype];
-    if (!isContextEntry(entry) || seen.has(entry.mapbox_id)) continue;
-    seen.add(entry.mapbox_id);
-    ordered.push(byId.get(entry.mapbox_id));
+    const id = contextEntryId(entry);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ordered.push(byId.get(id));
   }
   for (const ancestor of byId.values()) {
     if (seen.has(ancestor.placeId)) continue;

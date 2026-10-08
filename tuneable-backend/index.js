@@ -72,6 +72,27 @@ db.connectDB()
     });
 
     setImmediate(() => {
+      const Collective = require('./models/Collective');
+      const Label = require('./models/Label');
+      Promise.all([
+        Collective.repairSharedEmailIndex(),
+        Label.repairSharedEmailIndex(),
+      ])
+        .then(([collectiveResult, labelResult]) => {
+          const collectiveDropped = collectiveResult?.dropped || [];
+          const labelDropped = labelResult?.dropped || [];
+          if (collectiveDropped.length || labelDropped.length) {
+            console.log(
+              `Dropped stale unique email indexes: collectives [${collectiveDropped.join(', ')}], labels [${labelDropped.join(', ')}]`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to repair shared collective/label email indexes:', error);
+        });
+    });
+
+    setImmediate(() => {
       const User = require('./models/User');
       User.repairFoundingSeatUniqueness()
         .then((result) => {

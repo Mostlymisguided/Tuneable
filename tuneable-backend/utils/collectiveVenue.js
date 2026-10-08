@@ -41,6 +41,50 @@ function venueLocationError(type, location) {
   return null;
 }
 
+function resolvedVenueKind(kind) {
+  return normalizeVenueKind(kind) || 'other';
+}
+
+function collectiveSaveErrorResponse(error, action = 'create') {
+  if (error && error.code === 11000) {
+    const fields = Object.keys(error.keyPattern || error.keyValue || {});
+    if (fields.includes('email')) {
+      return {
+        status: 409,
+        body: { error: 'That email is already used by another collective. Use a different email.' },
+      };
+    }
+    if (fields.includes('name') || fields.includes('slug')) {
+      return {
+        status: 409,
+        body: { error: 'A collective with this name already exists' },
+      };
+    }
+    return {
+      status: 409,
+      body: { error: 'A collective with these details already exists' },
+    };
+  }
+
+  if (error && error.name === 'ValidationError') {
+    const messages = Object.values(error.errors || {})
+      .map((entry) => entry && entry.message)
+      .filter(Boolean);
+    return {
+      status: 400,
+      body: { error: messages.join(' ') || 'Invalid collective details' },
+    };
+  }
+
+  return {
+    status: 500,
+    body: {
+      error: `Failed to ${action} collective`,
+      details: error && error.message ? error.message : undefined,
+    },
+  };
+}
+
 function venuesAtPlaceQuery(placeId) {
   return {
     isActive: true,
@@ -83,8 +127,10 @@ module.exports = {
   parseMaybeJson,
   normalizeCollectiveType,
   normalizeVenueKind,
+  resolvedVenueKind,
   normalizeCollectiveLocation,
   venueLocationError,
+  collectiveSaveErrorResponse,
   venuesAtPlaceQuery,
   serializeVenueForPlace,
   parentPlaceIdFromLocation,

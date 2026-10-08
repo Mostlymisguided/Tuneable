@@ -120,6 +120,37 @@ describe('Mapbox location hierarchy', () => {
     expect(location.display).toBe('Clapton, London, England, United Kingdom');
   });
 
+  it('reads Search Box context ids so a POI venue links to its city', () => {
+    const location = parseFeatureToLocation({
+      geometry: { coordinates: [-9.77, 31.49] },
+      properties: {
+        mapbox_id: 'poi-dar-sahbi',
+        feature_type: 'poi',
+        name: 'Dar Sahbi',
+        full_address: 'Dar Sahbi, Tamraght, Morocco',
+        context: {
+          country: { id: 'morocco-id', name: 'Morocco', country_code: 'ma' },
+          place: { id: 'tamraght-id', name: 'Tamraght' },
+          region: { id: 'souss-id', name: 'Souss-Massa' },
+        },
+      },
+    });
+
+    expect(location.ancestors.map((a) => a.placeId)).toEqual([
+      'morocco-id',
+      'souss-id',
+      'tamraght-id',
+    ]);
+    expect(location.ancestorIds).toEqual([
+      'poi-dar-sahbi',
+      'morocco-id',
+      'souss-id',
+      'tamraght-id',
+    ]);
+    expect(location.city).toBe('Tamraght');
+    expect(location.countryCode).toBe('MA');
+  });
+
   it('keeps unknown future context types instead of dropping them', () => {
     const location = parseFeatureToLocation({
       properties: {

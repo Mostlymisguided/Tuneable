@@ -182,6 +182,12 @@ labelSchema.statics.findBySlug = function(slug) {
   return this.findOne({ slug, isActive: true });
 };
 
+// Email used to be unique. The schema allows repeats, but MongoDB keeps the old unique index.
+labelSchema.statics.repairSharedEmailIndex = function repairSharedEmailIndex() {
+  const { repairNonUniqueFieldIndex } = require('../utils/repairNonUniqueIndex');
+  return repairNonUniqueFieldIndex(this.collection, 'email');
+};
+
 // Static method to get top labels by bid amount
 labelSchema.statics.getTopByBidAmount = function(limit = 10) {
   return this.find({ isActive: true, 'stats.globalLabelAggregate': { $gt: 0 } })

@@ -2,8 +2,10 @@ const {
   COLLECTIVE_TYPES,
   normalizeCollectiveType,
   normalizeVenueKind,
+  resolvedVenueKind,
   normalizeCollectiveLocation,
   venueLocationError,
+  collectiveSaveErrorResponse,
   venuesAtPlaceQuery,
   serializeVenueForPlace,
   parentPlaceIdFromLocation,
@@ -20,6 +22,30 @@ describe('collectiveVenue', () => {
   it('normalizes venue kinds', () => {
     expect(normalizeVenueKind('Hostel')).toBe('hostel');
     expect(normalizeVenueKind('warehouse')).toBe(null);
+    expect(resolvedVenueKind('warehouse')).toBe('other');
+    expect(resolvedVenueKind(null)).toBe('other');
+  });
+
+  it('turns duplicate-email saves into a clear conflict', () => {
+    expect(collectiveSaveErrorResponse({
+      code: 11000,
+      keyPattern: { email: 1 },
+    }, 'create')).toEqual({
+      status: 409,
+      body: { error: 'That email is already used by another collective. Use a different email.' },
+    });
+  });
+
+  it('turns schema validation failures into a 400', () => {
+    expect(collectiveSaveErrorResponse({
+      name: 'ValidationError',
+      errors: {
+        venueKind: { message: '`null` is not a valid enum value for path `venueKind`.' },
+      },
+    })).toEqual({
+      status: 400,
+      body: { error: '`null` is not a valid enum value for path `venueKind`.' },
+    });
   });
 
   it('parses JSON location strings', () => {
