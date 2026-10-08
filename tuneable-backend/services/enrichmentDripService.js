@@ -8,6 +8,7 @@
 
 const Media = require('../models/Media');
 const metadataEnrichmentService = require('./metadataEnrichmentService');
+const { musicMediaQuery } = require('../utils/mediaKinds');
 const {
   runMediaLocationBackfill,
   getLocationCoverageStats,
@@ -38,43 +39,13 @@ function normalizeDripOpts(opts = {}) {
     nameSearch: Boolean(opts.nameSearch),
     upgradeInferred: Boolean(opts.upgradeInferred),
     delayMs: opts.delayMs != null ? Number(opts.delayMs) : 150,
-    mbDelayMs: opts.mbDelayMs != null ? Number(opts.mbDelayMs) : 1200,
     quiet: Boolean(opts.quiet),
     includeCoverage: opts.includeCoverage !== false,
   };
 }
 
 async function getTagCoverageStats() {
-  const musicFilter = {
-    $and: [
-      {
-        $or: [
-          { status: { $exists: false } },
-          { status: { $ne: 'deleted' } },
-        ],
-      },
-      {
-        $or: [
-          { deletedAt: null },
-          { deletedAt: { $exists: false } },
-        ],
-      },
-      {
-        $or: [
-          { contentType: 'music' },
-          { contentType: { $in: ['music'] } },
-          { contentForm: 'tune' },
-          { contentForm: { $in: ['tune'] } },
-          { contentType: { $exists: false } },
-        ],
-      },
-      {
-        $nor: [
-          { contentForm: { $in: ['podcast-series', 'podcast-episode', 'episode', 'series'] } },
-        ],
-      },
-    ],
-  };
+  const musicFilter = musicMediaQuery();
 
   const [total, withTags, untagged, linked, linkedUntagged] = await Promise.all([
     Media.countDocuments(musicFilter),
@@ -106,6 +77,45 @@ async function getTagCoverageStats() {
   ]);
 
   return { total, withTags, untagged, linked, linkedUntagged };
+}
+
+async function getReleaseDateCoverageStats() {
+  const musicFilter = musicMediaQuery();
+  const [total, withRelease] = await Promise.all([
+    Media.countDocuments(musicFilter),
+    Media.countDocuments({
+      $and: [
+        ...musicFilter.$and,
+        {
+          $or: [
+            { releaseDate: { $ne: null } },
+            { releaseYear: { $ne: null } },
+          ],
+        },
+      ],
+    }),
+  ]);
+  return { total, withRelease, missing: Math.max(total - withRelease, 0) };
+}
+
+/**
+ * Catalogue-wide completeness for the admin overview: MusicBrainz link,
+ * tags, release date and location, all over the same music-track set.
+ */
+async function getEnrichmentCoverage() {
+  const [tags, release, locations] = await Promise.all([
+    getTagCoverageStats(),
+    getReleaseDateCoverageStats(),
+    getLocationCoverageStats(),
+  ]);
+  return {
+    total: tags.total,
+    linked: tags.linked,
+    tagged: tags.withTags,
+    withRelease: release.withRelease,
+    withLocation: locations.withLoc,
+    mapboxEnabled: locations.mapboxEnabled,
+  };
 }
 
 async function dripTags(opts) {
@@ -177,7 +187,6 @@ async function dripLocations(opts) {
     nameSearch: opts.nameSearch,
     upgradeInferred: opts.upgradeInferred,
     delayMs: opts.delayMs,
-    mbDelayMs: opts.mbDelayMs,
     quiet: opts.quiet,
     includeStats: false,
   });
@@ -345,4 +354,5 @@ module.exports = {
   startEnrichmentDripCron,
   isDripRunning,
   getTagCoverageStats,
+  getEnrichmentCoverage,
 };

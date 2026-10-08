@@ -903,11 +903,17 @@ export const mediaAPI = {
 
   getEnrichments: async (params?: {
     status?: string;
+    group?: 'review' | 'in_progress' | 'done' | 'ignored';
     page?: number;
     limit?: number;
     importSource?: string;
   }) => {
     const response = await api.get('/media/admin/enrichment', { params });
+    return response.data;
+  },
+
+  getEnrichmentCoverage: async () => {
+    const response = await api.get('/media/admin/enrichment/coverage');
     return response.data;
   },
 

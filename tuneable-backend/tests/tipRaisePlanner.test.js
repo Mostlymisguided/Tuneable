@@ -1,6 +1,6 @@
 /**
  * Planner tests for "bring tips up to". No database.
- * Run: node tuneable-backend/tests/tipRaisePlanner.test.js
+ * Run: npx jest tests/tipRaisePlanner.test.js
  */
 
 const assert = require('assert');
@@ -170,16 +170,13 @@ async function testOversizedWelcomeTipIsSkippedWithoutBlockingPaidGap() {
   assert.strictEqual(plan.chargePence, 50);
 }
 
-async function run() {
-  await testGapsAndShortfall();
-  await testWholeSetShortfall();
-  await testWelcomeArtistCapSkipsFourth();
-  await testWelcomeSeededMediaCap();
-  await testOversizedWelcomeTipIsSkippedWithoutBlockingPaidGap();
-  console.log('✅ tipRaisePlanner.test.js passed');
-}
-
-run().catch((error) => {
-  console.error(error);
-  process.exit(1);
+describe('buildTipRaisePlan', () => {
+  it('plans gaps and reports shortfall', testGapsAndShortfall);
+  it('reports shortfall for the whole set', testWholeSetShortfall);
+  it('skips the fourth tune once the welcome artist cap is hit', testWelcomeArtistCapSkipsFourth);
+  it('respects the welcome seeded-media cap', testWelcomeSeededMediaCap);
+  it(
+    'skips an oversized welcome tip without blocking a paid gap',
+    testOversizedWelcomeTipIsSkippedWithoutBlockingPaidGap
+  );
 });

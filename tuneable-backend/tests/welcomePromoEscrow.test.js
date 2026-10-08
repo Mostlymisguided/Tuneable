@@ -1,6 +1,6 @@
 /**
  * Unit tests for welcome promo escrow split helpers (no DB).
- * Run: node tuneable-backend/tests/welcomePromoEscrow.test.js
+ * Run: npx jest tests/welcomePromoEscrow.test.js
  */
 
 const assert = require('assert');
@@ -107,17 +107,14 @@ function testExpiryDate() {
   assert.strictEqual(expires.toISOString().slice(0, 10), '2026-04-15');
 }
 
-function run() {
-  testConstants();
-  testPaidMethods();
-  testFullWelcomeTip();
-  testPayingUserTreatsWelcomeAsPaid();
-  testMixedTip();
-  testPaidOnlyTip();
-  testOwnerSplitAllPromo();
-  testOwnerSplitMixed();
-  testExpiryDate();
-  console.log('✅ welcomePromoEscrow.test.js passed');
-}
-
-run();
+describe('welcomePromoEscrow', () => {
+  it('exposes the expected constants', testConstants);
+  it('classifies paid top-up methods', testPaidMethods);
+  it('splits a fully welcome-funded tip', testFullWelcomeTip);
+  it('treats welcome credit as paid for paying users', testPayingUserTreatsWelcomeAsPaid);
+  it('splits a mixed tip', testMixedTip);
+  it('splits a paid-only tip', testPaidOnlyTip);
+  it('splits owner share when all promo', testOwnerSplitAllPromo);
+  it('splits owner share when mixed', testOwnerSplitMixed);
+  it('computes the escrow expiry date', testExpiryDate);
+});

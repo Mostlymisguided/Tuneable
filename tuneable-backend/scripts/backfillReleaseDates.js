@@ -44,6 +44,9 @@ const {
   extractSpotifyTrackId,
   extractMusicBrainzId,
 } = require('../utils/releaseDateUtils');
+const { musicMediaQuery, isMusicMedia } = require('../utils/mediaKinds');
+const { mediaPrimaryArtistName } = require('../utils/mediaMatchUtils');
+const { pickIsrcCandidate } = require('../services/metadataEnrichmentService');
 
 const DRY_RUN = !args.includes('--execute');
 const STATS_ONLY = args.includes('--stats-only');
@@ -60,11 +63,6 @@ const DELAY_MS = (() => {
   const idx = args.indexOf('--delay-ms');
   return idx >= 0 ? parseInt(args[idx + 1], 10) : 200;
 })();
-const MB_DELAY_MS = (() => {
-  const idx = args.indexOf('--mb-delay-ms');
-  return idx >= 0 ? parseInt(args[idx + 1], 10) : 1100;
-})();
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -73,14 +71,9 @@ function getMongoUri() {
   return process.env.MONGO_URI || process.env.MONGODB_URI;
 }
 
-function isMusicTune(media) {
-  const forms = Array.isArray(media.contentForm) ? media.contentForm : [media.contentForm];
-  const types = Array.isArray(media.contentType) ? media.contentType : [media.contentType];
-  const podcastForms = new Set(['podcast-series', 'podcast-episode', 'episode', 'series']);
-  if (forms.some((f) => podcastForms.has(f))) return false;
-  if (types.some((t) => t === 'music') || forms.some((f) => f === 'tune')) return true;
-  // Legacy rows without contentType
-  return !media.contentType;
+/** Music-track query with extra clauses ANDed in. */
+function musicQuery(...clauses) {
+  return { $and: [...musicMediaQuery().$and, ...clauses] };
 }
 
 function needsReleaseBackfill(media) {
@@ -101,20 +94,7 @@ function needsReleaseBackfill(media) {
 }
 
 function buildQuery() {
-  const and = [
-    {
-      $or: [
-        { status: { $exists: false } },
-        { status: { $ne: 'deleted' } },
-      ],
-    },
-    {
-      $or: [
-        { deletedAt: null },
-        { deletedAt: { $exists: false } },
-      ],
-    },
-  ];
+  const and = [...musicMediaQuery().$and];
 
   if (!FORCE_MANUAL) {
     and.push({
@@ -158,48 +138,23 @@ function buildQuery() {
 }
 
 async function printCoverageStats() {
-  const musicFilter = {
-    $or: [
-      { contentType: 'music' },
-      { contentType: { $in: ['music'] } },
-      { contentForm: 'tune' },
-      { contentForm: { $in: ['tune'] } },
-      { contentType: { $exists: false } },
-    ],
-    deletedAt: { $in: [null, undefined] },
-  };
-
   const [total, withDate, withYearOnly, missing, withSpotify, withMb, withIsrc, manual] = await Promise.all([
-    Media.countDocuments(musicFilter),
-    Media.countDocuments({ ...musicFilter, releaseDate: { $ne: null } }),
-    Media.countDocuments({
-      ...musicFilter,
-      releaseDate: null,
-      releaseYear: { $ne: null },
-    }),
-    Media.countDocuments({
-      ...musicFilter,
-      $and: [
-        { $or: [{ releaseDate: null }, { releaseDate: { $exists: false } }] },
-        { $or: [{ releaseYear: null }, { releaseYear: { $exists: false } }] },
-      ],
-    }),
-    Media.countDocuments({
-      ...musicFilter,
+    Media.countDocuments(musicQuery()),
+    Media.countDocuments(musicQuery({ releaseDate: { $ne: null } })),
+    Media.countDocuments(musicQuery({ releaseDate: null, releaseYear: { $ne: null } })),
+    Media.countDocuments(musicQuery(
+      { $or: [{ releaseDate: null }, { releaseDate: { $exists: false } }] },
+      { $or: [{ releaseYear: null }, { releaseYear: { $exists: false } }] }
+    )),
+    Media.countDocuments(musicQuery({
       $or: [
         { 'externalIds.spotify': { $exists: true, $ne: null } },
         { 'sources.spotify': { $exists: true, $ne: null } },
       ],
-    }),
-    Media.countDocuments({
-      ...musicFilter,
-      'externalIds.musicbrainz': { $exists: true, $ne: null },
-    }),
-    Media.countDocuments({
-      ...musicFilter,
-      isrc: { $exists: true, $nin: [null, ''] },
-    }),
-    Media.countDocuments({ ...musicFilter, releaseDateSource: 'manual' }),
+    })),
+    Media.countDocuments(musicQuery({ 'externalIds.musicbrainz': { $exists: true, $nin: [null, ''] } })),
+    Media.countDocuments(musicQuery({ isrc: { $exists: true, $nin: [null, ''] } })),
+    Media.countDocuments(musicQuery({ releaseDateSource: 'manual' })),
   ]);
 
   console.log('\n📊 Music release-date coverage');
@@ -287,7 +242,6 @@ async function backfillFromMusicBrainz(candidates) {
     checked += 1;
     try {
       const details = await musicbrainzService.getRecording(mbid);
-      await sleep(MB_DELAY_MS);
       if (!details) continue;
 
       const parsed = parseReleaseDate(details.releaseDate, details.releaseDatePrecision);
@@ -305,7 +259,6 @@ async function backfillFromMusicBrainz(candidates) {
     } catch (err) {
       errors += 1;
       console.warn(`   MB failed for ${media.title}: ${err.message}`);
-      await sleep(MB_DELAY_MS);
     }
   }
 
@@ -346,18 +299,22 @@ async function backfillFromIsrc(candidates) {
 
       if (!parsed?.releaseYear && !parsed?.releaseDate) {
         const tracks = await musicbrainzService.searchByIsrc(media.isrc, 3);
-        await sleep(MB_DELAY_MS);
-        const best = tracks[0];
+        // Only use (and link) the MB recording when title and artist agree.
+        const picked = pickIsrcCandidate(
+          { title: media.title, artist: mediaPrimaryArtistName(media), duration: media.duration || 0 },
+          tracks,
+          media.isrc
+        );
+        const best = picked?.confidence === 'high' ? picked.candidate : null;
         if (best) {
           parsed = parseReleaseDate(best.releaseDate, best.releaseDatePrecision);
           source = 'musicbrainz';
-          // Store MBID for future enrichment
-          if (best.id && media.externalIds) {
+          if (best.musicbrainzId) {
             if (!(media.externalIds instanceof Map)) {
               media.externalIds = new Map(Object.entries(media.externalIds || {}));
             }
             if (!media.externalIds.get('musicbrainz')) {
-              media.externalIds.set('musicbrainz', best.id);
+              media.externalIds.set('musicbrainz', best.musicbrainzId);
             }
           }
         }
@@ -379,7 +336,6 @@ async function backfillFromIsrc(candidates) {
     } catch (err) {
       errors += 1;
       console.warn(`   ISRC failed for ${media.title}: ${err.message}`);
-      await sleep(MB_DELAY_MS);
     }
   }
 
@@ -407,13 +363,13 @@ async function main() {
 
   const query = buildQuery();
   let cursor = Media.find(query)
-    .select('title artist releaseDate releaseYear releaseDatePrecision releaseDateSource isrc externalIds sources contentType contentForm status deletedAt')
+    .select('title artist duration releaseDate releaseYear releaseDatePrecision releaseDateSource isrc externalIds sources contentType contentForm status deletedAt')
     .sort({ updatedAt: -1 });
 
   if (LIMIT) cursor = cursor.limit(LIMIT);
 
   const docs = await cursor;
-  const candidates = docs.filter(isMusicTune).filter(needsReleaseBackfill);
+  const candidates = docs.filter(isMusicMedia).filter(needsReleaseBackfill);
 
   console.log(`\n🎯 Candidates after filters: ${candidates.length} (loaded ${docs.length})`);
 

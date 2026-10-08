@@ -23,6 +23,11 @@ const {
   needsMapboxEnrichment,
   ensureMapboxResolvedLocation,
 } = require('../utils/locationUtils');
+const { musicMediaQuery, isMusicMedia } = require('../utils/mediaKinds');
+const { mediaPrimaryArtistName } = require('../utils/mediaMatchUtils');
+const { pickIsrcCandidate } = require('./metadataEnrichmentService');
+
+const RECHECK_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,10 +43,11 @@ function normalizeOpts(opts = {}) {
     upgradeInferred: Boolean(opts.upgradeInferred),
     /** Geocode existing text/coords locations that lack placeId (incl. manual). */
     upgradeMapbox: Boolean(opts.upgradeMapbox),
+    /** Include tracks that came up empty within RECHECK_AFTER_MS. */
+    recheck: Boolean(opts.recheck),
     skipMapbox: Boolean(opts.skipMapbox),
     limit: opts.limit != null ? Number(opts.limit) : null,
     delayMs: opts.delayMs != null ? Number(opts.delayMs) : 150,
-    mbDelayMs: opts.mbDelayMs != null ? Number(opts.mbDelayMs) : 1200,
     quiet: Boolean(opts.quiet),
   };
 }
@@ -50,21 +56,28 @@ function hasMapbox(opts) {
   return !opts.skipMapbox && !!process.env.MAPBOX_ACCESS_TOKEN;
 }
 
-function isMusicTune(media) {
-  const forms = Array.isArray(media.contentForm) ? media.contentForm : [media.contentForm];
-  const types = Array.isArray(media.contentType) ? media.contentType : [media.contentType];
-  const podcastForms = new Set([
-    'podcast-series',
-    'podcast-episode',
-    'podcastepisode',
-    'podcastseries',
-    'episode',
-    'series',
-  ]);
-  if (forms.some((f) => podcastForms.has(f))) return false;
-  if (types.some((t) => t === 'music') || forms.some((f) => f === 'tune')) return true;
-  return !media.contentType;
+const isMusicTune = isMusicMedia;
+
+/** Music-track query with extra clauses ANDed in. */
+function musicQuery(...clauses) {
+  return { $and: [...musicMediaQuery().$and, ...clauses] };
 }
+
+const MISSING_LOCATION_CLAUSE = {
+  $and: ['city', 'country', 'countryCode', 'placeId'].map((field) => ({
+    $or: [
+      { primaryLocation: null },
+      { primaryLocation: { $exists: false } },
+      { [`primaryLocation.${field}`]: { $in: [null, ''] } },
+    ],
+  })),
+};
+
+const HAS_LOCATION_CLAUSE = {
+  $or: ['city', 'country', 'countryCode', 'placeId'].map((field) => ({
+    [`primaryLocation.${field}`]: { $exists: true, $nin: [null, ''] },
+  })),
+};
 
 function needsLocationBackfill(media, opts) {
   if (opts.upgradeMapbox) {
@@ -79,34 +92,8 @@ function needsLocationBackfill(media, opts) {
   return false;
 }
 
-function musicFilter() {
-  return {
-    $or: [
-      { contentType: 'music' },
-      { contentType: { $in: ['music'] } },
-      { contentForm: 'tune' },
-      { contentForm: { $in: ['tune'] } },
-      { contentType: { $exists: false } },
-    ],
-    deletedAt: { $in: [null, undefined] },
-  };
-}
-
 function buildQuery(opts) {
-  const and = [
-    {
-      $or: [
-        { status: { $exists: false } },
-        { status: { $ne: 'deleted' } },
-      ],
-    },
-    {
-      $or: [
-        { deletedAt: null },
-        { deletedAt: { $exists: false } },
-      ],
-    },
-  ];
+  const and = [...musicMediaQuery().$and];
 
   // Upgrade text/coords locations that predate Mapbox placeIds (includes manual).
   if (opts.upgradeMapbox) {
@@ -143,36 +130,14 @@ function buildQuery(opts) {
   }
 
   if (!opts.upgradeInferred) {
+    and.push(MISSING_LOCATION_CLAUSE);
+  }
+
+  if (!opts.recheck) {
     and.push({
-      $and: [
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.city': { $in: [null, ''] } },
-          ],
-        },
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.country': { $in: [null, ''] } },
-          ],
-        },
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.countryCode': { $in: [null, ''] } },
-          ],
-        },
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.placeId': { $in: [null, ''] } },
-          ],
-        },
+      $or: [
+        { locationCheckedAt: null },
+        { locationCheckedAt: { $lt: new Date(Date.now() - RECHECK_AFTER_MS) } },
       ],
     });
   }
@@ -181,7 +146,6 @@ function buildQuery(opts) {
 }
 
 async function getLocationCoverageStats() {
-  const filter = musicFilter();
   const [
     total,
     withLoc,
@@ -194,65 +158,16 @@ async function getLocationCoverageStats() {
     artistHome,
     musicbrainz,
   ] = await Promise.all([
-    Media.countDocuments(filter),
-    Media.countDocuments({
-      ...filter,
-      $or: [
-        { 'primaryLocation.city': { $exists: true, $nin: [null, ''] } },
-        { 'primaryLocation.country': { $exists: true, $nin: [null, ''] } },
-        { 'primaryLocation.countryCode': { $exists: true, $nin: [null, ''] } },
-        { 'primaryLocation.placeId': { $exists: true, $nin: [null, ''] } },
-      ],
-    }),
-    Media.countDocuments({
-      ...filter,
-      $and: [
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.city': { $in: [null, ''] } },
-          ],
-        },
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.country': { $in: [null, ''] } },
-          ],
-        },
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.countryCode': { $in: [null, ''] } },
-          ],
-        },
-        {
-          $or: [
-            { primaryLocation: null },
-            { primaryLocation: { $exists: false } },
-            { 'primaryLocation.placeId': { $in: [null, ''] } },
-          ],
-        },
-      ],
-    }),
-    Media.countDocuments({
-      ...filter,
-      'artist.userId': { $exists: true, $ne: null },
-    }),
-    Media.countDocuments({
-      ...filter,
-      'externalIds.musicbrainz': { $exists: true, $ne: null },
-    }),
-    Media.countDocuments({
-      ...filter,
-      isrc: { $exists: true, $nin: [null, ''] },
-    }),
-    Media.countDocuments({ ...filter, locationSource: 'manual' }),
-    Media.countDocuments({ ...filter, locationSource: 'uploader' }),
-    Media.countDocuments({ ...filter, locationSource: 'artist_home' }),
-    Media.countDocuments({ ...filter, locationSource: 'musicbrainz' }),
+    Media.countDocuments(musicQuery()),
+    Media.countDocuments(musicQuery(HAS_LOCATION_CLAUSE)),
+    Media.countDocuments(musicQuery(MISSING_LOCATION_CLAUSE)),
+    Media.countDocuments(musicQuery({ 'artist.userId': { $exists: true, $ne: null } })),
+    Media.countDocuments(musicQuery({ 'externalIds.musicbrainz': { $exists: true, $nin: [null, ''] } })),
+    Media.countDocuments(musicQuery({ isrc: { $exists: true, $nin: [null, ''] } })),
+    Media.countDocuments(musicQuery({ locationSource: 'manual' })),
+    Media.countDocuments(musicQuery({ locationSource: 'uploader' })),
+    Media.countDocuments(musicQuery({ locationSource: 'artist_home' })),
+    Media.countDocuments(musicQuery({ locationSource: 'musicbrainz' })),
   ]);
 
   return {
@@ -389,7 +304,6 @@ function createBackfillContext(opts) {
     if (artistOriginCache.has(artistMbid)) {
       return artistOriginCache.get(artistMbid);
     }
-    if (opts.mbDelayMs > 0) await sleep(opts.mbDelayMs);
     const artist = await musicbrainzService.getArtist(artistMbid);
     const origin = musicbrainzService.mapArtistOrigin(artist);
     artistOriginCache.set(artistMbid, origin);
@@ -397,7 +311,6 @@ function createBackfillContext(opts) {
   }
 
   async function originFromRecordingMbid(mbid) {
-    if (opts.mbDelayMs > 0) await sleep(opts.mbDelayMs);
     const recording = await musicbrainzService.getRecordingRaw(mbid);
     if (!recording) return null;
 
@@ -470,8 +383,16 @@ function createBackfillContext(opts) {
     if (!media.isrc) return false;
 
     try {
-      if (opts.mbDelayMs > 0) await sleep(opts.mbDelayMs);
-      const recordings = await musicbrainzService.searchByIsrcRaw(media.isrc, 3);
+      const raw = await musicbrainzService.searchByIsrcRaw(media.isrc, 3);
+      // Only trust the ISRC hit when title and artist agree with this track;
+      // otherwise leave it for the metadata matcher to review.
+      const picked = pickIsrcCandidate(
+        { title: media.title, artist: mediaPrimaryArtistName(media), duration: media.duration || 0 },
+        raw.map((r) => musicbrainzService.mapRecordingToTrack(r)),
+        media.isrc
+      );
+      if (picked?.confidence !== 'high') return false;
+      const recordings = raw.filter((r) => r.id === picked.candidate.musicbrainzId);
       for (const recording of recordings) {
         const artistMbids = musicbrainzService.extractPrimaryArtistMbids(recording);
         let origin = null;
@@ -521,7 +442,6 @@ function createBackfillContext(opts) {
     if (!primaryName) return false;
 
     try {
-      if (opts.mbDelayMs > 0) await sleep(opts.mbDelayMs);
       const artists = await musicbrainzService.searchArtists(primaryName, 5);
       const exact = artists.find((a) => {
         const score = Number(a.score) || 0;
@@ -611,9 +531,9 @@ function isLocationBackfillRunning() {
  * @param {boolean} [opts.forceManual]
  * @param {boolean} [opts.upgradeInferred]
  * @param {boolean} [opts.upgradeMapbox] Geocode existing locations missing placeId
+ * @param {boolean} [opts.recheck] Also retry tracks that found nothing in the last 30 days
  * @param {boolean} [opts.skipMapbox]
  * @param {number} [opts.delayMs=150]
- * @param {number} [opts.mbDelayMs=1200]
  * @param {boolean} [opts.quiet]
  * @param {boolean} [opts.includeStats]
  */
@@ -690,7 +610,7 @@ async function runMediaLocationBackfillUnlocked(rawOpts = {}) {
 
   let query = Media.find(buildQuery(opts))
     .select(
-      'title artist primaryLocation locationSource externalIds isrc contentType contentForm status deletedAt'
+      'title artist duration primaryLocation locationSource externalIds isrc contentType contentForm status deletedAt'
     )
     .sort({ updatedAt: -1 });
 
@@ -720,6 +640,9 @@ async function runMediaLocationBackfillUnlocked(rawOpts = {}) {
         );
       } else if (result.status === 'unmatched') {
         unmatched += 1;
+        if (!opts.dryRun && !opts.upgradeMapbox) {
+          await Media.updateOne({ _id: media._id }, { $set: { locationCheckedAt: new Date() } });
+        }
       } else {
         skipped += 1;
       }

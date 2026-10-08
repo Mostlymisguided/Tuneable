@@ -6,20 +6,7 @@
 const spotifyService = require('./spotifyService');
 const musicbrainzService = require('./musicbrainzService');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
-
-const MB_GAP_MS = 1100;
-
-let lastMbCallAt = 0;
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function throttleMusicBrainz() {
-  const wait = Math.max(0, MB_GAP_MS - (Date.now() - lastMbCallAt));
-  if (wait > 0) await sleep(wait);
-  lastMbCallAt = Date.now();
-}
+const { pickIsrcCandidate } = require('./metadataEnrichmentService');
 
 /**
  * @typedef {'verified'|'catalog'|'likely'|'unverified'} IdentityConfidence
@@ -55,13 +42,18 @@ async function enrichTrackViaIsrc(track, opts = {}) {
     console.warn('ISRC Spotify lookup failed:', err.message);
   }
 
-  // MusicBrainz is rate-limited (~1 req/s) — only hit when Spotify misses and allowed
+  // MusicBrainz is rate-limited (~1 req/s) — only hit when Spotify misses and allowed.
+  // An ISRC hit only counts when title and artist also agree with the import.
   let mbTrack = null;
   if (!spotifyTrack && !skipMusicBrainz) {
     try {
-      await throttleMusicBrainz();
       const mbHits = await musicbrainzService.searchByIsrc(isrc, 3);
-      mbTrack = Array.isArray(mbHits) && mbHits.length > 0 ? mbHits[0] : null;
+      const picked = pickIsrcCandidate(
+        { title: track.title, artist: track.artist, duration: track.duration },
+        mbHits,
+        isrc
+      );
+      mbTrack = picked?.confidence === 'high' ? picked.candidate : null;
     } catch (err) {
       console.warn('ISRC MusicBrainz lookup failed:', err.message);
     }
@@ -124,7 +116,7 @@ async function enrichTrackViaIsrc(track, opts = {}) {
 
   if (mbTrack) {
     sources.push('musicbrainz');
-    const mbid = mbTrack.id || mbTrack.externalIds?.musicbrainz;
+    const mbid = mbTrack.musicbrainzId;
     if (mbid) enriched.externalIds.musicbrainz = String(mbid);
     // Prefer Spotify identity when both exist; fill gaps from MB otherwise
     if (!spotifyTrack) {
@@ -232,5 +224,4 @@ module.exports = {
   enrichTrackViaIsrc,
   enrichTracksViaIsrc,
   resolveIdentityConfidence,
-  throttleMusicBrainz,
 };

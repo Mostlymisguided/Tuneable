@@ -1,6 +1,6 @@
 /**
  * Unit tests for admin user purge guards (no DB).
- * Run: node tuneable-backend/tests/userPurgeService.test.js
+ * Run: npx jest tests/userPurgeService.test.js
  */
 
 const assert = require('assert');
@@ -42,10 +42,7 @@ function testPurgeGuards() {
   assertTestAccount({ isTestUser: true });
 }
 
-function run() {
-  testUsernameShape();
-  testPurgeGuards();
-  console.log('✅ userPurgeService.test.js passed');
-}
-
-run();
+describe('userPurgeService guards', () => {
+  it('validates username shape', testUsernameShape);
+  it('guards who can be purged', testPurgeGuards);
+});

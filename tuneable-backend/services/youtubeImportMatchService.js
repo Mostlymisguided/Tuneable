@@ -1,5 +1,4 @@
 const musicbrainzService = require('./musicbrainzService');
-const importCrossRefService = require('./importCrossRefService');
 const {
   scoreCandidate,
   HIGH_SCORE,
@@ -59,7 +58,6 @@ async function searchMusicBrainz(title, artist) {
   const query = [artist, title].filter(Boolean).join(' ').slice(0, 200);
   if (!query) return remember(key, []);
 
-  await importCrossRefService.throttleMusicBrainz();
   const { tracks } = await musicbrainzService.searchRecordings(query, 0, 5);
   return remember(key, tracks || []);
 }

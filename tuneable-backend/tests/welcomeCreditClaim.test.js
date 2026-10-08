@@ -1,6 +1,6 @@
 /**
  * Unit tests for welcome credit claim / offer helpers (no DB).
- * Run: node tuneable-backend/tests/welcomeCreditClaim.test.js
+ * Run: npx jest tests/welcomeCreditClaim.test.js
  */
 
 const assert = require('assert');
@@ -80,12 +80,9 @@ function testOfferStatuses() {
   });
 }
 
-function run() {
-  testBetaMode();
-  testVerifiedIdentity();
-  testReceivedCredit();
-  testOfferStatuses();
-  console.log('✅ welcomeCreditClaim.test.js passed');
-}
-
-run();
+describe('welcome credit claim helpers', () => {
+  it('reads beta mode from env', testBetaMode);
+  it('detects verified identity', testVerifiedIdentity);
+  it('detects previously received credit', testReceivedCredit);
+  it('reports offer statuses', testOfferStatuses);
+});

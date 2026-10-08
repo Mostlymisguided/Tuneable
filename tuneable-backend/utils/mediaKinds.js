@@ -48,6 +48,40 @@ const BOOK_CATALOG_QUERY = {
   contentForm: { $in: ['book'] },
 };
 
+/** Forms never treated as music tracks by enrichment / coverage. */
+const NON_MUSIC_FORMS = [...PODCAST_FORMS, 'series'];
+
+/**
+ * Music tracks eligible for metadata / location enrichment: not deleted,
+ * contentType music (or legacy rows with no contentType) or form tune,
+ * excluding podcast forms. Returns a fresh object each call.
+ */
+function musicMediaQuery() {
+  return {
+    $and: [
+      { $or: [{ status: { $exists: false } }, { status: { $ne: 'deleted' } }] },
+      { $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] },
+      {
+        $or: [
+          { contentType: 'music' },
+          { contentForm: 'tune' },
+          { contentType: { $exists: false } },
+        ],
+      },
+      { contentForm: { $nin: NON_MUSIC_FORMS } },
+    ],
+  };
+}
+
+function isMusicMedia(media) {
+  if (!media) return false;
+  const forms = mediaForms(media);
+  if (forms.some((f) => NON_MUSIC_FORMS.includes(f))) return false;
+  const types = mediaTypes(media);
+  if (types.includes('music') || forms.includes('tune')) return true;
+  return types.length === 0;
+}
+
 module.exports = {
   PODCAST_FORMS,
   PODCAST_EPISODE_FORMS,
@@ -62,4 +96,7 @@ module.exports = {
   isPodcastEpisode,
   isPodcastSeries,
   BOOK_CATALOG_QUERY,
+  NON_MUSIC_FORMS,
+  musicMediaQuery,
+  isMusicMedia,
 };

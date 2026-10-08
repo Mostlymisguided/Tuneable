@@ -76,7 +76,6 @@ async function main() {
     nameSearch: args.includes('--name-search'),
     upgradeInferred: args.includes('--upgrade-inferred'),
     delayMs: argValue('--delay-ms') ?? 150,
-    mbDelayMs: argValue('--mb-delay-ms') ?? 1200,
     includeCoverage: !args.includes('--no-coverage'),
   });
 

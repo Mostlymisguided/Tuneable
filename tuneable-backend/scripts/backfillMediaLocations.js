@@ -15,6 +15,7 @@
  * Pass --upgrade-inferred to also replace locationSource in (uploader, null) with better sources.
  * Pass --upgrade-mapbox to geocode existing text/coords locations that lack placeId
  *   (includes manual edits made before Mapbox autocomplete).
+ * Tracks that found nothing are skipped for 30 days; pass --recheck to retry them now.
  *
  * Usage:
  *   node scripts/backfillMediaLocations.js --dry-run
@@ -72,10 +73,10 @@ async function main() {
     forceManual: args.includes('--force-manual'),
     upgradeInferred: args.includes('--upgrade-inferred'),
     upgradeMapbox: args.includes('--upgrade-mapbox'),
+    recheck: args.includes('--recheck'),
     skipMapbox: args.includes('--skip-mapbox'),
     limit: argValue('--limit'),
     delayMs: argValue('--delay-ms') ?? 150,
-    mbDelayMs: argValue('--mb-delay-ms') ?? 1200,
     includeStats: true,
   });
 

@@ -19,8 +19,7 @@ const mediaDoc = {
 };
 
 jest.mock('../models/Media', () => ({
-  findById: jest.fn(),
-  findOne: jest.fn(),
+  findByIdentifier: jest.fn(),
   updateOne: jest.fn(),
 }));
 
@@ -52,8 +51,7 @@ function historyDoc(overrides = {}) {
 describe('trackListeningSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    Media.findById.mockResolvedValue(mediaDoc);
-    Media.findOne.mockResolvedValue(null);
+    Media.findByIdentifier.mockResolvedValue(mediaDoc);
     Media.updateOne.mockResolvedValue({ modifiedCount: 1 });
     ListeningHistory.findOne.mockResolvedValue(null);
   });
@@ -67,8 +65,7 @@ describe('trackListeningSession', () => {
   });
 
   it('rejects unknown media', async () => {
-    Media.findById.mockResolvedValue(null);
-    Media.findOne.mockResolvedValue(null);
+    Media.findByIdentifier.mockResolvedValue(null);
     await expect(trackListeningSession({
       userId,
       mediaId: mediaId.toString(),

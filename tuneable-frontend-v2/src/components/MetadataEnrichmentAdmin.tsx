@@ -1,233 +1,96 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  Loader2,
-  RefreshCw,
-  Check,
-  X,
-  Sparkles,
-  ExternalLink,
-  Tags,
-  CheckCheck,
-  ChevronDown,
-  ChevronRight,
-  MapPin,
-} from 'lucide-react';
+import { CheckCheck, Loader2, RefreshCw, Sparkles, X } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
+import EnrichmentCoverageCard from './enrichment/EnrichmentCoverageCard';
+import EnrichNowPanel from './enrichment/EnrichNowPanel';
+import EnrichmentReviewCard from './enrichment/EnrichmentReviewCard';
+import {
+  REVIEWABLE_STATUSES,
+  type EnrichmentCoverage,
+  type EnrichmentGroup,
+  type EnrichmentItem,
+} from './enrichment/types';
 
-type LocationBackfillMode = 'missing' | 'artist_home' | 'musicbrainz';
-
-interface EnrichmentItem {
-  _id: string;
-  mediaId: string;
-  mediaUuid?: string;
-  importSource?: string;
-  importSourceUrl?: string | null;
-  status: string;
-  confidence?: string | null;
-  enrichTagsOnly?: boolean;
-  original?: {
-    title?: string;
-    artist?: string;
-    album?: string | null;
-    duration?: number;
-    releaseYear?: number | null;
-    isrc?: string | null;
-    tags?: string[];
-    genres?: string[];
-  };
-  suggestion?: {
-    title?: string;
-    artist?: string;
-    artists?: Array<{ name?: string; relationToNext?: string | null }>;
-    featuring?: Array<{ name?: string }>;
-    album?: string | null;
-    duration?: number;
-    releaseYear?: number | null;
-    isrc?: string | null;
-    tags?: string[];
-    genres?: string[];
-    musicbrainzId?: string;
-    score?: number;
-    matchType?: string;
-  } | null;
-  candidates?: Array<{
-    musicbrainzId?: string;
-    title?: string;
-    artist?: string;
-    artists?: Array<{ name?: string; relationToNext?: string | null }>;
-    featuring?: Array<{ name?: string }>;
-    album?: string | null;
-    duration?: number;
-    releaseYear?: number | null;
-    isrc?: string | null;
-    tags?: string[];
-    genres?: string[];
-    score?: number;
-    matchType?: string;
-    detailsFetched?: boolean;
-  }>;
-  currentTags?: string[];
-  currentGenres?: string[];
-  currentReleaseYear?: number | null;
-  currentIsrc?: string | null;
-  newTags?: string[];
-  error?: string | null;
-  importedBy?: { username?: string; uuid?: string } | null;
-  createdAt?: string;
-  processedAt?: string;
-}
-
-const STATUS_OPTIONS = [
-  { value: 'needs_review', label: 'Needs review' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'auto_applied', label: 'Auto-applied' },
-  { value: 'applied', label: 'Applied' },
-  { value: 'dismissed', label: 'Dismissed' },
-  { value: 'skipped', label: 'Skipped' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'all', label: 'All' },
+const GROUP_TABS: Array<{ value: EnrichmentGroup; label: string; empty: string }> = [
+  { value: 'review', label: 'Needs review', empty: 'Nothing waiting for review.' },
+  { value: 'in_progress', label: 'In progress', empty: 'No tracks waiting to be matched.' },
+  { value: 'done', label: 'Done', empty: 'No applied matches yet.' },
+  { value: 'ignored', label: 'Ignored', empty: 'No dismissed or skipped tracks.' },
 ];
 
-function formatDuration(sec?: number) {
-  if (!sec) return '—';
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-/** Prefer structured MB artists/featuring; fall back to legacy artist string. */
-function formatSuggestionArtist(
-  suggestion?: {
-    artist?: string;
-    artists?: Array<{ name?: string; relationToNext?: string | null }>;
-    featuring?: Array<{ name?: string }>;
-  } | null
-): string {
-  if (!suggestion) return '—';
-  const artists = Array.isArray(suggestion.artists) ? suggestion.artists : [];
-  const featuring = Array.isArray(suggestion.featuring) ? suggestion.featuring : [];
-
-  if (artists.length > 0) {
-    let display = '';
-    artists.forEach((artist, index) => {
-      const name = artist?.name?.trim();
-      if (!name) return;
-      display += name;
-      if (index < artists.length - 1) {
-        const relation = artist.relationToNext || '&';
-        display += relation === ',' ? ', ' : ` ${String(relation).trim()} `;
-      }
-    });
-    const featNames = featuring.map((f) => f?.name?.trim()).filter(Boolean);
-    if (featNames.length > 0) {
-      display += ` ft. ${featNames.join(', ')}`;
-    }
-    if (display.trim()) return display.trim();
-  }
-
-  return suggestion.artist?.trim() || '—';
-}
-
-function importSourceLinkLabel(url: string, importSource?: string) {
-  if (importSource === 'soundcloud_likes' || url.includes('soundcloud.com')) {
-    return 'View on SoundCloud';
-  }
-  if (importSource === 'spotify_likes' || url.includes('spotify.com')) {
-    return 'View on Spotify';
-  }
-  return 'View source';
-}
-
-function TagChips({
-  labels,
-  empty = 'No tags',
-  tone = 'neutral',
-}: {
-  labels?: string[] | null;
-  empty?: string;
-  tone?: 'neutral' | 'green' | 'amber';
-}) {
-  if (!labels || labels.length === 0) {
-    return <span className="text-xs text-gray-600">{empty}</span>;
-  }
-  const toneClass =
-    tone === 'green'
-      ? 'border-green-800/80 bg-green-950/40 text-green-200'
-      : tone === 'amber'
-        ? 'border-amber-800/80 bg-amber-950/40 text-amber-200'
-        : 'border-gray-600 bg-gray-800 text-gray-300';
-  return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {labels.map((tag) => (
-        <span
-          key={tag}
-          className={`px-2 py-0.5 rounded text-[11px] border ${toneClass}`}
-        >
-          {tag}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 const MetadataEnrichmentAdmin: React.FC = () => {
-  const [status, setStatus] = useState('needs_review');
+  const [group, setGroup] = useState<EnrichmentGroup>('review');
   const [items, setItems] = useState<EnrichmentItem[]>([]);
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
+  const [groupCounts, setGroupCounts] = useState<Partial<Record<EnrichmentGroup, number>>>({});
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [backfilling, setBackfilling] = useState(false);
-  const [locationBusy, setLocationBusy] = useState(false);
-  const [locationLimit, setLocationLimit] = useState(50);
-  const [locationMode, setLocationMode] = useState<LocationBackfillMode>('missing');
-  const [locationNameSearch, setLocationNameSearch] = useState(false);
-  const [locationCoverage, setLocationCoverage] = useState<{
-    total?: number;
-    withLoc?: number;
-    missing?: number;
-  } | null>(null);
+  const [coverage, setCoverage] = useState<EnrichmentCoverage | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [expandedCandidates, setExpandedCandidates] = useState<Set<string>>(new Set());
-  const [previewingCandidate, setPreviewingCandidate] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await mediaAPI.getEnrichments({ status, page, limit: 25 });
+      const data = await mediaAPI.getEnrichments({ group, page, limit: 25 });
       setItems(data.items || []);
-      setStatusCounts(data.statusCounts || {});
+      setGroupCounts(data.groupCounts || {});
       setPages(data.pagination?.pages || 1);
       setTotal(data.pagination?.total || 0);
       setSelected(new Set());
-      setExpandedCandidates(new Set());
-      setPreviewingCandidate(null);
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to load enrichment queue');
     } finally {
       setLoading(false);
     }
-  }, [status, page]);
+  }, [group, page]);
+
+  const loadCoverage = useCallback(async () => {
+    setCoverageLoading(true);
+    try {
+      const data = await mediaAPI.getEnrichmentCoverage();
+      setCoverage(data.coverage || null);
+    } catch {
+      setCoverage(null);
+    } finally {
+      setCoverageLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void loadCoverage();
+  }, [loadCoverage]);
+
+  const refreshAll = useCallback(() => {
+    void load();
+    void loadCoverage();
+  }, [load, loadCoverage]);
+
+  const handleEnrichDone = (switchTo?: EnrichmentGroup) => {
+    void loadCoverage();
+    if (switchTo && switchTo !== group) {
+      setGroup(switchTo);
+      setPage(1);
+    } else {
+      void load();
+    }
+  };
+
   const reviewableIds = useMemo(
     () => items
-      .filter((item) => ['needs_review', 'skipped', 'failed'].includes(item.status) && item.suggestion?.title)
+      .filter((item) => REVIEWABLE_STATUSES.includes(item.status) && item.suggestion?.title)
       .map((item) => item._id),
     [items]
   );
-
-  const allReviewableSelected = reviewableIds.length > 0
-    && reviewableIds.every((id) => selected.has(id));
+  const allReviewableSelected = reviewableIds.length > 0 && reviewableIds.every((id) => selected.has(id));
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -238,266 +101,58 @@ const MetadataEnrichmentAdmin: React.FC = () => {
     });
   };
 
-  const toggleSelectAllReviewable = () => {
-    if (allReviewableSelected) {
-      setSelected(new Set());
-      return;
-    }
-    setSelected(new Set(reviewableIds));
-  };
-
-  const handleProcess = async () => {
-    setProcessing(true);
-    try {
-      const result = await mediaAPI.processEnrichmentQueue(25);
-      if (result.skipped) {
-        toast.info('Queue already processing');
-      } else {
-        toast.success(
-          `Processed ${result.processed}: ${result.autoApplied} auto, ${result.needsReview} review, ${result.skipped} skipped`
-        );
-      }
-      await load();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Process failed');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleBackfill = async (
-    mode: 'supplement' | 'untagged',
-    linkage: 'linked' | 'unlinked' | 'any' = 'linked'
-  ) => {
-    setBackfilling(true);
-    try {
-      const result = await mediaAPI.enqueueEnrichmentBackfill({
-        limit: linkage === 'unlinked' ? 40 : mode === 'supplement' ? 100 : 50,
-        linkage,
-        processImmediately: true,
-        mode,
-      });
-      const label = linkage === 'unlinked'
-        ? 'Unlinked match'
-        : mode === 'supplement'
-          ? 'Supplement'
-          : 'Untagged';
-      toast.success(
-        `${label} queued ${result.enqueued}`
-          + ` (scanned ${result.scanned}`
-          + `${result.skippedOpen ? `, ${result.skippedOpen} already open` : ''})`
-      );
-      setPage(1);
-      setStatus('pending');
-      // load() will re-run via useEffect when status/page change
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Backfill failed');
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
-  const summarizeLocationResult = (result: any, label: string) => {
-    if (result?.coverage) {
-      setLocationCoverage({
-        total: result.coverage.total,
-        withLoc: result.coverage.withLoc,
-        missing: result.coverage.missing,
-      });
-    }
-    const cov = result?.coverage;
-    const coverageBit = cov
-      ? ` · coverage ${cov.withLoc}/${cov.total} (${cov.missing} missing)`
-      : '';
-    if (result?.statsOnly) {
-      toast.info(`${label}: stats only${coverageBit}`);
-      return;
-    }
-    const bySource = result?.bySource && Object.keys(result.bySource).length > 0
-      ? ` · ${Object.entries(result.bySource).map(([k, v]) => `${k}:${v}`).join(', ')}`
-      : '';
-    toast.success(
-      `${label}: ${result?.updated ?? 0} updated`
-        + ` / ${result?.unmatched ?? 0} unmatched`
-        + ` / ${result?.scanned ?? 0} scanned`
-        + `${result?.dryRun ? ' (dry-run)' : ''}`
-        + bySource
-        + coverageBit
-    );
-  };
-
-  const handleLocationDrip = async () => {
-    setLocationBusy(true);
-    try {
-      const result = await mediaAPI.runEnrichmentDrip({
-        locationsOnly: true,
-        locationLimit: 25,
-        includeCoverage: true,
-      });
-      const loc = result?.locations;
-      toast.success(
-        `Location drip: ${loc?.updated ?? 0} updated`
-          + ` / ${loc?.unmatched ?? 0} unmatched`
-          + ` / ${loc?.scanned ?? 0} scanned`
-          + (result?.coverage?.locations
-            ? ` · ${result.coverage.locations.withLoc}/${result.coverage.locations.total} with location`
-            : '')
-      );
-      if (result?.coverage?.locations) {
-        setLocationCoverage({
-          total: result.coverage.locations.total,
-          withLoc: result.coverage.locations.withLoc,
-          missing: result.coverage.locations.missing,
-        });
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Location drip failed');
-    } finally {
-      setLocationBusy(false);
-    }
-  };
-
-  const handleLocationBackfill = async (opts: {
-    statsOnly?: boolean;
-    dryRun?: boolean;
-    execute?: boolean;
-  }) => {
-    setLocationBusy(true);
-    try {
-      const result = await mediaAPI.runLocationBackfill({
-        statsOnly: opts.statsOnly === true,
-        dryRun: opts.execute === true ? false : opts.dryRun !== false,
-        execute: opts.execute === true,
-        limit: Math.min(Math.max(locationLimit || 50, 1), 200),
-        mode: locationMode,
-        nameSearch: locationNameSearch,
-        includeStats: true,
-        quiet: true,
-      });
-      const label = opts.statsOnly
-        ? 'Location stats'
-        : opts.execute
-          ? 'Location backfill'
-          : 'Location dry-run';
-      summarizeLocationResult(result, label);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Location backfill failed');
-    } finally {
-      setLocationBusy(false);
-    }
-  };
-
-  const handleApply = async (id: string) => {
+  const runItemAction = async (id: string, action: () => Promise<unknown>, success: string, failure: string) => {
     setBusyId(id);
     try {
-      await mediaAPI.applyEnrichment(id);
-      toast.success('Metadata applied');
+      await action();
+      toast.success(success);
       await load();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Apply failed');
+      toast.error(error?.response?.data?.error || failure);
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleDismiss = async (id: string) => {
-    setBusyId(id);
-    try {
-      await mediaAPI.dismissEnrichment(id);
-      toast.success('Dismissed');
-      await load();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Dismiss failed');
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleChoose = async (id: string, candidateIndex: number) => {
-    setBusyId(id);
-    try {
-      await mediaAPI.chooseEnrichmentCandidate(id, candidateIndex);
-      toast.success('Candidate applied');
-      await load();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to apply candidate');
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const candidateExpandKey = (itemId: string, index: number) => `${itemId}:${index}`;
-
-  const handleToggleCandidate = async (
-    itemId: string,
-    candidateIndex: number,
-    candidate: NonNullable<EnrichmentItem['candidates']>[number]
-  ) => {
-    const key = candidateExpandKey(itemId, candidateIndex);
-    const willExpand = !expandedCandidates.has(key);
-
-    setExpandedCandidates((prev) => {
-      const next = new Set(prev);
-      if (willExpand) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-
-    if (!willExpand || candidate.detailsFetched) return;
-
-    setPreviewingCandidate(key);
+  const handlePreviewCandidate = async (itemId: string, candidateIndex: number) => {
     try {
       const data = await mediaAPI.previewEnrichmentCandidate(itemId, candidateIndex);
-      if (data?.candidate) {
-        setItems((prev) =>
-          prev.map((item) => {
-            if (item._id !== itemId || !item.candidates) return item;
-            const candidates = item.candidates.map((c, i) =>
-              i === candidateIndex ? { ...c, ...data.candidate, detailsFetched: true } : c
-            );
-            return { ...item, candidates };
-          })
-        );
-      }
+      if (!data?.candidate) return;
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item._id !== itemId || !item.candidates) return item;
+          const candidates = item.candidates.map((c, i) =>
+            i === candidateIndex ? { ...c, ...data.candidate, detailsFetched: true } : c
+          );
+          return { ...item, candidates };
+        })
+      );
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to load candidate details');
-    } finally {
-      setPreviewingCandidate(null);
     }
   };
 
-  const handleBatchApply = async () => {
+  const handleBatch = async (kind: 'apply' | 'dismiss') => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     setBatchBusy(true);
     try {
-      const result = await mediaAPI.batchApplyEnrichments(ids);
-      toast.success(`Applied ${result.applied}${result.failed ? `, ${result.failed} failed` : ''}`);
+      if (kind === 'apply') {
+        const result = await mediaAPI.batchApplyEnrichments(ids);
+        toast.success(`Applied ${result.applied}${result.failed ? `, ${result.failed} failed` : ''}`);
+      } else {
+        const result = await mediaAPI.batchDismissEnrichments(ids);
+        toast.success(`Dismissed ${result.dismissed}${result.failed ? `, ${result.failed} failed` : ''}`);
+      }
       await load();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Batch apply failed');
+      toast.error(error?.response?.data?.error || `Batch ${kind} failed`);
     } finally {
       setBatchBusy(false);
     }
   };
 
-  const handleBatchDismiss = async () => {
-    const ids = Array.from(selected);
-    if (ids.length === 0) return;
-    setBatchBusy(true);
-    try {
-      const result = await mediaAPI.batchDismissEnrichments(ids);
-      toast.success(`Dismissed ${result.dismissed}${result.failed ? `, ${result.failed} failed` : ''}`);
-      await load();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Batch dismiss failed');
-    } finally {
-      setBatchBusy(false);
-    }
-  };
-
-  const reviewCount = statusCounts.needs_review || 0;
-  const pendingCount = (statusCounts.pending || 0) + (statusCounts.failed || 0);
+  const activeTab = GROUP_TABS.find((t) => t.value === group) || GROUP_TABS[0];
 
   return (
     <div className="space-y-6">
@@ -505,185 +160,44 @@ const MetadataEnrichmentAdmin: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-amber-400" />
-            Imported — to review
+            Metadata enrichment
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Linked tracks: fast tag lookup. Unlinked tracks: search MusicBrainz by title/artist,
-            then approve match + tags (batch apply supported).
+            Match tracks to MusicBrainz to fill in tags, release dates and locations.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading}
-            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm flex items-center gap-2"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBackfill('supplement', 'linked')}
-            disabled={backfilling}
-            className="px-3 py-2 bg-teal-800 hover:bg-teal-700 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
-            title="Queue MB-linked tracks to suggest additional tags (admin approval)"
-          >
-            {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tags className="h-4 w-4" />}
-            Supplement linked (100)
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBackfill('supplement', 'unlinked')}
-            disabled={backfilling}
-            className="px-3 py-2 bg-cyan-900 hover:bg-cyan-800 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
-            title="Search MusicBrainz for tracks with no MBID, then review match + tags"
-          >
-            {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tags className="h-4 w-4" />}
-            Match unlinked (40)
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBackfill('untagged', 'linked')}
-            disabled={backfilling}
-            className="px-3 py-2 bg-amber-900/80 hover:bg-amber-800 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
-            title="Only linked media with empty tags"
-          >
-            {backfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tags className="h-4 w-4" />}
-            Untagged linked
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleProcess()}
-            disabled={processing}
-            className="px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
-          >
-            {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Process queue{pendingCount ? ` (${pendingCount})` : ''}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={refreshAll}
+          disabled={loading}
+          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm flex items-center gap-2"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Refresh
+        </button>
       </div>
 
-      <div className="rounded-lg border border-sky-900/60 bg-sky-950/30 px-3 py-3 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm text-sky-200">
-            <MapPin className="h-4 w-4" />
-            <span className="font-medium">Media locations</span>
-            {locationCoverage ? (
-              <span className="text-xs text-sky-300/80">
-                {locationCoverage.withLoc}/{locationCoverage.total} with location
-                {locationCoverage.missing != null ? ` · ${locationCoverage.missing} missing` : ''}
-              </span>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleLocationDrip()}
-            disabled={locationBusy || backfilling}
-            className="px-3 py-1.5 bg-sky-800 hover:bg-sky-700 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2"
-            title="Run one capped location drip (25 missing)"
-          >
-            {locationBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-            Location drip (25)
-          </button>
-        </div>
+      <EnrichmentCoverageCard coverage={coverage} loading={coverageLoading} />
 
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <label className="text-xs text-gray-400 flex items-center gap-1.5">
-            Limit
-            <input
-              type="number"
-              min={1}
-              max={200}
-              value={locationLimit}
-              onChange={(e) => setLocationLimit(Math.min(Math.max(parseInt(e.target.value, 10) || 50, 1), 200))}
-              className="w-16 rounded bg-gray-900 border border-gray-700 px-2 py-1 text-white"
-            />
-          </label>
-          {(
-            [
-              { value: 'missing' as const, label: 'Missing' },
-              { value: 'artist_home' as const, label: 'Artist home' },
-              { value: 'musicbrainz' as const, label: 'MusicBrainz' },
-            ]
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setLocationMode(opt.value)}
-              className={`px-2.5 py-1 rounded-full border text-xs ${
-                locationMode === opt.value
-                  ? 'bg-sky-800/70 border-sky-500 text-white'
-                  : 'bg-gray-900 border-gray-700 text-gray-300 hover:border-gray-500'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-          <label className="flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer ml-1">
-            <input
-              type="checkbox"
-              checked={locationNameSearch}
-              onChange={(e) => setLocationNameSearch(e.target.checked)}
-              className="rounded border-gray-600"
-            />
-            Name search
-          </label>
-          <div className="flex flex-wrap gap-2 ml-auto">
-            <button
-              type="button"
-              disabled={locationBusy}
-              onClick={() => void handleLocationBackfill({ statsOnly: true })}
-              className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded text-xs"
-            >
-              Stats
-            </button>
-            <button
-              type="button"
-              disabled={locationBusy}
-              onClick={() => void handleLocationBackfill({ dryRun: true })}
-              className="px-2.5 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded text-xs"
-            >
-              Dry-run
-            </button>
-            <button
-              type="button"
-              disabled={locationBusy}
-              onClick={() => void handleLocationBackfill({ execute: true })}
-              className="px-2.5 py-1.5 bg-emerald-800 hover:bg-emerald-700 disabled:opacity-50 rounded text-xs font-medium"
-            >
-              Execute backfill
-            </button>
-          </div>
-        </div>
-        <p className="text-[11px] text-sky-300/70">
-          Dedicated backfill fills missing media origins (artist home → MusicBrainz → ISRC).
-          Cap is 200 per run. Name search is noisier — use sparingly.
-        </p>
-      </div>
+      <EnrichNowPanel onDone={handleEnrichDone} />
 
       <div className="flex flex-wrap gap-2 text-xs">
-        {STATUS_OPTIONS.map((opt) => (
+        {GROUP_TABS.map((tab) => (
           <button
-            key={opt.value}
+            key={tab.value}
             type="button"
             onClick={() => {
-              setStatus(opt.value);
+              setGroup(tab.value);
               setPage(1);
             }}
             className={`px-3 py-1.5 rounded-full border ${
-              status === opt.value
+              group === tab.value
                 ? 'bg-purple-700/50 border-purple-500 text-white'
                 : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-500'
             }`}
           >
-            {opt.label}
-            {opt.value !== 'all' && statusCounts[opt.value] != null
-              ? ` · ${statusCounts[opt.value]}`
-              : ''}
-            {opt.value === 'needs_review' && reviewCount > 0 && status !== 'needs_review'
-              ? ` · ${reviewCount}`
-              : ''}
+            {tab.label}
+            {groupCounts[tab.value] != null ? ` · ${groupCounts[tab.value]}` : ''}
           </button>
         ))}
       </div>
@@ -694,7 +208,7 @@ const MetadataEnrichmentAdmin: React.FC = () => {
             <input
               type="checkbox"
               checked={allReviewableSelected}
-              onChange={toggleSelectAllReviewable}
+              onChange={() => setSelected(allReviewableSelected ? new Set() : new Set(reviewableIds))}
               className="rounded border-gray-600"
             />
             Select all on page ({reviewableIds.length})
@@ -703,7 +217,7 @@ const MetadataEnrichmentAdmin: React.FC = () => {
           <button
             type="button"
             disabled={selected.size === 0 || batchBusy}
-            onClick={() => void handleBatchApply()}
+            onClick={() => void handleBatch('apply')}
             className="px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-40 rounded text-sm flex items-center gap-1"
           >
             {batchBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
@@ -712,7 +226,7 @@ const MetadataEnrichmentAdmin: React.FC = () => {
           <button
             type="button"
             disabled={selected.size === 0 || batchBusy}
-            onClick={() => void handleBatchDismiss()}
+            onClick={() => void handleBatch('dismiss')}
             className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 rounded text-sm flex items-center gap-1"
           >
             <X className="h-3.5 w-3.5" />
@@ -727,266 +241,38 @@ const MetadataEnrichmentAdmin: React.FC = () => {
         </div>
       ) : items.length === 0 ? (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center text-gray-400">
-          No items in this queue status.
+          {activeTab.empty}
         </div>
       ) : (
         <div className="space-y-4">
-          {items.map((item) => {
-            const suggestedTags = item.suggestion?.tags?.length
-              ? item.suggestion.tags
-              : item.suggestion?.genres;
-            const originalTags = item.original?.tags?.length
-              ? item.original.tags
-              : item.currentTags;
-            const newTags = item.newTags?.length
-              ? item.newTags
-              : (item.enrichTagsOnly ? suggestedTags : undefined);
-            const canReview = ['needs_review', 'skipped', 'failed'].includes(item.status);
-
-            return (
-              <div
-                key={item._id}
-                className={`bg-gray-800 border rounded-lg p-4 space-y-3 ${
-                  selected.has(item._id) ? 'border-teal-600' : 'border-gray-700'
-                }`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex gap-3">
-                    {canReview && item.suggestion?.title ? (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(item._id)}
-                        onChange={() => toggleSelect(item._id)}
-                        className="mt-1 rounded border-gray-600"
-                        aria-label={`Select ${item.original?.title || item._id}`}
-                      />
-                    ) : null}
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mb-1">
-                        <span className="px-2 py-0.5 rounded border border-gray-600">{item.status}</span>
-                        {item.confidence ? (
-                          <span className="px-2 py-0.5 rounded border border-amber-700 text-amber-200">
-                            {item.confidence}
-                            {item.suggestion?.score != null
-                              ? ` · ${(item.suggestion.score * 100).toFixed(0)}%`
-                              : ''}
-                          </span>
-                        ) : null}
-                        {item.enrichTagsOnly ? (
-                          <span className="px-2 py-0.5 rounded border border-teal-800 text-teal-200">
-                            tag supplement
-                          </span>
-                        ) : null}
-                        {item.importSource ? (
-                          <span className="text-gray-500">{item.importSource.replace('_', ' ')}</span>
-                        ) : null}
-                        {item.importedBy?.username ? (
-                          <span>by @{item.importedBy.username}</span>
-                        ) : null}
-                      </div>
-                      {item.mediaUuid ? (
-                        <Link
-                          to={`/tune/${item.mediaUuid}`}
-                          className="text-sm text-purple-300 hover:underline inline-flex items-center gap-1"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Open media <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
-                  {canReview && (
-                    <div className="flex gap-2">
-                      {item.suggestion?.title ? (
-                        <button
-                          type="button"
-                          disabled={busyId === item._id || batchBusy}
-                          onClick={() => void handleApply(item._id)}
-                          className="px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded text-sm flex items-center gap-1"
-                        >
-                          {busyId === item._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                          Apply
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={busyId === item._id || batchBusy}
-                        onClick={() => void handleDismiss(item._id)}
-                        className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 rounded text-sm flex items-center gap-1"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  <div className="bg-gray-900/70 rounded-lg p-3">
-                    <div className="text-xs text-red-300 mb-1">Current</div>
-                    <div className="font-medium text-white">{item.original?.title || '—'}</div>
-                    <div className="text-gray-400">{item.original?.artist || '—'}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {item.original?.album || 'No album'} · {formatDuration(item.original?.duration)}
-                      {item.original?.releaseYear || item.currentReleaseYear
-                        ? ` · ${item.original?.releaseYear || item.currentReleaseYear}`
-                        : ''}
-                      {item.original?.isrc || item.currentIsrc
-                        ? ` · ${item.original?.isrc || item.currentIsrc}`
-                        : ''}
-                    </div>
-                    <div className="mt-2">
-                      <div className="text-[11px] text-gray-500 uppercase tracking-wide">Tags</div>
-                      <TagChips labels={originalTags} empty="No tags yet" />
-                    </div>
-                    {item.importSourceUrl ? (
-                      <a
-                        href={item.importSourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-purple-300 hover:underline mt-2 inline-block"
-                      >
-                        {importSourceLinkLabel(item.importSourceUrl, item.importSource)}
-                      </a>
-                    ) : null}
-                  </div>
-                  <div className="bg-gray-900/70 rounded-lg p-3">
-                    <div className="text-xs text-green-300 mb-1">Suggestion (MusicBrainz)</div>
-                    {item.suggestion?.title ? (
-                      <>
-                        <div className="font-medium text-white">{item.suggestion.title}</div>
-                        <div className="text-gray-400">{formatSuggestionArtist(item.suggestion)}</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {item.suggestion.album || 'No album'} · {formatDuration(item.suggestion.duration)}
-                          {item.suggestion.releaseYear ? ` · ${item.suggestion.releaseYear}` : ''}
-                          {item.suggestion.isrc ? ` · ${item.suggestion.isrc}` : ''}
-                          {item.suggestion.matchType ? ` · ${item.suggestion.matchType}` : ''}
-                        </div>
-                        {newTags && newTags.length > 0 ? (
-                          <div className="mt-2">
-                            <div className="text-[11px] text-amber-400/90 uppercase tracking-wide">
-                              New tags to add
-                            </div>
-                            <TagChips labels={newTags} tone="amber" />
-                          </div>
-                        ) : null}
-                        <div className="mt-2">
-                          <div className="text-[11px] text-gray-500 uppercase tracking-wide">
-                            Suggested tags
-                          </div>
-                          <TagChips labels={suggestedTags} empty="No MB tags found" tone="green" />
-                        </div>
-                        {item.suggestion.musicbrainzId ? (
-                          <a
-                            href={`https://musicbrainz.org/recording/${item.suggestion.musicbrainzId}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-purple-300 hover:underline mt-2 inline-block"
-                          >
-                            View on MusicBrainz
-                          </a>
-                        ) : null}
-                      </>
-                    ) : (
-                      <div className="text-gray-500">
-                        {item.error || 'No suggestion'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {item.candidates && item.candidates.length > 1 && item.status === 'needs_review' ? (
-                  <div className="space-y-2">
-                    <div className="text-xs text-gray-400">Other candidates</div>
-                    {item.candidates.slice(1).map((c, offset) => {
-                      const idx = offset + 1;
-                      const expandKey = candidateExpandKey(item._id, idx);
-                      const isExpanded = expandedCandidates.has(expandKey);
-                      const isPreviewing = previewingCandidate === expandKey;
-                      const candidateTags = c.tags?.length ? c.tags : c.genres;
-
-                      return (
-                        <div
-                          key={`${c.musicbrainzId || idx}`}
-                          className="bg-gray-900/50 border border-gray-700 rounded px-3 py-2 space-y-2"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() => void handleToggleCandidate(item._id, idx, c)}
-                              className="min-w-0 flex-1 text-left flex items-start gap-1.5 group"
-                              aria-expanded={isExpanded}
-                            >
-                              <span className="mt-0.5 text-gray-500 group-hover:text-gray-300 shrink-0">
-                                {isExpanded
-                                  ? <ChevronDown className="h-3.5 w-3.5" />
-                                  : <ChevronRight className="h-3.5 w-3.5" />}
-                              </span>
-                              <span className="min-w-0 text-sm">
-                                <span className="text-white">{c.title}</span>
-                                <span className="text-gray-400"> — {formatSuggestionArtist(c)}</span>
-                                <span className="text-gray-500 text-xs ml-2">
-                                  {c.score != null ? `${(c.score * 100).toFixed(0)}%` : ''}
-                                  {c.matchType ? ` · ${c.matchType}` : ''}
-                                  {c.releaseYear ? ` · ${c.releaseYear}` : ''}
-                                </span>
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busyId === item._id || batchBusy}
-                              onClick={() => void handleChoose(item._id, idx)}
-                              className="text-xs px-2 py-1 bg-purple-800 hover:bg-purple-700 rounded shrink-0"
-                            >
-                              Use this
-                            </button>
-                          </div>
-
-                          {isExpanded ? (
-                            <div className="pl-5 space-y-2 text-sm border-t border-gray-700/80 pt-2">
-                              <div className="text-xs text-gray-500">
-                                {c.album || 'No album'} · {formatDuration(c.duration)}
-                                {c.releaseYear ? ` · ${c.releaseYear}` : ''}
-                                {c.isrc ? ` · ${c.isrc}` : ''}
-                              </div>
-                              <div>
-                                <div className="text-[11px] text-gray-500 uppercase tracking-wide">
-                                  Tags
-                                </div>
-                                {isPreviewing ? (
-                                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    Loading MusicBrainz details…
-                                  </div>
-                                ) : (
-                                  <TagChips
-                                    labels={candidateTags}
-                                    empty="No MB tags found"
-                                    tone="amber"
-                                  />
-                                )}
-                              </div>
-                              {c.musicbrainzId ? (
-                                <a
-                                  href={`https://musicbrainz.org/recording/${c.musicbrainzId}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-xs text-purple-300 hover:underline inline-block"
-                                >
-                                  View on MusicBrainz
-                                </a>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+          {items.map((item) => (
+            <EnrichmentReviewCard
+              key={item._id}
+              item={item}
+              selected={selected.has(item._id)}
+              busy={busyId === item._id || batchBusy}
+              onToggleSelect={() => toggleSelect(item._id)}
+              onApply={() => void runItemAction(
+                item._id,
+                () => mediaAPI.applyEnrichment(item._id),
+                'Metadata applied',
+                'Apply failed'
+              )}
+              onDismiss={() => void runItemAction(
+                item._id,
+                () => mediaAPI.dismissEnrichment(item._id),
+                'Dismissed',
+                'Dismiss failed'
+              )}
+              onChoose={(idx) => void runItemAction(
+                item._id,
+                () => mediaAPI.chooseEnrichmentCandidate(item._id, idx),
+                'Candidate applied',
+                'Failed to apply candidate'
+              )}
+              onPreviewCandidate={(idx) => handlePreviewCandidate(item._id, idx)}
+            />
+          ))}
         </div>
       )}
 

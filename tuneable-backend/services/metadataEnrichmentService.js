@@ -31,24 +31,28 @@ const {
   parseReleaseDate,
   applyReleaseToMedia,
 } = require('../utils/releaseDateUtils');
+const { musicMediaQuery } = require('../utils/mediaKinds');
 
-const MB_GAP_MS = 1100;
 const HIGH_SCORE = 0.82;
 const MEDIUM_SCORE = 0.55;
 const MAX_TAGS = 24;
 const MAX_GENRES = 12;
 
+const MAX_ATTEMPTS = 3;
+const STALE_PROCESSING_MS = 15 * 60 * 1000;
+
+/** Admin review tabs: each groups several queue statuses. */
+const ENRICHMENT_STATUS_GROUPS = {
+  review: ['needs_review'],
+  in_progress: ['pending', 'processing', 'failed'],
+  done: ['auto_applied', 'applied'],
+  ignored: ['dismissed', 'skipped'],
+};
+
 let queueBusy = false;
-let lastMbCallAt = 0;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function throttleMusicBrainz() {
-  const wait = Math.max(0, MB_GAP_MS - (Date.now() - lastMbCallAt));
-  if (wait > 0) await sleep(wait);
-  lastMbCallAt = Date.now();
 }
 
 function mapToObject(value) {
@@ -200,6 +204,9 @@ function resolveImportSourceUrl(media, importSource) {
   if ((importSource === 'deezer_playlist' || importSource === 'deezer_likes') && sources.deezer) {
     return sources.deezer;
   }
+  if (String(importSource || '').startsWith('youtube') && sources.youtube) {
+    return sources.youtube;
+  }
   if (sources.soundcloud) return sources.soundcloud;
   if (sources.spotify) {
     return sources.spotify
@@ -214,7 +221,6 @@ function resolveImportSourceUrl(media, importSource) {
 async function enrichCandidateDetails(candidate) {
   if (!candidate?.musicbrainzId) return candidate;
   try {
-    await throttleMusicBrainz();
     const details = await musicbrainzService.getRecording(candidate.musicbrainzId);
     if (!details) return candidate;
     return {
@@ -293,7 +299,6 @@ async function hydrateSuggestionArtists(suggestion) {
   if (!mbid) return suggestion;
 
   try {
-    await throttleMusicBrainz();
     const details = await musicbrainzService.getRecording(mbid);
     if (!details?.artists?.length) return suggestion;
     return {
@@ -397,7 +402,7 @@ async function enqueueEnrichment(mediaId, {
   const item = await MetadataEnrichment.create({
     mediaId: media._id,
     mediaUuid: media.uuid,
-    importSource,
+    importSource: MetadataEnrichment.IMPORT_SOURCES.includes(importSource) ? importSource : 'other',
     importedBy: importedBy || media.importedBy || media.addedBy || null,
     status: 'pending',
     enrichTagsOnly: Boolean(enrichTagsOnly || (externalIds.musicbrainz && force)),
@@ -635,7 +640,6 @@ function pickIsrcCandidate(original, recordings, isrc) {
 async function processViaIsrc(item, media, original, isrc) {
   let recordings;
   try {
-    await throttleMusicBrainz();
     recordings = await musicbrainzService.searchByIsrc(isrc, 5);
   } catch (err) {
     console.warn('MB ISRC lookup failed:', isrc, err.message);
@@ -689,6 +693,7 @@ async function processEnrichmentItem(itemOrId) {
   if (!['pending', 'failed'].includes(item.status)) return item;
 
   item.status = 'processing';
+  item.processingStartedAt = new Date();
   await item.save();
 
   try {
@@ -726,7 +731,6 @@ async function processEnrichmentItem(itemOrId) {
     }
 
     const query = buildSearchQuery(original.title, original.artist);
-    await throttleMusicBrainz();
     const { tracks } = await musicbrainzService.searchRecordings(query, 0, 8);
 
     const scored = (tracks || []).map((track) => {
@@ -817,8 +821,15 @@ async function processEnrichmentItem(itemOrId) {
     return item;
   } catch (error) {
     console.error('metadataEnrichment process error:', error.message);
-    item.status = 'failed';
-    item.error = error.message || 'Enrichment failed';
+    item.attempts = (item.attempts || 0) + 1;
+    const message = error.message || 'Enrichment failed';
+    if (item.attempts >= MAX_ATTEMPTS) {
+      item.status = 'skipped';
+      item.error = `Gave up after ${item.attempts} failed attempts: ${message}`;
+    } else {
+      item.status = 'failed';
+      item.error = message;
+    }
     item.processedAt = new Date();
     await item.save();
     return item;
@@ -826,15 +837,48 @@ async function processEnrichmentItem(itemOrId) {
 }
 
 /**
+ * Return rows orphaned in `processing` (crash / restart mid-item) to `pending`.
+ * Rows from before processingStartedAt existed fall back to updatedAt.
+ */
+async function recoverStaleProcessing() {
+  const cutoff = new Date(Date.now() - STALE_PROCESSING_MS);
+  const result = await MetadataEnrichment.updateMany(
+    {
+      status: 'processing',
+      $or: [
+        { processingStartedAt: { $lt: cutoff } },
+        { processingStartedAt: null, updatedAt: { $lt: cutoff } },
+      ],
+    },
+    { $set: { status: 'pending', processingStartedAt: null } }
+  );
+  return result.modifiedCount || 0;
+}
+
+/**
  * Process pending queue items (rate-limited). Safe to call after imports.
+ * New (pending) rows go first; failed rows only fill leftover capacity so
+ * a run of bad rows cannot starve fresh work.
  */
 async function processQueue({ limit = 20 } = {}) {
   if (queueBusy) return { skipped: true, reason: 'busy' };
   queueBusy = true;
   try {
-    const pending = await MetadataEnrichment.find({ status: { $in: ['pending', 'failed'] } })
+    await recoverStaleProcessing();
+
+    const cap = Math.min(Math.max(limit, 1), 50);
+    const pending = await MetadataEnrichment.find({ status: 'pending' })
       .sort({ createdAt: 1 })
-      .limit(Math.min(Math.max(limit, 1), 50));
+      .limit(cap);
+    if (pending.length < cap) {
+      const retries = await MetadataEnrichment.find({
+        status: 'failed',
+        attempts: { $lt: MAX_ATTEMPTS },
+      })
+        .sort({ updatedAt: 1 })
+        .limit(cap - pending.length);
+      pending.push(...retries);
+    }
 
     const results = { processed: 0, autoApplied: 0, needsReview: 0, skipped: 0, failed: 0 };
     for (const item of pending) {
@@ -851,9 +895,42 @@ async function processQueue({ limit = 20 } = {}) {
   }
 }
 
-function kickProcessQueue(limit = 15) {
+const DRAIN_MAX_ROUNDS = 40;
+let drainRequested = false;
+let draining = false;
+
+/**
+ * Drain pending rows in batches until empty. Kicks that arrive while a drain is running
+ * are coalesced into another pass instead of being dropped.
+ */
+async function drainQueue(batchSize) {
+  if (draining) {
+    drainRequested = true;
+    return;
+  }
+  draining = true;
+  try {
+    do {
+      drainRequested = false;
+      for (let round = 0; round < DRAIN_MAX_ROUNDS; round += 1) {
+        const result = await processQueue({ limit: batchSize });
+        if (result?.skipped) {
+          await sleep(5000);
+          continue;
+        }
+        // Stop when the batch was short or made no progress (all failed → retry later)
+        if (!result || result.processed < batchSize || result.failed === result.processed) break;
+      }
+    } while (drainRequested);
+  } finally {
+    draining = false;
+  }
+}
+
+function kickProcessQueue(limit = 25) {
+  const batchSize = Math.min(Math.max(Number(limit) || 25, 1), 50);
   setImmediate(() => {
-    processQueue({ limit }).catch((err) => {
+    drainQueue(batchSize).catch((err) => {
       console.error('metadataEnrichment background queue error:', err);
     });
   });
@@ -861,16 +938,21 @@ function kickProcessQueue(limit = 15) {
 
 async function listEnrichments({
   status = 'needs_review',
+  group,
   page = 1,
   limit = 30,
   importSource,
 } = {}) {
   const query = {};
-  if (status && status !== 'all') query.status = status;
+  if (group && ENRICHMENT_STATUS_GROUPS[group]) {
+    query.status = { $in: ENRICHMENT_STATUS_GROUPS[group] };
+  } else if (status && status !== 'all') {
+    query.status = status;
+  }
   if (importSource) query.importSource = importSource;
 
-  const skip = (Math.max(1, page) - 1) * limit;
   const capped = Math.min(Math.max(limit, 1), 100);
+  const skip = (Math.max(1, page) - 1) * capped;
 
   const [items, total, counts] = await Promise.all([
     MetadataEnrichment.find(query)
@@ -890,11 +972,17 @@ async function listEnrichments({
     acc[row._id] = row.count;
     return acc;
   }, {});
+  const groupCounts = Object.fromEntries(
+    Object.entries(ENRICHMENT_STATUS_GROUPS).map(([key, statuses]) => [
+      key,
+      statuses.reduce((sum, s) => sum + (statusCounts[s] || 0), 0),
+    ])
+  );
 
   const mediaIds = items.map((item) => item.mediaId).filter(Boolean);
   const mediaDocs = mediaIds.length > 0
     ? await Media.find({ _id: { $in: mediaIds } })
-      .select('sources externalIds tags genres releaseYear isrc')
+      .select('sources externalIds tags genres releaseYear releaseDate releaseDatePrecision isrc')
       .lean()
     : [];
   const mediaById = new Map(mediaDocs.map((doc) => [String(doc._id), doc]));
@@ -909,6 +997,8 @@ async function listEnrichments({
       currentTags,
       currentGenres: media?.genres || [],
       currentReleaseYear: media?.releaseYear || null,
+      currentReleaseDate: media?.releaseDate || null,
+      currentReleaseDatePrecision: media?.releaseDatePrecision || null,
       currentIsrc: media?.isrc || null,
       newTags: filterNewTags(currentTags, suggestedTags),
     };
@@ -923,6 +1013,7 @@ async function listEnrichments({
       pages: Math.ceil(total / capped) || 1,
     },
     statusCounts,
+    groupCounts,
   };
 }
 
@@ -1141,7 +1232,7 @@ async function enqueueAfterLibraryImport(tippedItems, {
     }
   }
   if (created.length > 0) {
-    kickProcessQueue(Math.min(created.length, 25));
+    kickProcessQueue(25);
   }
   return created;
 }
@@ -1178,20 +1269,7 @@ async function enqueueUntaggedBackfill({
     else resolvedLinkage = 'linked';
   }
 
-  const baseQuery = {
-    status: { $ne: 'deleted' },
-    deletedAt: null,
-    $and: [
-      {
-        $or: [
-          { contentType: 'music' },
-          { contentType: { $in: ['music'] } },
-          { contentForm: { $in: ['tune'] } },
-          { contentType: { $exists: false } },
-        ],
-      },
-    ],
-  };
+  const baseQuery = musicMediaQuery();
 
   if (!supplement) {
     baseQuery.$and.push({
@@ -1280,6 +1358,7 @@ module.exports = {
   processEnrichmentItem,
   processQueue,
   kickProcessQueue,
+  recoverStaleProcessing,
   listEnrichments,
   applyEnrichment,
   dismissEnrichment,
@@ -1296,4 +1375,5 @@ module.exports = {
   applySuggestionToMedia,
   HIGH_SCORE,
   MEDIUM_SCORE,
+  ENRICHMENT_STATUS_GROUPS,
 };

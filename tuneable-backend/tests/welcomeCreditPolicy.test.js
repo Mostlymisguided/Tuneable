@@ -1,6 +1,6 @@
 /**
  * Unit tests for welcome credit policy helpers (no DB).
- * Run: node tuneable-backend/tests/welcomeCreditPolicy.test.js
+ * Run: npx jest tests/welcomeCreditPolicy.test.js
  */
 
 const assert = require('assert');
@@ -87,15 +87,12 @@ function testExpiryMonths() {
   assert.strictEqual(expires.getUTCMonth(), 0); // January
 }
 
-function run() {
-  testControllers();
-  testUserControlsMedia();
-  testSelfMediaCapRemaining();
-  testCapTargetsOwned();
-  testCapTargetsByName();
-  testConstantsMatchBrandMaths();
-  testExpiryMonths();
-  console.log('✅ welcomeCreditPolicy.test.js passed');
-}
-
-run();
+describe('welcomeCreditPolicy', () => {
+  it('collects media controller user ids', testControllers);
+  it('detects users who control media', testUserControlsMedia);
+  it('computes remaining self-media welcome credit', testSelfMediaCapRemaining);
+  it('targets artist caps for owned media', testCapTargetsOwned);
+  it('targets artist caps by artist name', testCapTargetsByName);
+  it('keeps constants in line with the brand maths', testConstantsMatchBrandMaths);
+  it('computes welcome credit expiry', testExpiryMonths);
+});

@@ -27,6 +27,7 @@ const {
   enqueueEnrichment,
   processQueue,
 } = require('../services/metadataEnrichmentService');
+const { musicMediaQuery } = require('../utils/mediaKinds');
 
 const DRY_RUN = !args.includes('--execute');
 const PROCESS_ONLY = args.includes('--process-only');
@@ -46,38 +47,12 @@ function getMongoUri() {
 function missingReleaseQuery() {
   return {
     $and: [
-      {
-        $or: [
-          { status: { $exists: false } },
-          { status: { $ne: 'deleted' } },
-        ],
-      },
-      {
-        $or: [
-          { deletedAt: null },
-          { deletedAt: { $exists: false } },
-        ],
-      },
-      {
-        $or: [
-          { contentType: 'music' },
-          { contentType: { $in: ['music'] } },
-          { contentForm: 'tune' },
-          { contentForm: { $in: ['tune'] } },
-          { contentType: { $exists: false } },
-        ],
-      },
+      ...musicMediaQuery().$and,
       {
         $or: [{ releaseDate: null }, { releaseDate: { $exists: false } }],
       },
       {
         $or: [{ releaseYear: null }, { releaseYear: { $exists: false } }],
-      },
-      // Skip podcasts
-      {
-        $nor: [
-          { contentForm: { $in: ['podcast-series', 'podcast-episode', 'episode', 'series'] } },
-        ],
       },
     ],
   };
@@ -87,19 +62,14 @@ async function printCoverage() {
   const base = missingReleaseQuery();
   const missing = await Media.countDocuments(base);
   const withDate = await Media.countDocuments({
-    $and: [
-      base.$and[0],
-      base.$and[1],
-      base.$and[2],
-      { releaseDate: { $ne: null } },
-    ],
+    $and: [...musicMediaQuery().$and, { releaseDate: { $ne: null } }],
   });
   const queue = await MetadataEnrichment.aggregate([
     { $group: { _id: '$status', n: { $sum: 1 } } },
     { $sort: { _id: 1 } },
   ]);
   console.log(`\n📊 Missing releaseDate+year: ${missing}`);
-  console.log(`   With releaseDate (music filter approx): ${withDate}`);
+    console.log(`   With releaseDate: ${withDate}`);
   console.log('   Enrichment queue:', Object.fromEntries(queue.map((r) => [r._id, r.n])));
 }
 

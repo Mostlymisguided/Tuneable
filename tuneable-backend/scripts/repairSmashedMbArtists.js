@@ -54,10 +54,6 @@ function mapToObject(value) {
   return { ...value };
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function repairEnrichments(limit) {
   const query = {
     'suggestion.musicbrainzId': { $exists: true, $nin: [null, ''] },
@@ -139,7 +135,6 @@ async function repairMedia(limit) {
     }
 
     try {
-      await sleep(1100);
       const details = await musicbrainzService.getRecording(mbid);
       if (!details?.artists?.length) {
         stats.skipped += 1;

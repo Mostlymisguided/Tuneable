@@ -1,5 +1,22 @@
 const mongoose = require('mongoose');
 
+const IMPORT_SOURCES = [
+  'soundcloud_likes',
+  'spotify_likes',
+  'deezer_playlist',
+  'deezer_likes',
+  'rekordbox',
+  'itunes_library',
+  'youtube',
+  'youtube_playlist',
+  'youtube_likes',
+  'youtube_video',
+  'library_import',
+  'manual',
+  'other',
+  'backfill',
+];
+
 /**
  * Post-import metadata enrichment queue (MusicBrainz cross-ref).
  * High-confidence suggestions can be auto-applied; medium confidence needs admin review.
@@ -82,7 +99,7 @@ const metadataEnrichmentSchema = new mongoose.Schema({
 
   importSource: {
     type: String,
-    enum: ['soundcloud_likes', 'spotify_likes', 'deezer_playlist', 'deezer_likes', 'library_import', 'manual', 'other', 'backfill'],
+    enum: IMPORT_SOURCES,
     default: 'library_import',
     index: true,
   },
@@ -132,6 +149,10 @@ const metadataEnrichmentSchema = new mongoose.Schema({
   candidates: [candidateSchema],
 
   error: { type: String, default: null },
+  /** Processing attempts that ended in failure; rows stop retrying at MAX_ATTEMPTS. */
+  attempts: { type: Number, default: 0 },
+  /** Set when a worker claims the row; used to recover rows orphaned by a crash. */
+  processingStartedAt: { type: Date, default: null },
   adminNotes: { type: String, default: null },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   reviewedAt: { type: Date, default: null },
@@ -143,4 +164,7 @@ const metadataEnrichmentSchema = new mongoose.Schema({
 metadataEnrichmentSchema.index({ status: 1, createdAt: -1 });
 metadataEnrichmentSchema.index({ mediaId: 1, status: 1 });
 
-module.exports = mongoose.model('MetadataEnrichment', metadataEnrichmentSchema);
+const MetadataEnrichment = mongoose.model('MetadataEnrichment', metadataEnrichmentSchema);
+MetadataEnrichment.IMPORT_SOURCES = IMPORT_SOURCES;
+
+module.exports = MetadataEnrichment;

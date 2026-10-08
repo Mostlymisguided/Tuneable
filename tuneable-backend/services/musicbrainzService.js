@@ -8,17 +8,34 @@ const USER_AGENT = 'TuneableLocal/1.0 ( https://tuneable.stream )';
 
 const MB_RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const MB_MAX_RETRIES = 4;
+/** MusicBrainz allows ~1 request/second per client; shared by every caller in this process. */
+const MB_MIN_GAP_MS = 1100;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+let mbGate = Promise.resolve();
+let lastMbRequestAt = 0;
+
+/** Resolves when this caller may send the next request (serialised, spaced by MB_MIN_GAP_MS). */
+function waitForMbSlot() {
+  const slot = mbGate.then(async () => {
+    const wait = Math.max(0, MB_MIN_GAP_MS - (Date.now() - lastMbRequestAt));
+    if (wait > 0) await sleep(wait);
+    lastMbRequestAt = Date.now();
+  });
+  mbGate = slot.catch(() => {});
+  return slot;
+}
+
 /**
- * MusicBrainz GET with backoff on 429/5xx (common under the 1 req/s soft limit).
+ * Rate-limited MusicBrainz GET with backoff on 429/5xx.
  */
 async function mbGet(url, params = {}) {
   let lastError = null;
   for (let attempt = 0; attempt <= MB_MAX_RETRIES; attempt += 1) {
+    await waitForMbSlot();
     try {
       return await axios.get(url, {
         headers: {
@@ -497,6 +514,7 @@ module.exports = {
   searchArtists,
   searchByIsrc,
   searchByIsrcRaw,
+  mapRecordingToTrack,
   extractPrimaryArtistMbids,
   mapArtistOrigin,
   getOriginFromRecordingMbid,

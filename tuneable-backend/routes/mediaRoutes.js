@@ -3886,7 +3886,8 @@ router.get('/admin/enrichment', authMiddleware, async (req, res) => {
     }
     const metadataEnrichmentService = require('../services/metadataEnrichmentService');
     const data = await metadataEnrichmentService.listEnrichments({
-      status: req.query.status || 'needs_review',
+      status: req.query.group ? undefined : (req.query.status || 'needs_review'),
+      group: req.query.group || undefined,
       page: parseInt(req.query.page, 10) || 1,
       limit: parseInt(req.query.limit, 10) || 30,
       importSource: req.query.importSource || undefined,
@@ -3895,6 +3896,23 @@ router.get('/admin/enrichment', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error listing enrichments:', error);
     res.status(500).json({ error: error.message || 'Failed to list enrichments' });
+  }
+});
+
+// @route   GET /api/media/admin/enrichment/coverage
+// @desc    Catalogue completeness: MusicBrainz link, tags, release date, location
+// @access  Private (Admin)
+router.get('/admin/enrichment/coverage', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { getEnrichmentCoverage, isDripRunning } = require('../services/enrichmentDripService');
+    const coverage = await getEnrichmentCoverage();
+    res.json({ success: true, coverage, dripRunning: isDripRunning() });
+  } catch (error) {
+    console.error('Error loading enrichment coverage:', error);
+    res.status(500).json({ error: error.message || 'Failed to load coverage' });
   }
 });
 
@@ -4012,6 +4030,7 @@ router.post('/admin/enrichment/location-backfill', authMiddleware, async (req, r
       nameSearch: body.nameSearch === true,
       upgradeInferred: body.upgradeInferred === true,
       upgradeMapbox: body.upgradeMapbox === true || body.mode === 'upgrade_mapbox',
+      recheck: body.recheck === true,
       quiet: body.quiet !== false,
       includeStats: body.includeStats !== false,
     });

@@ -2525,7 +2525,7 @@ const Admin: React.FC = () => {
                     }`}
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Import review
+                    Enrichment
                     {enrichmentReviewCount > 0 ? (
                       <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-amber-600 text-white">
                         {enrichmentReviewCount}

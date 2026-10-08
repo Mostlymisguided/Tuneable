@@ -334,6 +334,8 @@ const mediaSchema = new mongoose.Schema({
   secondaryLocation: mapboxLocationFields(),
   /** Where primaryLocation came from: artist_home | musicbrainz | uploader | manual | … */
   locationSource: { type: String, default: null },
+  /** Last time the location backfill looked for this track and found nothing. */
+  locationCheckedAt: { type: Date, default: null },
   
   // Minimum bid/tip amount (media-level override, falls back to party minimumBid if not set)
   minimumBid: {
