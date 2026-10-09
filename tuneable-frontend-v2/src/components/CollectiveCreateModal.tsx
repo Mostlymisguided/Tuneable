@@ -340,7 +340,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   onChange={handleProfilePictureChange}
                   className="hidden"
                 />

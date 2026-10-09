@@ -255,7 +255,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
               <input
                 type="file"
                 multiple
-                accept="image/*,.pdf"
+                accept="image/*,.heic,.heif,.pdf"
                 onChange={(e) => setProofFiles(Array.from(e.target.files || []))}
                 disabled={submitting}
                 className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"

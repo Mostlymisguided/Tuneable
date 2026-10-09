@@ -331,7 +331,7 @@ const LabelCreateModal: React.FC<LabelCreateModalProps> = ({ isOpen, onClose, on
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   onChange={handleProfilePictureChange}
                   className="hidden"
                 />

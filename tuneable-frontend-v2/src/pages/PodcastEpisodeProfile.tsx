@@ -3840,7 +3840,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                     <input
                       ref={coverArtFileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       onChange={handleCoverArtUpload}
                       className="hidden"
                     />

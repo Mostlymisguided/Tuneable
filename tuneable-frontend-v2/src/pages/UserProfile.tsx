@@ -2136,7 +2136,7 @@ const UserProfile: React.FC = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 onChange={handleProfilePicUpload}
                 className="hidden"
               />

@@ -575,7 +575,7 @@ useEffect(() => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 onChange={handleProfilePictureUpload}
                 className="hidden"
               />
