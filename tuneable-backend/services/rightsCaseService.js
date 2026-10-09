@@ -26,6 +26,7 @@ const {
   escapeRegex,
 } = require('../utils/rightsCaseHelpers');
 const { findContactCandidates } = require('./rightsContactLookupService');
+const { RIGHTS_STATUSES, isValidRightsStatus } = require('../utils/mediaRights');
 
 const MEDIA_SELECT = 'title artist featuring songwriter composer producer host guest narrator director cinematographer editor author label creatorDisplay coverArt uuid rightsStatus rightsCleared importSource importedBy globalMediaAggregate isrc status';
 
@@ -249,6 +250,8 @@ async function listCases(query = {}) {
 
   if (query.status && CASE_STATUSES.includes(query.status)) {
     filter.status = query.status;
+  } else if (queue === 'all') {
+    // Every case, including cleared, declined, and takedown.
   } else if (queue === 'open') {
     filter.status = { $in: OPEN_STATUSES };
   } else if (queue === 'follow_ups') {
@@ -412,9 +415,40 @@ async function listLimbo(query = {}) {
   };
 }
 
-async function queueCounts() {
+function emptyMediaStatuses() {
+  return { pending: 0, permitted: 0, cleared: 0, disputed: 0 };
+}
+
+function summarizeOutreach(rows) {
+  const summary = {
+    total: 0,
+    outbound: 0,
+    inbound: 0,
+    notes: 0,
+    byChannel: {},
+    lastAt: null,
+  };
+  for (const row of rows) {
+    const count = row.count || 0;
+    const channel = row._id?.channel || 'other';
+    const direction = row._id?.direction || 'outbound';
+    summary.total += count;
+    summary.byChannel[channel] = (summary.byChannel[channel] || 0) + count;
+    if (direction === 'inbound') summary.inbound += count;
+    else if (direction === 'note') summary.notes += count;
+    else summary.outbound += count;
+    if (row.lastAt && (!summary.lastAt || new Date(row.lastAt) > new Date(summary.lastAt))) {
+      summary.lastAt = row.lastAt;
+    }
+  }
+  return summary;
+}
+
+const LIVE_MEDIA = { status: { $nin: ['deleted', 'vetoed'] } };
+
+async function ownershipSnapshot() {
   const now = new Date();
-  const [open, followUps, stalled, inbound, limbo] = await Promise.all([
+  const [open, followUps, stalled, inbound, limbo, all, statusRows, outreachRows] = await Promise.all([
     RightsCase.countDocuments({ status: { $in: OPEN_STATUSES } }),
     RightsCase.countDocuments({
       status: { $in: FOLLOW_UP_STATUSES },
@@ -426,15 +460,110 @@ async function queueCounts() {
       status: { $in: OPEN_STATUSES },
     }),
     listLimbo({ page: 1, limit: 1, uncontacted: 'true' }).then((r) => r.total),
+    RightsCase.countDocuments({}),
+    Media.aggregate([
+      { $match: LIVE_MEDIA },
+      { $group: { _id: '$rightsStatus', count: { $sum: 1 } } },
+    ]),
+    RightsCase.aggregate([
+      { $unwind: '$outreach' },
+      {
+        $group: {
+          _id: { channel: '$outreach.channel', direction: '$outreach.direction' },
+          count: { $sum: 1 },
+          lastAt: { $max: '$outreach.sentAt' },
+        },
+      },
+    ]),
   ]);
 
+  const mediaStatuses = emptyMediaStatuses();
+  for (const row of statusRows) {
+    const key = RIGHTS_STATUSES.includes(row._id) ? row._id : 'pending';
+    mediaStatuses[key] += row.count || 0;
+  }
+
   return {
-    limbo,
-    followUps,
-    open,
-    inbound,
-    stalled,
+    counts: {
+      limbo,
+      followUps,
+      open,
+      inbound,
+      stalled,
+      all,
+    },
+    mediaStatuses,
+    outreach: summarizeOutreach(outreachRows),
   };
+}
+
+async function listCatalogue(query = {}) {
+  const { page, limit, skip } = parsePage(query);
+  const rightsStatus = query.rightsStatus;
+  if (!isValidRightsStatus(rightsStatus)) {
+    const error = new Error('Invalid rights status');
+    error.status = 400;
+    throw error;
+  }
+
+  const match = { ...LIVE_MEDIA, rightsStatus };
+  const rx = searchRegex(query.search);
+  if (rx) Object.assign(match, mediaSearchClause(rx));
+
+  const [items, total] = await Promise.all([
+    Media.find(match)
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select('title artist creatorDisplay coverArt uuid rightsStatus rightsCleared importSource globalMediaAggregate isrc updatedAt')
+      .lean(),
+    Media.countDocuments(match),
+  ]);
+
+  const ids = items.map((item) => item._id);
+  const cases = ids.length
+    ? await RightsCase.find({ mediaId: { $in: ids } })
+      .select('mediaId status party.displayName outreach.channel outreach.direction outreach.sentAt outreach.template')
+      .lean()
+    : [];
+
+  const byMedia = new Map();
+  for (const rightsCase of cases) {
+    const key = String(rightsCase.mediaId);
+    if (!byMedia.has(key)) byMedia.set(key, []);
+    byMedia.get(key).push(rightsCase);
+  }
+
+  const media = items.map((item) => {
+    const related = byMedia.get(String(item._id)) || [];
+    let lastOutreach = null;
+    let outreachCount = 0;
+    for (const rightsCase of related) {
+      for (const event of rightsCase.outreach || []) {
+        outreachCount += 1;
+        const sentAt = event.sentAt ? new Date(event.sentAt).getTime() : 0;
+        const previous = lastOutreach ? new Date(lastOutreach.sentAt).getTime() : -1;
+        if (!lastOutreach || sentAt >= previous) {
+          lastOutreach = {
+            channel: event.channel,
+            direction: event.direction,
+            template: event.template,
+            sentAt: event.sentAt,
+            partyName: rightsCase.party?.displayName || '',
+            caseStatus: rightsCase.status,
+          };
+        }
+      }
+    }
+    return {
+      ...item,
+      caseCount: related.length,
+      outreachCount,
+      lastOutreach,
+    };
+  });
+
+  return { media, total, page, limit };
 }
 
 async function updateCase(id, patch, actorId) {
@@ -768,7 +897,8 @@ module.exports = {
   getCase,
   listCases,
   listLimbo,
-  queueCounts,
+  listCatalogue,
+  ownershipSnapshot,
   updateCase,
   addOutreach,
   attachClaim,

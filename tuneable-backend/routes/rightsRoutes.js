@@ -30,8 +30,17 @@ router.get('/admin/meta', adminMiddleware, (req, res) => {
 
 router.get('/admin/queues', adminMiddleware, async (req, res) => {
   try {
-    const counts = await rightsCaseService.queueCounts();
-    res.json({ counts });
+    const snapshot = await rightsCaseService.ownershipSnapshot();
+    res.json(snapshot);
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
+router.get('/admin/catalogue', adminMiddleware, async (req, res) => {
+  try {
+    const result = await rightsCaseService.listCatalogue(req.query);
+    res.json(result);
   } catch (error) {
     handleServiceError(res, error);
   }

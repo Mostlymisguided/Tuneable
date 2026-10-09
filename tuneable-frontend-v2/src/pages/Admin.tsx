@@ -1215,7 +1215,7 @@ const Admin: React.FC = () => {
     { id: 'users-labels', name: 'Users Labels Collectives', icon: Users },
     { id: 'bids-media-vetoes', name: 'Bids Media Vetoes', icon: DollarSign },
     { id: 'reports', name: 'Reports Apps Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
-    { id: 'rights', name: 'Rights', icon: Scale, hasNotification: rightsAttentionCount > 0 },
+    { id: 'rights', name: 'Ownership', icon: Scale, hasNotification: rightsAttentionCount > 0 },
     { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
     { id: 'refunds', name: 'Tip Refunds', icon: Undo2, hasNotification: pendingRefundCount > 0 },
     { id: 'ledger', name: 'Ledger', icon: Database },

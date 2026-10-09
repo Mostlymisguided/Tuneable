@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import {
@@ -21,20 +21,50 @@ import { rightsAPI } from '../lib/api';
 import type { RightsContactCandidate } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
+import {
+  RIGHTS_STATUSES,
+  RIGHTS_STATUS_HELP,
+  RIGHTS_STATUS_LABELS,
+  type RightsStatus,
+} from '../utils/rightsStatus';
 
-type QueueId = 'limbo' | 'follow_ups' | 'open' | 'inbound' | 'stalled';
+type QueueId = 'all' | 'limbo' | 'follow_ups' | 'open' | 'inbound' | 'stalled';
 
 interface RightsAdminProps {
   onAttentionCountChange?: (count: number) => void;
 }
 
 const QUEUE_LABELS: { id: QueueId; label: string }[] = [
+  { id: 'all', label: 'All' },
   { id: 'limbo', label: 'Limbo' },
   { id: 'follow_ups', label: 'Follow-ups' },
   { id: 'open', label: 'Open cases' },
   { id: 'inbound', label: 'Inbound' },
   { id: 'stalled', label: 'No response' },
 ];
+
+const MEDIA_STATUS_COLORS: Record<RightsStatus, string> = {
+  pending: 'bg-yellow-600',
+  permitted: 'bg-sky-600',
+  cleared: 'bg-green-600',
+  disputed: 'bg-red-600',
+};
+
+const EMPTY_MEDIA_STATUSES: Record<RightsStatus, number> = {
+  pending: 0,
+  permitted: 0,
+  cleared: 0,
+  disputed: 0,
+};
+
+const EMPTY_OUTREACH = {
+  total: 0,
+  outbound: 0,
+  inbound: 0,
+  notes: 0,
+  byChannel: {} as Record<string, number>,
+  lastAt: null as string | null,
+};
 
 const STATUS_LABELS: Record<string, string> = {
   identified: 'Identified',
@@ -198,6 +228,33 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function MediaStatusPill({ status }: { status?: string }) {
+  const key = (RIGHTS_STATUSES.includes(status as RightsStatus) ? status : 'pending') as RightsStatus;
+  return (
+    <span
+      className={`inline-flex px-2 py-0.5 rounded text-xs font-medium text-white ${MEDIA_STATUS_COLORS[key]}`}
+      title={RIGHTS_STATUS_HELP[key]}
+    >
+      {RIGHTS_STATUS_LABELS[key]}
+    </span>
+  );
+}
+
+function latestOutreach(rightsCase: any) {
+  const events = rightsCase?.outreach || [];
+  if (!events.length) return null;
+  return [...events].sort(
+    (a: any, b: any) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+  )[0];
+}
+
+function outreachSummaryLine(event: any, count?: number) {
+  if (!event) return 'No outreach';
+  const channel = CHANNEL_LABELS[event.channel] || event.channel || 'Outreach';
+  const prefix = typeof count === 'number' ? `${count} · ` : '';
+  return `${prefix}${channel} · ${event.direction || 'outbound'} · ${formatDate(event.sentAt)}`;
+}
+
 function ContactCandidateList({
   candidates,
   loading,
@@ -272,11 +329,19 @@ function ContactCandidateList({
 
 const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => {
   const [queue, setQueue] = useState<QueueId>('limbo');
-  const [counts, setCounts] = useState({ limbo: 0, followUps: 0, open: 0, inbound: 0, stalled: 0 });
+  const [catalogueStatus, setCatalogueStatus] = useState<RightsStatus | null>(null);
+  const [counts, setCounts] = useState({ limbo: 0, followUps: 0, open: 0, inbound: 0, stalled: 0, all: 0 });
+  const [mediaStatuses, setMediaStatuses] = useState(EMPTY_MEDIA_STATUSES);
+  const [outreachSummary, setOutreachSummary] = useState(EMPTY_OUTREACH);
   const [replyTo, setReplyTo] = useState('hi@tuneable.stream');
   const [loading, setLoading] = useState(true);
   const [limbo, setLimbo] = useState<any[]>([]);
   const [cases, setCases] = useState<any[]>([]);
+  const [catalogue, setCatalogue] = useState<any[]>([]);
+  const [selectedCatalogue, setSelectedCatalogue] = useState<any | null>(null);
+  const [catalogueCases, setCatalogueCases] = useState<any[]>([]);
+  const [catalogueCasesLoading, setCatalogueCasesLoading] = useState(false);
+  const catalogueRequest = useRef(0);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -308,7 +373,16 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   const refreshCounts = useCallback(async () => {
     try {
       const data = await rightsAPI.getQueues();
-      setCounts(data.counts);
+      setCounts({
+        limbo: data.counts?.limbo || 0,
+        followUps: data.counts?.followUps || 0,
+        open: data.counts?.open || 0,
+        inbound: data.counts?.inbound || 0,
+        stalled: data.counts?.stalled || 0,
+        all: data.counts?.all || 0,
+      });
+      setMediaStatuses({ ...EMPTY_MEDIA_STATUSES, ...(data.mediaStatuses || {}) });
+      setOutreachSummary({ ...EMPTY_OUTREACH, ...(data.outreach || {}), byChannel: data.outreach?.byChannel || {} });
       onAttentionCountChange?.(data.counts.followUps + data.counts.inbound);
     } catch (error) {
       console.error('Failed to load rights queue counts', error);
@@ -318,7 +392,18 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   const loadList = useCallback(async () => {
     try {
       setLoading(true);
-      if (queue === 'limbo') {
+      if (catalogueStatus) {
+        const data = await rightsAPI.getCatalogue({
+          rightsStatus: catalogueStatus,
+          page,
+          limit,
+          search: debouncedSearch.trim() || undefined,
+        });
+        setCatalogue(data.media || []);
+        setLimbo([]);
+        setCases([]);
+        setTotal(data.total || 0);
+      } else if (queue === 'limbo') {
         const data = await rightsAPI.getLimbo({
           page,
           limit,
@@ -327,6 +412,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         });
         setLimbo(data.media || []);
         setCases([]);
+        setCatalogue([]);
         setTotal(data.total || 0);
       } else {
         const data = await rightsAPI.getCases({
@@ -337,6 +423,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         });
         setCases(data.cases || []);
         setLimbo([]);
+        setCatalogue([]);
         setTotal(data.total || 0);
       }
     } catch (error) {
@@ -345,7 +432,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     } finally {
       setLoading(false);
     }
-  }, [queue, page, debouncedSearch]);
+  }, [queue, catalogueStatus, page, debouncedSearch]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
@@ -370,10 +457,12 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     setPage(1);
     setSelectedCase(null);
     setSelectedLimbo(null);
+    setSelectedCatalogue(null);
+    setCatalogueCases([]);
     setCandidates([]);
     setAccepted(null);
     setDismissedIds([]);
-  }, [queue]);
+  }, [queue, catalogueStatus]);
 
   const contactQueryName = selectedLimbo
     ? partyName
@@ -418,8 +507,36 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     [candidates, dismissedIds]
   );
 
+  const selectCatalogue = async (media: any) => {
+    const requestId = catalogueRequest.current + 1;
+    catalogueRequest.current = requestId;
+    setSelectedCase(null);
+    setSelectedLimbo(null);
+    setSelectedCatalogue(media);
+    setCatalogueCases([]);
+    setAccepted(null);
+    setDismissedIds([]);
+    try {
+      setCatalogueCasesLoading(true);
+      const data = await rightsAPI.getCases({
+        queue: 'all',
+        mediaId: media._id,
+        page: 1,
+        limit: 50,
+      });
+      if (catalogueRequest.current !== requestId) return;
+      setCatalogueCases(data.cases || []);
+    } catch (error) {
+      console.error('Failed to load listing outreach', error);
+      if (catalogueRequest.current === requestId) setCatalogueCases([]);
+    } finally {
+      if (catalogueRequest.current === requestId) setCatalogueCasesLoading(false);
+    }
+  };
+
   const selectLimbo = (media: any) => {
     setSelectedCase(null);
+    setSelectedCatalogue(null);
     setSelectedLimbo(media);
     const first = media.suggestedParties?.[0];
     setPartyName(first?.displayName || artistLine(media));
@@ -435,6 +552,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
   const selectCase = (rightsCase: any) => {
     setSelectedLimbo(null);
+    setSelectedCatalogue(null);
     setSelectedCase(rightsCase);
     setCaseStatus(rightsCase.status);
     setFollowUp(toDatetimeLocal(rightsCase.nextFollowUpAt));
@@ -749,12 +867,17 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   };
 
   const countFor = (id: QueueId) => {
+    if (id === 'all') return counts.all;
     if (id === 'limbo') return counts.limbo;
     if (id === 'follow_ups') return counts.followUps;
     if (id === 'open') return counts.open;
     if (id === 'inbound') return counts.inbound;
     return counts.stalled;
   };
+
+  const outreachChannelBits = Object.entries(outreachSummary.byChannel)
+    .filter(([, count]) => count > 0)
+    .map(([channel, count]) => `${count} ${CHANNEL_LABELS[channel] || channel}`);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -767,16 +890,31 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     return [...events].sort((a: any, b: any) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
   }, [selectedCase]);
 
+  const catalogueTimeline = useMemo(() => {
+    const events: any[] = [];
+    for (const item of catalogueCases) {
+      for (const event of item.outreach || []) {
+        events.push({
+          ...event,
+          partyName: item.party?.displayName,
+          caseStatus: item.status,
+          caseId: item._id,
+        });
+      }
+    }
+    return events.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+  }, [catalogueCases]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Scale className="h-6 w-6 text-purple-400" />
-            Rights
+            Ownership
           </h2>
           <p className="text-sm text-gray-400 mt-1">
-            Outreach cases for rights holders. Copy a tipped-on-Tuneable link, send email, or paste an Instagram DM. Replies go to {replyTo}. Playability still lives on the media rights status.
+            Catalogue status and outreach. Pending and disputed are not playable. Permitted and cleared are. Replies go to {replyTo}.
           </p>
         </div>
         <button
@@ -786,6 +924,40 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
           <RefreshCw className="h-4 w-4" />
           Refresh
         </button>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-wide text-gray-500">Catalogue</p>
+        <div className="flex flex-wrap gap-2">
+          {RIGHTS_STATUSES.map((status) => (
+            <button
+              key={status}
+              type="button"
+              title={RIGHTS_STATUS_HELP[status]}
+              onClick={() => setCatalogueStatus((current) => (current === status ? null : status))}
+              className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                catalogueStatus === status
+                  ? `${MEDIA_STATUS_COLORS[status]} text-white`
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              {RIGHTS_STATUS_LABELS[status]}
+              <span className="ml-2 text-xs opacity-80">{mediaStatuses[status] || 0}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-gray-400">
+          {outreachSummary.total === 0
+            ? 'No outreach logged yet.'
+            : `${outreachSummary.total} outreach event${outreachSummary.total === 1 ? '' : 's'} logged${
+              outreachChannelBits.length ? ` · ${outreachChannelBits.join(' · ')}` : ''
+            }${outreachSummary.inbound ? ` · ${outreachSummary.inbound} inbound` : ''}${
+              outreachSummary.lastAt ? ` · latest ${formatDate(outreachSummary.lastAt)}` : ''
+            }`}
+        </p>
+        <p className="text-xs text-gray-500">
+          Counts are live listings, excluding deleted and vetoed. Limbo is pending media with no case yet.
+        </p>
       </div>
 
       {attention > 0 && (
@@ -798,9 +970,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         {QUEUE_LABELS.map((item) => (
           <button
             key={item.id}
-            onClick={() => setQueue(item.id)}
+            onClick={() => { setCatalogueStatus(null); setQueue(item.id); }}
             className={`px-3 py-2 rounded-lg text-sm font-medium ${
-              queue === item.id
+              !catalogueStatus && queue === item.id
                 ? 'bg-purple-600 text-white'
                 : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
             }`}
@@ -810,13 +982,18 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
           </button>
         ))}
       </div>
+      {!catalogueStatus && queue === 'all' && (
+        <p className="text-xs text-gray-500 -mt-4">
+          Every outreach case, including cleared, declined, and takedown.
+        </p>
+      )}
 
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder={queue === 'limbo' ? 'Search title, artist, or ISRC' : 'Search counterpart, email, title, or notes'}
+          placeholder={catalogueStatus || queue === 'limbo' ? 'Search title, artist, or ISRC' : 'Search counterpart, email, title, or notes'}
           className="w-full pl-9 pr-9 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
         />
         {search && (
@@ -837,6 +1014,45 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             <div className="py-16 flex justify-center">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
             </div>
+          ) : catalogueStatus ? (
+            catalogue.length === 0 ? (
+              <div className="p-8 text-center text-gray-400">
+                {search.trim() ? 'No matching media' : `No ${RIGHTS_STATUS_LABELS[catalogueStatus].toLowerCase()} media`}
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Media</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Outreach</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {catalogue.map((media) => (
+                    <tr
+                      key={media._id}
+                      onClick={() => selectCatalogue(media)}
+                      className={`cursor-pointer hover:bg-gray-700/60 ${selectedCatalogue?._id === media._id ? 'bg-gray-700' : ''}`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <img src={media.coverArt || DEFAULT_COVER_ART} alt="" className="h-10 w-10 rounded object-cover" />
+                          <div>
+                            <p className="text-white text-sm font-medium">{media.title}</p>
+                            <p className="text-gray-400 text-xs">{artistLine(media)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3"><MediaStatusPill status={media.rightsStatus} /></td>
+                      <td className="px-4 py-3 text-xs text-gray-300">
+                        {outreachSummaryLine(media.lastOutreach, media.outreachCount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
           ) : queue === 'limbo' ? (
             limbo.length === 0 ? (
               <div className="p-8 text-center text-gray-400">
@@ -900,8 +1116,14 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
                         <td className="px-4 py-3">
                           <p className="text-white text-sm font-medium">{item.party?.displayName}</p>
                           <p className="text-gray-400 text-xs">{media.title || 'Media'} · {artistLine(media)}</p>
+                          <p className="text-gray-500 text-xs mt-1">{outreachSummaryLine(latestOutreach(item))}</p>
                         </td>
-                        <td className="px-4 py-3"><StatusPill status={item.status} /></td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusPill status={item.status} />
+                            <MediaStatusPill status={media.rightsStatus} />
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-xs text-gray-300">{formatDate(item.nextFollowUpAt)}</td>
                       </tr>
                     );
@@ -924,10 +1146,80 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         </div>
 
         <div className="lg:col-span-2 space-y-4">
-          {!selectedLimbo && !selectedCase && (
+          {!selectedLimbo && !selectedCase && !selectedCatalogue && (
             <div className="bg-gray-800 rounded-lg p-8 text-center text-gray-400">
               <Music className="h-10 w-10 mx-auto mb-3 text-gray-500" />
               Select a row to open a case or send outreach.
+            </div>
+          )}
+
+          {selectedCatalogue && !selectedCase && (
+            <div className="bg-gray-800 rounded-lg p-5 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-white font-semibold">{selectedCatalogue.title}</h3>
+                  <p className="text-gray-400 text-sm">{artistLine(selectedCatalogue)}</p>
+                  <div className="mt-2"><MediaStatusPill status={selectedCatalogue.rightsStatus} /></div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {RIGHTS_STATUS_HELP[(selectedCatalogue.rightsStatus || 'pending') as RightsStatus]}
+                  </p>
+                </div>
+                {selectedCatalogue.uuid && (
+                  <Link to={`/tune/${selectedCatalogue.uuid}`} className="text-purple-400 hover:text-purple-300">
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-200 mb-2">Cases</h4>
+                {catalogueCasesLoading && <p className="text-xs text-gray-500">Loading outreach…</p>}
+                {!catalogueCasesLoading && catalogueCases.length === 0 && (
+                  <p className="text-xs text-gray-500">No outreach case on this listing.</p>
+                )}
+                <div className="space-y-2">
+                  {catalogueCases.map((item) => (
+                    <div key={item._id} className="bg-gray-700/70 rounded p-2 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-white">{item.party?.displayName}</p>
+                        <StatusPill status={item.status} />
+                      </div>
+                      <p className="text-gray-400 mt-1">{outreachSummaryLine(latestOutreach(item))}</p>
+                      <button
+                        type="button"
+                        onClick={() => selectCase(item)}
+                        className="mt-2 text-purple-400 hover:text-purple-300"
+                      >
+                        Work this case
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-200 mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4" /> Outreach
+                </h4>
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                  {catalogueTimeline.length === 0 && !catalogueCasesLoading && (
+                    <p className="text-xs text-gray-500">No outreach yet</p>
+                  )}
+                  {catalogueTimeline.map((event: any) => (
+                    <div key={event._id || `${event.caseId}-${event.sentAt}`} className="bg-gray-700/70 rounded p-2 text-xs text-gray-300">
+                      <div className="flex justify-between gap-2 text-gray-400">
+                        <span>
+                          {event.partyName ? `${event.partyName} · ` : ''}
+                          {CHANNEL_LABELS[event.channel] || event.channel} · {event.direction}
+                        </span>
+                        <span>{formatDate(event.sentAt)}</span>
+                      </div>
+                      {event.subject && <p className="text-white mt-1">{event.subject}</p>}
+                      {event.body && <p className="whitespace-pre-wrap mt-1">{event.body}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

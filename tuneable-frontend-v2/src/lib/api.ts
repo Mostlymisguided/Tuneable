@@ -3125,8 +3125,32 @@ export const rightsAPI = {
         open: number;
         inbound: number;
         stalled: number;
+        all: number;
+      };
+      mediaStatuses: {
+        pending: number;
+        permitted: number;
+        cleared: number;
+        disputed: number;
+      };
+      outreach: {
+        total: number;
+        outbound: number;
+        inbound: number;
+        notes: number;
+        byChannel: Record<string, number>;
+        lastAt: string | null;
       };
     };
+  },
+  getCatalogue: async (params?: {
+    rightsStatus?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/rights/admin/catalogue', { params });
+    return response.data as { media: any[]; total: number; page: number; limit: number };
   },
   getLimbo: async (params?: { page?: number; limit?: number; uncontacted?: boolean; search?: string }) => {
     const response = await api.get('/rights/admin/limbo', { params });
