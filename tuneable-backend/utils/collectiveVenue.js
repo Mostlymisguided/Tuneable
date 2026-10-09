@@ -18,9 +18,19 @@ function parseMaybeJson(value) {
 }
 
 function normalizeCollectiveType(type) {
-  if (typeof type !== 'string') return 'collective';
+  // Handle array of types
+  if (Array.isArray(type)) {
+    const normalized = type
+      .filter(t => typeof t === 'string')
+      .map(t => t.trim().toLowerCase())
+      .filter(t => COLLECTIVE_TYPES.includes(t));
+    return normalized.length > 0 ? normalized : ['collective'];
+  }
+  
+  // Handle single type
+  if (typeof type !== 'string') return ['collective'];
   const normalized = type.trim().toLowerCase();
-  return COLLECTIVE_TYPES.includes(normalized) ? normalized : 'collective';
+  return [COLLECTIVE_TYPES.includes(normalized) ? normalized : 'collective'];
 }
 
 function normalizeVenueKind(kind) {
@@ -34,7 +44,12 @@ function normalizeCollectiveLocation(raw) {
 }
 
 function venueLocationError(type, location) {
-  if (type !== 'venue') return null;
+  // Check if 'venue' is in the types array
+  const isVenue = Array.isArray(type) 
+    ? type.includes('venue') 
+    : type === 'venue';
+  
+  if (!isVenue) return null;
   if (!location?.placeId) {
     return 'Venues must be bound to a Mapbox place';
   }
@@ -88,7 +103,7 @@ function collectiveSaveErrorResponse(error, action = 'create') {
 function venuesAtPlaceQuery(placeId) {
   return {
     isActive: true,
-    type: 'venue',
+    type: 'venue', // MongoDB will match if array contains 'venue'
     'location.ancestorIds': placeId,
   };
 }

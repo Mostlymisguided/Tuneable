@@ -13,11 +13,17 @@ const collectiveSchema = new mongoose.Schema({
   profilePicture: { type: String }, // URL to profile picture image
   coverImage: { type: String }, // URL to cover image
   
-  // Type/Category
+  // Type/Category (can have multiple types, e.g., both 'band' and 'venue')
   type: {
-    type: String,
+    type: [String],
     enum: COLLECTIVE_TYPES,
-    default: 'collective'
+    default: ['collective'],
+    validate: {
+      validator: function(types) {
+        return types && types.length > 0;
+      },
+      message: 'Collective must have at least one type'
+    }
   },
   venueKind: {
     type: String,

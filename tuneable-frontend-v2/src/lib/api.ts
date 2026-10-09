@@ -2514,7 +2514,7 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    type?: ('band' | 'collective' | 'production_company' | 'venue' | 'other') | ('band' | 'collective' | 'production_company' | 'venue' | 'other')[];
     venueKind?: string;
   }) => {
     // Handle both FormData (with file upload) and plain object
@@ -2536,7 +2536,7 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    type?: ('band' | 'collective' | 'production_company' | 'venue' | 'other') | ('band' | 'collective' | 'production_company' | 'venue' | 'other')[];
     venueKind?: string;
     location?: Record<string, unknown> | null;
     profilePicture?: string;

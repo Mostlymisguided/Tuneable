@@ -2,6 +2,7 @@ import type { ResolvedLocation } from './locationHelpers';
 import { getPlaceProfilePath } from './locationHelpers';
 
 export type CollectiveType = 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+export type CollectiveTypes = CollectiveType | CollectiveType[];
 export type VenueKind = 'bar' | 'club' | 'hostel' | 'cafe' | 'restaurant' | 'festival' | 'other';
 
 const CITY_LIKE = new Set(['place', 'locality', 'neighborhood', 'district']);
@@ -32,8 +33,20 @@ export function venueKindLabel(kind?: string | null): string {
   return VENUE_KIND_OPTIONS.find((option) => option.value === kind)?.label || '';
 }
 
-export function isVenueCollective(type?: string | null): boolean {
+export function isVenueCollective(type?: CollectiveTypes | string | null): boolean {
+  if (!type) return false;
+  if (Array.isArray(type)) {
+    return type.includes('venue');
+  }
   return type === 'venue';
+}
+
+export function hasCollectiveType(types?: CollectiveTypes | string | null, targetType?: CollectiveType): boolean {
+  if (!types || !targetType) return false;
+  if (Array.isArray(types)) {
+    return types.includes(targetType);
+  }
+  return types === targetType;
 }
 
 export function collectiveNoun(type?: string | null): string {

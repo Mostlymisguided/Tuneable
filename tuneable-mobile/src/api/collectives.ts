@@ -28,7 +28,7 @@ export interface Collective {
   coverImage: string;
   email: string;
   website: string;
-  type: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+  type: ('band' | 'collective' | 'production_company' | 'venue' | 'other') | ('band' | 'collective' | 'production_company' | 'venue' | 'other')[];
   venueKind?: 'bar' | 'club' | 'hostel' | 'cafe' | 'restaurant' | 'festival' | 'other';
   location?: ResolvedLocation;
   socialMedia?: {
