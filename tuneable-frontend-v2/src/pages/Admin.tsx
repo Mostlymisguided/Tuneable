@@ -1020,7 +1020,7 @@ const Admin: React.FC = () => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [mediaSortField, mediaSortDirection, mediaPage, mediaContentTypeFilter, mediaContentFormFilter, mediaSearchQuery, mediaRightsFilter, activeTab]);
+  }, [mediaSortField, mediaSortDirection, mediaPage, mediaContentTypeFilter, mediaContentFormFilter, mediaSearchQuery, mediaRightsFilter, activeTab, bidsMediaVetoesSubTab, isAdmin]);
 
   useEffect(() => {
     if (activeTab === 'reports' && isAdmin) {
