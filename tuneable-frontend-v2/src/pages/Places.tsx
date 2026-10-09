@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, MapPin } from 'lucide-react';
-import { locationAPI } from '../lib/api';
+import { ChevronRight, MapPin, Building2 } from 'lucide-react';
+import { locationAPI, collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import EntertainingLoader from '../components/EntertainingLoader';
 import { penceToPounds } from '../utils/currency';
+import { venueKindLabel } from '../utils/collectiveTypes';
+import { DEFAULT_PROFILE_PIC } from '../constants';
 import {
   getCountryPickFromLocation,
   getPlaceProfilePath,
@@ -26,6 +28,22 @@ type PlaceChartItem = {
   bidCount?: number;
 };
 
+type VenueItem = {
+  _id: string;
+  name: string;
+  slug: string;
+  profilePicture?: string;
+  type: string;
+  venueKind?: string | null;
+  location?: {
+    display?: string;
+    placeId?: string;
+  };
+  stats?: {
+    globalCollectiveAggregate?: number;
+  };
+};
+
 const Places: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -33,28 +51,49 @@ const Places: React.FC = () => {
   const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [places, setPlaces] = useState<PlaceChartItem[]>([]);
+  const [venues, setVenues] = useState<VenueItem[]>([]);
+  const [totalVenues, setTotalVenues] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const parentPlaceId = selectedLocation?.placeId ?? null;
+  const FEATURED_VENUES_COUNT = 5;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await locationAPI.getChart({
+      // Fetch location chart
+      const placesRes = await locationAPI.getChart({
         parentPlaceId: parentPlaceId ?? undefined,
         scope: locationScope,
         limit: 50,
       });
-      setPlaces(res.places ?? []);
+      setPlaces(placesRes.places ?? []);
+
+      // Fetch venues (only on global view - no parent selected)
+      if (!parentPlaceId) {
+        const venuesRes = await collectiveAPI.getCollectives({
+          type: 'venue',
+          sortBy: 'globalCollectiveAggregate',
+          sortOrder: 'desc',
+          page: 1,
+          limit: FEATURED_VENUES_COUNT,
+        });
+        setVenues(venuesRes.collectives ?? []);
+        setTotalVenues(venuesRes.total ?? 0);
+      } else {
+        // If a location is selected, clear venues (could fetch location-specific venues later)
+        setVenues([]);
+        setTotalVenues(0);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load places';
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [parentPlaceId, locationScope]);
+  }, [parentPlaceId, locationScope, FEATURED_VENUES_COUNT]);
 
   useEffect(() => {
     void load();
@@ -108,7 +147,7 @@ const Places: React.FC = () => {
 
         {error ? <p className="text-red-400 text-center mb-4">{error}</p> : null}
 
-        {loading && places.length === 0 ? (
+        {loading && places.length === 0 && venues.length === 0 ? (
           <EntertainingLoader
             flavor="music"
             size="section"
@@ -116,7 +155,57 @@ const Places: React.FC = () => {
           />
         ) : null}
 
-        {!loading && places.length === 0 && !error ? (
+        {/* Featured Venues Section */}
+        {!loading && !parentPlaceId && venues.length > 0 && totalVenues >= 3 ? (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-amber-400" />
+                Featured Venues
+                {totalVenues > FEATURED_VENUES_COUNT ? (
+                  <span className="text-sm font-normal text-purple-300">
+                    ({totalVenues} total)
+                  </span>
+                ) : null}
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+              {venues.map((venue) => (
+                <Link
+                  key={venue._id}
+                  to={`/collective/${venue.slug}`}
+                  className="flex items-center gap-3 bg-black/20 border border-white/10 hover:border-amber-400/50 rounded-xl p-3 no-underline text-white transition-colors"
+                >
+                  <img
+                    src={venue.profilePicture || DEFAULT_PROFILE_PIC}
+                    alt={venue.name}
+                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate text-sm">{venue.name}</div>
+                    <div className="text-xs text-amber-200/70 truncate">
+                      {venueKindLabel(venue.venueKind) || 'Venue'}
+                      {venue.location?.display ? ` · ${venue.location.display}` : ''}
+                    </div>
+                    {venue.stats?.globalCollectiveAggregate ? (
+                      <div className="text-xs text-purple-300 font-semibold mt-1">
+                        {penceToPounds(venue.stats.globalCollectiveAggregate)} support
+                      </div>
+                    ) : null}
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <div className="border-t border-white/10 pt-6 mb-2">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                <MapPin className="h-5 w-5 text-purple-400" />
+                Locations
+              </h3>
+            </div>
+          </div>
+        ) : null}
+
+        {!loading && places.length === 0 && venues.length === 0 && !error ? (
           <p className="text-center text-purple-200/80 py-12">{emptyMessage}</p>
         ) : null}
 
