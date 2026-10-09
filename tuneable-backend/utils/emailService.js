@@ -1066,7 +1066,7 @@ async function sendPayoutRequestNotification(payoutRequest, user) {
               <strong>Action Required:</strong> Process this payout request in the admin panel.
             </p>
             <p style="margin: 10px 0 0 0;">
-              <a href="${FRONTEND_URL}/admin?tab=payouts" style="color: #3b82f6; text-decoration: underline;">
+              <a href="${FRONTEND_URL}/admin?tab=finance&sub=payouts" style="color: #3b82f6; text-decoration: underline;">
                 View Payout Request →
               </a>
             </p>

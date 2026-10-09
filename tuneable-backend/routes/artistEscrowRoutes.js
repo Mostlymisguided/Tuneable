@@ -270,7 +270,7 @@ router.post('/request-payout', authMiddleware, async (req, res) => {
           type: 'payout_requested',
           title: 'New Payout Request',
           message: `${user.creatorProfile?.artistName || user.username} requested a payout of £${(requestedAmount / 100).toFixed(2)}`,
-          link: '/admin?tab=payouts',
+          link: '/admin?tab=finance&sub=payouts',
           linkText: 'View Payout Request'
         });
         await notification.save();

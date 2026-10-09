@@ -4278,7 +4278,7 @@ router.post('/:partyId/bids/:bidId/request-refund', authMiddleware, resolveParty
                     type: 'refund_requested',
                     title: 'New Refund Request',
                     message: `${bid.username} requested a refund of £${(bid.amount / 100).toFixed(2)} for "${bid.mediaTitle}"`,
-                    link: `/admin?tab=refunds`,
+                    link: `/admin?tab=finance&sub=refunds`,
                     linkText: 'Review Refund Request',
                     relatedBidId: bid._id,
                     relatedMediaId: bid.mediaId

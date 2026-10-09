@@ -20,6 +20,7 @@ import {
   Building,
   Bell,
   DollarSign,
+  Wallet,
   Gift,
   Sparkles,
   Undo2,
@@ -82,6 +83,11 @@ interface User {
   };
 }
 
+type FinanceSubTab = 'payouts' | 'refunds' | 'ledger';
+
+const isFinanceSubTab = (value: string | null): value is FinanceSubTab =>
+  value === 'payouts' || value === 'refunds' || value === 'ledger';
+
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -89,7 +95,15 @@ const Admin: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     const tab = searchParams.get('tab');
+    if (isFinanceSubTab(tab)) return 'finance';
     return tab || 'overview';
+  });
+  const [financeSubTab, setFinanceSubTab] = useState<FinanceSubTab>(() => {
+    const tab = searchParams.get('tab');
+    const sub = searchParams.get('sub');
+    if (tab === 'finance' && isFinanceSubTab(sub)) return sub;
+    if (isFinanceSubTab(tab)) return tab;
+    return 'payouts';
   });
   const [users, setUsers] = useState<User[]>([]);
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
@@ -224,11 +238,25 @@ const Admin: React.FC = () => {
     checkAdminStatus();
   }, []);
 
-  // Keep ?tab= in sync for deep links (e.g. /admin?tab=refunds from notifications)
+  // Keep ?tab= in sync for deep links (e.g. /admin?tab=finance&sub=refunds from notifications).
+  // Older links used ?tab=payouts|refunds|ledger and are rewritten onto Finance.
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
+    if (isFinanceSubTab(tabFromUrl)) {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'finance');
+      next.set('sub', tabFromUrl);
+      setSearchParams(next, { replace: true });
+      return;
+    }
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
+    }
+    if (tabFromUrl === 'finance') {
+      const financeSub = searchParams.get('sub');
+      if (isFinanceSubTab(financeSub)) {
+        setFinanceSubTab(financeSub);
+      }
     }
     const subFromUrl = searchParams.get('sub');
     if (subFromUrl === 'media' || subFromUrl === 'vetoes' || subFromUrl === 'bids' || subFromUrl === 'enrichment') {
@@ -247,6 +275,19 @@ const Admin: React.FC = () => {
     } else {
       next.set('tab', tabId);
     }
+    if (tabId === 'finance') {
+      next.set('sub', financeSubTab);
+    } else if (isFinanceSubTab(next.get('sub'))) {
+      next.delete('sub');
+    }
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleFinanceSubTab = (sub: FinanceSubTab) => {
+    setFinanceSubTab(sub);
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', 'finance');
+    next.set('sub', sub);
     setSearchParams(next, { replace: true });
   };
 
@@ -1047,10 +1088,10 @@ const Admin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'payouts' && isAdmin) {
+    if (activeTab === 'finance' && financeSubTab === 'payouts' && isAdmin) {
       loadPayouts();
     }
-  }, [activeTab, payoutStatusFilter, isAdmin]);
+  }, [activeTab, financeSubTab, payoutStatusFilter, isAdmin]);
 
   const loadPendingRefundCount = async () => {
     try {
@@ -1086,10 +1127,10 @@ const Admin: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'refunds' && isAdmin) {
+    if (activeTab === 'finance' && financeSubTab === 'refunds' && isAdmin) {
       loadRefunds();
     }
-  }, [activeTab, refundStatusFilter, refundPage, isAdmin]);
+  }, [activeTab, financeSubTab, refundStatusFilter, refundPage, isAdmin]);
 
   const closeRefundModal = () => {
     setSelectedRefundRequest(null);
@@ -1216,9 +1257,7 @@ const Admin: React.FC = () => {
     { id: 'bids-media-vetoes', name: 'Bids Media Vetoes', icon: DollarSign },
     { id: 'reports', name: 'Reports Apps Claims', icon: AlertTriangle, hasNotification: hasReportsNotifications },
     { id: 'rights', name: 'Ownership', icon: Scale, hasNotification: rightsAttentionCount > 0 },
-    { id: 'payouts', name: 'Artist Payouts', icon: DollarSign },
-    { id: 'refunds', name: 'Tip Refunds', icon: Undo2, hasNotification: pendingRefundCount > 0 },
-    { id: 'ledger', name: 'Ledger', icon: Database },
+    { id: 'finance', name: 'Finance', icon: Wallet, hasNotification: pendingRefundCount > 0 },
     { id: 'notifications', name: 'Notifications', icon: Bell },
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
@@ -3994,7 +4033,56 @@ const Admin: React.FC = () => {
           <RightsAdmin onAttentionCountChange={setRightsAttentionCount} />
         )}
 
-        {activeTab === 'payouts' && (
+        {activeTab === 'finance' && (
+          <div className="space-y-6">
+            <div className="bg-gray-800 border-b border-gray-700">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav className="flex space-x-8">
+                  <button
+                    onClick={() => handleFinanceSubTab('payouts')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      financeSubTab === 'payouts'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Artist Payouts
+                  </button>
+                  <button
+                    onClick={() => handleFinanceSubTab('refunds')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      financeSubTab === 'refunds'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Undo2 className="h-4 w-4 mr-2" />
+                    <span className="flex items-center">
+                      Tip Refunds
+                      {pendingRefundCount > 0 && (
+                        <span className="ml-2 flex items-center">
+                          <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleFinanceSubTab('ledger')}
+                    className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      financeSubTab === 'ledger'
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    <Database className="h-4 w-4 mr-2" />
+                    Ledger
+                  </button>
+                </nav>
+              </div>
+            </div>
+
+            {financeSubTab === 'payouts' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
@@ -4215,7 +4303,7 @@ const Admin: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'refunds' && (
+            {financeSubTab === 'refunds' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
               <div className="flex items-center">
@@ -4496,15 +4584,17 @@ const Admin: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'notifications' && (
-          <div>
-            <NotificationsManager />
+            {financeSubTab === 'ledger' && (
+              <div>
+                <LedgerAdmin />
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === 'ledger' && (
+        {activeTab === 'notifications' && (
           <div>
-            <LedgerAdmin />
+            <NotificationsManager />
           </div>
         )}
 
