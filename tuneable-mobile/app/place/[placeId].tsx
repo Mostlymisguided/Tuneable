@@ -23,6 +23,7 @@ import { getPlaceProfileHref } from '@/src/lib/location';
 import { getCreatorDisplay, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
+import { venueKindLabel } from '@/src/lib/collectiveTypes';
 import {
   CHART_ADDED_SORT_HINT,
   CHART_SORT_OPTIONS,
@@ -59,7 +60,13 @@ export default function PlaceProfileScreen() {
     []
   );
   const [venues, setVenues] = useState<
-    Array<{ _id: string; name: string; slug: string; venueKind?: string | null }>
+    Array<{
+      _id: string;
+      name: string;
+      slug: string;
+      venueKind?: string | null;
+      profilePicture?: string | null;
+    }>
   >([]);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -258,12 +265,25 @@ export default function PlaceProfileScreen() {
 
       {!loading && venues.length > 0 ? (
         <View style={styles.chipRow}>
-          {venues.map((venue) => (
-            <View key={venue._id || venue.slug} style={styles.venueChip}>
-              <Ionicons name="business-outline" size={12} color="#fbbf24" />
-              <Text style={styles.venueChipText}>{venue.name}</Text>
-            </View>
-          ))}
+          {venues.map((venue) => {
+            const kindLabel = venueKindLabel(venue.venueKind);
+            return (
+              <Pressable
+                key={venue._id || venue.slug}
+                onPress={() => router.push(`/collective/${venue.slug}` as Href)}
+                style={styles.venueChip}
+                accessibilityRole="button"
+                accessibilityLabel={`${venue.name}${kindLabel ? `, ${kindLabel}` : ''}`}>
+                <Ionicons name="business-outline" size={12} color="#fbbf24" />
+                <Text style={styles.venueChipText}>
+                  {venue.name}
+                  {kindLabel ? (
+                    <Text style={styles.venueChipKind}> · {kindLabel}</Text>
+                  ) : null}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
 
@@ -635,6 +655,11 @@ const styles = StyleSheet.create({
     color: '#fde68a',
     fontSize: 12,
     fontWeight: '600',
+  },
+  venueChipKind: {
+    color: 'rgba(253, 230, 138, 0.7)',
+    fontSize: 11,
+    fontWeight: '500',
   },
   sectionHeader: {
     alignItems: 'center',
