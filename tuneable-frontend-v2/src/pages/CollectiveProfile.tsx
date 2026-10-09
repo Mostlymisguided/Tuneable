@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
+import { prepareProfileImage } from '../utils/profileImage';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2, UserPlus, Search, Mail } from 'lucide-react';
 import { collectiveAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -356,15 +357,18 @@ useEffect(() => {
     const file = e.target.files?.[0];
     if (!file || !collective) return;
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+    let prepared: File;
+    try {
+      prepared = await prepareProfileImage(file);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not use that image');
+      if (e.target) e.target.value = '';
       return;
     }
 
     try {
       setIsUploadingProfilePicture(true);
-      await collectiveAPI.uploadProfilePicture(collective._id, file);
+      await collectiveAPI.uploadProfilePicture(collective._id, prepared);
       toast.success('Collective profile picture updated!');
       
       // Refresh collective data

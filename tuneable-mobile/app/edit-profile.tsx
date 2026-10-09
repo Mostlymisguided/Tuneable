@@ -24,6 +24,7 @@ import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { DEFAULT_TIP_POUNDS, hasHomeLocation } from '@/src/lib/onboarding';
+import { canResizeOnDevice, prepareProfilePhoto } from '@/src/lib/profileImage';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import {
@@ -33,7 +34,6 @@ import {
   type User,
 } from '@/src/types/user';
 
-const MAX_PIC_BYTES = 5 * 1024 * 1024;
 const NUMERIC_KEYBOARD_ACCESSORY_ID = 'edit-profile-numeric-keyboard-done';
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
 
@@ -144,7 +144,9 @@ export default function EditProfileScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        // High quality is re-encoded down to 1600px when the resizer is installed.
+        // Without it, iOS turns a ~3MB HEIC photo into a JPEG over 5MB.
+        quality: canResizeOnDevice() ? 0.85 : 0.35,
       };
       const result =
         source === 'camera'
@@ -153,26 +155,18 @@ export default function EditProfileScreen() {
       if (result.canceled || !result.assets[0]) return;
 
       const asset = result.assets[0];
-      if (asset.fileSize && asset.fileSize > MAX_PIC_BYTES) {
-        showToast('Image must be less than 5MB', 'error');
+      let photo;
+      try {
+        photo = await prepareProfilePhoto(asset);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Image must be less than 20MB', 'error');
         return;
       }
 
-      const mime = asset.mimeType || 'image/jpeg';
-      const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
-      const name =
-        asset.fileName && /\.(jpe?g|png|webp|heic)$/i.test(asset.fileName)
-          ? asset.fileName
-          : `profile.${ext}`;
-
       setUploadingPic(true);
       setError(null);
-      setPreviewPic(asset.uri);
-      await authAPI.uploadProfilePic({
-        uri: asset.uri,
-        name,
-        mimeType: mime,
-      });
+      setPreviewPic(photo.uri);
+      await authAPI.uploadProfilePic(photo);
       await refreshUser();
       setPreviewPic(null);
       showToast('Profile picture updated');
@@ -360,7 +354,7 @@ export default function EditProfileScreen() {
                   <Text style={styles.removeBtnText}>Remove</Text>
                 </Pressable>
               ) : null}
-              <Text style={styles.hint}>JPG or PNG, up to 5MB.</Text>
+              <Text style={styles.hint}>Large photos are resized automatically.</Text>
             </View>
           </View>
 

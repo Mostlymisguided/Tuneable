@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
+import { prepareProfileImage } from '../utils/profileImage';
 import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, ArrowLeft, Flag, X, Save, Loader2, UserPlus } from 'lucide-react';
 import { labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -387,15 +388,18 @@ const LabelProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !label) return;
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+    let prepared: File;
+    try {
+      prepared = await prepareProfileImage(file);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not use that image');
+      if (e.target) e.target.value = '';
       return;
     }
 
     try {
       setIsUploadingProfilePicture(true);
-      await labelAPI.uploadProfilePicture(label._id, file);
+      await labelAPI.uploadProfilePicture(label._id, prepared);
       toast.success('Label profile picture updated!');
       
       // Refresh label data

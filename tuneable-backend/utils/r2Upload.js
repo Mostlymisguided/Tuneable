@@ -59,37 +59,100 @@ function hasWavHeader(buffer) {
   );
 }
 
-/**
- * Detect if a file is HEIC/HEIF format
- * @param {Object} file - Multer file object
- * @returns {boolean}
- */
-function isHeicFile(file) {
-  if (!file) return false;
-  const ext = path.extname(file.originalname || '').toLowerCase();
-  const mime = (file.mimetype || '').toLowerCase();
-  return (
-    ext === '.heic' ||
-    ext === '.heif' ||
-    mime === 'image/heic' ||
-    mime === 'image/heif'
-  );
+/** Stored profile photos are resized to this. iPhone HEIC exports often exceed it as JPEG. */
+const PROFILE_IMAGE_MAX_EDGE = 1600;
+const PROFILE_IMAGE_MAX_BYTES = 5 * MB;
+/** Raw upload cap. Phone exports are resized down before they are stored. */
+const PROFILE_IMAGE_MAX_UPLOAD_BYTES = 20 * MB;
+
+function replaceImageExt(name, ext) {
+  const base = path.basename(name || 'profile', path.extname(name || ''));
+  return `${base}${ext}`;
 }
 
 /**
- * Convert HEIC/HEIF image buffer to JPEG
- * @param {Buffer} buffer - Image buffer
- * @returns {Promise<Buffer>} JPEG buffer
+ * Resize phone photos and convert HEIC to JPEG.
+ * Returns null when the image is already small enough to store as-is.
+ * @param {Buffer} buffer
+ * @param {string} originalname
+ * @returns {Promise<{ buffer: Buffer, mimetype: string, originalname: string } | null>}
  */
-async function convertHeicToJpeg(buffer) {
+async function normalizeProfileImage(buffer, originalname) {
+  let meta;
   try {
-    return await sharp(buffer)
-      .jpeg({ quality: 92, mozjpeg: true })
-      .toBuffer();
+    meta = await sharp(buffer, { failOn: 'none', animated: false }).metadata();
   } catch (error) {
-    console.error('HEIC conversion error:', error);
-    throw new Error('Failed to convert HEIC image. Please try a different format.');
+    console.error('Profile image read error:', error);
+    throw new Error('Failed to process image. Please try a different photo.');
   }
+
+  const format = (meta.format || '').toLowerCase();
+  const width = meta.width || 0;
+  const height = meta.height || 0;
+  const isHeif = format === 'heif' || format === 'heic';
+  const oversized =
+    buffer.length > PROFILE_IMAGE_MAX_BYTES ||
+    width > PROFILE_IMAGE_MAX_EDGE ||
+    height > PROFILE_IMAGE_MAX_EDGE;
+
+  if (!isHeif && !oversized) return null;
+
+  try {
+    let pipeline = sharp(buffer, { failOn: 'none', animated: false }).rotate();
+    if (width > PROFILE_IMAGE_MAX_EDGE || height > PROFILE_IMAGE_MAX_EDGE) {
+      pipeline = pipeline.resize({
+        width: PROFILE_IMAGE_MAX_EDGE,
+        height: PROFILE_IMAGE_MAX_EDGE,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+    }
+
+    let out;
+    let mimetype;
+    let ext;
+    if (format === 'png') {
+      out = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+      mimetype = 'image/png';
+      ext = '.png';
+    } else if (format === 'webp') {
+      out = await pipeline.webp({ quality: 82 }).toBuffer();
+      mimetype = 'image/webp';
+      ext = '.webp';
+    } else {
+      out = await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+      mimetype = 'image/jpeg';
+      ext = '.jpg';
+    }
+
+    if (out.length > PROFILE_IMAGE_MAX_BYTES) {
+      out = await sharp(out)
+        .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 72, mozjpeg: true })
+        .toBuffer();
+      mimetype = 'image/jpeg';
+      ext = '.jpg';
+    }
+
+    return {
+      buffer: out,
+      mimetype,
+      originalname: replaceImageExt(originalname, ext),
+    };
+  } catch (error) {
+    console.error('Profile image normalize error:', error);
+    throw new Error('Failed to process image. Please try a different photo.');
+  }
+}
+
+async function applyProfileImageNormalization(file) {
+  if (!file?.buffer) return;
+  const normalized = await normalizeProfileImage(file.buffer, file.originalname);
+  if (!normalized) return;
+  file.buffer = normalized.buffer;
+  file.mimetype = normalized.mimetype;
+  file.originalname = normalized.originalname;
+  file.size = normalized.buffer.length;
 }
 
 /** Multer fileFilter helper: MP3 or WAV; FLAC gets a coming-soon error. */
@@ -334,23 +397,10 @@ async function processAndUploadImage(req, res, next) {
   }
 
   try {
-    let buffer = req.file.buffer;
-    let mimetype = req.file.mimetype;
-    let originalname = req.file.originalname;
-
-    // Convert HEIC to JPEG if needed
-    if (isHeicFile(req.file)) {
-      console.log(`Converting HEIC image: ${originalname}`);
-      buffer = await convertHeicToJpeg(buffer);
-      mimetype = 'image/jpeg';
-      originalname = originalname.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg');
-      
-      // Update req.file with converted data
-      req.file.buffer = buffer;
-      req.file.mimetype = mimetype;
-      req.file.originalname = originalname;
-      req.file.size = buffer.length;
-    }
+    await applyProfileImageNormalization(req.file);
+    const buffer = req.file.buffer;
+    const mimetype = req.file.mimetype;
+    const originalname = req.file.originalname;
 
     // Upload to R2 if configured
     if (isR2Configured()) {
@@ -387,7 +437,7 @@ const createProfilePictureUpload = () => {
   if (isR2Configured()) {
     return multer({
       storage: multer.memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+      limits: { fileSize: PROFILE_IMAGE_MAX_UPLOAD_BYTES },
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
           return cb(new Error('Only image files are allowed'));
@@ -412,7 +462,7 @@ const createProfilePictureUpload = () => {
           cb(null, `${userId}-${timestamp}-profilepic${path.extname(file.originalname)}`);
         }
       }),
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: PROFILE_IMAGE_MAX_UPLOAD_BYTES },
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
           return cb(new Error('Only image files are allowed'));
@@ -560,23 +610,10 @@ async function processAndUploadLabelImage(req, res, next) {
   }
 
   try {
-    let buffer = req.file.buffer;
-    let mimetype = req.file.mimetype;
-    let originalname = req.file.originalname;
-
-    // Convert HEIC to JPEG if needed
-    if (isHeicFile(req.file)) {
-      console.log(`Converting HEIC image: ${originalname}`);
-      buffer = await convertHeicToJpeg(buffer);
-      mimetype = 'image/jpeg';
-      originalname = originalname.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg');
-      
-      // Update req.file with converted data
-      req.file.buffer = buffer;
-      req.file.mimetype = mimetype;
-      req.file.originalname = originalname;
-      req.file.size = buffer.length;
-    }
+    await applyProfileImageNormalization(req.file);
+    const buffer = req.file.buffer;
+    const mimetype = req.file.mimetype;
+    const originalname = req.file.originalname;
 
     // Upload to R2 if configured
     if (isR2Configured()) {
@@ -616,7 +653,7 @@ const createLabelProfilePictureUpload = () => {
 
   return multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+    limits: { fileSize: PROFILE_IMAGE_MAX_UPLOAD_BYTES },
     fileFilter: (req, file, cb) => {
       if (!file.mimetype.startsWith('image/')) {
         return cb(new Error('Only image files are allowed'));
@@ -637,6 +674,10 @@ module.exports = {
   createLabelProfilePictureUpload,
   processAndUploadImage,
   processAndUploadLabelImage,
+  normalizeProfileImage,
+  PROFILE_IMAGE_MAX_BYTES,
+  PROFILE_IMAGE_MAX_EDGE,
+  PROFILE_IMAGE_MAX_UPLOAD_BYTES,
   filterUploadAudioFile,
   getUploadAudioFormat,
   checkUploadAudioFile,

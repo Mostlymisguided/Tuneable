@@ -27,7 +27,7 @@ function uploadCollectivePicture(req, res, next) {
       const tooLarge = err.code === 'LIMIT_FILE_SIZE';
       const rejectedType = /only image files/i.test(err.message || '');
       return res.status(tooLarge || rejectedType ? 400 : 500).json({
-        error: tooLarge ? 'Image must be smaller than 5MB' : (err.message || 'Failed to upload profile picture'),
+        error: tooLarge ? 'Image must be smaller than 20MB' : (err.message || 'Failed to upload profile picture'),
       });
     }
     

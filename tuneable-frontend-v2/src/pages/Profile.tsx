@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authAPI } from '../lib/api';
 import { toast } from '../utils/toast';
+import { prepareProfileImage } from '../utils/profileImage';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import LocationAutocomplete from '../components/LocationAutocomplete';
@@ -85,21 +86,18 @@ const Profile: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be smaller than 5MB');
+    let prepared: File;
+    try {
+      prepared = await prepareProfileImage(file);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not use that image');
+      if (event.target) event.target.value = '';
       return;
     }
 
     try {
       setIsUploading(true);
-      const response = await authAPI.uploadProfilePic(file);
+      const response = await authAPI.uploadProfilePic(prepared);
       
       if (profile) {
         setProfile({

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '../utils/toast';
+import { prepareProfileImage } from '../utils/profileImage';
 import { X, Loader2, Image } from 'lucide-react';
 import { collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -76,30 +77,26 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
   };
 
   // Handle profile picture selection
-  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
+    try {
+      const prepared = await prepareProfileImage(file);
+      setProfilePicture(prepared);
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePicturePreview(reader.result as string);
+      };
+      reader.readAsDataURL(prepared);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not use that image');
+      setProfilePicture(null);
+      setProfilePicturePreview(null);
+    } finally {
+      if (e.target) e.target.value = '';
     }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be smaller than 5MB');
-      return;
-    }
-
-    setProfilePicture(file);
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfilePicturePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleCreateCollective = async () => {

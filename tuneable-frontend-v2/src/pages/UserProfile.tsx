@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
+import { prepareProfileImage } from '../utils/profileImage';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
 import { 
   Coins, 
@@ -1936,15 +1937,18 @@ const UserProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+    let prepared: File;
+    try {
+      prepared = await prepareProfileImage(file);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not use that image');
+      if (e.target) e.target.value = '';
       return;
     }
 
     try {
       setIsUploading(true);
-      const response = await authAPI.uploadProfilePic(file);
+      const response = await authAPI.uploadProfilePic(prepared);
       toast.success('Profile picture updated!');
       setUser((prev) =>
         prev ? { ...prev, profilePic: response.user.profilePic || prev.profilePic } : prev
@@ -3614,7 +3618,7 @@ const UserProfile: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    JPG or PNG, up to 5MB. Removing your picture restores the default avatar.
+                    Large photos are resized automatically. Removing your picture restores the default avatar.
                   </p>
                 </div>
                 
