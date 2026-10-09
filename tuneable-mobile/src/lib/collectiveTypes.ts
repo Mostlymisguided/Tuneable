@@ -1,15 +1,36 @@
-export type CollectiveType = 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+// Venue types are now top-level types alongside band, collective, etc.
+export type CollectiveType = 
+  | 'band' 
+  | 'collective' 
+  | 'production_company'
+  | 'bar'
+  | 'club'
+  | 'hostel'
+  | 'cafe'
+  | 'restaurant'
+  | 'festival'
+  | 'other';
+
 export type CollectiveTypes = CollectiveType | CollectiveType[];
+
+// Venue types (for checking if a collective is a venue)
+export const VENUE_TYPES: CollectiveType[] = ['bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival'];
 export type VenueKind = 'bar' | 'club' | 'hostel' | 'cafe' | 'restaurant' | 'festival' | 'other';
 
 export const COLLECTIVE_TYPE_OPTIONS: { value: CollectiveType; label: string }[] = [
-  { value: 'collective', label: 'Collective' },
   { value: 'band', label: 'Band' },
+  { value: 'collective', label: 'Collective' },
   { value: 'production_company', label: 'Production Company' },
-  { value: 'venue', label: 'Venue' },
+  { value: 'bar', label: 'Bar' },
+  { value: 'club', label: 'Club' },
+  { value: 'cafe', label: 'Cafe' },
+  { value: 'restaurant', label: 'Restaurant' },
+  { value: 'hostel', label: 'Hostel' },
+  { value: 'festival', label: 'Festival' },
   { value: 'other', label: 'Other' },
 ];
 
+// Deprecated: venueKind is no longer used (venue types are now top-level)
 export const VENUE_KIND_OPTIONS: { value: VenueKind; label: string }[] = [
   { value: 'bar', label: 'Bar' },
   { value: 'club', label: 'Club' },
@@ -31,9 +52,9 @@ export function venueKindLabel(kind?: string | null): string {
 export function isVenueCollective(type?: CollectiveTypes | string | null): boolean {
   if (!type) return false;
   if (Array.isArray(type)) {
-    return type.includes('venue');
+    return type.some(t => VENUE_TYPES.includes(t as CollectiveType));
   }
-  return type === 'venue';
+  return VENUE_TYPES.includes(type as CollectiveType);
 }
 
 export function hasCollectiveType(types?: CollectiveTypes | string | null, targetType?: CollectiveType): boolean {

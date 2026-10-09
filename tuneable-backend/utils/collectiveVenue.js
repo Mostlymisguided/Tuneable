@@ -1,7 +1,24 @@
 const { applyResolvedLocation } = require('./locationUtils');
 
-const COLLECTIVE_TYPES = ['band', 'collective', 'production_company', 'venue', 'other'];
+// All types are now top-level - venue types (bar, club, etc.) are alongside band, collective, etc.
+const COLLECTIVE_TYPES = [
+  'band',
+  'collective', 
+  'production_company',
+  'bar',
+  'club',
+  'hostel',
+  'cafe',
+  'restaurant',
+  'festival',
+  'other'
+];
+
+// Deprecated: venueKind is no longer used, but kept for backward compatibility
 const VENUE_KINDS = ['bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival', 'other'];
+
+// Venue types (for checking if a collective is a venue)
+const VENUE_TYPES = ['bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival'];
 const CITY_LIKE_PLACETYPES = new Set(['place', 'locality', 'neighborhood', 'district']);
 
 function parseMaybeJson(value) {
@@ -43,13 +60,16 @@ function normalizeCollectiveLocation(raw) {
   return applyResolvedLocation(parseMaybeJson(raw));
 }
 
+function isVenueType(type) {
+  // Check if the collective has any venue types (bar, club, cafe, etc.)
+  if (Array.isArray(type)) {
+    return type.some(t => VENUE_TYPES.includes(t));
+  }
+  return VENUE_TYPES.includes(type);
+}
+
 function venueLocationError(type, location) {
-  // Check if 'venue' is in the types array
-  const isVenue = Array.isArray(type) 
-    ? type.includes('venue') 
-    : type === 'venue';
-  
-  if (!isVenue) return null;
+  if (!isVenueType(type)) return null;
   if (!location?.placeId) {
     return 'Venues must be bound to a Mapbox place';
   }
@@ -103,7 +123,7 @@ function collectiveSaveErrorResponse(error, action = 'create') {
 function venuesAtPlaceQuery(placeId) {
   return {
     isActive: true,
-    type: 'venue', // MongoDB will match if array contains 'venue'
+    type: { $in: VENUE_TYPES }, // Match any venue type (bar, club, cafe, etc.)
     'location.ancestorIds': placeId,
   };
 }
@@ -139,12 +159,14 @@ function parentPlaceIdFromLocation(location) {
 module.exports = {
   COLLECTIVE_TYPES,
   VENUE_KINDS,
+  VENUE_TYPES,
   parseMaybeJson,
   normalizeCollectiveType,
   normalizeVenueKind,
   resolvedVenueKind,
   normalizeCollectiveLocation,
   venueLocationError,
+  isVenueType,
   collectiveSaveErrorResponse,
   venuesAtPlaceQuery,
   serializeVenueForPlace,
