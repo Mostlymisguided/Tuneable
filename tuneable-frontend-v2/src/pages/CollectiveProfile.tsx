@@ -746,7 +746,7 @@ useEffect(() => {
             <nav className="flex space-x-8">
               {[
                 { id: 'overview', label: 'Overview' },
-                { id: 'members', label: isVenueCollective(collective.type) ? 'Staff' : 'Members' },
+                { id: 'members', label: isVenueCollective(collective.type) ? 'Membership' : 'Members' },
                 { id: 'media', label: isVenueCollective(collective.type) ? 'Library' : 'Releases' }
               ].map((tab) => (
                 <button
