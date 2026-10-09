@@ -333,7 +333,6 @@ const LocationProfile: React.FC = () => {
       <CollectiveCreateModal
         isOpen={showVenueModal}
         onClose={() => setShowVenueModal(false)}
-        initialType="venue"
         onSuccess={() => {
           setShowVenueModal(false);
           void loadProfile({ silent: true });

@@ -20,7 +20,6 @@ import {
   getCollectivePlaceProfilePath,
   isVenueCollective,
   type CollectiveType,
-  type CollectiveTypes,
 } from '../utils/collectiveTypes';
 import { usePageMeta } from '../seo/usePageMeta';
 import { clipText } from '../seo/pageMeta';
@@ -34,7 +33,7 @@ interface Collective {
   coverImage: string;
   email: string;
   website: string;
-  type: CollectiveTypes;
+  type: CollectiveType | CollectiveType[];
   venueKind?: string; // deprecated, kept for backward compatibility
   location?: ResolvedLocation;
   socialMedia?: {
@@ -122,7 +121,7 @@ const CollectiveProfile: React.FC = () => {
     email: '',
     website: '',
     foundedYear: '',
-    type: ['collective'] as CollectiveTypes,
+    type: ['collective'] as CollectiveType[],
     genres: [] as string[],
     location: null as ResolvedLocation | null,
     socialMedia: {
@@ -1085,7 +1084,7 @@ useEffect(() => {
                               setEditForm({
                                 ...editForm,
                                 type: isSelected
-                                  ? editForm.type.filter(t => t !== option.value)
+                                  ? editForm.type.filter((t: CollectiveType) => t !== option.value)
                                   : [...editForm.type, option.value]
                               });
                             }}

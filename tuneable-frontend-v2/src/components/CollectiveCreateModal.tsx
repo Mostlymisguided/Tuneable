@@ -10,14 +10,13 @@ import {
   COLLECTIVE_TYPE_OPTIONS,
   isVenueCollective,
   type CollectiveType,
-  type CollectiveTypes,
 } from '../utils/collectiveTypes';
 
 interface CollectiveCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (collective: any) => void;
-  initialType?: CollectiveTypes;
+  initialType?: CollectiveType[];
 }
 
 const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
@@ -136,7 +135,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
       if (formData.description) createData.append('description', formData.description);
       if (formData.website) createData.append('website', formData.website);
       // Send types as multiple 'type' fields (FormData standard for arrays)
-      formData.type.forEach(t => createData.append('type', t));
+      formData.type.forEach((t: CollectiveType) => createData.append('type', t));
       if (location) {
         createData.append('location', JSON.stringify(location));
       }
@@ -220,7 +219,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
                       setFormData(prev => ({
                         ...prev,
                         type: isSelected
-                          ? prev.type.filter(t => t !== option.value)
+                          ? prev.type.filter((t: CollectiveType) => t !== option.value)
                           : [...prev.type, option.value]
                       }));
                     }}

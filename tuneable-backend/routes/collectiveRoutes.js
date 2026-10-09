@@ -65,9 +65,15 @@ router.get('/', async (req, res) => {
       query.genres = genre;
     }
     
-    // Filter by type
+    // Filter by type (supports both single type and checking if type is in array)
     if (type) {
-      query.type = type;
+      // Check if the type string is 'venue' (legacy) - convert to venue types array
+      if (type === 'venue') {
+        query.type = { $in: require('../utils/collectiveVenue').VENUE_TYPES };
+      } else {
+        // For specific types, check if it's in the array or equals it (supports both old and new format)
+        query.type = type;
+      }
     }
 
     if (placeId && typeof placeId === 'string' && placeId.trim()) {
@@ -902,7 +908,12 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
       query.genres = genre;
     }
     if (type) {
-      query.type = type;
+      // Check if the type string is 'venue' (legacy) - convert to venue types array
+      if (type === 'venue') {
+        query.type = { $in: require('../utils/collectiveVenue').VENUE_TYPES };
+      } else {
+        query.type = type;
+      }
     }
     if (search) {
       query.name = { $regex: search, $options: 'i' };
