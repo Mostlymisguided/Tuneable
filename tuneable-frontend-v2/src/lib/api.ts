@@ -2554,6 +2554,12 @@ export const collectiveAPI = {
     return response.data;
   },
 
+  // Delete collective (authenticated, founder or platform admin)
+  deleteCollective: async (collectiveId: string) => {
+    const response = await api.delete(`/collectives/${collectiveId}`);
+    return response.data;
+  },
+
 
   // Upload collective profile picture (authenticated, collective admin/founder only)
   uploadProfilePicture: async (collectiveId: string, file: File) => {

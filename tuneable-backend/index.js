@@ -77,13 +77,20 @@ db.connectDB()
       Promise.all([
         Collective.repairSharedEmailIndex(),
         Label.repairSharedEmailIndex(),
+        Collective.repairActiveIdentityIndexes(),
       ])
-        .then(([collectiveResult, labelResult]) => {
+        .then(([collectiveResult, labelResult, identityResult]) => {
           const collectiveDropped = collectiveResult?.dropped || [];
           const labelDropped = labelResult?.dropped || [];
+          const identityDropped = identityResult?.dropped || [];
           if (collectiveDropped.length || labelDropped.length) {
             console.log(
               `Dropped stale unique email indexes: collectives [${collectiveDropped.join(', ')}], labels [${labelDropped.join(', ')}]`
+            );
+          }
+          if (identityDropped.length) {
+            console.log(
+              `Dropped stale collective name/slug unique indexes: [${identityDropped.join(', ')}]`
             );
           }
         })

@@ -5596,6 +5596,7 @@ router.get('/me/collective-memberships', authMiddleware, async (req, res) => {
     
     // Find collectives where user is a member (and hasn't left)
     const collectives = await Collective.find({
+      isActive: { $ne: false },
       'members.userId': userId,
       'members.leftAt': { $exists: false } // Only active members
     })

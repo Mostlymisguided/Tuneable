@@ -561,7 +561,7 @@ router.post('/', authMiddleware, uploadCollectivePicture, async (req, res) => {
     }
 
     // Check if collective name already exists
-    const existingCollective = await Collective.findOne({ name });
+    const existingCollective = await Collective.findOne({ name, isActive: { $ne: false } });
     if (existingCollective) {
       return res.status(400).json({ error: 'Collective name already exists' });
     }
@@ -573,7 +573,7 @@ router.post('/', authMiddleware, uploadCollectivePicture, async (req, res) => {
       .replace(/(^-|-$)/g, '');
 
     // Check if slug already exists
-    const existingSlug = await Collective.findOne({ slug });
+    const existingSlug = await Collective.findOne({ slug, isActive: { $ne: false } });
     if (existingSlug) {
       return res.status(400).json({ error: 'A collective with a similar name already exists' });
     }
@@ -621,7 +621,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const collective = await Collective.findById(req.params.id);
     
-    if (!collective) {
+    if (!collective || collective.isActive === false) {
       return res.status(404).json({ error: 'Collective not found' });
     }
 
@@ -631,6 +631,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
 
     const updates = { ...req.body };
+    delete updates.isActive;
+    delete updates.members;
+    delete updates.uuid;
+    delete updates.stats;
     
     // Handle location separately to safely merge Mapbox fields
     let locationUpdate = undefined;
@@ -678,6 +682,42 @@ router.put('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Delete collective (founder or platform admin). Soft-delete so tune credits keep their id.
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    if (!/^[a-fA-F0-9]{24}$/.test(req.params.id)) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+
+    const collective = await Collective.findById(req.params.id);
+    if (!collective || collective.isActive === false) {
+      return res.status(404).json({ error: 'Collective not found' });
+    }
+
+    const isPlatformAdmin = req.user.role && req.user.role.includes('admin');
+    if (!isPlatformAdmin && !collective.isFounder(req.user.id)) {
+      return res.status(403).json({ error: 'Only the founder can delete this collective' });
+    }
+
+    collective.isActive = false;
+    await collective.save();
+
+    await Collective.updateMany(
+      { parentCollective: collective._id },
+      { $unset: { parentCollective: 1 } }
+    );
+    await Collective.updateMany(
+      { subCollectives: collective._id },
+      { $pull: { subCollectives: collective._id } }
+    );
+
+    res.json({ message: 'Collective deleted', collectiveId: collective._id });
+  } catch (error) {
+    console.error('Error deleting collective:', error);
+    res.status(500).json({ error: 'Failed to delete collective', details: error.message });
+  }
+});
+
 // Upload collective profile picture (authenticated, collective admin/founder only)
 router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
   try {
@@ -687,7 +727,7 @@ router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('
 
     const collective = await Collective.findById(req.params.id);
     
-    if (!collective) {
+    if (!collective || collective.isActive === false) {
       return res.status(404).json({ error: 'Collective not found' });
     }
 
@@ -721,7 +761,7 @@ router.post('/:id/members', authMiddleware, async (req, res) => {
     const { userId, role, instrument } = req.body;
     const collective = await Collective.findById(req.params.id);
     
-    if (!collective) {
+    if (!collective || collective.isActive === false) {
       return res.status(404).json({ error: 'Collective not found' });
     }
 
@@ -844,7 +884,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
       limit = 20 
     } = req.query;
     
-    const query = {};
+    const query = { isActive: { $ne: false } };
     if (verificationStatus) {
       query.verificationStatus = verificationStatus;
     }
@@ -932,7 +972,7 @@ router.post('/:id/verify', authMiddleware, adminMiddleware, async (req, res) => 
   try {
     const collective = await Collective.findById(req.params.id);
     
-    if (!collective) {
+    if (!collective || collective.isActive === false) {
       return res.status(404).json({ error: 'Collective not found' });
     }
 

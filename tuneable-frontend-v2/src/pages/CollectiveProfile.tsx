@@ -9,6 +9,7 @@ import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getUserProfileUrl } from '../utils/profileNavigation';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
+import DeleteCollectiveSection from '../components/DeleteCollectiveSection';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
@@ -1233,6 +1234,13 @@ useEffect(() => {
                     Cancel
                   </button>
                 </div>
+                {isCollectiveFounder() && (
+                  <DeleteCollectiveSection
+                    collectiveId={collective._id}
+                    collectiveName={collective.name}
+                    noun={isVenueCollective(collective.type) ? 'venue' : 'collective'}
+                  />
+                )}
               </div>
             )}
 

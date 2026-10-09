@@ -31,7 +31,52 @@ async function repairNonUniqueFieldIndex(collection, field) {
   return { dropped };
 }
 
+/**
+ * Unique single-field indexes that are not the desired partial index
+ * (only active documents). Those full unique indexes keep a deleted
+ * collective's name and slug reserved.
+ */
+function indexesToReplaceWithPartialUnique(indexes, field, desiredName) {
+  if (!Array.isArray(indexes) || !field || !desiredName) return [];
+  return indexes
+    .filter((idx) => {
+      if (!idx || !idx.name || idx.unique !== true || !idx.key) return false;
+      const keys = Object.keys(idx.key);
+      if (!(keys.length === 1 && idx.key[field] === 1)) return false;
+      const partial = idx.partialFilterExpression;
+      return !(idx.name === desiredName && partial && partial.isActive === true);
+    })
+    .map((idx) => idx.name);
+}
+
+async function repairPartialUniqueFieldIndex(collection, field, indexName) {
+  if (!collection || typeof collection.indexes !== 'function') {
+    return { dropped: [] };
+  }
+
+  const dropped = [];
+  for (const name of indexesToReplaceWithPartialUnique(await collection.indexes(), field, indexName)) {
+    await collection.dropIndex(name);
+    dropped.push(name);
+  }
+
+  if (typeof collection.createIndex === 'function') {
+    await collection.createIndex(
+      { [field]: 1 },
+      {
+        unique: true,
+        name: indexName,
+        partialFilterExpression: { isActive: true },
+      }
+    );
+  }
+
+  return { dropped };
+}
+
 module.exports = {
   uniqueSingleFieldIndexNames,
   repairNonUniqueFieldIndex,
+  indexesToReplaceWithPartialUnique,
+  repairPartialUniqueFieldIndex,
 };

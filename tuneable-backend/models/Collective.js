@@ -7,8 +7,8 @@ const collectiveSchema = new mongoose.Schema({
   uuid: { type: String, unique: true, default: uuidv7 },
   
   // Basic Info
-  name: { type: String, required: true, unique: true },
-  slug: { type: String, required: true, unique: true }, // URL-friendly version
+  name: { type: String, required: true },
+  slug: { type: String, required: true }, // URL-friendly version
   description: { type: String, maxlength: 1000 },
   profilePicture: { type: String }, // URL to profile picture image
   coverImage: { type: String }, // URL to cover image
@@ -136,7 +136,15 @@ const collectiveSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-// Note: name and slug fields already have unique: true which automatically creates indexes
+// Name and slug are unique among active collectives only, so a deleted one can be recreated.
+collectiveSchema.index(
+  { name: 1 },
+  { unique: true, name: 'name_active_unique', partialFilterExpression: { isActive: true } }
+);
+collectiveSchema.index(
+  { slug: 1 },
+  { unique: true, name: 'slug_active_unique', partialFilterExpression: { isActive: true } }
+);
 collectiveSchema.index({ email: 1 });
 collectiveSchema.index({ type: 1 });
 collectiveSchema.index({ 'location.placeId': 1, type: 1 });
@@ -228,6 +236,13 @@ collectiveSchema.statics.findBySlug = function(slug) {
 collectiveSchema.statics.repairSharedEmailIndex = function repairSharedEmailIndex() {
   const { repairNonUniqueFieldIndex } = require('../utils/repairNonUniqueIndex');
   return repairNonUniqueFieldIndex(this.collection, 'email');
+};
+
+collectiveSchema.statics.repairActiveIdentityIndexes = async function repairActiveIdentityIndexes() {
+  const { repairPartialUniqueFieldIndex } = require('../utils/repairNonUniqueIndex');
+  const nameResult = await repairPartialUniqueFieldIndex(this.collection, 'name', 'name_active_unique');
+  const slugResult = await repairPartialUniqueFieldIndex(this.collection, 'slug', 'slug_active_unique');
+  return { dropped: [...(nameResult.dropped || []), ...(slugResult.dropped || [])] };
 };
 
 // Static method to get top collectives by bid amount
