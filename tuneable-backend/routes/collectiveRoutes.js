@@ -223,7 +223,8 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
         message: `${inviter?.username || 'Someone'} invited you to join "${collective.name}" as an admin`,
         link: `/collective/${collective.slug}`,
         linkText: 'View Collective',
-        relatedUserId: inviterId
+        relatedUserId: inviterId,
+        relatedCollectiveId: collective._id
       });
     } catch (notifError) {
       console.error('Error creating collective invite notification:', notifError);
@@ -302,7 +303,8 @@ router.post('/:slug/invite-member', authMiddleware, async (req, res) => {
         message: `${inviter?.username || 'Someone'} invited you to join "${collective.name}" as a ${role}${instrument ? ` (${instrument})` : ''}`,
         link: `/collective/${collective.slug}`,
         linkText: 'View Collective',
-        relatedUserId: inviterId
+        relatedUserId: inviterId,
+        relatedCollectiveId: collective._id
       });
     } catch (notifError) {
       console.error('Error creating collective invite notification:', notifError);

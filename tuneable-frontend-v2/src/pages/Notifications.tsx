@@ -5,22 +5,23 @@ import { notificationAPI, labelAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
 import { toast } from '../utils/toast';
+import {
+  isExternalNotificationLink,
+  notificationDestination,
+  notificationLinkLabel,
+  type NotificationLinkSource,
+} from '../utils/notificationLink';
 
-interface Notification {
+interface Notification extends NotificationLinkSource {
   _id: string;
   uuid?: string;
   type: string;
   title: string;
   message: string;
-  link?: string;
-  linkText?: string;
   isRead: boolean;
   createdAt: string;
   readAt?: string;
-  relatedMediaId?: any;
-  relatedPartyId?: any;
   relatedUserId?: any;
-  relatedLabelId?: any;
   inviteType?: 'admin' | 'artist' | 'member';
   inviteRole?: string;
 }
@@ -273,19 +274,18 @@ const Notifications: React.FC = () => {
     }
   };
 
-  // Handle notification click
+  // Open the record this notification is about. Invite actions stop propagation.
   const handleNotificationClick = (notification: Notification) => {
-    // Don't navigate if it's a label invite (user should use accept/decline buttons)
-    if (notification.type === 'label_invite') {
-      return;
-    }
-    
     if (!notification.isRead) {
       handleMarkAsRead(notification._id);
     }
-    if (notification.link) {
-      navigate(notification.link);
+    const destination = notificationDestination(notification);
+    if (!destination) return;
+    if (isExternalNotificationLink(destination)) {
+      window.location.assign(destination);
+      return;
     }
+    navigate(destination);
   };
 
   // Load more
@@ -364,11 +364,16 @@ const Notifications: React.FC = () => {
           </div>
         ) : (
           <>
-            {notifications.map((notification) => (
+            {notifications.map((notification) => {
+              const destination = notificationDestination(notification);
+              const destinationLabel = notificationLinkLabel(notification);
+              return (
               <div
                 key={notification._id}
                 onClick={() => handleNotificationClick(notification)}
-                className={`card p-4 hover:bg-gray-700/50 transition-colors cursor-pointer ${
+                className={`card p-4 hover:bg-gray-700/50 transition-colors ${
+                  destination ? 'cursor-pointer' : ''
+                } ${
                   !notification.isRead ? 'bg-gray-800/50 border-l-4 border-purple-500' : ''
                 }`}
               >
@@ -405,9 +410,9 @@ const Notifications: React.FC = () => {
                             </button>
                           </div>
                         )}
-                        {notification.linkText && notification.type !== 'label_invite' && (
+                        {destinationLabel && (
                           <span className="text-xs text-purple-400 mt-2 inline-block">
-                            {notification.linkText} →
+                            {destinationLabel} →
                           </span>
                         )}
                         <p className="text-xs text-gray-500 mt-2">
@@ -442,7 +447,8 @@ const Notifications: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
 
             {/* Load More */}
             {hasMore && (

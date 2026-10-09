@@ -9,6 +9,7 @@ const User = require('../models/User');
 const Media = require('../models/Media');
 const { sendNotification, sendUnreadCount } = require('../utils/socketIO');
 const { isBlockedBetween } = require('../utils/userBlocks');
+const { resolveNotificationLink } = require('../utils/notificationLink');
 
 // Types where relatedUserId is the member who caused the notification. Admin and
 // system notices also set relatedUserId, so they must stay out of this list.
@@ -132,6 +133,8 @@ const createNotification = async (params) => {
       .populate('relatedCollectiveId', 'name slug uuid')
       .populate('relatedConversationId', 'title uuid')
       .lean();
+
+    resolveNotificationLink(populated);
 
     // Send real-time notification via Socket.IO
     sendNotification(userId.toString(), {

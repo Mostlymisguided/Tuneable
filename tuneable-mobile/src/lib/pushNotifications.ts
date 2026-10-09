@@ -1,6 +1,7 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import * as WebBrowser from 'expo-web-browser';
 import { router, type Href } from 'expo-router';
 import { api } from '@/src/api/client';
 import { notificationAPI } from '@/src/api/notifications';
@@ -136,37 +137,101 @@ export async function syncPushTokenIfGranted(pushEnabled = true): Promise<void> 
   }
 }
 
-export function hrefFromNotificationUrl(url?: string | null): Href | null {
-  if (!url || typeof url !== 'string') return null;
-  const path = url.startsWith('http')
-    ? (() => {
-        try {
-          return new URL(url).pathname;
-        } catch {
-          return url;
-        }
-      })()
-    : url;
+const SITE_ORIGIN = 'https://tuneable.stream';
 
-  const tune = path.match(/^\/tune\/([^/?#]+)/);
-  if (tune) {
-    return { pathname: '/tune/[id]', params: { id: tune[1] } };
-  }
-  const podcast = path.match(/^\/podcast\/([^/?#]+)/);
-  if (podcast) {
-    return { pathname: '/podcast/[id]', params: { id: podcast[1] } };
-  }
-  const user = path.match(/^\/user\/([^/?#]+)/);
-  if (user) {
-    return { pathname: '/user/[id]', params: { id: user[1] } };
+function notificationTarget(url?: string | null): URL | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  try {
+    if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return new URL(trimmed, SITE_ORIGIN);
+    if (/^https?:\/\//i.test(trimmed)) return new URL(trimmed);
+  } catch {
+    return null;
   }
   return null;
 }
 
-export function openNotificationUrl(url?: string | null) {
+function isTuneableHost(hostname: string): boolean {
+  return (
+    hostname === 'tuneable.stream' ||
+    hostname === 'www.tuneable.stream' ||
+    hostname.endsWith('.tuneable.stream')
+  );
+}
+
+/** In-app route for notification links the mobile app can open itself. */
+export function hrefFromNotificationUrl(url?: string | null): Href | null {
+  const target = notificationTarget(url);
+  if (!target) return null;
+  if (!isTuneableHost(target.hostname) && target.origin !== SITE_ORIGIN) return null;
+  const path = target.pathname;
+
+  const tune = path.match(/^\/tune\/([^/]+)$/);
+  if (tune) return { pathname: '/tune/[id]', params: { id: decodeURIComponent(tune[1]) } };
+
+  const episode = path.match(/^\/podcasts\/([^/]+)$/);
+  if (episode && episode[1] !== 'search') {
+    return { pathname: '/podcast/[id]', params: { id: decodeURIComponent(episode[1]) } };
+  }
+
+  const series = path.match(/^\/podcast\/([^/]+)$/);
+  if (series) return { pathname: '/show/[id]', params: { id: decodeURIComponent(series[1]) } };
+
+  const user = path.match(/^\/user\/([^/]+)$/);
+  if (user) return { pathname: '/user/[id]', params: { id: decodeURIComponent(user[1]) } };
+
+  const book = path.match(/^\/book\/([^/]+)$/);
+  if (book) return { pathname: '/book/[id]', params: { id: decodeURIComponent(book[1]) } };
+
+  const show = path.match(/^\/show\/([^/]+)$/);
+  if (show) return { pathname: '/show/[id]', params: { id: decodeURIComponent(show[1]) } };
+
+  const place = path.match(/^\/place\/([^/]+)$/);
+  if (place) {
+    return { pathname: '/place/[placeId]', params: { placeId: decodeURIComponent(place[1]) } };
+  }
+
+  const tag = path.match(/^\/tag\/([^/]+)$/);
+  if (tag) return { pathname: '/tag/[slug]', params: { slug: decodeURIComponent(tag[1]) } };
+
+  if (path === '/wallet') return '/wallet';
+  if (path === '/notifications') return '/notifications';
+  if (path === '/profile') return '/(tabs)/profile';
+  if (path === '/charts') return '/(tabs)/charts';
+  if (path === '/places') return '/(tabs)/places';
+  if (path === '/podcasts') return '/(tabs)/podcasts';
+  if (path === '/' || path === '/explore') return '/(tabs)/music';
+
+  return null;
+}
+
+/** Website URL for notification links that live on the platform, such as a collective. */
+export function webUrlForNotification(url?: string | null): string | null {
+  const target = notificationTarget(url);
+  if (!target || hrefFromNotificationUrl(url)) return null;
+  if (!isTuneableHost(target.hostname)) return target.href;
+  return target.href;
+}
+
+export async function openNotificationUrl(url?: string | null): Promise<boolean> {
   const href = hrefFromNotificationUrl(url);
   if (href) {
     router.push(href);
+    return true;
+  }
+  const web = webUrlForNotification(url);
+  if (!web) return false;
+  try {
+    await WebBrowser.openBrowserAsync(web);
+    return true;
+  } catch {
+    try {
+      await Linking.openURL(web);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

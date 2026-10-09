@@ -14,7 +14,7 @@ import { Screen } from '@/src/components/Screen';
 import { notificationAPI } from '@/src/api/notifications';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
-import { hrefFromNotificationUrl } from '@/src/lib/pushNotifications';
+import { openNotificationUrl } from '@/src/lib/pushNotifications';
 import { useNotificationStore } from '@/src/stores/notificationStore';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
@@ -130,8 +130,7 @@ export default function NotificationsScreen() {
           void loadPage(1, 'replace');
         });
     }
-    const href = hrefFromNotificationUrl(item.link);
-    if (href) router.push(href);
+    if (item.link) void openNotificationUrl(item.link);
   };
 
   const markAllRead = async () => {
@@ -240,7 +239,13 @@ export default function NotificationsScreen() {
                     {when ? <Text style={styles.time}>{when}</Text> : null}
                   </View>
                   <Text style={styles.rowMessage}>{item.message}</Text>
+                  {item.link ? (
+                    <Text style={styles.rowLink}>{item.linkText || 'Open'}</Text>
+                  ) : null}
                 </View>
+                {item.link ? (
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                ) : null}
               </Pressable>
             );
           }}
@@ -324,6 +329,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  rowLink: {
+    color: colors.accentLight,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
   },
   empty: {
     flex: 1,

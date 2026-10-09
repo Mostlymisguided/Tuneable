@@ -6,6 +6,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { isValidObjectId } = require('../utils/validators');
 const { sendNotification, sendUnreadCount, broadcastNotification } = require('../utils/socketIO');
+const { resolveNotificationLink } = require('../utils/notificationLink');
 
 /**
  * @route   GET /api/notifications
@@ -32,13 +33,16 @@ router.get('/', authMiddleware, async (req, res) => {
       .populate('relatedMediaId', 'title artist coverArt uuid')
       .populate('relatedPartyId', 'name uuid')
       .populate('relatedUserId', 'username profilePic uuid')
+      .populate('relatedLabelId', 'name slug uuid')
+      .populate('relatedCollectiveId', 'name slug uuid')
+      .populate('relatedConversationId', 'title uuid')
       .lean();
     
     const total = await Notification.countDocuments(query);
     const unreadCount = await Notification.countDocuments({ userId, isRead: false });
     
     res.json({
-      notifications,
+      notifications: notifications.map((notification) => resolveNotificationLink(notification)),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

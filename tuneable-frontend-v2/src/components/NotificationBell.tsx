@@ -4,19 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import { notificationAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
+import {
+  isExternalNotificationLink,
+  notificationDestination,
+  notificationLinkLabel,
+  type NotificationLinkSource,
+} from '../utils/notificationLink';
 
-interface Notification {
+interface Notification extends NotificationLinkSource {
   _id: string;
   uuid?: string;
   type: string;
   title: string;
   message: string;
-  link?: string;
-  linkText?: string;
   isRead: boolean;
   createdAt: string;
-  relatedMediaId?: any;
-  relatedPartyId?: any;
   relatedUserId?: any;
 }
 
@@ -195,27 +197,22 @@ const NotificationBell: React.FC = () => {
     }
   };
 
-  // Handle notification click
+  // Open the tune, collective, party, or other record this notification is about.
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead) {
       await markAsReadInternal(notification._id);
     }
-    navigate('/notifications');
+    const destination = notificationDestination(notification);
     setIsOpen(false);
-  };
-
-  const handleNotificationLinkClick = async (
-    e: React.MouseEvent,
-    notification: Notification
-  ) => {
-    e.stopPropagation();
-    if (!notification.isRead) {
-      await markAsReadInternal(notification._id);
+    if (!destination) {
+      navigate('/notifications');
+      return;
     }
-    if (notification.link) {
-      navigate(notification.link);
-      setIsOpen(false);
+    if (isExternalNotificationLink(destination)) {
+      window.location.assign(destination);
+      return;
     }
+    navigate(destination);
   };
 
   if (!user) return null;
@@ -273,7 +270,9 @@ const NotificationBell: React.FC = () => {
               <div className="p-4 text-center text-gray-400">No notifications</div>
             ) : (
               <div className="divide-y divide-gray-700">
-                {notifications.map((notification) => (
+                {notifications.map((notification) => {
+                  const destinationLabel = notificationLinkLabel(notification);
+                  return (
                   <div
                     key={notification._id}
                     onClick={() => handleNotificationClick(notification)}
@@ -289,13 +288,10 @@ const NotificationBell: React.FC = () => {
                         <p className="text-xs text-gray-400 mt-1 line-clamp-2">
                           {notification.message}
                         </p>
-                        {notification.linkText && (
-                          <button
-                            onClick={(e) => handleNotificationLinkClick(e, notification)}
-                            className="text-xs text-purple-400 mt-1 inline-flex items-center gap-1 hover:text-purple-300 transition-colors"
-                          >
-                            {notification.linkText} <span aria-hidden="true">→</span>
-                          </button>
+                        {destinationLabel && (
+                          <span className="text-xs text-purple-400 mt-1 inline-flex items-center gap-1">
+                            {destinationLabel} <span aria-hidden="true">→</span>
+                          </span>
                         )}
                       </div>
                       <button
@@ -315,7 +311,8 @@ const NotificationBell: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
