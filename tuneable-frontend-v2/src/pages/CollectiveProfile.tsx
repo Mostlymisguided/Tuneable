@@ -68,6 +68,44 @@ interface Collective {
   }>;
 }
 
+function collectiveToEditForm(collectiveData: Collective) {
+  const rawTypes = Array.isArray(collectiveData.type)
+    ? collectiveData.type
+    : collectiveData.type
+      ? [collectiveData.type]
+      : [];
+  const known = new Set(COLLECTIVE_TYPE_OPTIONS.map((option) => option.value));
+  const types = rawTypes.filter((type): type is CollectiveType => known.has(type));
+
+  if (
+    types.length === 0 &&
+    collectiveData.venueKind &&
+    known.has(collectiveData.venueKind as CollectiveType)
+  ) {
+    types.push(collectiveData.venueKind as CollectiveType);
+  }
+
+  return {
+    name: collectiveData.name || '',
+    description: collectiveData.description || '',
+    email: collectiveData.email || '',
+    website: collectiveData.website || '',
+    foundedYear: collectiveData.foundedYear != null ? String(collectiveData.foundedYear) : '',
+    type: (types.length > 0 ? types : ['collective']) as CollectiveType[],
+    genres: collectiveData.genres || [],
+    location: collectiveData.location || null,
+    socialMedia: {
+      instagram: collectiveData.socialMedia?.instagram || '',
+      facebook: collectiveData.socialMedia?.facebook || '',
+      soundcloud: collectiveData.socialMedia?.soundcloud || '',
+      spotify: collectiveData.socialMedia?.spotify || '',
+      youtube: collectiveData.socialMedia?.youtube || '',
+      twitter: collectiveData.socialMedia?.twitter || '',
+      tiktok: collectiveData.socialMedia?.tiktok || '',
+    },
+  };
+}
+
 interface Media {
   _id: string;
   uuid?: string;
@@ -309,33 +347,13 @@ useEffect(() => {
         }
       }
       
-      // Populate edit form when collective loads (always populate, not just in edit mode)
-      if (data.collective && canEditCollective(data.collective)) {
-        // Normalize type to array (handle old string format and new array format)
-        const normalizedType = Array.isArray(data.collective.type)
-          ? data.collective.type
-          : [data.collective.type || 'collective'];
-        
-        setEditForm({
-          name: data.collective.name || '',
-          description: data.collective.description || '',
-          email: data.collective.email || '',
-          website: data.collective.website || '',
-          foundedYear: data.collective.foundedYear?.toString() || '',
-          type: normalizedType,
-          genres: data.collective.genres || [],
-          location: data.collective.location || null,
-          socialMedia: {
-            instagram: data.collective.socialMedia?.instagram || '',
-            facebook: data.collective.socialMedia?.facebook || '',
-            soundcloud: data.collective.socialMedia?.soundcloud || '',
-            spotify: data.collective.socialMedia?.spotify || '',
-            youtube: data.collective.socialMedia?.youtube || '',
-            twitter: data.collective.socialMedia?.twitter || '',
-            tiktok: data.collective.socialMedia?.tiktok || ''
-          }
-        });
-        setGenresInput((data.collective.genres || []).join(', '));
+      // Fill the edit form from the loaded collective. Do not gate this on
+      // canEditCollective: that check reads the signed-in user, which is still
+      // null on a full page load when this response arrives.
+      if (data.collective) {
+        const nextForm = collectiveToEditForm(data.collective);
+        setEditForm(nextForm);
+        setGenresInput(nextForm.genres.join(', '));
       }
     } catch (error: any) {
       console.error('Error fetching collective data:', error);
