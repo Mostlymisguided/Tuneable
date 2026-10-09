@@ -46,7 +46,17 @@ export const VENUE_KIND_OPTIONS: { value: VenueKind; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export function collectiveTypeLabel(type?: string | null): string {
+export function collectiveTypeLabel(type?: CollectiveTypes | string | null): string {
+  if (!type) return 'Collective';
+  
+  if (Array.isArray(type)) {
+    if (type.length === 0) return 'Collective';
+    const labels = type
+      .map(t => COLLECTIVE_TYPE_OPTIONS.find((option) => option.value === t)?.label)
+      .filter(Boolean);
+    return labels.length > 0 ? labels.join(' · ') : 'Collective';
+  }
+  
   return COLLECTIVE_TYPE_OPTIONS.find((option) => option.value === type)?.label || 'Collective';
 }
 

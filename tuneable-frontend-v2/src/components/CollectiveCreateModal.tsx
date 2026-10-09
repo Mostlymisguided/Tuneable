@@ -8,24 +8,23 @@ import LocationAutocomplete from './LocationAutocomplete';
 import type { ResolvedLocation } from '../utils/locationHelpers';
 import {
   COLLECTIVE_TYPE_OPTIONS,
-  VENUE_KIND_OPTIONS,
   isVenueCollective,
   type CollectiveType,
-  type VenueKind,
+  type CollectiveTypes,
 } from '../utils/collectiveTypes';
 
 interface CollectiveCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (collective: any) => void;
-  initialType?: CollectiveType;
+  initialType?: CollectiveTypes;
 }
 
 const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  initialType = 'collective',
+  initialType = ['collective'],
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -41,7 +40,6 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
     email: '',
     website: '',
     type: initialType,
-    venueKind: 'other' as VenueKind,
     genres: [] as string[],
     foundedYear: ''
   });
@@ -55,7 +53,6 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
         email: user?.email || '',
         website: '',
         type: initialType,
-        venueKind: 'other',
         genres: [],
         foundedYear: ''
       });
@@ -111,6 +108,10 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
       toast.error('Name and email are required');
       return;
     }
+    if (formData.type.length === 0) {
+      toast.error('Please select at least one type');
+      return;
+    }
     if (isVenueCollective(formData.type) && !location?.placeId) {
       toast.error('Venues must be bound to a Mapbox place');
       return;
@@ -134,10 +135,8 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
       createData.append('email', formData.email);
       if (formData.description) createData.append('description', formData.description);
       if (formData.website) createData.append('website', formData.website);
-      createData.append('type', formData.type);
-      if (isVenueCollective(formData.type)) {
-        createData.append('venueKind', formData.venueKind);
-      }
+      // Send types as multiple 'type' fields (FormData standard for arrays)
+      formData.type.forEach(t => createData.append('type', t));
       if (location) {
         createData.append('location', JSON.stringify(location));
       }
@@ -149,7 +148,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
       
       const response = await collectiveAPI.createCollective(createData);
       
-      toast.success(isVenueCollective(formData.type) ? 'Venue created successfully!' : 'Collective created successfully!');
+      toast.success('Collective created successfully!');
       
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -182,7 +181,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
       <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-white">
-            {isVenueCollective(formData.type) ? 'Create Venue' : 'Create Collective'}
+            Create Collective
           </h2>
           <button
             onClick={onClose}
@@ -195,51 +194,58 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
         <div className="space-y-4">
           <div>
             <label className="block text-white font-medium mb-2">
-              {isVenueCollective(formData.type) ? 'Venue Name *' : 'Collective Name *'}
+              Name *
             </label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-              placeholder={isVenueCollective(formData.type) ? 'Enter venue name' : 'Enter collective name'}
+              placeholder="Enter name"
             />
           </div>
           
           <div>
-            <label className="block text-white font-medium mb-2">Type</label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as CollectiveType }))}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-            >
-              {COLLECTIVE_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {isVenueCollective(formData.type) && (
-            <div>
-              <label className="block text-white font-medium mb-2">Venue kind</label>
-              <select
-                value={formData.venueKind}
-                onChange={(e) => setFormData(prev => ({ ...prev, venueKind: e.target.value as VenueKind }))}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
-              >
-                {VENUE_KIND_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+            <label className="block text-white font-medium mb-2">
+              Type{formData.type.length > 1 ? 's' : ''} (select one or more)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {COLLECTIVE_TYPE_OPTIONS.map((option) => {
+                const isSelected = formData.type.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        type: isSelected
+                          ? prev.type.filter(t => t !== option.value)
+                          : [...prev.type, option.value]
+                      }));
+                    }}
+                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                      isSelected
+                        ? 'bg-purple-600 text-white border-purple-500'
+                        : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
-          )}
+            {formData.type.length === 0 && (
+              <p className="text-xs text-red-400 mt-2">Please select at least one type</p>
+            )}
+          </div>
 
           <div>
             <LocationAutocomplete
               label={isVenueCollective(formData.type) ? 'Place *' : 'Location'}
               description={
                 isVenueCollective(formData.type)
-                  ? 'Search for the bar, hostel, club, or street address. This is what appears on the city place profile.'
+                  ? 'Venues must be bound to a specific Mapbox place. Search for the venue address or neighbourhood.'
                   : 'Optional city or region for this collective.'
               }
               value={location}
@@ -355,7 +361,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
         <div className="flex space-x-3 mt-6">
           <button
             onClick={handleCreateCollective}
-            disabled={isLoading || !formData.name || !formData.email || (isVenueCollective(formData.type) && !location?.placeId)}
+            disabled={isLoading || !formData.name || !formData.email || formData.type.length === 0 || (isVenueCollective(formData.type) && !location?.placeId)}
             className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
           >
             {isLoading ? (
@@ -364,7 +370,7 @@ const CollectiveCreateModal: React.FC<CollectiveCreateModalProps> = ({
                 <span>Creating...</span>
               </span>
             ) : (
-              isVenueCollective(formData.type) ? 'Create Venue' : 'Create Collective'
+              'Create Collective'
             )}
           </button>
           <button

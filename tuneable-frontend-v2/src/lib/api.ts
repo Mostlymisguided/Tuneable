@@ -2514,8 +2514,8 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: ('band' | 'collective' | 'production_company' | 'venue' | 'other') | ('band' | 'collective' | 'production_company' | 'venue' | 'other')[];
-    venueKind?: string;
+    type?: ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other') | ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other')[];
+    venueKind?: string; // deprecated
   }) => {
     // Handle both FormData (with file upload) and plain object
     const response = collectiveData instanceof FormData
@@ -2536,8 +2536,8 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: ('band' | 'collective' | 'production_company' | 'venue' | 'other') | ('band' | 'collective' | 'production_company' | 'venue' | 'other')[];
-    venueKind?: string;
+    type?: ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other') | ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other')[];
+    venueKind?: string; // deprecated
     location?: Record<string, unknown> | null;
     profilePicture?: string;
     coverImage?: string;

@@ -16,13 +16,11 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import {
   COLLECTIVE_TYPE_OPTIONS,
-  VENUE_KIND_OPTIONS,
   collectiveTypeLabel,
   getCollectivePlaceProfilePath,
   isVenueCollective,
-  venueKindLabel,
   type CollectiveType,
-  type VenueKind,
+  type CollectiveTypes,
 } from '../utils/collectiveTypes';
 import { usePageMeta } from '../seo/usePageMeta';
 import { clipText } from '../seo/pageMeta';
@@ -36,8 +34,8 @@ interface Collective {
   coverImage: string;
   email: string;
   website: string;
-  type: CollectiveType;
-  venueKind?: VenueKind;
+  type: CollectiveTypes;
+  venueKind?: string; // deprecated, kept for backward compatibility
   location?: ResolvedLocation;
   socialMedia?: {
     instagram?: string;
@@ -124,8 +122,7 @@ const CollectiveProfile: React.FC = () => {
     email: '',
     website: '',
     foundedYear: '',
-    type: 'collective' as CollectiveType,
-    venueKind: 'other' as VenueKind,
+    type: ['collective'] as CollectiveTypes,
     genres: [] as string[],
     location: null as ResolvedLocation | null,
     socialMedia: {
@@ -314,14 +311,18 @@ useEffect(() => {
       
       // Populate edit form when collective loads (always populate, not just in edit mode)
       if (data.collective && canEditCollective(data.collective)) {
+        // Normalize type to array (handle old string format and new array format)
+        const normalizedType = Array.isArray(data.collective.type)
+          ? data.collective.type
+          : [data.collective.type || 'collective'];
+        
         setEditForm({
           name: data.collective.name || '',
           description: data.collective.description || '',
           email: data.collective.email || '',
           website: data.collective.website || '',
           foundedYear: data.collective.foundedYear?.toString() || '',
-          type: data.collective.type || 'collective',
-          venueKind: data.collective.venueKind || 'other',
+          type: normalizedType,
           genres: data.collective.genres || [],
           location: data.collective.location || null,
           socialMedia: {
@@ -399,6 +400,11 @@ useEffect(() => {
     if (!collective) return;
 
     try {
+      if (editForm.type.length === 0) {
+        toast.error('Please select at least one type');
+        return;
+      }
+      
       if (isVenueCollective(editForm.type) && !editForm.location?.placeId) {
         toast.error('Venues must be bound to a Mapbox place');
         return;
@@ -416,7 +422,6 @@ useEffect(() => {
         website: editForm.website || undefined,
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
         type: editForm.type,
-        venueKind: isVenueCollective(editForm.type) ? editForm.venueKind : undefined,
         genres,
         ...(editForm.location || isVenueCollective(editForm.type)
           ? { location: editForm.location || null }
@@ -588,9 +593,6 @@ useEffect(() => {
                   <h1 className="text-4xl font-bold">{collective.name}</h1>
                   <span className="px-3 py-1 rounded-full bg-purple-600/40 border border-purple-400/30 text-purple-100 text-sm font-medium">
                     {collectiveTypeLabel(collective.type)}
-                    {isVenueCollective(collective.type) && venueKindLabel(collective.venueKind)
-                      ? ` · ${venueKindLabel(collective.venueKind)}`
-                      : ''}
                   </span>
                 </div>
                 {collective.description && (
@@ -1069,30 +1071,39 @@ useEffect(() => {
                   </div>
 
                   <div>
-                  <select
-                    value={editForm.type}
-                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value as CollectiveType })}
-                    className="input"
-                  >
-                    {COLLECTIVE_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-                {isVenueCollective(editForm.type) && (
-                  <div>
-                    <label className="block text-white font-medium mb-2">Venue kind</label>
-                    <select
-                      value={editForm.venueKind}
-                      onChange={(e) => setEditForm({ ...editForm, venueKind: e.target.value as VenueKind })}
-                      className="input"
-                    >
-                      {VENUE_KIND_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
+                    <label className="block text-white font-medium mb-2">
+                      Type{editForm.type.length > 1 ? 's' : ''} (select one or more)
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {COLLECTIVE_TYPE_OPTIONS.map((option) => {
+                        const isSelected = editForm.type.includes(option.value);
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => {
+                              setEditForm({
+                                ...editForm,
+                                type: isSelected
+                                  ? editForm.type.filter(t => t !== option.value)
+                                  : [...editForm.type, option.value]
+                              });
+                            }}
+                            className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                              isSelected
+                                ? 'bg-purple-600 text-white border-purple-500'
+                                : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {editForm.type.length === 0 && (
+                      <p className="text-xs text-red-400 mt-2">Please select at least one type</p>
+                    )}
                   </div>
-                )}
                 <div>
                   <label className="block text-white font-medium mb-2">Founded Year</label>
                   <input
@@ -1221,7 +1232,7 @@ useEffect(() => {
                 <div className="flex space-x-3 mt-6">
                   <button
                     onClick={handleSaveCollective}
-                    disabled={!editForm.name || !editForm.email || (isVenueCollective(editForm.type) && !editForm.location?.placeId)}
+                    disabled={!editForm.name || !editForm.email || editForm.type.length === 0 || (isVenueCollective(editForm.type) && !editForm.location?.placeId)}
                     className="btn-primary flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save className="h-4 w-4" />
