@@ -142,6 +142,8 @@ const LabelProfile: React.FC = () => {
       tiktok: ''
     }
   });
+  // Raw text so a trailing comma stays visible while the next genre is typed.
+  const [genresInput, setGenresInput] = useState('');
 
   const populateEditForm = useCallback((labelData: Label) => {
     setEditForm({
@@ -166,6 +168,7 @@ const LabelProfile: React.FC = () => {
         tiktok: labelData.socialMedia?.tiktok || ''
       }
     });
+    setGenresInput((labelData.genres || []).join(', '));
   }, []);
 
   // Helper function to get country code from country name
@@ -427,13 +430,18 @@ const LabelProfile: React.FC = () => {
     if (!label) return;
 
     try {
+      const genres = genresInput
+        .split(',')
+        .map((genre) => genre.trim())
+        .filter((genre) => genre.length > 0);
+
       const updates: any = {
         name: editForm.name,
         description: editForm.description || undefined,
         email: editForm.email,
         website: editForm.website || undefined,
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
-        genres: editForm.genres.length > 0 ? editForm.genres : undefined,
+        genres,
         location: (editForm.location.city || editForm.location.region || editForm.location.country) ? {
           city: editForm.location.city || undefined,
           region: editForm.location.region || undefined,
@@ -1126,8 +1134,8 @@ const LabelProfile: React.FC = () => {
                     <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
                     <input
                       type="text"
-                      value={editForm.genres.join(', ')}
-                      onChange={(e) => setEditForm({ ...editForm, genres: e.target.value.split(',').map(g => g.trim()).filter(g => g) })}
+                      value={genresInput}
+                      onChange={(e) => setGenresInput(e.target.value)}
                       className="input"
                       placeholder="electronic, hip-hop, rock"
                     />

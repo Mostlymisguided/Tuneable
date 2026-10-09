@@ -137,6 +137,8 @@ const CollectiveProfile: React.FC = () => {
       tiktok: ''
     }
   });
+  // Raw text so a trailing comma stays visible while the next genre is typed.
+  const [genresInput, setGenresInput] = useState('');
 
   const fetchCollectiveTeam = async (collectiveSlug: string) => {
     if (!collectiveSlug) return;
@@ -331,6 +333,7 @@ useEffect(() => {
             tiktok: data.collective.socialMedia?.tiktok || ''
           }
         });
+        setGenresInput((data.collective.genres || []).join(', '));
       }
     } catch (error: any) {
       console.error('Error fetching collective data:', error);
@@ -400,6 +403,11 @@ useEffect(() => {
         return;
       }
 
+      const genres = genresInput
+        .split(',')
+        .map((genre) => genre.trim())
+        .filter((genre) => genre.length > 0);
+
       const updates: any = {
         name: editForm.name,
         description: editForm.description || undefined,
@@ -408,7 +416,7 @@ useEffect(() => {
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
         type: editForm.type,
         venueKind: isVenueCollective(editForm.type) ? editForm.venueKind : undefined,
-        genres: editForm.genres.length > 0 ? editForm.genres : undefined,
+        genres,
         ...(editForm.location || isVenueCollective(editForm.type)
           ? { location: editForm.location || null }
           : {}),
@@ -1134,8 +1142,8 @@ useEffect(() => {
                 <label className="block text-white font-medium mb-2">Genres (comma-separated)</label>
                 <input
                   type="text"
-                  value={editForm.genres.join(', ')}
-                  onChange={(e) => setEditForm({ ...editForm, genres: e.target.value.split(',').map(g => g.trim()).filter(g => g) })}
+                  value={genresInput}
+                  onChange={(e) => setGenresInput(e.target.value)}
                   className="input"
                   placeholder="electronic, hip-hop, rock"
                 />
