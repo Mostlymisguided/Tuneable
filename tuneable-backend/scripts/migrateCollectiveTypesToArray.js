@@ -86,7 +86,30 @@ async function migrateCollectiveTypes() {
       console.log('✍️  Applying migration...');
       console.log('');
 
-      // Use MongoDB aggregation pipeline to convert string to array
+      // Step 1: Check for problematic compound indexes
+      console.log('🔍 Checking for compound indexes with type field...');
+      const indexes = await collectivesCollection.indexes();
+      const problematicIndexes = indexes.filter(idx => {
+        const keys = Object.keys(idx.key || {});
+        return keys.includes('type') && keys.length > 1;
+      });
+
+      const droppedIndexes = [];
+      
+      if (problematicIndexes.length > 0) {
+        console.log(`   Found ${problematicIndexes.length} compound indexes containing 'type'`);
+        for (const idx of problematicIndexes) {
+          if (idx.name !== '_id_') {
+            console.log(`   Dropping index: ${idx.name}`);
+            await collectivesCollection.dropIndex(idx.name);
+            droppedIndexes.push(idx);
+          }
+        }
+        console.log('');
+      }
+
+      // Step 2: Use MongoDB aggregation pipeline to convert string to array
+      console.log('🔄 Converting type field to array...');
       const result = await collectivesCollection.updateMany(
         { type: { $type: 'string' } },
         [{ $set: { type: ['$type'] } }]
@@ -96,6 +119,24 @@ async function migrateCollectiveTypes() {
       console.log(`   Matched: ${result.matchedCount}`);
       console.log(`   Modified: ${result.modifiedCount}`);
       console.log('');
+
+      // Step 3: Recreate single-field type index
+      console.log('🔨 Recreating type index...');
+      await collectivesCollection.createIndex({ type: 1 });
+      console.log('   ✅ Created index: type_1');
+      console.log('');
+
+      // Step 4: Note about compound indexes
+      if (droppedIndexes.length > 0) {
+        console.log('⚠️  Note: Compound indexes with type were dropped:');
+        droppedIndexes.forEach(idx => {
+          console.log(`   - ${idx.name}: ${JSON.stringify(idx.key)}`);
+        });
+        console.log('');
+        console.log('   These cannot be recreated as compound indexes with type as an array.');
+        console.log('   MongoDB will use separate indexes for queries instead.');
+        console.log('');
+      }
 
       // Verify the migration
       const remainingStringTypes = await collectivesCollection.countDocuments({
