@@ -2,6 +2,7 @@ const { S3Client } = require('@aws-sdk/client-s3');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
+const sharp = require('sharp');
 const { buildReadableAudioKey, buildReadableCoverKey } = require('./readableUploadKey');
 
 const MB = 1024 * 1024;
@@ -56,6 +57,39 @@ function hasWavHeader(buffer) {
     && buffer.toString('ascii', 0, 4) === 'RIFF'
     && buffer.toString('ascii', 8, 12) === 'WAVE'
   );
+}
+
+/**
+ * Detect if a file is HEIC/HEIF format
+ * @param {Object} file - Multer file object
+ * @returns {boolean}
+ */
+function isHeicFile(file) {
+  if (!file) return false;
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = (file.mimetype || '').toLowerCase();
+  return (
+    ext === '.heic' ||
+    ext === '.heif' ||
+    mime === 'image/heic' ||
+    mime === 'image/heif'
+  );
+}
+
+/**
+ * Convert HEIC/HEIF image buffer to JPEG
+ * @param {Buffer} buffer - Image buffer
+ * @returns {Promise<Buffer>} JPEG buffer
+ */
+async function convertHeicToJpeg(buffer) {
+  try {
+    return await sharp(buffer)
+      .jpeg({ quality: 92, mozjpeg: true })
+      .toBuffer();
+  } catch (error) {
+    console.error('HEIC conversion error:', error);
+    throw new Error('Failed to convert HEIC image. Please try a different format.');
+  }
 }
 
 /** Multer fileFilter helper: MP3 or WAV; FLAC gets a coming-soon error. */
@@ -290,22 +324,69 @@ const createClaimUpload = () => {
   }
 };
 
-// Create multer upload for profile pictures
+/**
+ * Middleware to convert HEIC images and upload to R2
+ * Use after multer memory storage
+ */
+async function processAndUploadImage(req, res, next) {
+  if (!req.file || !req.file.buffer) {
+    return next();
+  }
+
+  try {
+    let buffer = req.file.buffer;
+    let mimetype = req.file.mimetype;
+    let originalname = req.file.originalname;
+
+    // Convert HEIC to JPEG if needed
+    if (isHeicFile(req.file)) {
+      console.log(`Converting HEIC image: ${originalname}`);
+      buffer = await convertHeicToJpeg(buffer);
+      mimetype = 'image/jpeg';
+      originalname = originalname.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg');
+      
+      // Update req.file with converted data
+      req.file.buffer = buffer;
+      req.file.mimetype = mimetype;
+      req.file.originalname = originalname;
+      req.file.size = buffer.length;
+    }
+
+    // Upload to R2 if configured
+    if (isR2Configured()) {
+      const { PutObjectCommand } = require('@aws-sdk/client-s3');
+      const userId = req.user?.userId || req.user?._id || 'user';
+      const timestamp = Date.now();
+      const ext = path.extname(originalname) || '.jpg';
+      const key = `profile-pictures/${userId}-${timestamp}${ext}`;
+
+      await s3Client.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: mimetype,
+        ACL: 'public-read',
+      }));
+
+      // Attach the public URL to req.file
+      req.file.location = getPublicUrl(key);
+      req.file.key = key;
+    }
+
+    next();
+  } catch (error) {
+    console.error('Image processing error:', error);
+    return res.status(400).json({ 
+      error: error.message || 'Failed to process image'
+    });
+  }
+}
+
+// Create multer upload for profile pictures (using memory storage for HEIC support)
 const createProfilePictureUpload = () => {
   if (isR2Configured()) {
     return multer({
-      storage: multerS3({
-        s3: s3Client,
-        bucket: process.env.R2_BUCKET_NAME,
-        acl: 'public-read',
-        contentType: multerS3.AUTO_CONTENT_TYPE,
-        key: function (req, file, cb) {
-          const userId = req.user?.userId || req.user?._id || 'user';
-          const timestamp = Date.now();
-          const filename = `profile-pictures/${userId}-${timestamp}${path.extname(file.originalname)}`;
-          cb(null, filename);
-        }
-      }),
+      storage: multer.memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
       fileFilter: (req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) {
@@ -469,27 +550,72 @@ const createCoverArtUpload = () => {
   }
 };
 
-// Create multer upload for label profile pictures
+/**
+ * Middleware to convert HEIC images and upload to R2 (for labels/collectives)
+ * Use after multer memory storage
+ */
+async function processAndUploadLabelImage(req, res, next) {
+  if (!req.file || !req.file.buffer) {
+    return next();
+  }
+
+  try {
+    let buffer = req.file.buffer;
+    let mimetype = req.file.mimetype;
+    let originalname = req.file.originalname;
+
+    // Convert HEIC to JPEG if needed
+    if (isHeicFile(req.file)) {
+      console.log(`Converting HEIC image: ${originalname}`);
+      buffer = await convertHeicToJpeg(buffer);
+      mimetype = 'image/jpeg';
+      originalname = originalname.replace(/\.heic$/i, '.jpg').replace(/\.heif$/i, '.jpg');
+      
+      // Update req.file with converted data
+      req.file.buffer = buffer;
+      req.file.mimetype = mimetype;
+      req.file.originalname = originalname;
+      req.file.size = buffer.length;
+    }
+
+    // Upload to R2 if configured
+    if (isR2Configured()) {
+      const { PutObjectCommand } = require('@aws-sdk/client-s3');
+      const labelId = req.params?.id || req.body?.labelId || req.user?._id?.toString() || req.user?.id?.toString() || Date.now().toString();
+      const timestamp = Date.now();
+      const ext = path.extname(originalname) || '.jpg';
+      const key = `label-logos/${labelId}-${timestamp}${ext}`;
+
+      await s3Client.send(new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: key,
+        Body: buffer,
+        ContentType: mimetype,
+        ACL: 'public-read',
+      }));
+
+      // Attach the public URL to req.file
+      req.file.location = getPublicUrl(key);
+      req.file.key = key;
+    }
+
+    next();
+  } catch (error) {
+    console.error('Label image processing error:', error);
+    return res.status(400).json({ 
+      error: error.message || 'Failed to process image'
+    });
+  }
+}
+
+// Create multer upload for label profile pictures (using memory storage for HEIC support)
 const createLabelProfilePictureUpload = () => {
   if (!isR2Configured()) {
     throw new Error('R2 storage is required for label profile picture uploads');
   }
 
   return multer({
-    storage: multerS3({
-      s3: s3Client,
-      bucket: process.env.R2_BUCKET_NAME,
-      acl: 'public-read',
-      contentType: multerS3.AUTO_CONTENT_TYPE,
-      key: function (req, file, cb) {
-        // For label creation, use user ID (will be updated after label creation if needed)
-        // For label update, use the label ID from params
-        const labelId = req.params?.id || req.body?.labelId || req.user?._id?.toString() || req.user?.id?.toString() || Date.now().toString();
-        const timestamp = Date.now();
-        const filename = `label-logos/${labelId}-${timestamp}${path.extname(file.originalname)}`;
-        cb(null, filename);
-      }
-    }),
+    storage: multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
     fileFilter: (req, file, cb) => {
       if (!file.mimetype.startsWith('image/')) {
@@ -509,6 +635,8 @@ module.exports = {
   createMediaUpload,
   createCoverArtUpload,
   createLabelProfilePictureUpload,
+  processAndUploadImage,
+  processAndUploadLabelImage,
   filterUploadAudioFile,
   getUploadAudioFormat,
   checkUploadAudioFile,

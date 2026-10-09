@@ -238,7 +238,7 @@ const rateLimit = require('../middleware/rateLimit');
 const { checkNewPassword } = require('../utils/passwordPolicy');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
 const { getBlockState, getBlockedUserIds, isBlockedBetween } = require('../utils/userBlocks');
-const { createProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createProfilePictureUpload, processAndUploadImage, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
@@ -371,6 +371,7 @@ router.get('/detect-location', async (req, res) => {
 router.post(
   '/register',
   upload.single('profilePic'),
+  processAndUploadImage,
   [
     check('username').notEmpty().withMessage('Username is required'),
     check('email').isEmail().withMessage('Valid email is required'),
@@ -3942,7 +3943,7 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
   }
 });
 
-router.put('/profile-pic', authMiddleware, upload.single('profilePic'), async (req, res) => {
+router.put('/profile-pic', authMiddleware, upload.single('profilePic'), processAndUploadImage, async (req, res) => {
   try {
       if (!req.file) {
           console.log("❌ No file uploaded");

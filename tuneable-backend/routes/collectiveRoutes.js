@@ -6,7 +6,7 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
-const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createLabelProfilePictureUpload, processAndUploadLabelImage, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
 const { isBlockedBetween } = require('../utils/userBlocks');
 const {
@@ -21,14 +21,22 @@ const {
 const profilePictureUpload = createLabelProfilePictureUpload();
 
 function uploadCollectivePicture(req, res, next) {
-  profilePictureUpload.single('profilePicture')(req, res, (err) => {
-    if (!err) return next();
-    console.error('Collective profile picture upload failed:', err);
-    const tooLarge = err.code === 'LIMIT_FILE_SIZE';
-    const rejectedType = /only image files/i.test(err.message || '');
-    return res.status(tooLarge || rejectedType ? 400 : 500).json({
-      error: tooLarge ? 'Image must be smaller than 5MB' : (err.message || 'Failed to upload profile picture'),
-    });
+  profilePictureUpload.single('profilePicture')(req, res, async (err) => {
+    if (err) {
+      console.error('Collective profile picture upload failed:', err);
+      const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+      const rejectedType = /only image files/i.test(err.message || '');
+      return res.status(tooLarge || rejectedType ? 400 : 500).json({
+        error: tooLarge ? 'Image must be smaller than 5MB' : (err.message || 'Failed to upload profile picture'),
+      });
+    }
+    
+    // Process and upload the image (handles HEIC conversion)
+    if (req.file) {
+      return processAndUploadLabelImage(req, res, next);
+    }
+    
+    next();
   });
 }
 
@@ -721,7 +729,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 });
 
 // Upload collective profile picture (authenticated, collective admin/founder only)
-router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
+router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('profilePicture'), processAndUploadLabelImage, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });

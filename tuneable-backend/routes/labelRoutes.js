@@ -7,7 +7,7 @@ const Bid = require('../models/Bid');
 const Notification = require('../models/Notification');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
-const { createLabelProfilePictureUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createLabelProfilePictureUpload, processAndUploadLabelImage, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
 const { isBlockedBetween } = require('../utils/userBlocks');
 const { processLocation, mergeLocation } = require('../utils/locationUtils');
@@ -774,7 +774,7 @@ router.get('/:slug/media', async (req, res) => {
 // ========================================
 
 // Create label (with optional profile picture upload)
-router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
+router.post('/', authMiddleware, profilePictureUpload.single('profilePicture'), processAndUploadLabelImage, async (req, res) => {
   try {
     const { name, description, email, website, genres, foundedYear, userType, location } = req.body;
     
@@ -990,7 +990,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 });
 
 // Upload label profile picture (authenticated, label admin/owner only)
-router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('profilePicture'), async (req, res) => {
+router.put('/:id/profile-picture', authMiddleware, profilePictureUpload.single('profilePicture'), processAndUploadLabelImage, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
