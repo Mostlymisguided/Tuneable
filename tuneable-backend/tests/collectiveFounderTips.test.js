@@ -1,6 +1,7 @@
 const {
   founderTipWindows,
   founderTipTotal,
+  founderTuneByteAwards,
   sumFounderTipsForCollectives,
   collectiveRankingAggregate,
   freezeFounderTipScope,
@@ -27,6 +28,21 @@ describe('collective founder tips', () => {
       { userId: founderId, amount: 25, createdAt: new Date('2024-04-01T00:00:00.000Z'), status: 'refunded' },
     ]);
     expect(total).toBe(150);
+  });
+
+  it('sums TuneBytes on the founder tips that count, and skips refunded tips', () => {
+    const windows = founderTipWindows(collective([{
+      userId: founderId,
+      role: 'founder',
+      joinedAt: new Date('2024-01-01T00:00:20.000Z'),
+    }]));
+    const awards = founderTuneByteAwards(windows, [
+      { _id: 'b1', userId: founderId, amount: 100, tuneBytesEarned: 12.5, createdAt: new Date('2023-06-01T00:00:00.000Z'), status: 'active' },
+      { _id: 'b2', userId: founderId, amount: 50, tuneBytesEarned: 4, createdAt: new Date('2024-03-01T00:00:00.000Z'), status: 'active' },
+      { _id: 'b3', userId: founderId, amount: 25, tuneBytesEarned: 99, createdAt: new Date('2024-04-01T00:00:00.000Z'), status: 'refunded' },
+    ]);
+    expect(awards.map((award) => award.bidId)).toEqual(['b1', 'b2']);
+    expect(awards.reduce((sum, award) => sum + award.earned, 0)).toBe(16.5);
   });
 
   it('does not import history for a founder recorded long after the collective was created', () => {

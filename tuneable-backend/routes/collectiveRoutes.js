@@ -4,11 +4,13 @@ const Collective = require('../models/Collective');
 const User = require('../models/User');
 const Media = require('../models/Media');
 const Bid = require('../models/Bid');
+const TuneBytesTransaction = require('../models/TuneBytesTransaction');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createLabelProfilePictureUpload, processAndUploadLabelImage, getPublicUrl } = require('../utils/r2Upload');
 const { createNotification } = require('../services/notificationService');
 const { isBlockedBetween } = require('../utils/userBlocks');
+const { founderTipWindows, founderTuneByteAwards } = require('../utils/collectiveFounderTips');
 const {
   normalizeCollectiveType,
   resolvedVenueKind,
@@ -27,6 +29,91 @@ function scheduleCollectiveRankingRefresh(collectiveId) {
       console.error('Error refreshing collective founder ranking:', error);
     });
   });
+}
+
+async function tuneBytesTotalsForCollectives(collectives) {
+  const totals = new Map();
+  if (!collectives.length) return totals;
+
+  const windowsByCollective = new Map();
+  const userIds = new Set();
+  for (const collective of collectives) {
+    const windows = founderTipWindows(collective);
+    windowsByCollective.set(String(collective._id), windows);
+    for (const window of windows) userIds.add(window.userId);
+  }
+
+  const bids = userIds.size
+    ? await Bid.find({ status: 'active', userId: { $in: [...userIds] } })
+      .select('_id userId createdAt status')
+      .lean()
+    : [];
+  const bidIds = bids.map((bid) => bid._id);
+  const founderTransactions = bidIds.length
+    ? await TuneBytesTransaction.find({ bidId: { $in: bidIds } })
+      .select('bidId tuneBytesEarned')
+      .lean()
+    : [];
+  const earnedByBid = new Map(
+    founderTransactions.map((row) => [String(row.bidId), Number(row.tuneBytesEarned) || 0])
+  );
+  const tips = bids.map((bid) => ({
+    ...bid,
+    tuneBytesEarned: earnedByBid.get(String(bid._id)) || 0,
+  }));
+
+  const collectiveIds = collectives.map((collective) => collective._id);
+  const media = await Media.find({
+    $or: [
+      { 'artist.collectiveId': { $in: collectiveIds } },
+      { 'producer.collectiveId': { $in: collectiveIds } },
+      { 'featuring.collectiveId': { $in: collectiveIds } },
+    ],
+  })
+    .select('_id artist.collectiveId producer.collectiveId featuring.collectiveId')
+    .lean();
+
+  const mediaIds = [];
+  const ownersByMedia = new Map();
+  for (const item of media) {
+    const owners = new Set();
+    for (const field of ['artist', 'producer', 'featuring']) {
+      const people = Array.isArray(item[field]) ? item[field] : [];
+      for (const person of people) {
+        if (person && person.collectiveId) owners.add(String(person.collectiveId));
+      }
+    }
+    if (!owners.size) continue;
+    mediaIds.push(item._id);
+    ownersByMedia.set(String(item._id), owners);
+  }
+
+  const mediaTransactions = mediaIds.length
+    ? await TuneBytesTransaction.find({ mediaId: { $in: mediaIds } })
+      .select('bidId mediaId tuneBytesEarned')
+      .lean()
+    : [];
+
+  for (const collective of collectives) {
+    const id = String(collective._id);
+    const seenBids = new Set();
+    let total = 0;
+    for (const award of founderTuneByteAwards(windowsByCollective.get(id), tips)) {
+      if (!award.bidId || seenBids.has(award.bidId)) continue;
+      seenBids.add(award.bidId);
+      total += award.earned;
+    }
+    for (const row of mediaTransactions) {
+      const owners = ownersByMedia.get(String(row.mediaId));
+      if (!owners || !owners.has(id)) continue;
+      const bidId = row.bidId ? String(row.bidId) : '';
+      if (!bidId || seenBids.has(bidId)) continue;
+      seenBids.add(bidId);
+      total += Number(row.tuneBytesEarned) || 0;
+    }
+    totals.set(id, total);
+  }
+  return totals;
 }
 
 async function prepareCollectiveRankings() {
@@ -102,6 +189,34 @@ router.get('/', async (req, res) => {
         { name: { $regex: search, $options: 'i' } },
         { slug: { $regex: search, $options: 'i' } }
       ];
+    }
+
+    if (sortBy === 'tuneBytes') {
+      const matched = await Collective.find(query)
+        .select(`${COLLECTIVE_LIST_FIELDS} members createdAt`)
+        .lean();
+      const totals = await tuneBytesTotalsForCollectives(matched);
+      const direction = sortOrder === 'asc' ? 1 : -1;
+      matched.forEach((collective) => {
+        collective.stats = collective.stats || {};
+        collective.stats.tuneBytesAggregate = totals.get(String(collective._id)) || 0;
+        delete collective.members;
+        delete collective.createdAt;
+      });
+      matched.sort((a, b) => {
+        const delta = (a.stats.tuneBytesAggregate || 0) - (b.stats.tuneBytesAggregate || 0);
+        if (delta !== 0) return delta * direction;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 20);
+      const start = (pageNum - 1) * limitNum;
+      return res.json({
+        collectives: matched.slice(start, start + limitNum),
+        totalPages: Math.ceil(matched.length / limitNum) || 1,
+        currentPage: pageNum,
+        total: matched.length,
+      });
     }
 
     // Build sort object

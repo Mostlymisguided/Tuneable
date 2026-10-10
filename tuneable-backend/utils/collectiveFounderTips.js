@@ -103,6 +103,19 @@ function founderTipTotal(windows, tips) {
   return total;
 }
 
+function founderTuneByteAwards(windows, tips) {
+  const byUser = new Map((windows || []).map((window) => [window.userId, window]));
+  const awards = [];
+  for (const tip of tips || []) {
+    if (!tipFallsInWindow(tip, byUser.get(tipUserId(tip)))) continue;
+    awards.push({
+      bidId: tip && tip._id ? String(tip._id) : '',
+      earned: Number(tip.tuneBytesEarned) || 0,
+    });
+  }
+  return awards;
+}
+
 function sumFounderTipsForCollectives(collectives, tips) {
   const totals = new Map();
   for (const collective of collectives || []) {
@@ -120,6 +133,7 @@ module.exports = {
   freezeFounderTipScope,
   founderTipWindows,
   founderTipTotal,
+  founderTuneByteAwards,
   sumFounderTipsForCollectives,
   collectiveRankingAggregate,
 };

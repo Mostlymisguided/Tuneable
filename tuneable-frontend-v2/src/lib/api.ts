@@ -2444,7 +2444,7 @@ export const collectiveAPI = {
     genre?: string;
     type?: 'band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other';
     placeId?: string;
-    sortBy?: 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'name';
+    sortBy?: 'globalCollectiveAggregate' | 'totalBidAmount' | 'rankingAggregate' | 'tuneBytes' | 'memberCount' | 'name';
     sortOrder?: 'asc' | 'desc';
     search?: string;
   }) => {

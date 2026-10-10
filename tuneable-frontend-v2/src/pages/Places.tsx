@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, MapPin, Building2 } from 'lucide-react';
+import { ChevronRight, MapPin, Building2, Sparkles } from 'lucide-react';
 import { locationAPI, collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
@@ -44,8 +44,15 @@ type CollectiveChartItem = {
   stats?: {
     globalCollectiveAggregate?: number;
     rankingAggregate?: number;
+    tuneBytesAggregate?: number;
   };
 };
+
+function formatTuneBytes(value: number | null | undefined): string {
+  const n = Number(value);
+  const safe = Number.isFinite(n) ? n : 0;
+  return safe.toLocaleString(undefined, { maximumFractionDigits: 1 });
+}
 
 const COLLECTIVES_CHART_LIMIT = 20;
 
@@ -107,8 +114,13 @@ function CollectiveChartCard({
                 </p>
               ) : null}
             </div>
-            <div className="flex-shrink-0 text-purple-200 font-semibold text-sm tabular-nums pt-0.5">
-              {penceToPounds(collective.stats?.rankingAggregate ?? 0)}
+            <div
+              className="flex flex-shrink-0 items-center gap-1 pt-0.5 text-sm font-semibold tabular-nums text-purple-200"
+              title="TuneBytes"
+              aria-label={`${formatTuneBytes(collective.stats?.tuneBytesAggregate)} TuneBytes`}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-purple-400" aria-hidden />
+              <span>{formatTuneBytes(collective.stats?.tuneBytesAggregate)}</span>
             </div>
           </div>
           {genres.length > 0 ? (
@@ -155,7 +167,7 @@ const Places: React.FC = () => {
         limit: 50,
       });
       const collectivesRes = await collectiveAPI.getCollectives({
-        sortBy: 'globalCollectiveAggregate',
+        sortBy: 'tuneBytes',
         sortOrder: 'desc',
         page: 1,
         limit: COLLECTIVES_CHART_LIMIT,
