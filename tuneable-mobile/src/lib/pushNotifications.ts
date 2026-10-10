@@ -8,24 +8,35 @@ import { notificationAPI } from '@/src/api/notifications';
 import { userAPI } from '@/src/api/user';
 import { useNotificationStore } from '@/src/stores/notificationStore';
 
+/** Must match the Expo push `channelId` and app.json `defaultChannel`. */
+export const ANDROID_PUSH_CHANNEL_ID = 'alerts';
+
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldPlaySound: false,
+      shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,
       shouldShowList: true,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
     }),
   });
 }
 
 export type PushPermissionResult = 'granted' | 'denied' | 'unavailable';
 
-async function ensureAndroidChannel() {
+export async function ensureAndroidNotificationChannel() {
   if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('default', {
-    name: 'Tuneable',
-    importance: Notifications.AndroidImportance.DEFAULT,
+  await Notifications.setNotificationChannelAsync(ANDROID_PUSH_CHANNEL_ID, {
+    name: 'Alerts',
+    importance: Notifications.AndroidImportance.HIGH,
+    description: 'Tips, replies, and outtips',
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#6D28D9',
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    sound: 'default',
+    enableVibrate: true,
+    showBadge: true,
   });
 }
 
@@ -54,7 +65,7 @@ export async function getPushPermissionSnapshot(): Promise<{
 export async function requestAndRegisterPush(): Promise<PushPermissionResult> {
   if (Platform.OS === 'web') return 'unavailable';
 
-  await ensureAndroidChannel();
+  await ensureAndroidNotificationChannel();
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
   if (status !== 'granted') {

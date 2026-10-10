@@ -12,6 +12,7 @@ import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
 import {
+  ensureAndroidNotificationChannel,
   openInitialNotificationResponse,
   setNotificationRoutingReady,
   subscribeForegroundNotifications,
@@ -69,6 +70,7 @@ function RootNavigator() {
   const { isLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
+    void ensureAndroidNotificationChannel();
     return subscribeNotificationResponses();
   }, []);
 

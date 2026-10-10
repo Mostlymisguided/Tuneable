@@ -9,6 +9,8 @@ const User = require('../models/User');
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const EXPO_TOKEN_RE = /^Expo(nent)?PushToken\[.+\]$/;
 const CHUNK_SIZE = 100;
+// Must match ANDROID_PUSH_CHANNEL_ID in the mobile app.
+const ANDROID_PUSH_CHANNEL_ID = 'alerts';
 
 function isExpoPushToken(token) {
   return typeof token === 'string' && EXPO_TOKEN_RE.test(token);
@@ -54,6 +56,8 @@ async function sendPushToUser(userId, payload) {
       title: payload.title,
       body: payload.body,
       sound: 'default',
+      channelId: ANDROID_PUSH_CHANNEL_ID,
+      priority: 'high',
       data: payload.data || {},
       ...(badge !== undefined ? { badge } : {}),
     }));
@@ -70,9 +74,15 @@ async function sendPushToUser(userId, payload) {
       });
       const tickets = Array.isArray(response.data?.data) ? response.data.data : [];
       tickets.forEach((ticket, index) => {
-        if (ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered') {
+        if (ticket?.status !== 'error') return;
+        if (ticket?.details?.error === 'DeviceNotRegistered') {
           invalid.push(group[index].to);
+          return;
         }
+        console.error(
+          'Push ticket error:',
+          ticket?.details?.error || ticket?.message || 'unknown'
+        );
       });
     }
 
