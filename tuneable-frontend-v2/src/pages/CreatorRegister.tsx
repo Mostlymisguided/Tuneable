@@ -966,14 +966,14 @@ const CreatorRegister: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-black/20 backdrop-blur-sm rounded-lg p-8 border border-white/10">
+        <div className="bg-black/20 backdrop-blur-sm rounded-lg p-4 sm:p-8 border border-white/10">
           {renderStepContent()}
 
-          <div className="flex justify-between mt-8 pt-6 border-t border-gray-700">
+          <div className="flex justify-between gap-3 mt-8 pt-6 border-t border-gray-700">
             <button
               type="button"
               onClick={() => step === 1 ? navigate(-1) : setStep(step - 1)}
-              className="flex items-center px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+              className="flex items-center justify-center shrink-0 px-4 sm:px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
             >
               <ArrowLeft className="h-5 w-5 mr-2" />
               {step === 1 ? 'Cancel' : 'Back'}
@@ -984,7 +984,7 @@ const CreatorRegister: React.FC = () => {
                 type="button"
                 onClick={handleNextStep}
                 disabled={nextDisabled}
-                className="flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                className="flex flex-1 sm:flex-none items-center justify-center px-4 sm:px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
                 {isCreatingAccount ? (
                   <>
@@ -1003,7 +1003,7 @@ const CreatorRegister: React.FC = () => {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting || isValidatingCode}
-                className="flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                className="flex flex-1 sm:flex-none items-center justify-center whitespace-nowrap px-4 sm:px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
               >
                 {isSubmitting ? (
                   <>
@@ -1013,7 +1013,8 @@ const CreatorRegister: React.FC = () => {
                 ) : (
                   <>
                     <Upload className="h-5 w-5 mr-2" />
-                    Finish and continue to upload
+                    <span className="sm:hidden">Finish</span>
+                    <span className="hidden sm:inline">Finish and continue to upload</span>
                   </>
                 )}
               </button>

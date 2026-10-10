@@ -56,6 +56,13 @@ import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { roundBpm } from '../utils/bpm';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
+import {
+  formatLinkedProfileLabel,
+  getStoredArtistRecords,
+  linkedProfileFromUser,
+  primaryArtistName,
+  readStoredArtistLink,
+} from '../utils/linkedArtist';
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipStatChips from '../components/TipStatChips';
@@ -861,9 +868,12 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   // Populate edit form when media loads (always populate, not just in edit mode)
   useEffect(() => {
-    if (media && canEditTune()) {
-      // Extract artist name from subdocument array
-      const artistName = (media as any).artist?.[0]?.name || media.artist || '';
+    if (!(media && canEditTune())) return;
+
+    let cancelled = false;
+    const storedArtists = getStoredArtistRecords(media);
+    const existingArtist = storedArtists[0];
+    const artistName = primaryArtistName(media);
       
       // Extract producer name from subdocument array
       const producerName = (media as any).producer?.[0]?.name || '';
@@ -956,24 +966,19 @@ const PodcastEpisodeProfile: React.FC = () => {
         setLabelSearchQuery('');
       }
       
-      // Set selected artist/creator if artist has userId
-      const existingArtist = (media as any).artist?.[0];
-      if (existingArtist && existingArtist.userId) {
-        // If userId is an object (populated), use it directly
-        const user = existingArtist.userId;
-        if (typeof user === 'object' && user._id) {
-          setSelectedArtist({
-            _id: user._id,
-            artistName: user.creatorProfile?.artistName || existingArtist.name || '',
-            username: user.username || '',
-            uuid: user.uuid || ''
+      // Show an existing Tuneable profile link in the form, not only after a fresh pick.
+      const { linked, userIdToFetch } = readStoredArtistLink(existingArtist);
+      setSelectedArtist(linked);
+      if (userIdToFetch) {
+        userAPI.getProfile(userIdToFetch)
+          .then((profile) => {
+            if (cancelled) return;
+            const hydrated = linkedProfileFromUser(profile?.user || profile, existingArtist?.name || '');
+            if (hydrated) setSelectedArtist(hydrated);
+          })
+          .catch((error) => {
+            console.error('Error loading linked artist profile:', error);
           });
-        } else if (typeof user === 'string') {
-          // If it's just an ID, we'd need to fetch it, but for now just set the name
-          // The userId will be preserved when saving
-        }
-      } else {
-        setSelectedArtist(null);
       }
       
       // Set selected collective if artist has collectiveId
@@ -995,7 +1000,10 @@ const PodcastEpisodeProfile: React.FC = () => {
         setSelectedCollective(null);
         setCollectiveSearchField(null);
       }
-    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [media, user]);
 
   useEffect(() => {
@@ -3167,7 +3175,7 @@ const PodcastEpisodeProfile: React.FC = () => {
                   {selectedArtist && (
                     <div className="mt-2 flex items-center gap-2 text-sm text-gray-400">
                       <CheckCircle className="h-4 w-4 text-green-400" />
-                      <span>Linked to: {selectedArtist.artistName} (@{selectedArtist.username})</span>
+                      <span>{formatLinkedProfileLabel(selectedArtist)}</span>
                     </div>
                   )}
                   {collectiveSearchField === 'artist' && showCollectiveDropdown && collectiveSearchResults.length > 0 && (

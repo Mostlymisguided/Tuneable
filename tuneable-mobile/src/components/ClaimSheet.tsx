@@ -4,6 +4,7 @@ import {
   InputAccessoryView,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '@/src/auth/AuthContext';
 import { claimsAPI, type ClaimIntent } from '@/src/api/claims';
+import { CREATOR_REGISTER_URL } from '@/src/components/InviteShareCard';
 import { colors } from '@/src/theme/colors';
 
 type Step = 'intent' | 'login' | 'creator' | 'proof';
@@ -212,9 +214,15 @@ export function ClaimSheet({
             {step === 'creator' && (
               <>
                 <Text style={styles.copy}>
-                  To claim ownership and earn from tips, enable creator mode on the
-                  web app (Profile → Creator).
+                  To claim ownership and earn from tips, become a creator on the
+                  web app first, then come back and claim this {noun}.
                 </Text>
+                <Pressable
+                  style={styles.primaryBtn}
+                  onPress={() => void Linking.openURL(CREATOR_REGISTER_URL)}
+                >
+                  <Text style={styles.primaryBtnText}>Become a creator</Text>
+                </Pressable>
                 <Pressable style={styles.secondaryBtn} onPress={() => setStep('intent')}>
                   <Text style={styles.secondaryBtnText}>Back</Text>
                 </Pressable>

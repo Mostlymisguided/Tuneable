@@ -28,6 +28,7 @@ import {
   titleFromAudioFileName,
 } from '@/src/lib/audioUpload';
 import { LEGAL_URLS } from '@/src/components/LegalLinks';
+import { CREATOR_REGISTER_URL } from '@/src/components/InviteShareCard';
 import { UploadProgressBar, type UploadPhase } from '@/src/components/UploadProgressBar';
 import { colors } from '@/src/theme/colors';
 
@@ -170,11 +171,19 @@ export default function UploadScreen() {
               Uploading audio is available to creator and admin accounts. You can
               still tip and explore the charts.
             </Text>
-            <Pressable
-              style={styles.secondaryBtn}
-              onPress={() => router.push('/(tabs)/charts')}>
-              <Text style={styles.secondaryBtnText}>Browse music</Text>
-            </Pressable>
+            <View style={styles.gateActions}>
+              <Pressable
+                style={styles.gatePrimaryBtn}
+                onPress={() => void Linking.openURL(CREATOR_REGISTER_URL)}>
+                <Text style={styles.gatePrimaryBtnText}>Become a creator</Text>
+                <Ionicons name="open-outline" size={14} color="#fff" />
+              </Pressable>
+              <Pressable
+                style={styles.secondaryBtn}
+                onPress={() => router.push('/(tabs)/charts')}>
+                <Text style={styles.secondaryBtnText}>Browse music</Text>
+              </Pressable>
+            </View>
           </View>
         ) : (
           <>
@@ -344,6 +353,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 14,
+  },
+  gateActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  gatePrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  gatePrimaryBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   filePicker: {
     flexDirection: 'row',

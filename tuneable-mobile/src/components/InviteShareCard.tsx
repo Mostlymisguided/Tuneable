@@ -21,8 +21,10 @@ type Props = {
   isFoundingCreator?: boolean;
 };
 
+export const CREATOR_REGISTER_URL = 'https://tuneable.stream/creator/register';
+
 function getInviteShareUrl(code: string): string {
-  return `https://tuneable.stream/creator/register?invite=${encodeURIComponent(code)}`;
+  return `${CREATOR_REGISTER_URL}?invite=${encodeURIComponent(code)}`;
 }
 
 export function InviteShareCard({
