@@ -24,7 +24,7 @@ import {
 const pillars: {
   title: string;
   items: { icon: LucideIcon; label: string; panel: string }[];
-  note?: string;
+  note?: React.ReactNode;
 }[] = [
   {
     title: 'Tip what you love',
@@ -32,6 +32,7 @@ const pillars: {
       { icon: Heart, label: 'Pay creators', panel: 'bg-pink-100 text-pink-600' },
       { icon: Globe, label: 'Influence charts', panel: 'bg-purple-100 text-purple-600' },
     ],
+    note: 'From £0.01 upwards',
   },
   {
     title: 'Be a champion',
@@ -39,6 +40,7 @@ const pillars: {
       { icon: Crown, label: 'Get recognition', panel: 'bg-amber-100 text-amber-600' },
       { icon: MapPin, label: 'Local or global', panel: 'bg-indigo-100 text-indigo-600' },
     ],
+    note: 'Represent your favourites',
   },
   {
     title: 'Own your taste',
@@ -47,7 +49,18 @@ const pillars: {
       { icon: Headphones, label: 'Podcasts', panel: 'bg-pink-100 text-pink-600' },
       { icon: BookOpen, label: 'Books', panel: 'bg-indigo-100 text-indigo-600' },
     ],
-    note: 'Stays in your library.',
+    note: (
+      <>
+        Download what you pay for
+        <a
+          href="#download-offline"
+          className="text-purple-600 hover:text-purple-800"
+          aria-label="See how creators set downloads"
+        >
+          *
+        </a>
+      </>
+    ),
   },
 ];
 
@@ -145,9 +158,12 @@ const About: React.FC = () => {
             </div>
           ))}
         </div>
-        <p className="mx-auto mt-8 max-w-2xl px-4 text-center text-base leading-relaxed text-gray-600">
-          The people who tip a work the most become its champion - displayed beside the media they
-          love. Vie for that place where you live, or worldwide. Anyone can take it by tipping more.
+        <p
+          id="download-offline"
+          className="mx-auto mt-8 max-w-2xl scroll-mt-24 px-4 text-center text-base leading-relaxed text-gray-600"
+        >
+          *Creators can set minimum tips and choose the level at which a user can download and keep
+          offline
         </p>
       </section>
 
