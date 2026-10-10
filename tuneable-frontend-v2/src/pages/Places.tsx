@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, MapPin, Building2 } from 'lucide-react';
 import { locationAPI, collectiveAPI } from '../lib/api';
@@ -9,6 +9,7 @@ import EntertainingLoader from '../components/EntertainingLoader';
 import { penceToPounds } from '../utils/currency';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import TagList from '../components/TagList';
 import {
   getCountryPickFromLocation,
   getPlaceProfilePath,
@@ -28,15 +29,16 @@ type PlaceChartItem = {
   bidCount?: number;
 };
 
-type VenueItem = {
+type CollectiveChartItem = {
   _id: string;
   name: string;
   slug: string;
   profilePicture?: string;
   type?: string | string[];
-  venueKind?: string | null;
+  genres?: string[];
   location?: {
     display?: string;
+    label?: string;
     placeId?: string;
   };
   stats?: {
@@ -45,6 +47,86 @@ type VenueItem = {
   };
 };
 
+const COLLECTIVES_CHART_LIMIT = 20;
+
+function CollectiveChartCard({
+  collective,
+  rank,
+}: {
+  collective: CollectiveChartItem;
+  rank: number;
+}) {
+  const typeLabel = collectiveTypeLabel(collective.type);
+  const locationLabel =
+    collective.location?.display?.trim() || collective.location?.label?.trim() || '';
+  const placePath = getPlaceProfilePath(collective.location?.placeId);
+  const genres = Array.isArray(collective.genres) ? collective.genres.filter(Boolean) : [];
+  const href = `/collective/${collective.slug}`;
+
+  return (
+    <div className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl hover:shadow-[0_0_30px_rgba(251,191,36,0.12)] transition-shadow p-1.5 md:p-4">
+      <div className="flex items-start gap-2 md:gap-4">
+        <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden flex-shrink-0">
+          <Link to={href} className="block w-full h-full" tabIndex={-1} aria-hidden>
+            <img
+              src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </Link>
+          <span
+            className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 text-white font-bold tabular-nums leading-none ${
+              rank >= 100 ? 'text-xs md:text-sm' : 'text-sm md:text-lg'
+            }`}
+          >
+            {rank}
+          </span>
+        </div>
+
+        <div className="flex-1 min-w-0 pt-0.5">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-medium text-white text-sm truncate">
+                <Link to={href} className="text-white hover:text-amber-200 transition-colors no-underline">
+                  {collective.name}
+                </Link>
+              </h3>
+              <p className="text-xs text-amber-200/80 truncate mt-0.5">{typeLabel}</p>
+              {locationLabel ? (
+                <p className="text-xs truncate">
+                  {placePath ? (
+                    <Link
+                      to={placePath}
+                      className="text-gray-300 hover:text-white hover:underline underline-offset-2 no-underline"
+                    >
+                      {locationLabel}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">{locationLabel}</span>
+                  )}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex-shrink-0 text-purple-200 font-semibold text-sm tabular-nums pt-0.5">
+              {penceToPounds(collective.stats?.rankingAggregate ?? 0)}
+            </div>
+          </div>
+          {genres.length > 0 ? (
+            <>
+              <div className="hidden md:block mt-1.5">
+                <TagList tags={genres} limit={5} />
+              </div>
+              <div className="md:hidden mt-1.5">
+                <TagList tags={genres} limit={3} />
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const Places: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -52,48 +134,49 @@ const Places: React.FC = () => {
   const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [places, setPlaces] = useState<PlaceChartItem[]>([]);
-  const [venues, setVenues] = useState<VenueItem[]>([]);
-  const [totalVenues, setTotalVenues] = useState(0);
+  const [collectives, setCollectives] = useState<CollectiveChartItem[]>([]);
+  const [collectivesForPlaceId, setCollectivesForPlaceId] = useState<string | null>(null);
+  const [totalCollectives, setTotalCollectives] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const parentPlaceId = selectedLocation?.placeId ?? null;
-  const FEATURED_VENUES_COUNT = 5;
+  const visibleCollectives = collectivesForPlaceId === parentPlaceId ? collectives : [];
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError(null);
     try {
-      // Fetch location chart
       const placesRes = await locationAPI.getChart({
         parentPlaceId: parentPlaceId ?? undefined,
         scope: locationScope,
         limit: 50,
       });
+      const collectivesRes = await collectiveAPI.getCollectives({
+        sortBy: 'globalCollectiveAggregate',
+        sortOrder: 'desc',
+        page: 1,
+        limit: COLLECTIVES_CHART_LIMIT,
+        ...(parentPlaceId ? { placeId: parentPlaceId } : {}),
+      });
+      if (seq !== loadSeq.current) return;
       setPlaces(placesRes.places ?? []);
-
-      // Fetch venues (only on global view - no parent selected)
-      if (!parentPlaceId) {
-        const venuesRes = await collectiveAPI.getCollectives({
-          sortBy: 'globalCollectiveAggregate',
-          sortOrder: 'desc',
-          page: 1,
-          limit: FEATURED_VENUES_COUNT,
-        });
-        setVenues(venuesRes.collectives ?? []);
-        setTotalVenues(venuesRes.total ?? 0);
-      } else {
-        // If a location is selected, clear venues (could fetch location-specific venues later)
-        setVenues([]);
-        setTotalVenues(0);
-      }
+      setCollectives(collectivesRes.collectives ?? []);
+      setTotalCollectives(collectivesRes.total ?? 0);
+      setCollectivesForPlaceId(parentPlaceId);
     } catch (err: unknown) {
+      if (seq !== loadSeq.current) return;
       const message = err instanceof Error ? err.message : 'Failed to load places';
       setError(message);
+      setCollectives([]);
+      setTotalCollectives(0);
+      setCollectivesForPlaceId(parentPlaceId);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
-  }, [parentPlaceId, locationScope, FEATURED_VENUES_COUNT]);
+  }, [parentPlaceId, locationScope]);
 
   useEffect(() => {
     void load();
@@ -147,7 +230,7 @@ const Places: React.FC = () => {
 
         {error ? <p className="text-red-400 text-center mb-4">{error}</p> : null}
 
-        {loading && places.length === 0 && venues.length === 0 ? (
+        {loading && places.length === 0 && visibleCollectives.length === 0 ? (
           <EntertainingLoader
             flavor="music"
             size="section"
@@ -155,58 +238,40 @@ const Places: React.FC = () => {
           />
         ) : null}
 
-        {/* Featured Venues Section */}
-        {!loading && !parentPlaceId && venues.length > 0 && totalVenues >= 3 ? (
+        {visibleCollectives.length > 0 ? (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-amber-400" />
-                Featured Collectives
-                {totalVenues > FEATURED_VENUES_COUNT ? (
+                Collectives
+                {totalCollectives > visibleCollectives.length ? (
                   <span className="text-sm font-normal text-purple-300">
-                    ({totalVenues} total)
+                    ({totalCollectives} total)
                   </span>
                 ) : null}
               </h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-              {venues.map((venue) => (
-                <Link
-                  key={venue._id}
-                  to={`/collective/${venue.slug}`}
-                  className="flex items-center gap-3 bg-black/20 border border-white/10 hover:border-amber-400/50 rounded-xl p-3 no-underline text-white transition-colors"
-                >
-                  <img
-                    src={venue.profilePicture || DEFAULT_PROFILE_PIC}
-                    alt={venue.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold truncate text-sm">{venue.name}</div>
-                    <div className="text-xs text-amber-200/70 truncate">
-                      {collectiveTypeLabel(venue.type) || 'Collective'}
-                      {venue.location?.display ? ` · ${venue.location.display}` : ''}
-                    </div>
-                    {(venue.stats?.rankingAggregate ?? venue.stats?.globalCollectiveAggregate) ? (
-                      <div className="text-xs text-purple-300 font-semibold mt-1">
-                        {penceToPounds(venue.stats?.rankingAggregate ?? venue.stats?.globalCollectiveAggregate ?? 0)} support
-                      </div>
-                    ) : null}
-                  </div>
-                </Link>
+            <ol className="space-y-2">
+              {visibleCollectives.map((collective, index) => (
+                <li key={collective._id || collective.slug}>
+                  <CollectiveChartCard collective={collective} rank={index + 1} />
+                </li>
               ))}
-            </div>
-            <div className="border-t border-white/10 pt-6 mb-2">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                <MapPin className="h-5 w-5 text-purple-400" />
-                Locations
-              </h3>
-            </div>
+            </ol>
           </div>
         ) : null}
 
-        {!loading && places.length === 0 && venues.length === 0 && !error ? (
+        {!loading && places.length === 0 && visibleCollectives.length === 0 && !error ? (
           <p className="text-center text-purple-200/80 py-12">{emptyMessage}</p>
+        ) : null}
+
+        {visibleCollectives.length > 0 && places.length > 0 ? (
+          <div className="border-t border-white/10 pt-6 mb-4">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-purple-400" />
+              Locations
+            </h3>
+          </div>
         ) : null}
 
         <ol className="space-y-2">
