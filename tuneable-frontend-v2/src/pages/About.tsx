@@ -106,7 +106,7 @@ const About: React.FC = () => {
               href="/whitepaper.pdf"
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-lg border-2 border-white px-8 py-3 text-center text-lg font-semibold text-white transition-colors hover:bg-white hover:text-gray-900"
+              className="rounded-lg border-2 border-white bg-white px-8 py-3 text-center text-lg font-semibold text-black transition-colors hover:bg-transparent hover:text-white"
             >
               Whitepaper
             </a>
