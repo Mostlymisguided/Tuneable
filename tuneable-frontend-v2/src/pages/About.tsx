@@ -203,18 +203,20 @@ const About: React.FC = () => {
           </div>
           <div className="flex items-start gap-4 rounded-xl border border-white/10 bg-white/5 p-6">
             <Landmark className="mt-1 h-8 w-8 flex-shrink-0 text-purple-300" />
-            <p className="leading-relaxed text-indigo-100">
-              Tuneable is a UK Community Interest Company. It is not conducted for private gain:
-              surplus and assets are used for the benefit of the community.
-            </p>
+            <div>
+              <p className="leading-relaxed text-indigo-100">
+                Tuneable is a UK Community Interest Company. It is not conducted for private gain:
+                surplus and assets are used for the benefit of the community.
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-indigo-200">
+                The current split and this direction are also in our{' '}
+                <Link to="/terms-of-service" className="underline hover:text-white">
+                  Terms of Service
+                </Link>
+                .
+              </p>
+            </div>
           </div>
-          <p className="mt-8 text-center text-sm text-indigo-200">
-            The current split and this direction are also in our{' '}
-            <Link to="/terms-of-service" className="underline hover:text-white">
-              Terms of Service
-            </Link>
-            .
-          </p>
         </div>
       </section>
 
@@ -254,10 +256,10 @@ const About: React.FC = () => {
               Creators set aside a share of their earnings. That pool buys the perks. Fans spend
               the TuneBytes they earned.
             </p>
+            <p id="tunebytes-spend" className="mx-auto mt-4 max-w-xl scroll-mt-24 text-sm text-gray-500">
+              * You can earn TuneBytes today and spend them when we launch V1.1
+            </p>
           </div>
-          <p id="tunebytes-spend" className="mt-8 scroll-mt-24 text-center text-sm text-gray-500">
-            * You can earn TuneBytes today and spend them when we launch V1.1
-          </p>
         </div>
       </section>
 
@@ -266,7 +268,16 @@ const About: React.FC = () => {
           <div className="mb-8 text-center">
             <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">Legal Mission</h2>
             <p className="mt-3 text-balance text-gray-600">
-              As a CIC, Tuneable is legally bound to the following objectives.
+              Tuneable is a{' '}
+              <a
+                href="https://find-and-update.company-information.service.gov.uk/company/16736489"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-purple-600 underline hover:text-purple-800"
+              >
+                CIC
+              </a>
+              . Legally bound to the following objectives.
             </p>
           </div>
           <ul className="space-y-3">
