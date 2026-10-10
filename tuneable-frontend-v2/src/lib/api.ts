@@ -2547,6 +2547,7 @@ export const collectiveAPI = {
       soundcloud?: string;
       spotify?: string;
       youtube?: string;
+      twitter?: string;
       tiktok?: string;
     };
   }) => {

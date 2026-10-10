@@ -438,7 +438,7 @@ useEffect(() => {
 
       const updates: any = {
         name: editForm.name,
-        description: editForm.description || undefined,
+        description: editForm.description.trim(),
         email: editForm.email,
         website: editForm.website || undefined,
         foundedYear: editForm.foundedYear ? parseInt(editForm.foundedYear) : undefined,
@@ -485,6 +485,15 @@ useEffect(() => {
     }
     if (collective.socialMedia.twitter) {
       links.push({ name: 'Twitter', url: collective.socialMedia.twitter, icon: Twitter, color: 'hover:text-cyan-400' });
+    }
+    if (collective.socialMedia.soundcloud) {
+      links.push({ name: 'SoundCloud', url: collective.socialMedia.soundcloud, icon: Music, color: 'hover:text-orange-400' });
+    }
+    if (collective.socialMedia.spotify) {
+      links.push({ name: 'Spotify', url: collective.socialMedia.spotify, icon: Music, color: 'hover:text-green-400' });
+    }
+    if (collective.socialMedia.tiktok) {
+      links.push({ name: 'TikTok', url: collective.socialMedia.tiktok, icon: Music, color: 'hover:text-pink-300' });
     }
     
     return links;
@@ -1092,6 +1101,19 @@ useEffect(() => {
                   </div>
 
                   <div>
+                    <label className="block text-white font-medium mb-2">Description</label>
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value.slice(0, 1000) })}
+                      className="input"
+                      rows={4}
+                      maxLength={1000}
+                      placeholder="Tell us about your collective..."
+                    />
+                    <p className="text-gray-400 text-sm mt-1">{editForm.description.length}/1000</p>
+                  </div>
+
+                  <div>
                     <label className="block text-white font-medium mb-2">
                       Type{editForm.type.length > 1 ? 's' : ''} (select one or more)
                     </label>
@@ -1137,7 +1159,6 @@ useEffect(() => {
                     max={new Date().getFullYear()}
                   />
                 </div>
-              </div>
 
               <div>
                 <label className="block text-white font-medium mb-2">Website</label>
@@ -1246,7 +1267,18 @@ useEffect(() => {
                       placeholder="https://open.spotify.com/..."
                     />
                   </div>
+                  <div>
+                    <label className="block text-white text-sm mb-2">TikTok</label>
+                    <input
+                      type="url"
+                      value={editForm.socialMedia.tiktok}
+                      onChange={(e) => setEditForm({ ...editForm, socialMedia: { ...editForm.socialMedia, tiktok: e.target.value } })}
+                      className="input"
+                      placeholder="https://tiktok.com/..."
+                    />
+                  </div>
                 </div>
+              </div>
               </div>
 
                 {/* Action Buttons */}
