@@ -209,6 +209,29 @@ collectiveSchema.methods.addMember = function(userId, role, addedBy, instrument 
   return this.save();
 };
 
+// Change an active member's role without resetting when they joined or their instrument.
+collectiveSchema.methods.setMemberRole = function(userId, role) {
+  const member = this.members.find(
+    (entry) => entry.userId && entry.userId.toString() === userId.toString() && !entry.leftAt
+  );
+  if (!member) {
+    const error = new Error('Member not found');
+    error.status = 404;
+    throw error;
+  }
+  if (member.role === role) return Promise.resolve(this);
+
+  const { freezeFounderTipScope } = require('../utils/collectiveFounderTips');
+  if (member.role === 'founder') freezeFounderTipScope(this, member);
+  const promotingToFounder = role === 'founder';
+  member.role = role;
+  if (promotingToFounder) {
+    member.founderSince = new Date();
+    member.founderTipScope = 'since';
+  }
+  return this.save();
+};
+
 // Method to remove member
 collectiveSchema.methods.removeMember = function(userId) {
   const member = this.members.find(

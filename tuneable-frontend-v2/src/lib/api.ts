@@ -2489,7 +2489,7 @@ export const collectiveAPI = {
     return response.data;
   },
 
-  // Change member role (authenticated, founder only)
+  // Change member role (founders and platform admins: any role; collective admins: admin or member)
   changeMemberRole: async (slug: string, userId: string, role: 'founder' | 'admin' | 'member') => {
     const response = await api.patch(`/collectives/${slug}/members/${userId}/role`, { role });
     return response.data;

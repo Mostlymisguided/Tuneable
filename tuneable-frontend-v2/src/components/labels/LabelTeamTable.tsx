@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../../constants';
 
@@ -28,9 +28,79 @@ interface LabelTeamTableProps {
   currentUserId?: string;
   currentUserRole?: 'owner' | 'admin' | 'member' | string;
   onRemove?: (memberId: string, memberRole: string) => void;
-  onChangeRole?: (memberId: string, newRole: string) => void;
+  onChangeRole?: (memberId: string, newRole: string) => void | Promise<void>;
   isRemoving?: boolean;
+  context?: 'label' | 'collective';
+  canManageRoles?: boolean;
 }
+
+const COLLECTIVE_ROLE_OPTIONS = [
+  { value: 'founder', label: 'Founder' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'member', label: 'Member' },
+] as const;
+
+interface CollectiveRoleSelectProps {
+  username: string;
+  role: string;
+  allowFounder: boolean;
+  disabled?: boolean;
+  onChange: (role: string) => void | Promise<void>;
+}
+
+const CollectiveRoleSelect: React.FC<CollectiveRoleSelectProps> = ({
+  username,
+  role,
+  allowFounder,
+  disabled,
+  onChange,
+}) => {
+  const [value, setValue] = useState(role);
+
+  useEffect(() => {
+    setValue(role);
+  }, [role]);
+
+  const options = COLLECTIVE_ROLE_OPTIONS.filter(
+    (option) => allowFounder || option.value !== 'founder'
+  );
+  const labelFor = (roleValue: string) =>
+    COLLECTIVE_ROLE_OPTIONS.find((option) => option.value === roleValue)?.label || roleValue;
+
+  return (
+    <select
+      aria-label={`Role for ${username}`}
+      title={`Change ${username}'s role`}
+      value={options.some((option) => option.value === value) ? value : role}
+      disabled={disabled}
+      onChange={(event) => {
+        const next = event.target.value;
+        if (next === role) {
+          setValue(role);
+          return;
+        }
+        const confirmed = window.confirm(
+          `Change ${username}'s role from ${labelFor(role)} to ${labelFor(next)}?`
+        );
+        if (!confirmed) {
+          setValue(role);
+          return;
+        }
+        setValue(next);
+        Promise.resolve(onChange(next)).catch(() => {
+          setValue(role);
+        });
+      }}
+      className="bg-gray-800 border border-white/15 rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+};
 
 const ROLE_BADGE_MAP: Record<string, { label: string; classes: string }> = {
   owner: { label: 'Owner', classes: 'bg-purple-500/20 text-purple-300 border border-purple-500/60' },
@@ -71,7 +141,9 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
   currentUserRole,
   onRemove,
   onChangeRole,
-  isRemoving = false
+  isRemoving = false,
+  context,
+  canManageRoles = false,
 }) => {
   if (!members || members.length === 0) {
     return (
@@ -110,6 +182,67 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
               label: member.role,
               classes: 'bg-gray-500/20 text-gray-300 border border-gray-500/60',
             };
+            const memberId = user.id?.toString();
+            const isCurrentUser = currentUserId && memberId && currentUserId === memberId.toString();
+            const isLabelContext = context === 'label' || (
+              context !== 'collective' &&
+              (member.role === 'owner' || member.role === 'artist' || member.role === 'producer' || member.role === 'manager' || member.role === 'staff')
+            );
+            const isCollectiveContext = context === 'collective' || (
+              context !== 'label' &&
+              (member.role === 'founder' || (member.role === 'admin' && !isLabelContext) || member.role === 'member')
+            );
+            const isLabelAdmin = member.role === 'admin' || member.role === 'owner';
+            const isLabelArtist = isLabelContext && !isLabelAdmin && ['artist', 'producer', 'manager', 'staff', 'member'].includes(member.role);
+            const isCollectiveAdmin = isCollectiveContext && (member.role === 'founder' || member.role === 'admin');
+            const isCollectiveMember = isCollectiveContext && member.role === 'member';
+            const canAssignFounder = Boolean(canManageRoles || currentUserRole === 'founder');
+            const founderCount = members.filter((entry) => entry.role === 'founder').length;
+            const isOnlyFounder = member.role === 'founder' && founderCount <= 1;
+
+            let canChangeRole = false;
+            let canRemove = false;
+
+            if (isCollectiveContext && context === 'collective') {
+              const canEditRoster = canAssignFounder || currentUserRole === 'admin';
+              canChangeRole = Boolean(
+                onChangeRole &&
+                canEditRoster &&
+                (canAssignFounder || member.role !== 'founder')
+              );
+              canRemove = Boolean(onRemove && (
+                isCurrentUser ||
+                (currentUserRole === 'founder' && (isCollectiveAdmin || isCollectiveMember)) ||
+                (currentUserRole === 'admin' && isCollectiveMember) ||
+                (canManageRoles && !isCurrentUser)
+              ));
+            } else if (isLabelContext) {
+              canChangeRole = Boolean(onChangeRole &&
+                currentUserRole === 'owner' &&
+                (member.role === 'owner' || member.role === 'admin'));
+              canRemove = Boolean(onRemove && (
+                isCurrentUser ||
+                (currentUserRole === 'owner' && isLabelAdmin) ||
+                (currentUserRole === 'admin' && isLabelArtist) ||
+                (currentUserRole === 'owner' && isLabelArtist)
+              ));
+            } else if (isCollectiveContext) {
+              canChangeRole = Boolean(onChangeRole &&
+                currentUserRole === 'founder' &&
+                (member.role === 'founder' || member.role === 'admin' || member.role === 'member'));
+              canRemove = Boolean(onRemove && (
+                isCurrentUser ||
+                (currentUserRole === 'founder' && (isCollectiveAdmin || isCollectiveMember)) ||
+                (currentUserRole === 'admin' && isCollectiveMember)
+              ));
+            }
+
+            const nextCycledRole = () => {
+              if (isLabelContext) return member.role === 'owner' ? 'admin' : 'owner';
+              if (member.role === 'founder') return 'admin';
+              if (member.role === 'admin') return 'member';
+              return 'founder';
+            };
 
             return (
               <tr key={user.id} className="hover:bg-white/5 transition-colors">
@@ -130,107 +263,55 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${roleMeta.classes}`}>
+                  <span
+                    title={context === 'collective' && isOnlyFounder ? 'A collective needs at least one founder' : undefined}
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${roleMeta.classes}`}
+                  >
                     {roleMeta.label}
                   </span>
                 </td>
                 <td className="px-4 py-4 text-sm text-gray-300">{formatDate(member.joinedAt)}</td>
                 {isEditable && (
                   <td className="px-4 py-4 text-right text-sm">
-                    {(() => {
-                      const user = getUserData(member);
-                      const memberId = user.id?.toString();
-                      const isCurrentUser = currentUserId && memberId && currentUserId === memberId.toString();
-                      
-                      // Determine if this is a label or collective based on roles
-                      const isLabelContext = member.role === 'owner' || member.role === 'artist' || member.role === 'producer' || member.role === 'manager' || member.role === 'staff';
-                      const isCollectiveContext = member.role === 'founder' || (member.role === 'admin' && !isLabelContext) || member.role === 'member';
-                      
-                      // For labels
-                      const isLabelAdmin = member.role === 'admin' || member.role === 'owner';
-                      const isLabelArtist = isLabelContext && !isLabelAdmin && ['artist', 'producer', 'manager', 'staff', 'member'].includes(member.role);
-                      
-                      // For collectives
-                      const isCollectiveAdmin = isCollectiveContext && (member.role === 'founder' || member.role === 'admin');
-                      const isCollectiveMember = isCollectiveContext && member.role === 'member';
-                      
-                      // Determine what actions are allowed
-                      let canChangeRole = false;
-                      let canRemove = false;
-                      
-                      if (isLabelContext) {
-                        // Label logic: owner can change admin roles, owner can remove admins, admin/owner can remove artists
-                        canChangeRole = !!(onChangeRole && 
-                          currentUserRole === 'owner' && 
-                          (member.role === 'owner' || member.role === 'admin'));
-                        
-                        canRemove = !!(onRemove && (
-                          isCurrentUser || // Always allow self-removal
-                          (currentUserRole === 'owner' && isLabelAdmin) || // Owner can remove admins
-                          (currentUserRole === 'admin' && isLabelArtist) || // Admin can remove artists
-                          (currentUserRole === 'owner' && isLabelArtist) // Owner can remove artists
-                        ));
-                      } else if (isCollectiveContext) {
-                        // Collective logic: founder can change roles, founder/admin can remove others
-                        canChangeRole = !!(onChangeRole && 
-                          currentUserRole === 'founder' && 
-                          (member.role === 'founder' || member.role === 'admin' || member.role === 'member'));
-                        
-                        canRemove = !!(onRemove && (
-                          isCurrentUser || // Always allow self-removal
-                          (currentUserRole === 'founder' && (isCollectiveAdmin || isCollectiveMember)) || // Founder can remove anyone
-                          (currentUserRole === 'admin' && isCollectiveMember) // Admin can remove members
-                        ));
-                      }
-
-                      if (!canChangeRole && !canRemove) {
-                        return null;
-                      }
-
-                      // Determine new role for change role button
-                      const getNewRole = () => {
-                        if (isLabelContext) {
-                          return member.role === 'owner' ? 'admin' : 'owner';
-                        } else if (isCollectiveContext) {
-                          // Cycle through: founder -> admin -> member -> founder
-                          if (member.role === 'founder') return 'admin';
-                          if (member.role === 'admin') return 'member';
-                          return 'founder';
-                        }
-                        return member.role;
-                      };
-
-                      return (
-                        <div className="flex items-center justify-end gap-2">
-                          {canChangeRole && (
-                            <button
-                              onClick={() => {
-                                if (onChangeRole && memberId) {
-                                  onChangeRole(memberId, getNewRole());
-                                }
-                              }}
-                              className="text-xs text-purple-300 hover:text-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={isRemoving}
-                            >
-                              Change role
-                            </button>
-                          )}
-                          {canRemove && (
-                            <button
-                              onClick={() => {
-                                if (onRemove && memberId) {
-                                  onRemove(memberId, member.role);
-                                }
-                              }}
-                              className="text-xs text-red-300 hover:text-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={isRemoving}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
+                    {(canChangeRole || canRemove) && (
+                      <div className="flex items-center justify-end gap-2">
+                        {context === 'collective' && canChangeRole && memberId && !isOnlyFounder && (
+                          <CollectiveRoleSelect
+                            username={user.username || 'this person'}
+                            role={member.role}
+                            allowFounder={canAssignFounder}
+                            disabled={isRemoving}
+                            onChange={(nextRole) => onChangeRole!(memberId, nextRole)}
+                          />
+                        )}
+                        {canChangeRole && context !== 'collective' && (
+                          <button
+                            onClick={() => {
+                              if (onChangeRole && memberId) {
+                                onChangeRole(memberId, nextCycledRole());
+                              }
+                            }}
+                            className="text-xs text-purple-300 hover:text-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isRemoving}
+                          >
+                            Change role
+                          </button>
+                        )}
+                        {canRemove && (
+                          <button
+                            onClick={() => {
+                              if (onRemove && memberId) {
+                                onRemove(memberId, member.role);
+                              }
+                            }}
+                            className="text-xs text-red-300 hover:text-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isRemoving}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 )}
               </tr>

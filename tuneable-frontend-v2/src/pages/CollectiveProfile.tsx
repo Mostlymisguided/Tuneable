@@ -250,11 +250,19 @@ const CollectiveProfile: React.FC = () => {
     try {
       setIsRemoving(true);
       await collectiveAPI.changeMemberRole(slug, memberId, newRole as 'founder' | 'admin' | 'member');
-      toast.success('Role updated successfully');
+      const roleLabel = newRole.charAt(0).toUpperCase() + newRole.slice(1);
+      toast.success(`Role updated to ${roleLabel}`);
       await fetchCollectiveTeam(slug);
+      try {
+        const membersData = await collectiveAPI.getCollectiveMembers(slug);
+        setMembers(membersData.members || []);
+      } catch (membersError) {
+        console.error('Error refreshing collective members:', membersError);
+      }
     } catch (error: any) {
       console.error('Error changing role:', error);
       toast.error(error.response?.data?.error || 'Failed to change role');
+      throw error;
     } finally {
       setIsRemoving(false);
     }
@@ -1322,7 +1330,7 @@ useEffect(() => {
                   <div>
                     <h2 className="text-2xl font-bold text-white">Collective Ownership</h2>
                     <p className="text-sm text-gray-300">
-                      Founders, admins, and members who manage this collective on Tuneable.
+                      Founders can set anyone to founder, admin, or member. Admins can switch people between admin and member. A collective keeps at least one founder.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1373,6 +1381,8 @@ useEffect(() => {
                   <LabelTeamTable 
                     members={teamMembers} 
                     isEditable 
+                    context="collective"
+                    canManageRoles={isCollectiveFounder()}
                     currentUserId={(currentUser as any)?._id || currentUser?.id || currentUser?.uuid}
                     currentUserRole={getCurrentUserRole()}
                     onRemove={handleRemoveMember}

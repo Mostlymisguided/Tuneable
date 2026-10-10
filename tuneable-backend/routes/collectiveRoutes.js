@@ -872,7 +872,9 @@ router.delete('/:slug/members/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// Change member role (founder only)
+// Change member role.
+// Founders and platform admins can set founder, admin, or member.
+// Collective admins can switch people between admin and member.
 router.patch('/:slug/members/:userId/role', authMiddleware, async (req, res) => {
   try {
     const { slug, userId } = req.params;
@@ -885,30 +887,42 @@ router.patch('/:slug/members/:userId/role', authMiddleware, async (req, res) => 
       return res.status(404).json({ error: 'Collective not found' });
     }
 
-    if (!collective.isFounder(requesterId)) {
-      return res.status(403).json({ error: 'Only collective founders can change member roles' });
-    }
-
     if (!['founder', 'admin', 'member'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role. Must be founder, admin, or member' });
     }
 
+    const isPlatformAdmin = req.user.role && req.user.role.includes('admin');
+    const isFounder = collective.isFounder(requesterId);
+    if (!isPlatformAdmin && !collective.isAdmin(requesterId)) {
+      return res.status(403).json({ error: 'Only collective founders and admins can change member roles' });
+    }
+
+    const targetMember = collective.members.find(m => m.userId.toString() === userId && !m.leftAt);
+    if (!targetMember) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    const touchesFounder = role === 'founder' || targetMember.role === 'founder';
+    if (touchesFounder && !isPlatformAdmin && !isFounder) {
+      return res.status(403).json({ error: 'Only founders can assign or change the founder role' });
+    }
+
     // Prevent changing the last founder's role
-    if (role !== 'founder') {
-      const targetMember = collective.members.find(m => m.userId.toString() === userId && !m.leftAt);
-      if (targetMember && targetMember.role === 'founder') {
-        const founderCount = collective.members.filter(m => m.role === 'founder' && !m.leftAt).length;
-        if (founderCount <= 1) {
-          return res.status(400).json({ error: 'Cannot change the last founder\'s role' });
-        }
+    if (role !== 'founder' && targetMember.role === 'founder') {
+      const founderCount = collective.members.filter(m => m.role === 'founder' && !m.leftAt).length;
+      if (founderCount <= 1) {
+        return res.status(400).json({ error: 'Cannot change the last founder\'s role' });
       }
     }
 
-    await collective.addMember(userId, role, requesterId);
+    await collective.setMemberRole(userId, role);
     scheduleCollectiveRankingRefresh(collective._id);
 
-    res.json({ message: 'Member role updated successfully' });
+    res.json({ message: 'Member role updated successfully', role });
   } catch (error) {
+    if (error.status === 404) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error('Error changing member role:', error);
     res.status(500).json({ error: 'Failed to change member role' });
   }
