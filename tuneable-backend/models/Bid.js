@@ -245,6 +245,13 @@ bidSchema.post('save', function(doc) {
             console.error('Error updating metrics after bid save:', error);
         }
 
+        try {
+            const { refreshFounderRankingsForUser } = require('../services/collectiveRankingService');
+            await refreshFounderRankingsForUser(bidData.userId);
+        } catch (error) {
+            console.error('Error updating collective founder ranking after bid save:', error);
+        }
+
         if (!bidData.mediaId) return;
         try {
             const copyAccessService = require('../services/copyAccessService');
@@ -274,6 +281,13 @@ bidSchema.post('remove', function(doc) {
             await bidMetricsEngine.updateMetricsForBidChange(bidData, 'delete');
         } catch (error) {
             console.error('Error updating metrics after bid removal:', error);
+        }
+
+        try {
+            const { refreshFounderRankingsForUser } = require('../services/collectiveRankingService');
+            await refreshFounderRankingsForUser(bidData.userId);
+        } catch (error) {
+            console.error('Error updating collective founder ranking after bid removal:', error);
         }
     });
 });

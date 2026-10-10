@@ -52,6 +52,8 @@ interface Collective {
     memberCount?: number;
     releaseCount?: number;
     globalCollectiveAggregate?: number;
+    founderTipAggregate?: number;
+    rankingAggregate?: number;
     globalCollectiveBidAvg?: number;
     globalCollectiveBidTop?: number;
     globalCollectiveBidCount?: number;
@@ -66,6 +68,12 @@ interface Collective {
     leftAt?: string;
     verified?: boolean;
   }>;
+}
+
+function collectiveRankingPence(stats?: Collective['stats']) {
+  if (!stats) return 0;
+  if (typeof stats.rankingAggregate === 'number') return stats.rankingAggregate;
+  return (stats.globalCollectiveAggregate || 0) + (stats.founderTipAggregate || 0);
 }
 
 function collectiveToEditForm(collectiveData: Collective) {
@@ -757,7 +765,7 @@ useEffect(() => {
               {collectiveStats?.globalCollectiveAggregate !== undefined && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                  <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(collectiveStats?.globalCollectiveAggregate || 0)}</div>
+                  <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(collectiveRankingPence(collectiveStats))}</div>
                   <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                 </div>
               )}
@@ -1049,7 +1057,7 @@ useEffect(() => {
                       {collectiveStats?.globalCollectiveAggregate !== undefined && (
                         <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <TrendingUp className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                          <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(collectiveStats?.globalCollectiveAggregate || 0)}</div>
+                          <div className="text-lg md:text-2xl font-bold text-white">{penceToPounds(collectiveRankingPence(collectiveStats))}</div>
                           <div className="text-xs md:text-sm text-gray-300">Total Tips</div>
                         </div>
                       )}

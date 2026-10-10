@@ -5593,7 +5593,14 @@ router.post('/:userId/tunebytes/recalculate', authMiddleware, async (req, res) =
 router.get('/me/collective-memberships', authMiddleware, async (req, res) => {
   try {
     const Collective = require('../models/Collective');
+    const { ensureCollectiveFounderRankings } = require('../services/collectiveRankingService');
     const userId = req.user._id;
+
+    try {
+      await ensureCollectiveFounderRankings();
+    } catch (rankingError) {
+      console.error('Error preparing collective founder rankings:', rankingError);
+    }
     
     // Find collectives where user is a member (and hasn't left)
     const collectives = await Collective.find({
@@ -5621,7 +5628,9 @@ router.get('/me/collective-memberships', authMiddleware, async (req, res) => {
         verified: memberInfo?.verified || false,
         memberCount: collective.stats?.memberCount || 0,
         releaseCount: collective.stats?.releaseCount || 0,
-        globalCollectiveAggregate: collective.stats?.globalCollectiveAggregate || 0
+        globalCollectiveAggregate: collective.stats?.globalCollectiveAggregate || 0,
+        founderTipAggregate: collective.stats?.founderTipAggregate || 0,
+        rankingAggregate: collective.stats?.rankingAggregate || 0
       };
     });
     

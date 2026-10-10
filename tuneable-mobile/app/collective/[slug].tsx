@@ -112,13 +112,13 @@ export default function CollectiveProfileScreen() {
               <Text style={styles.description}>{collective.description}</Text>
             ) : null}
 
-            {collective.stats?.globalCollectiveAggregate ? (
+            {(collective.stats?.rankingAggregate ?? collective.stats?.globalCollectiveAggregate) ? (
               <View style={styles.statChips}>
                 <View style={styles.statChip}>
                   <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
                   <Text style={styles.statChipText}>
                     {formatPoundsFromPence(
-                      collective.stats.globalCollectiveAggregate
+                      collective.stats?.rankingAggregate ?? collective.stats?.globalCollectiveAggregate ?? 0
                     )}{' '}
                     <Text style={styles.statChipMuted}>total support</Text>
                   </Text>

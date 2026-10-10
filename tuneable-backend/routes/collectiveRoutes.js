@@ -17,6 +17,27 @@ const {
   collectiveSaveErrorResponse,
 } = require('../utils/collectiveVenue');
 
+const COLLECTIVE_LIST_FIELDS = 'name slug profilePicture description genres type venueKind location stats.globalCollectiveAggregate stats.founderTipAggregate stats.rankingAggregate stats.globalRank stats.memberCount stats.releaseCount';
+
+function scheduleCollectiveRankingRefresh(collectiveId) {
+  if (!collectiveId) return;
+  setImmediate(() => {
+    const { refreshCollectiveFounderRanking } = require('../services/collectiveRankingService');
+    refreshCollectiveFounderRanking(collectiveId).catch((error) => {
+      console.error('Error refreshing collective founder ranking:', error);
+    });
+  });
+}
+
+async function prepareCollectiveRankings() {
+  try {
+    const { ensureCollectiveFounderRankings } = require('../services/collectiveRankingService');
+    await ensureCollectiveFounderRankings();
+  } catch (error) {
+    console.error('Error preparing collective founder rankings:', error);
+  }
+}
+
 // Configure upload for collective profile pictures (reuse label upload config)
 const profilePictureUpload = createLabelProfilePictureUpload();
 
@@ -58,6 +79,8 @@ router.get('/', async (req, res) => {
       search 
     } = req.query;
 
+    await prepareCollectiveRankings();
+
     const query = { isActive: true };
     
     // Filter by genre
@@ -83,8 +106,8 @@ router.get('/', async (req, res) => {
 
     // Build sort object
     const sort = {};
-    if (sortBy === 'totalBidAmount' || sortBy === 'globalCollectiveAggregate') {
-      sort['stats.globalCollectiveAggregate'] = sortOrder === 'desc' ? -1 : 1;
+    if (sortBy === 'totalBidAmount' || sortBy === 'globalCollectiveAggregate' || sortBy === 'rankingAggregate') {
+      sort['stats.rankingAggregate'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'memberCount') {
       sort['stats.memberCount'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'name') {
@@ -92,7 +115,7 @@ router.get('/', async (req, res) => {
     }
 
     const collectives = await Collective.find(query)
-      .select('name slug profilePicture description genres type venueKind location stats.globalCollectiveAggregate stats.memberCount stats.releaseCount')
+      .select(COLLECTIVE_LIST_FIELDS)
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -338,8 +361,16 @@ router.get('/:slug', async (req, res) => {
       return res.status(404).json({ error: 'Collective not found' });
     }
 
-    // TODO: Recalculate stats if requested (similar to labels)
-    // For now, just return the collective
+    try {
+      const {
+        ensureCollectiveFounderRankings,
+        refreshCollectiveFounderRanking,
+      } = require('../services/collectiveRankingService');
+      await ensureCollectiveFounderRankings();
+      await refreshCollectiveFounderRanking(collective._id);
+    } catch (rankingError) {
+      console.error('Error refreshing collective founder ranking:', rankingError);
+    }
 
     // Get recent releases (media where collective is credited)
     const recentReleases = await Media.find({ 
@@ -459,6 +490,8 @@ router.get('/:slug', async (req, res) => {
         memberCount: 0,
         releaseCount: 0,
         globalCollectiveAggregate: 0,
+        founderTipAggregate: 0,
+        rankingAggregate: 0,
         globalCollectiveBidAvg: 0,
         globalCollectiveBidTop: 0,
         globalCollectiveBidCount: 0
@@ -610,12 +643,15 @@ router.post('/', authMiddleware, uploadCollectivePicture, async (req, res) => {
         userId: req.user.id,
         role: 'founder',
         joinedAt: new Date(),
+        founderSince: new Date(),
+        founderTipScope: 'all',
         addedBy: req.user.id,
         verified: true
       }]
     });
 
     await collective.save();
+    scheduleCollectiveRankingRefresh(collective._id);
 
     res.status(201).json({ collective });
   } catch (error) {
@@ -786,6 +822,7 @@ router.post('/:id/members', authMiddleware, async (req, res) => {
     }
 
     await collective.addMember(userId, role || 'member', req.user.id, instrument);
+    scheduleCollectiveRankingRefresh(collective._id);
 
     res.json({ message: 'Member added successfully' });
   } catch (error) {
@@ -826,6 +863,7 @@ router.delete('/:slug/members/:userId', authMiddleware, async (req, res) => {
     }
 
     await collective.removeMember(userId);
+    scheduleCollectiveRankingRefresh(collective._id);
 
     res.json({ message: 'Member removed successfully' });
   } catch (error) {
@@ -867,6 +905,7 @@ router.patch('/:slug/members/:userId/role', authMiddleware, async (req, res) => 
     }
 
     await collective.addMember(userId, role, requesterId);
+    scheduleCollectiveRankingRefresh(collective._id);
 
     res.json({ message: 'Member role updated successfully' });
   } catch (error) {
@@ -893,6 +932,8 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
       limit = 20 
     } = req.query;
     
+    await prepareCollectiveRankings();
+
     const query = { isActive: { $ne: false } };
     if (verificationStatus) {
       query.verificationStatus = verificationStatus;
@@ -913,8 +954,8 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
       sort.name = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'verificationStatus') {
       sort.verificationStatus = sortOrder === 'desc' ? -1 : 1;
-    } else if (sortBy === 'totalBidAmount' || sortBy === 'globalCollectiveAggregate') {
-      sort['stats.globalCollectiveAggregate'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'totalBidAmount' || sortBy === 'globalCollectiveAggregate' || sortBy === 'rankingAggregate') {
+      sort['stats.rankingAggregate'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'memberCount') {
       sort['stats.memberCount'] = sortOrder === 'desc' ? -1 : 1;
     } else if (sortBy === 'releaseCount') {
@@ -926,7 +967,7 @@ router.get('/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
     }
 
     const collectives = await Collective.find(query)
-      .select('name slug email profilePicture verificationStatus verificationMethod verifiedAt verifiedBy stats.globalCollectiveAggregate stats.memberCount stats.releaseCount stats.lastBidAt genres type createdAt updatedAt')
+      .select('name slug email profilePicture verificationStatus verificationMethod verifiedAt verifiedBy stats.globalCollectiveAggregate stats.founderTipAggregate stats.rankingAggregate stats.globalRank stats.memberCount stats.releaseCount stats.lastBidAt genres type createdAt updatedAt')
       .populate('members.userId', 'username email uuid profilePic')
       .populate('verifiedBy', 'username')
       .sort(sort)

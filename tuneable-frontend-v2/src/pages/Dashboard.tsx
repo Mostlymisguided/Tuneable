@@ -1922,7 +1922,7 @@ Join here: ${inviteLink}`.trim();
                       if (collectivesSortField === 'name') {
                         comparison = a.name.localeCompare(b.name);
                       } else if (collectivesSortField === 'totalBids') {
-                        comparison = (a.globalCollectiveAggregate || 0) - (b.globalCollectiveAggregate || 0);
+                        comparison = (a.rankingAggregate ?? a.globalCollectiveAggregate ?? 0) - (b.rankingAggregate ?? b.globalCollectiveAggregate ?? 0);
                       } else if (collectivesSortField === 'memberCount') {
                         comparison = (a.memberCount || 0) - (b.memberCount || 0);
                       } else if (collectivesSortField === 'releaseCount') {
@@ -2125,7 +2125,7 @@ Join here: ${inviteLink}`.trim();
                                               <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
                                               <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
                                               <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                                <div className="text-white font-medium">{penceToPounds(collective.rankingAggregate ?? collective.globalCollectiveAggregate ?? 0)}</div>
                                               </td>
                                               <td className="px-4 py-3">
                                                 {collective.verificationStatus === 'verified' ? (
@@ -2218,7 +2218,7 @@ Join here: ${inviteLink}`.trim();
                                               <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
                                               <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
                                               <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                                <div className="text-white font-medium">{penceToPounds(collective.rankingAggregate ?? collective.globalCollectiveAggregate ?? 0)}</div>
                                               </td>
                                               <td className="px-4 py-3">
                                                 {collective.verificationStatus === 'verified' ? (
@@ -2317,7 +2317,7 @@ Join here: ${inviteLink}`.trim();
                                               <td className="px-4 py-3 text-gray-300">{collective.memberCount || 0}</td>
                                               <td className="px-4 py-3 text-gray-300">{collective.releaseCount || 0}</td>
                                               <td className="px-4 py-3">
-                                                <div className="text-white font-medium">{penceToPounds(collective.globalCollectiveAggregate || 0)}</div>
+                                                <div className="text-white font-medium">{penceToPounds(collective.rankingAggregate ?? collective.globalCollectiveAggregate ?? 0)}</div>
                                               </td>
                                               <td className="px-4 py-3">
                                                 {collective.verificationStatus === 'verified' ? (

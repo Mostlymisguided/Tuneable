@@ -65,6 +65,9 @@ const collectiveSchema = new mongoose.Schema({
     instrument: { type: String }, // Optional: "guitar", "vocals", "producer", etc.
     joinedAt: { type: Date, default: Date.now },
     leftAt: { type: Date }, // For former members
+    // When this person became a founder. Ranking uses this with founderTipScope.
+    founderSince: { type: Date },
+    founderTipScope: { type: String, enum: ['all', 'since'] },
     verified: { type: Boolean, default: false },
     addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }],
@@ -87,7 +90,10 @@ const collectiveSchema = new mongoose.Schema({
     
     // Bid Metrics (from bidMetricsSchema)
     // NOTE: All amounts stored in PENCE (integer), not pounds
-    globalCollectiveAggregate: { type: Number, default: 0 }, // GlobalAggregate for collective's media (in pence)
+    globalCollectiveAggregate: { type: Number, default: 0 }, // Tips received on the collective's media (pence)
+    founderTipAggregate: { type: Number, default: 0 }, // Active tips by founders that count toward ranking (pence)
+    rankingAggregate: { type: Number, default: 0 }, // Media tips plus founder tips. Lists rank by this (pence)
+    founderTipsCalculatedAt: { type: Date }, // Set when founder tips were last summed. Missing means not calculated yet.
     globalCollectiveBidAvg: { type: Number, default: 0 }, // GlobalBidAvg for collective's media (in pence)
     globalCollectiveBidTop: { type: Number, default: 0 }, // GlobalBidTop for collective's media (in pence)
     globalCollectiveBidCount: { type: Number, default: 0 }, // Count of all bids on collective's media
@@ -120,7 +126,7 @@ const collectiveSchema = new mongoose.Schema({
     firstBidAt: Date, // When the first bid was placed on any of collective's media
     
     // Ranking metrics (computed from bidMetricsSchema)
-    globalRank: { type: Number }, // Rank among all collectives by total bid amount
+    globalRank: { type: Number }, // Rank among active collectives by stats.rankingAggregate
     genreRank: { type: Number }, // Rank within genre by total bid amount
     percentile: { type: Number, min: 0, max: 100 } // Percentile ranking (0-100)
   },
@@ -156,6 +162,7 @@ collectiveSchema.index({ type: 1 });
 collectiveSchema.index({ 'location.placeId': 1, type: 1 });
 collectiveSchema.index({ 'location.ancestorIds': 1, type: 1 });
 collectiveSchema.index({ 'stats.globalCollectiveAggregate': -1 });
+collectiveSchema.index({ 'stats.rankingAggregate': -1 });
 collectiveSchema.index({ 'stats.globalRank': 1 });
 collectiveSchema.index({ 'stats.genreRank': 1 });
 collectiveSchema.index({ 'stats.lastBidAt': -1 });
@@ -171,21 +178,32 @@ collectiveSchema.methods.addMember = function(userId, role, addedBy, instrument 
   );
   
   if (existingMember) {
+    const { freezeFounderTipScope } = require('../utils/collectiveFounderTips');
+    if (existingMember.role === 'founder') freezeFounderTipScope(this, existingMember);
+    const promotingToFounder = role === 'founder' && existingMember.role !== 'founder';
     // Update existing member
     existingMember.role = role;
     existingMember.instrument = instrument;
     existingMember.joinedAt = new Date();
     existingMember.leftAt = null; // Rejoin
     existingMember.addedBy = addedBy;
+    if (promotingToFounder) {
+      existingMember.founderSince = new Date();
+      existingMember.founderTipScope = 'since';
+    }
   } else {
-    // Add new member
+    // Add new member. Invited founders contribute their full tip history.
     this.members.push({
       userId,
       role,
       instrument,
       joinedAt: new Date(),
       addedBy,
-      verified: false
+      verified: false,
+      ...(role === 'founder' ? {
+        founderSince: new Date(),
+        founderTipScope: 'all',
+      } : {}),
     });
   }
   return this.save();
@@ -253,10 +271,10 @@ collectiveSchema.statics.repairActiveIdentityIndexes = async function repairActi
 
 // Static method to get top collectives by bid amount
 collectiveSchema.statics.getTopByBidAmount = function(limit = 10) {
-  return this.find({ isActive: true, 'stats.globalCollectiveAggregate': { $gt: 0 } })
-    .sort({ 'stats.globalCollectiveAggregate': -1 })
+  return this.find({ isActive: true, 'stats.rankingAggregate': { $gt: 0 } })
+    .sort({ 'stats.rankingAggregate': -1 })
     .limit(limit)
-    .select('name slug profilePicture stats.globalCollectiveAggregate stats.memberCount stats.releaseCount type');
+    .select('name slug profilePicture stats.rankingAggregate stats.founderTipAggregate stats.globalCollectiveAggregate stats.memberCount stats.releaseCount type');
 };
 
 // Static method to get collectives by genre
@@ -264,9 +282,9 @@ collectiveSchema.statics.getByGenre = function(genre, limit = 20) {
   return this.find({ 
     isActive: true, 
     genres: genre,
-    'stats.globalCollectiveAggregate': { $gt: 0 }
+    'stats.rankingAggregate': { $gt: 0 }
   })
-  .sort({ 'stats.globalCollectiveAggregate': -1 })
+  .sort({ 'stats.rankingAggregate': -1 })
   .limit(limit);
 };
 
@@ -275,9 +293,9 @@ collectiveSchema.statics.getByType = function(type, limit = 20) {
   return this.find({ 
     isActive: true, 
     type: type,
-    'stats.globalCollectiveAggregate': { $gt: 0 }
+    'stats.rankingAggregate': { $gt: 0 }
   })
-  .sort({ 'stats.globalCollectiveAggregate': -1 })
+  .sort({ 'stats.rankingAggregate': -1 })
   .limit(limit);
 };
 

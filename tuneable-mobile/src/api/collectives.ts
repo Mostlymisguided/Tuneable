@@ -6,6 +6,8 @@ export interface CollectiveStats {
   memberCount?: number;
   releaseCount?: number;
   globalCollectiveAggregate?: number;
+  founderTipAggregate?: number;
+  rankingAggregate?: number;
   globalCollectiveBidAvg?: number;
   globalCollectiveBidTop?: number;
   globalCollectiveBidCount?: number;

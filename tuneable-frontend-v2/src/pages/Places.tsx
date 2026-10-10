@@ -41,6 +41,7 @@ type VenueItem = {
   };
   stats?: {
     globalCollectiveAggregate?: number;
+    rankingAggregate?: number;
   };
 };
 
@@ -186,9 +187,9 @@ const Places: React.FC = () => {
                       {collectiveTypeLabel(venue.type) || 'Collective'}
                       {venue.location?.display ? ` · ${venue.location.display}` : ''}
                     </div>
-                    {venue.stats?.globalCollectiveAggregate ? (
+                    {(venue.stats?.rankingAggregate ?? venue.stats?.globalCollectiveAggregate) ? (
                       <div className="text-xs text-purple-300 font-semibold mt-1">
-                        {penceToPounds(venue.stats.globalCollectiveAggregate)} support
+                        {penceToPounds(venue.stats?.rankingAggregate ?? venue.stats?.globalCollectiveAggregate ?? 0)} support
                       </div>
                     ) : null}
                   </div>
