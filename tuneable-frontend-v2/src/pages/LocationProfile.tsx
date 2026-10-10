@@ -11,7 +11,7 @@ import { getTagProfilePath } from '../utils/tagNormalizer';
 import EntertainingLoader from '../components/EntertainingLoader';
 import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import { useAuth } from '../contexts/AuthContext';
-import { venueKindLabel } from '../utils/collectiveTypes';
+import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { usePageMeta } from '../seo/usePageMeta';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 
@@ -47,7 +47,7 @@ interface PlaceVenue {
   name: string;
   slug: string;
   profilePicture?: string | null;
-  type?: string;
+  type?: string | string[];
   venueKind?: string | null;
   display?: string;
   verificationStatus?: string;
@@ -231,7 +231,7 @@ const LocationProfile: React.FC = () => {
               {!loading && (venues.length > 0 || user) && (
                 <div className="w-full max-w-lg mb-3">
                   <div className="flex items-center justify-center md:justify-between gap-2 mb-2">
-                    <p className="text-xs uppercase tracking-wide text-gray-400">Venues</p>
+                    <p className="text-xs uppercase tracking-wide text-gray-400">Collectives</p>
                     {user && (
                       <button
                         type="button"
@@ -239,7 +239,7 @@ const LocationProfile: React.FC = () => {
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-100 text-xs font-medium hover:bg-amber-500/25 transition-colors"
                       >
                         <Plus className="h-3 w-3" />
-                        Add a venue here
+                        Add a collective
                       </button>
                     )}
                   </div>
@@ -257,15 +257,15 @@ const LocationProfile: React.FC = () => {
                             className="h-4 w-4 rounded-full object-cover"
                           />
                           {venue.name}
-                          {venueKindLabel(venue.venueKind) ? (
-                            <span className="text-amber-200/70">· {venueKindLabel(venue.venueKind)}</span>
+                          {collectiveTypeLabel(venue.type) ? (
+                            <span className="text-amber-200/70">· {collectiveTypeLabel(venue.type)}</span>
                           ) : null}
                         </Link>
                       ))}
                     </div>
                   ) : (
                     <p className="text-xs text-gray-500 text-center md:text-left">
-                      No claimed venues yet in {displayName}.
+                      No collectives in {displayName} yet.
                     </p>
                   )}
                 </div>

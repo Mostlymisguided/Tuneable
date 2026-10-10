@@ -15,7 +15,7 @@ import { collectiveAPI, type Collective } from '@/src/api/collectives';
 import { Screen } from '@/src/components/Screen';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
-import { collectiveTypeLabel, venueKindLabel } from '@/src/lib/collectiveTypes';
+import { collectiveTypeLabel } from '@/src/lib/collectiveTypes';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
@@ -57,10 +57,7 @@ export default function CollectiveProfileScreen() {
     void Linking.openURL(fullUrl);
   };
 
-  const typeLabel = collective ? collectiveTypeLabel(collective.type) : '';
-  const kindLabel = collective?.venueKind ? venueKindLabel(collective.venueKind) : '';
-  const displayType =
-    collective?.type === 'venue' && kindLabel ? kindLabel : typeLabel;
+  const displayType = collective ? collectiveTypeLabel(collective.type) : '';
 
   return (
     <Screen padForPlayer={false}>

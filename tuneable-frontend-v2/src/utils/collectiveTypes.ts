@@ -6,6 +6,11 @@ export type CollectiveType =
   | 'band' 
   | 'collective' 
   | 'production_company'
+  | 'promoter'
+  | 'radio'
+  | 'studio'
+  | 'record_store'
+  | 'venue'
   | 'bar'
   | 'club'
   | 'hostel'
@@ -17,7 +22,7 @@ export type CollectiveType =
 export type CollectiveTypes = CollectiveType | CollectiveType[];
 
 // Venue types (for checking if a collective is a venue)
-export const VENUE_TYPES: CollectiveType[] = ['bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival'];
+export const VENUE_TYPES: CollectiveType[] = ['venue', 'bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival'];
 export type VenueKind = 'bar' | 'club' | 'hostel' | 'cafe' | 'restaurant' | 'festival' | 'other';
 
 const CITY_LIKE = new Set(['place', 'locality', 'neighborhood', 'district']);
@@ -26,6 +31,11 @@ export const COLLECTIVE_TYPE_OPTIONS: { value: CollectiveType; label: string }[]
   { value: 'band', label: 'Band' },
   { value: 'collective', label: 'Collective' },
   { value: 'production_company', label: 'Production Company' },
+  { value: 'promoter', label: 'Promoter' },
+  { value: 'radio', label: 'Radio' },
+  { value: 'studio', label: 'Studio' },
+  { value: 'record_store', label: 'Record Store' },
+  { value: 'venue', label: 'Venue' },
   { value: 'bar', label: 'Bar' },
   { value: 'club', label: 'Club' },
   { value: 'cafe', label: 'Cafe' },

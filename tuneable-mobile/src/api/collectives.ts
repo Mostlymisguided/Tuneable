@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { CollectiveType } from '../lib/collectiveTypes';
 import type { ResolvedLocation } from '../types/user';
 
 export interface CollectiveStats {
@@ -28,7 +29,7 @@ export interface Collective {
   coverImage: string;
   email: string;
   website: string;
-  type: ('band' | 'collective' | 'production_company' | 'venue' | 'other') | ('band' | 'collective' | 'production_company' | 'venue' | 'other')[];
+  type: CollectiveType | CollectiveType[];
   venueKind?: 'bar' | 'club' | 'hostel' | 'cafe' | 'restaurant' | 'festival' | 'other';
   location?: ResolvedLocation;
   socialMedia?: {

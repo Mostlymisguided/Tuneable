@@ -14,9 +14,16 @@ const {
 
 describe('collectiveVenue', () => {
   it('includes venue in collective types', () => {
-    expect(COLLECTIVE_TYPES).toContain('venue');
-    expect(normalizeCollectiveType('Venue')).toBe('venue');
-    expect(normalizeCollectiveType('nope')).toBe('collective');
+    expect(COLLECTIVE_TYPES).toEqual(expect.arrayContaining([
+      'promoter',
+      'radio',
+      'studio',
+      'record_store',
+      'venue',
+    ]));
+    expect(normalizeCollectiveType('record_store')).toEqual(['record_store']);
+    expect(normalizeCollectiveType('Venue')).toEqual(['venue']);
+    expect(normalizeCollectiveType('nope')).toEqual(['collective']);
   });
 
   it('normalizes venue kinds', () => {
@@ -74,10 +81,9 @@ describe('collectiveVenue', () => {
     expect(location.ancestorIds).toEqual(['dXJuOm1ieHBsYTpl', 'goa-id']);
   });
 
-  it('finds venues whose location is the place or a descendant', () => {
+  it('finds any collective whose location is the place or a descendant', () => {
     expect(venuesAtPlaceQuery('goa-id')).toEqual({
       isActive: true,
-      type: 'venue',
       'location.ancestorIds': 'goa-id',
     });
   });

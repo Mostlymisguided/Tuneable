@@ -2442,7 +2442,7 @@ export const collectiveAPI = {
     page?: number;
     limit?: number;
     genre?: string;
-    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other';
     placeId?: string;
     sortBy?: 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'name';
     sortOrder?: 'asc' | 'desc';
@@ -2514,7 +2514,7 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other') | ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other')[];
+    type?: ('band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other') | ('band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other')[];
     venueKind?: string; // deprecated
   }) => {
     // Handle both FormData (with file upload) and plain object
@@ -2536,7 +2536,7 @@ export const collectiveAPI = {
     website?: string;
     genres?: string[];
     foundedYear?: number;
-    type?: ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other') | ('band' | 'collective' | 'production_company' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other')[];
+    type?: ('band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other') | ('band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other')[];
     venueKind?: string; // deprecated
     location?: Record<string, unknown> | null;
     profilePicture?: string;
@@ -2573,7 +2573,7 @@ export const collectiveAPI = {
   getAllCollectives: async (params?: {
     verificationStatus?: string;
     genre?: string;
-    type?: 'band' | 'collective' | 'production_company' | 'venue' | 'other';
+    type?: 'band' | 'collective' | 'production_company' | 'promoter' | 'radio' | 'studio' | 'record_store' | 'venue' | 'bar' | 'club' | 'cafe' | 'restaurant' | 'hostel' | 'festival' | 'other';
     search?: string;
     sortBy?: 'name' | 'verificationStatus' | 'globalCollectiveAggregate' | 'totalBidAmount' | 'memberCount' | 'releaseCount' | 'createdAt' | 'lastBidAt';
     sortOrder?: 'asc' | 'desc';

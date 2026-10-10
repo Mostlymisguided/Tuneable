@@ -7,7 +7,7 @@ import GlobalChartLocationHero, { type LocationQuickPick } from '../components/G
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import EntertainingLoader from '../components/EntertainingLoader';
 import { penceToPounds } from '../utils/currency';
-import { venueKindLabel } from '../utils/collectiveTypes';
+import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import {
   getCountryPickFromLocation,
@@ -33,7 +33,7 @@ type VenueItem = {
   name: string;
   slug: string;
   profilePicture?: string;
-  type: string;
+  type?: string | string[];
   venueKind?: string | null;
   location?: {
     display?: string;
@@ -74,7 +74,6 @@ const Places: React.FC = () => {
       // Fetch venues (only on global view - no parent selected)
       if (!parentPlaceId) {
         const venuesRes = await collectiveAPI.getCollectives({
-          type: 'venue',
           sortBy: 'globalCollectiveAggregate',
           sortOrder: 'desc',
           page: 1,
@@ -161,7 +160,7 @@ const Places: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-amber-400" />
-                Featured Venues
+                Featured Collectives
                 {totalVenues > FEATURED_VENUES_COUNT ? (
                   <span className="text-sm font-normal text-purple-300">
                     ({totalVenues} total)
@@ -184,7 +183,7 @@ const Places: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate text-sm">{venue.name}</div>
                     <div className="text-xs text-amber-200/70 truncate">
-                      {venueKindLabel(venue.venueKind) || 'Venue'}
+                      {collectiveTypeLabel(venue.type) || 'Collective'}
                       {venue.location?.display ? ` · ${venue.location.display}` : ''}
                     </div>
                     {venue.stats?.globalCollectiveAggregate ? (

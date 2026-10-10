@@ -3,8 +3,13 @@ const { applyResolvedLocation } = require('./locationUtils');
 // All types are now top-level - venue types (bar, club, etc.) are alongside band, collective, etc.
 const COLLECTIVE_TYPES = [
   'band',
-  'collective', 
+  'collective',
   'production_company',
+  'promoter',
+  'radio',
+  'studio',
+  'record_store',
+  'venue',
   'bar',
   'club',
   'hostel',
@@ -17,8 +22,8 @@ const COLLECTIVE_TYPES = [
 // Deprecated: venueKind is no longer used, but kept for backward compatibility
 const VENUE_KINDS = ['bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival', 'other'];
 
-// Venue types (for checking if a collective is a venue)
-const VENUE_TYPES = ['bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival'];
+// Types that must be bound to a Mapbox place. Display does not use this list.
+const VENUE_TYPES = ['venue', 'bar', 'club', 'hostel', 'cafe', 'restaurant', 'festival'];
 const CITY_LIKE_PLACETYPES = new Set(['place', 'locality', 'neighborhood', 'district']);
 
 function parseMaybeJson(value) {
@@ -123,7 +128,6 @@ function collectiveSaveErrorResponse(error, action = 'create') {
 function venuesAtPlaceQuery(placeId) {
   return {
     isActive: true,
-    type: { $in: VENUE_TYPES }, // Match any venue type (bar, club, cafe, etc.)
     'location.ancestorIds': placeId,
   };
 }
