@@ -31,7 +31,7 @@ const originalMedia = {
 describe('inviteeAffiliateDisclosure', () => {
   it('tells the artist the 3% comes from Tuneable when inviter is founding', () => {
     expect(inviteeAffiliateDisclosure('Ada')).toBe(
-      "If you upload your own music and your creator profile is verified, Ada (a founding creator) earns 3% of your paid tips for the first year after verification — taken from Tuneable's share, not yours."
+      "If you upload your own music and your creator profile is verified, Ada (a founding creator) earns 3% of your paid tips for the first year after verification - taken from Tuneable's share, not yours ✨"
     );
   });
 

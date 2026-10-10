@@ -102,7 +102,7 @@ function isInvitedCreator(user) {
 function inviteeAffiliateDisclosure(inviterName, { inviterIsFounding = true } = {}) {
   if (!inviterIsFounding) return null;
   const who = inviterName || 'Your inviter';
-  return `If you upload your own music and your creator profile is verified, ${who} (a founding creator) earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for the first year after verification — taken from Tuneable's share, not yours.`;
+  return `If you upload your own music and your creator profile is verified, ${who} (a founding creator) earns ${AFFILIATE_SHARE_PERCENT}% of your paid tips for the first year after verification - taken from Tuneable's share, not yours ✨`;
 }
 
 /**

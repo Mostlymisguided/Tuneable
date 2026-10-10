@@ -890,15 +890,19 @@ async function sendInviteEmail(
           
           <p>Hi there,</p>
           
-          <p><strong>${inviterUsername}</strong> has invited you to join Tuneable as a creator — upload your music, claim your tracks, and receive 70% of paid tips.</p>
+          <p><strong>${inviterUsername}</strong> has invited you to join Tuneable as a creator — upload your music, podcasts and digital media, claim what's yours and receive paid tips*</p>
           ${affiliateLine ? `<p>${affiliateLine}</p>` : foundingLine}
 
           <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #1f2937;">What is Tuneable?</h3>
             <p style="color: #4b5563; margin-bottom: 0;">
-              Tuneable is a platform where fans tip on tunes. If you upload your own work, those tips can reach you. Use the invite code below when you sign up as a creator.
+              Tuneable is a platform where fans tip on tunes, podcasts and other digital media. If you upload your own work, those tips can reach you. Use the invite code below when you sign up as a creator.
             </p>
           </div>
+
+          <p style="color: #6b7280; font-size: 14px;">
+            *Creators currently receive 70% of all paid tips with a commitment to increase this to 90% as the platform grows 🙏
+          </p>
 
           <div style="margin: 30px 0; text-align: center;">
             <a href="${inviteLink}"
