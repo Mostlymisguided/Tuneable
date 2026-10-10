@@ -3,6 +3,7 @@ const router = express.Router();
 const Collective = require('../models/Collective');
 const User = require('../models/User');
 const Media = require('../models/Media');
+const Notification = require('../models/Notification');
 const Bid = require('../models/Bid');
 const TuneBytesTransaction = require('../models/TuneBytesTransaction');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -298,11 +299,42 @@ router.get('/:slug/team', authMiddleware, async (req, res) => {
       };
     });
 
+    const pendingUsers = await User.find({
+      'pendingCollectiveInvites.collectiveId': collective._id,
+      deletedAt: null,
+    }).select('username profilePic email uuid pendingCollectiveInvites');
+
+    const activeIds = new Set(team.map((member) => String(member._id)));
+    const invited = pendingUsers.flatMap((person) => {
+      if (activeIds.has(person._id.toString())) return [];
+      const pending = (person.pendingCollectiveInvites || []).find(
+        (invite) => invite.collectiveId && invite.collectiveId.toString() === collective._id.toString()
+      );
+      if (!pending) return [];
+      return [{
+        userId: {
+          _id: person._id,
+          uuid: person.uuid,
+          username: person.username,
+          profilePic: person.profilePic,
+        },
+        username: person.username,
+        profilePic: person.profilePic,
+        email: person.email,
+        role: pending.role,
+        membershipStatus: 'invited',
+        joinedAt: pending.invitedAt,
+        instrument: pending.instrument,
+        _id: person._id,
+      }];
+    });
+
     res.json({
-      team,
+      team: team.concat(invited),
       founders: team.filter((member) => member.role === 'founder'),
       admins: team.filter((member) => member.role === 'admin'),
       members: team.filter((member) => member.role === 'member'),
+      invited,
     });
   } catch (error) {
     console.error('Error fetching collective team:', error);
@@ -310,7 +342,90 @@ router.get('/:slug/team', authMiddleware, async (req, res) => {
   }
 });
 
-// Invite admin to collective (founders and admins)
+function pendingCollectiveInvite(user, collectiveId) {
+  return (user?.pendingCollectiveInvites || []).find(
+    (invite) => invite.collectiveId && invite.collectiveId.toString() === collectiveId.toString()
+  );
+}
+
+function dropPendingCollectiveInvite(user, collectiveId) {
+  user.pendingCollectiveInvites = (user.pendingCollectiveInvites || []).filter(
+    (invite) => !invite.collectiveId || invite.collectiveId.toString() !== collectiveId.toString()
+  );
+}
+
+async function clearCollectiveInviteNotifications(userId, collectiveId) {
+  await Notification.deleteMany({
+    userId,
+    type: 'collective_invite',
+    relatedCollectiveId: collectiveId,
+  });
+}
+
+async function queueCollectiveInvite({ collective, targetUser, role, instrument, inviterId }) {
+  if (!['admin', 'member'].includes(role)) {
+    const error = new Error('Invalid role. Must be member or admin');
+    error.status = 400;
+    throw error;
+  }
+  if (collective.isMember(targetUser._id)) {
+    const error = new Error('This person is already in the collective. Change their role from the roster.');
+    error.status = 400;
+    throw error;
+  }
+  if (pendingCollectiveInvite(targetUser, collective._id)) {
+    const error = new Error('This person already has a pending invitation.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (!targetUser.pendingCollectiveInvites) targetUser.pendingCollectiveInvites = [];
+  targetUser.pendingCollectiveInvites.push({
+    collectiveId: collective._id,
+    role,
+    instrument: instrument || undefined,
+    invitedAt: new Date(),
+    invitedBy: inviterId,
+  });
+  await targetUser.save();
+
+  const inviter = await User.findById(inviterId).select('username');
+  const inviterName = inviter?.username || 'Someone';
+  const rolePhrase = role === 'admin' ? 'an admin' : 'a member';
+  const instrumentNote = instrument ? ` (${instrument})` : '';
+
+  try {
+    await createNotification({
+      userId: targetUser._id,
+      type: 'collective_invite',
+      title: 'Collective Invitation',
+      message: `${inviterName} invited you to join "${collective.name}" as ${rolePhrase}${instrumentNote}`,
+      link: '/dashboard',
+      linkText: 'Review invitation',
+      relatedUserId: inviterId,
+      relatedCollectiveId: collective._id,
+      inviteType: role === 'admin' ? 'admin' : 'member',
+      inviteRole: role,
+    });
+  } catch (notifError) {
+    console.error('Error creating collective invite notification:', notifError);
+  }
+
+  try {
+    const { sendCollectiveInviteEmail } = require('../utils/emailService');
+    await sendCollectiveInviteEmail({
+      to: targetUser.email,
+      recipientName: targetUser.username,
+      inviterName,
+      collectiveName: collective.name,
+      rolePhrase,
+    });
+  } catch (emailError) {
+    console.error('Error sending collective invite email:', emailError);
+  }
+}
+
+// Invite admin to collective (founders and admins). They join after they accept.
 router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
   try {
     const { slug } = req.params;
@@ -344,40 +459,19 @@ router.post('/:slug/invite-admin', authMiddleware, async (req, res) => {
     if (await isBlockedBetween(inviterId, targetUser._id)) {
       return res.status(403).json({ error: 'You cannot invite this user', code: 'USER_BLOCKED' });
     }
+
+    await queueCollectiveInvite({
+      collective,
+      targetUser,
+      role: 'admin',
+      inviterId,
+    });
     
-    // Check if user is already a member
-    if (collective.isMember(targetUser._id)) {
-      const existingMember = collective.members.find(
-        m => m.userId.toString() === targetUser._id.toString() && !m.leftAt
-      );
-      if (existingMember && (existingMember.role === 'admin' || existingMember.role === 'founder')) {
-        return res.status(400).json({ error: 'User is already an admin or founder of this collective' });
-      }
-    }
-    
-    // Add as admin
-    await collective.addMember(targetUser._id, 'admin', inviterId);
-    
-    // Create notification for the invited user
-    try {
-      const inviter = await User.findById(inviterId).select('username');
-      await createNotification({
-        userId: targetUser._id,
-        type: 'collective_invite',
-        title: 'Collective Invitation',
-        message: `${inviter?.username || 'Someone'} invited you to join "${collective.name}" as an admin`,
-        link: `/collective/${collective.slug}`,
-        linkText: 'View Collective',
-        relatedUserId: inviterId,
-        relatedCollectiveId: collective._id
-      });
-    } catch (notifError) {
-      console.error('Error creating collective invite notification:', notifError);
-      // Don't fail the request if notification fails
-    }
-    
-    res.json({ success: true, message: 'Admin invited successfully' });
+    res.json({ success: true, message: 'Invitation sent. They will join after they accept.' });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error inviting admin:', error);
     res.status(500).json({ error: 'Failed to invite admin', details: error.message });
   }
@@ -421,45 +515,137 @@ router.post('/:slug/invite-member', authMiddleware, async (req, res) => {
     if (await isBlockedBetween(inviterId, targetUser._id)) {
       return res.status(403).json({ error: 'You cannot invite this user', code: 'USER_BLOCKED' });
     }
+
+    await queueCollectiveInvite({
+      collective,
+      targetUser,
+      role,
+      instrument: instrument || null,
+      inviterId,
+    });
     
-    // Check if user is already a member
-    if (collective.isMember(targetUser._id)) {
-      const existingMember = collective.members.find(
-        m => m.userId.toString() === targetUser._id.toString() && !m.leftAt
-      );
-      if (existingMember) {
-        if (existingMember.role === role) {
-          return res.status(400).json({ error: 'User is already a member with this role' });
-        }
-        // If they're already a member with a different role, we'll update it
-      }
-    }
-    
-    // Add member
-    await collective.addMember(targetUser._id, role, inviterId, instrument || null);
-    
-    // Create notification for the invited user
-    try {
-      const inviter = await User.findById(inviterId).select('username');
-      await createNotification({
-        userId: targetUser._id,
-        type: 'collective_invite',
-        title: 'Collective Invitation',
-        message: `${inviter?.username || 'Someone'} invited you to join "${collective.name}" as a ${role}${instrument ? ` (${instrument})` : ''}`,
-        link: `/collective/${collective.slug}`,
-        linkText: 'View Collective',
-        relatedUserId: inviterId,
-        relatedCollectiveId: collective._id
-      });
-    } catch (notifError) {
-      console.error('Error creating collective invite notification:', notifError);
-      // Don't fail the request if notification fails
-    }
-    
-    res.json({ success: true, message: 'Member invited successfully' });
+    res.json({ success: true, message: 'Invitation sent. They will join after they accept.' });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error inviting member:', error);
     res.status(500).json({ error: 'Failed to invite member', details: error.message });
+  }
+});
+
+// Pending collective invitations for the signed-in user.
+router.get('/me/invites', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .populate('pendingCollectiveInvites.collectiveId', 'name slug profilePicture isActive')
+      .populate('pendingCollectiveInvites.invitedBy', 'username');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const invites = (user.pendingCollectiveInvites || [])
+      .filter((invite) => invite.collectiveId && invite.collectiveId.isActive !== false)
+      .map((invite) => ({
+        id: invite._id,
+        role: invite.role,
+        instrument: invite.instrument || null,
+        invitedAt: invite.invitedAt,
+        collective: {
+          _id: invite.collectiveId._id,
+          name: invite.collectiveId.name,
+          slug: invite.collectiveId.slug,
+          profilePicture: invite.collectiveId.profilePicture || null,
+        },
+        invitedBy: invite.invitedBy ? {
+          _id: invite.invitedBy._id,
+          username: invite.invitedBy.username,
+        } : null,
+      }));
+
+    res.json({ invites });
+  } catch (error) {
+    console.error('Error fetching collective invites:', error);
+    res.status(500).json({ error: 'Failed to fetch collective invites' });
+  }
+});
+
+router.post('/:slug/accept-invite', authMiddleware, async (req, res) => {
+  try {
+    const collective = await Collective.findBySlug(req.params.slug);
+    if (!collective) return res.status(404).json({ error: 'Collective not found' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const pending = pendingCollectiveInvite(user, collective._id);
+    if (!pending) {
+      return res.status(400).json({ error: 'No pending invitation found for this collective' });
+    }
+
+    if (!collective.isMember(user._id)) {
+      await collective.addMember(user._id, pending.role, pending.invitedBy, pending.instrument || null);
+      scheduleCollectiveRankingRefresh(collective._id);
+    }
+
+    dropPendingCollectiveInvite(user, collective._id);
+    await user.save();
+    await clearCollectiveInviteNotifications(user._id, collective._id);
+
+    res.json({ success: true, message: 'Invitation accepted' });
+  } catch (error) {
+    console.error('Error accepting collective invitation:', error);
+    res.status(500).json({ error: 'Failed to accept invitation' });
+  }
+});
+
+router.post('/:slug/decline-invite', authMiddleware, async (req, res) => {
+  try {
+    const collective = await Collective.findBySlug(req.params.slug);
+    if (!collective) return res.status(404).json({ error: 'Collective not found' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (!pendingCollectiveInvite(user, collective._id)) {
+      return res.status(400).json({ error: 'No pending invitation found for this collective' });
+    }
+
+    dropPendingCollectiveInvite(user, collective._id);
+    await user.save();
+    await clearCollectiveInviteNotifications(user._id, collective._id);
+
+    res.json({ success: true, message: 'Invitation declined' });
+  } catch (error) {
+    console.error('Error declining collective invitation:', error);
+    res.status(500).json({ error: 'Failed to decline invitation' });
+  }
+});
+
+router.delete('/:slug/invites/:userId', authMiddleware, async (req, res) => {
+  try {
+    const collective = await Collective.findBySlug(req.params.slug);
+    if (!collective) return res.status(404).json({ error: 'Collective not found' });
+
+    const isPlatformAdmin = req.user.role && req.user.role.includes('admin');
+    if (!isPlatformAdmin && !collective.isAdmin(req.user._id)) {
+      return res.status(403).json({ error: 'Only collective founders and admins can cancel invitations' });
+    }
+
+    const targetUser = await User.findById(req.params.userId);
+    if (!targetUser || !pendingCollectiveInvite(targetUser, collective._id)) {
+      return res.status(404).json({ error: 'No pending invitation found for this person' });
+    }
+
+    dropPendingCollectiveInvite(targetUser, collective._id);
+    await targetUser.save();
+    await clearCollectiveInviteNotifications(targetUser._id, collective._id);
+
+    res.json({ success: true, message: 'Invitation cancelled' });
+  } catch (error) {
+    console.error('Error cancelling collective invitation:', error);
+    res.status(500).json({ error: 'Failed to cancel invitation' });
   }
 });
 

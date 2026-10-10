@@ -14,6 +14,7 @@ export interface LabelTeamMember {
   profilePic?: string;
   email?: string;
   role: 'owner' | 'admin' | 'member' | string;
+  membershipStatus?: 'active' | 'invited';
   joinedAt?: string;
   addedBy?: {
     _id?: string;
@@ -28,6 +29,7 @@ interface LabelTeamTableProps {
   currentUserId?: string;
   currentUserRole?: 'owner' | 'admin' | 'member' | string;
   onRemove?: (memberId: string, memberRole: string) => void;
+  onCancelInvite?: (memberId: string) => void;
   onChangeRole?: (memberId: string, newRole: string) => void | Promise<void>;
   isRemoving?: boolean;
   context?: 'label' | 'collective';
@@ -140,6 +142,7 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
   currentUserId,
   currentUserRole,
   onRemove,
+  onCancelInvite,
   onChangeRole,
   isRemoving = false,
   context,
@@ -237,6 +240,18 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
               ));
             }
 
+            const isInvited = member.membershipStatus === 'invited';
+            if (isInvited) {
+              canChangeRole = false;
+              canRemove = false;
+            }
+            const canCancelInvite = Boolean(
+              isInvited &&
+              onCancelInvite &&
+              context === 'collective' &&
+              (canAssignFounder || currentUserRole === 'admin' || canManageRoles)
+            );
+
             const nextCycledRole = () => {
               if (isLabelContext) return member.role === 'owner' ? 'admin' : 'owner';
               if (member.role === 'founder') return 'admin';
@@ -263,18 +278,38 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <span
-                    title={context === 'collective' && isOnlyFounder ? 'A collective needs at least one founder' : undefined}
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${roleMeta.classes}`}
-                  >
-                    {roleMeta.label}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      title={context === 'collective' && isOnlyFounder ? 'A collective needs at least one founder' : undefined}
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${roleMeta.classes}`}
+                    >
+                      {roleMeta.label}
+                    </span>
+                    {isInvited && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-200 border border-amber-500/50">
+                        Invited
+                      </span>
+                    )}
+                  </div>
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-300">{formatDate(member.joinedAt)}</td>
+                <td className="px-4 py-4 text-sm text-gray-300" title={isInvited ? 'Invitation sent' : undefined}>
+                  {formatDate(member.joinedAt)}
+                </td>
                 {isEditable && (
                   <td className="px-4 py-4 text-right text-sm">
-                    {(canChangeRole || canRemove) && (
+                    {(canChangeRole || canRemove || canCancelInvite) && (
                       <div className="flex items-center justify-end gap-2">
+                        {canCancelInvite && (
+                          <button
+                            onClick={() => {
+                              if (onCancelInvite && memberId) onCancelInvite(memberId);
+                            }}
+                            className="text-xs text-amber-200 hover:text-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isRemoving}
+                          >
+                            Cancel invite
+                          </button>
+                        )}
                         {context === 'collective' && canChangeRole && memberId && !isOnlyFounder && (
                           <CollectiveRoleSelect
                             username={user.username || 'this person'}

@@ -121,12 +121,18 @@ const PlayerRenderer = () => {
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
   
   if (isLoading) {
     return <LoadingSpinner />;
   }
+
+  if (!user) {
+    const returnUrl = `${location.pathname}${location.search}`;
+    return <Navigate to={`/login?returnUrl=${encodeURIComponent(returnUrl)}`} replace />;
+  }
   
-  return user ? <>{children}</> : <Navigate to="/login" />;
+  return <>{children}</>;
 };
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {

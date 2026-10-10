@@ -149,7 +149,11 @@ const createNotification = async (params) => {
       createdAt: populated.createdAt,
       relatedMediaId: populated.relatedMediaId,
       relatedPartyId: populated.relatedPartyId,
-      relatedUserId: populated.relatedUserId
+      relatedUserId: populated.relatedUserId,
+      relatedLabelId: populated.relatedLabelId,
+      relatedCollectiveId: populated.relatedCollectiveId,
+      inviteType: populated.inviteType,
+      inviteRole: populated.inviteRole
     });
 
     // Update unread count

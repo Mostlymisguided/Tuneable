@@ -243,6 +243,23 @@ const CollectiveProfile: React.FC = () => {
     }
   };
 
+  const handleCancelInvite = async (memberId: string) => {
+    if (!slug || !memberId) return;
+    if (!window.confirm('Cancel this invitation? They will not be added to the collective.')) return;
+
+    try {
+      setIsRemoving(true);
+      await collectiveAPI.cancelInvite(slug, memberId);
+      toast.success('Invitation cancelled');
+      await fetchCollectiveTeam(slug);
+    } catch (error: any) {
+      console.error('Error cancelling invitation:', error);
+      toast.error(error.response?.data?.error || 'Failed to cancel invitation');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   // Handle changing a member's role
   const handleChangeRole = async (memberId: string, newRole: string) => {
     if (!slug || !memberId) return;
@@ -1330,7 +1347,7 @@ useEffect(() => {
                   <div>
                     <h2 className="text-2xl font-bold text-white">Collective Ownership</h2>
                     <p className="text-sm text-gray-300">
-                      Founders can set anyone to founder, admin, or member. Admins can switch people between admin and member. A collective keeps at least one founder.
+                      Founders can set anyone to founder, admin, or member. Admins can switch people between admin and member. Invited people stay pending until they accept. A collective keeps at least one founder.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1386,6 +1403,7 @@ useEffect(() => {
                     currentUserId={(currentUser as any)?._id || currentUser?.id || currentUser?.uuid}
                     currentUserRole={getCurrentUserRole()}
                     onRemove={handleRemoveMember}
+                    onCancelInvite={handleCancelInvite}
                     onChangeRole={handleChangeRole}
                     isRemoving={isRemoving}
                   />
@@ -1536,7 +1554,7 @@ const CollectiveInviteModal: React.FC<CollectiveInviteModalProps> = ({
         await collectiveAPI.inviteAdmin(collectiveSlug, data);
       }
       
-      toast.success(`${inviteType === 'admin' ? 'Admin' : 'Member'} invited successfully!`);
+      toast.success('Invitation sent. They will join after they accept.');
       onSuccess();
       handleClose();
     } catch (error: any) {

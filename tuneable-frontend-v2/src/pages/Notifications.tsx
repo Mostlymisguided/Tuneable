@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck, Trash2, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
-import { notificationAPI, labelAPI } from '../lib/api';
+import { notificationAPI, labelAPI, collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
 import { toast } from '../utils/toast';
@@ -200,27 +200,45 @@ const Notifications: React.FC = () => {
     return null;
   };
 
+  const getCollectiveSlug = (notification: Notification): string | null => {
+    const related = notification.relatedCollectiveId;
+    if (related && typeof related === 'object' && related.slug) return related.slug;
+    if (notification.link) {
+      const match = notification.link.match(/\/collective\/([^/?#]+)/);
+      if (match) return decodeURIComponent(match[1]);
+    }
+    return null;
+  };
+
+  const isCollectiveInvite = (notification: Notification) =>
+    notification.type === 'collective_invite' && !!notification.inviteType;
+
+  const isLabelInvite = (notification: Notification) =>
+    notification.type === 'label_invite' &&
+    (notification.inviteType === 'admin' || notification.inviteType === 'artist');
+
   // Handle accept invitation
   const handleAcceptInvite = async (e: React.MouseEvent, notification: Notification) => {
     e.stopPropagation();
-    if (!notification.inviteType) return;
-    
-    // Only handle 'admin' and 'artist' invites for labels
-    // 'member' invites are for collectives (not yet implemented in frontend)
-    if (notification.inviteType === 'member') {
-      toast.error('Collective member invitations are not yet supported');
-      return;
-    }
+    if (!isCollectiveInvite(notification) && !isLabelInvite(notification)) return;
     
     try {
       setProcessingInvite(notification._id);
-      const slug = getLabelSlug(notification);
-      if (!slug) {
-        toast.error('Unable to find label information');
-        return;
+      if (isCollectiveInvite(notification)) {
+        const slug = getCollectiveSlug(notification);
+        if (!slug) {
+          toast.error('Unable to find collective information');
+          return;
+        }
+        await collectiveAPI.acceptInvite(slug);
+      } else {
+        const slug = getLabelSlug(notification);
+        if (!slug) {
+          toast.error('Unable to find label information');
+          return;
+        }
+        await labelAPI.acceptInvite(slug, notification.inviteType as 'admin' | 'artist');
       }
-      
-      await labelAPI.acceptInvite(slug, notification.inviteType as 'admin' | 'artist');
       toast.success('Invitation accepted!');
       
       // Remove notification and update unread count
@@ -240,24 +258,25 @@ const Notifications: React.FC = () => {
   // Handle decline invitation
   const handleDeclineInvite = async (e: React.MouseEvent, notification: Notification) => {
     e.stopPropagation();
-    if (!notification.inviteType) return;
-    
-    // Only handle 'admin' and 'artist' invites for labels
-    // 'member' invites are for collectives (not yet implemented in frontend)
-    if (notification.inviteType === 'member') {
-      toast.error('Collective member invitations are not yet supported');
-      return;
-    }
+    if (!isCollectiveInvite(notification) && !isLabelInvite(notification)) return;
     
     try {
       setProcessingInvite(notification._id);
-      const slug = getLabelSlug(notification);
-      if (!slug) {
-        toast.error('Unable to find label information');
-        return;
+      if (isCollectiveInvite(notification)) {
+        const slug = getCollectiveSlug(notification);
+        if (!slug) {
+          toast.error('Unable to find collective information');
+          return;
+        }
+        await collectiveAPI.declineInvite(slug);
+      } else {
+        const slug = getLabelSlug(notification);
+        if (!slug) {
+          toast.error('Unable to find label information');
+          return;
+        }
+        await labelAPI.declineInvite(slug, notification.inviteType as 'admin' | 'artist');
       }
-      
-      await labelAPI.declineInvite(slug, notification.inviteType as 'admin' | 'artist');
       toast.success('Invitation declined');
       
       // Remove notification and update unread count
@@ -390,7 +409,7 @@ const Notifications: React.FC = () => {
                         <p className="text-sm text-gray-400 mt-1">
                           {notification.message}
                         </p>
-                        {notification.type === 'label_invite' && notification.inviteType && (
+                        {(isCollectiveInvite(notification) || isLabelInvite(notification)) && (
                           <div className="flex items-center gap-2 mt-3">
                             <button
                               onClick={(e) => handleAcceptInvite(e, notification)}

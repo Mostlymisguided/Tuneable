@@ -21,6 +21,7 @@ import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import EmailInviteModal from '../components/EmailInviteModal';
 import CreatorProfilePrompts from '../components/CreatorProfilePrompts';
 import UserProfilePrompts from '../components/UserProfilePrompts';
+import CollectiveInvitations from '../components/CollectiveInvitations';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
@@ -2717,8 +2718,9 @@ Join here: ${inviteLink}`.trim();
         </div>
       </div>
 
-      {/* User Profile Prompts - for all users */}
+      {/* Invitations sit above profile chores so a finished profile still shows them. */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <CollectiveInvitations />
         <UserProfilePrompts user={user} />
       </div>
 

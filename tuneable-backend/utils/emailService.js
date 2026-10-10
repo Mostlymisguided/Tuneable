@@ -1287,6 +1287,44 @@ async function sendRightsOutreachEmail({ to, subject, text, caseId }) {
   }
 }
 
+async function sendCollectiveInviteEmail({ to, recipientName, inviterName, collectiveName, rolePhrase }) {
+  if (!to) return false;
+  const he = require('he');
+  const esc = (value) => he.encode(String(value || ''));
+  const reviewUrl = `${FRONTEND_URL}/dashboard`;
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `${inviterName} invited you to ${collectiveName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #9333ea;">You've been invited to a collective</h2>
+          <p>Hi ${esc(recipientName) || 'there'},</p>
+          <p><strong>${esc(inviterName)}</strong> invited you to join <strong>${esc(collectiveName)}</strong> as ${esc(rolePhrase)}.</p>
+          <p>Nothing is added until you accept. Open your dashboard and choose Accept or Decline.</p>
+          <div style="margin: 30px 0; text-align: center;">
+            <a href="${reviewUrl}"
+               style="background: #9333ea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+              Review invitation
+            </a>
+          </div>
+          ${await getUnsubscribeFooter(to)}
+        </div>
+      `,
+    });
+    if (error) {
+      console.error('Error sending collective invite email:', error);
+      return false;
+    }
+    console.log('Collective invite email sent:', data?.id, 'to', to);
+    return true;
+  } catch (error) {
+    console.error('Error sending collective invite email:', error.message);
+    return false;
+  }
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -1308,4 +1346,5 @@ module.exports = {
   sendPayoutCompletedNotification,
   sendPayoutRejectedNotification,
   sendRightsOutreachEmail,
+  sendCollectiveInviteEmail,
 };

@@ -323,6 +323,15 @@ const userSchema = new mongoose.Schema({
     invitedAt: { type: Date, default: Date.now },
     invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   }],
+
+  // Pending collective invitations. Membership starts when the person accepts.
+  pendingCollectiveInvites: [{
+    collectiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Collective', required: true },
+    role: { type: String, enum: ['admin', 'member'], required: true },
+    instrument: { type: String },
+    invitedAt: { type: Date, default: Date.now },
+    invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }],
   
   // Party affiliations - track which parties user has joined
   joinedParties: [{
@@ -609,6 +618,7 @@ userSchema.virtual('primaryInviteCode').get(function() {
 // Indexes
 // Index for invite code lookups
 userSchema.index({ 'personalInviteCodes.code': 1 });
+userSchema.index({ 'pendingCollectiveInvites.collectiveId': 1 });
 userSchema.index({ 'playbackQueue.mediaId': 1 });
 userSchema.index({ blockedUsers: 1 });
 // Note: personalInviteCode already has unique: true which creates an index automatically

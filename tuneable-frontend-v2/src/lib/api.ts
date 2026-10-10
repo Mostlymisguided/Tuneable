@@ -2477,9 +2477,29 @@ export const collectiveAPI = {
     return response.data;
   },
 
-  // Invite member to collective (founders and admins)
+  // Invite member to collective (founders and admins). They join after they accept.
   inviteMember: async (slug: string, data: { userId?: string; email?: string; role?: 'member' | 'admin'; instrument?: string }) => {
     const response = await api.post(`/collectives/${slug}/invite-member`, data);
+    return response.data;
+  },
+
+  getMyInvites: async () => {
+    const response = await api.get('/collectives/me/invites');
+    return response.data;
+  },
+
+  acceptInvite: async (slug: string) => {
+    const response = await api.post(`/collectives/${slug}/accept-invite`);
+    return response.data;
+  },
+
+  declineInvite: async (slug: string) => {
+    const response = await api.post(`/collectives/${slug}/decline-invite`);
+    return response.data;
+  },
+
+  cancelInvite: async (slug: string, userId: string) => {
+    const response = await api.delete(`/collectives/${slug}/invites/${userId}`);
     return response.data;
   },
 
