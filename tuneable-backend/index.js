@@ -114,6 +114,12 @@ db.connectDB()
         });
     });
 
+    try {
+      require('./services/metadataEnrichmentService').kickProcessQueue();
+    } catch (error) {
+      console.error('Failed to resume metadata enrichment queue:', error);
+    }
+
     // Optional ongoing tags + location drip (ENRICHMENT_DRIP_ENABLED=true)
     try {
       const { startEnrichmentDripCron } = require('./services/enrichmentDripService');
