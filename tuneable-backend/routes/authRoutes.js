@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
+const { resolveOAuthCallbackURL } = require('../utils/oauthCallbackUrl');
 
 const router = express.Router();
 const SECRET_KEY = require('../config/jwtSecret').getJwtSecret();
@@ -381,7 +382,7 @@ console.log('GOOGLE_CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
 console.log('GOOGLE_CLIENT_ID length:', process.env.GOOGLE_CLIENT_ID?.length || 0);
 console.log('GOOGLE_CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
 console.log('GOOGLE_CLIENT_SECRET length:', process.env.GOOGLE_CLIENT_SECRET?.length || 0);
-console.log('GOOGLE_CALLBACK_URL:', process.env.GOOGLE_CALLBACK_URL || 'not set (using default)');
+console.log('Google callback URL:', resolveOAuthCallbackURL('google'));
 console.log('NODE_ENV:', process.env.NODE_ENV);
 
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
@@ -834,7 +835,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
 if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   router.get('/instagram', async (req, res, next) => {
     console.log('📸 Instagram OAuth initiation');
-    console.log('📦 Callback URL:', process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback");
+    console.log('📦 Callback URL:', resolveOAuthCallbackURL('instagram'));
     
     // Store invite code in session if provided
     if (req.query.invite) {

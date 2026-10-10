@@ -17,11 +17,17 @@ SESSION_SECRET=your-session-secret-key-here
 FRONTEND_URL=http://localhost:5173
 ```
 
-For production on Render, use:
+For production (set in the Render dashboard), use:
 ```env
-GOOGLE_CALLBACK_URL=https://tuneable.onrender.com/api/auth/google/callback
-FRONTEND_URL=https://your-frontend-domain.com
+GOOGLE_CALLBACK_URL=https://tuneable.stream/api/auth/google/callback
+FRONTEND_URL=https://tuneable.stream
 ```
+
+The callback must be on the same host where OAuth starts. The frontend starts OAuth at
+`https://tuneable.stream/api/auth/google` (Cloudflare proxies `/api/*` to Render), and the
+OAuth state is stored in a host-scoped session cookie. A callback on `tuneable.onrender.com`
+won't receive that cookie and fails with `oauth_state_mismatch`. The same rule applies to
+Facebook, SoundCloud, Spotify and Instagram.
 
 ## Google Cloud Console Setup
 
@@ -58,10 +64,10 @@ FRONTEND_URL=https://your-frontend-domain.com
    - **Name**: Tuneable OAuth Client (or your preferred name)
    - **Authorized JavaScript origins**:
      - `http://localhost:8000` (for local development)
-     - `https://tuneable.onrender.com` (for production)
+     - `https://tuneable.stream` (for production)
    - **Authorized redirect URIs**:
      - `http://localhost:8000/api/auth/google/callback` (for local development)
-     - `https://tuneable.onrender.com/api/auth/google/callback` (for production)
+     - `https://tuneable.stream/api/auth/google/callback` (for production)
 
 8. Save and copy your credentials:
    - **Client ID** → Use as `GOOGLE_CLIENT_ID`
@@ -94,7 +100,7 @@ Our implementation requests the following Google permissions:
 
 **Error: "redirect_uri_mismatch"**
 - Verify the callback URL in Google Cloud Console matches exactly:
-  - Production: `https://tuneable.onrender.com/api/auth/google/callback`
+  - Production: `https://tuneable.stream/api/auth/google/callback`
   - Development: `http://localhost:8000/api/auth/google/callback`
 - Make sure there are no trailing slashes or typos
 - The URL must match exactly, including the protocol (http vs https)

@@ -7,6 +7,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
+const { getOAuthCallbackURL } = require('../utils/oauthCallbackUrl');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
 
 const SECRET_KEY = require('./jwtSecret').getJwtSecret();
@@ -19,27 +20,9 @@ function applyGoogleOAuthTokens(user, accessToken, refreshToken, youtubeImport) 
   user.oauthVerified.google = true;
   if (youtubeImport) user.oauthVerified.youtube = true;
 }
-function resolveOAuthCallbackURL(envKey, provider) {
-  if (process.env[envKey]) return process.env[envKey];
-  // Prefer FRONTEND_URL in production so callbacks stay on tuneable.stream (CF proxy),
-  // not the Render origin — matching Spotify's same-host requirement.
-  const frontend = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
-  if (frontend && !/localhost|127\.0\.0\.1/.test(frontend)) {
-    return `${frontend}/api/auth/${provider}/callback`;
-  }
-  return `http://localhost:8000/api/auth/${provider}/callback`;
-}
-
 // Facebook OAuth Strategy - only configure if environment variables are available
 if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
-  const facebookCallbackURL = resolveOAuthCallbackURL('FACEBOOK_CALLBACK_URL', 'facebook');
-  console.log('Facebook OAuth callbackURL:', facebookCallbackURL);
-  if (/onrender\.com/i.test(facebookCallbackURL) && /tuneable\.stream/i.test(process.env.FRONTEND_URL || '')) {
-    console.warn(
-      '⚠️  FACEBOOK_CALLBACK_URL points at onrender.com while FRONTEND_URL is tuneable.stream. ' +
-      'OAuth start and callback hosts differ — set FACEBOOK_CALLBACK_URL=https://tuneable.stream/api/auth/facebook/callback'
-    );
-  }
+  const facebookCallbackURL = getOAuthCallbackURL('facebook');
   passport.use(new FacebookStrategy({
       clientID: process.env.FACEBOOK_APP_ID,
       clientSecret: process.env.FACEBOOK_APP_SECRET,
@@ -297,8 +280,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
 
 // Google OAuth Strategy - only configure if environment variables are available
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  const googleCallbackURL = resolveOAuthCallbackURL('GOOGLE_CALLBACK_URL', 'google');
-  console.log('Google OAuth callbackURL:', googleCallbackURL);
+  const googleCallbackURL = getOAuthCallbackURL('google');
   passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -583,7 +565,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
       tokenURL: 'https://secure.soundcloud.com/oauth/token',
       clientID: process.env.SOUNDCLOUD_CLIENT_ID,
       clientSecret: process.env.SOUNDCLOUD_CLIENT_SECRET,
-      callbackURL: process.env.SOUNDCLOUD_CALLBACK_URL || "http://localhost:8000/api/auth/soundcloud/callback",
+      callbackURL: getOAuthCallbackURL('soundcloud'),
       passReqToCallback: true,
       state: true,
       pkce: true,
@@ -978,7 +960,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
   passport.use(new InstagramStrategy({
       clientID: process.env.INSTAGRAM_CLIENT_ID,
       clientSecret: process.env.INSTAGRAM_CLIENT_SECRET,
-      callbackURL: process.env.INSTAGRAM_CALLBACK_URL || "http://localhost:8000/api/auth/instagram/callback",
+      callbackURL: getOAuthCallbackURL('instagram'),
       passReqToCallback: true  // Enable passing req to callback for session access
     },
     async (req, accessToken, refreshToken, profile, done) => {
@@ -1198,7 +1180,7 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
   passport.use(new SpotifyStrategy({
       clientID: process.env.SPOTIFY_CLIENT_ID,
       clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-      callbackURL: process.env.SPOTIFY_CALLBACK_URL || 'http://localhost:8000/api/auth/spotify/callback',
+      callbackURL: getOAuthCallbackURL('spotify'),
       passReqToCallback: true
     },
     async (req, accessToken, refreshToken, expires_in, profile, done) => {
