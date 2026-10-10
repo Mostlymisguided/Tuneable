@@ -88,7 +88,17 @@ const About: React.FC = () => {
             <span className="mt-3 block text-pink-300">Be a champion</span>
             <span className="mt-3 block">Own your taste</span>
           </h1>
-          <div className="mt-12 flex flex-col justify-center gap-4 sm:flex-row">
+          <div className="mt-10 flex justify-center">
+            <a
+              href="/whitepaper.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border-2 border-white px-8 py-3 text-center text-lg font-semibold text-white transition-colors hover:bg-white hover:text-gray-900"
+            >
+              Whitepaper
+            </a>
+          </div>
+          <div className="mt-4 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               to="/party/global?period=all-time"
               className="rounded-lg border-2 border-white px-8 py-3 text-center text-lg font-semibold text-white transition-colors hover:bg-white hover:text-gray-900"
