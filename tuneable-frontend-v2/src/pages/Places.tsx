@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import EntertainingLoader from '../components/EntertainingLoader';
-import { penceToPounds } from '../utils/currency';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import TagList from '../components/TagList';
