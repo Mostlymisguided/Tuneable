@@ -54,6 +54,7 @@ export type PlaceChartItem = {
   country?: string | null;
   countryCode?: string | null;
   supportPence: number;
+  tuneBytes?: number;
   mediaCount?: number;
   bidCount?: number;
 };
