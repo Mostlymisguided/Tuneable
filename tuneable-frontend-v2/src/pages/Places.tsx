@@ -25,6 +25,7 @@ type PlaceChartItem = {
   country?: string | null;
   countryCode?: string | null;
   supportPence: number;
+  tuneBytes?: number;
   mediaCount?: number;
   bidCount?: number;
 };
@@ -293,6 +294,7 @@ const Places: React.FC = () => {
               place.featureType === 'country'
                 ? 'Country'
                 : place.country || place.featureType || 'Place';
+            const tuneBytesValue = place.tuneBytes ?? 0;
             if (!path) return null;
             return (
               <li key={place.placeId}>
@@ -309,7 +311,7 @@ const Places: React.FC = () => {
                     <div className="text-xs text-purple-200/70 capitalize truncate">{subtitle}</div>
                   </div>
                   <div className="text-purple-200 font-semibold text-sm tabular-nums">
-                    {penceToPounds(place.supportPence || 0)}
+                    {formatTuneBytes(tuneBytesValue)} TB
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />
                 </Link>

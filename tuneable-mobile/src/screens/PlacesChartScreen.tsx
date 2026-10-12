@@ -16,7 +16,7 @@ import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { locationAPI, type PlaceChartItem } from '@/src/api/locations';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
-import { formatPoundsFromPence } from '@/src/lib/format';
+import { formatTuneBytes } from '@/src/lib/format';
 import {
   getCountryPickFromLocation,
   getPlaceProfileHref,
@@ -168,12 +168,14 @@ function PlaceChartRow({
       : [place.country].filter(Boolean).join(' · ') ||
         (place.featureType ? place.featureType : 'Place');
 
+  const tuneBytesValue = place.tuneBytes ?? 0;
+
   return (
     <Pressable
       onPress={onOpen}
       style={styles.row}
       accessibilityRole="button"
-      accessibilityLabel={`${place.name}, ${formatPoundsFromPence(place.supportPence)}`}>
+      accessibilityLabel={`${place.name}, ${formatTuneBytes(tuneBytesValue)} TuneBytes`}>
       <View style={styles.rankCircle}>
         <Text style={[styles.rank, rank >= 100 && styles.rankSmall]}>{rank}</Text>
       </View>
@@ -186,7 +188,7 @@ function PlaceChartRow({
         </Text>
       </View>
       <View style={styles.right}>
-        <Text style={styles.tips}>{formatPoundsFromPence(place.supportPence)}</Text>
+        <Text style={styles.tuneBytes}>{formatTuneBytes(tuneBytesValue)} TB</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </View>
     </Pressable>
@@ -260,7 +262,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  tips: {
+  tuneBytes: {
     color: colors.accentLight,
     fontWeight: '700',
     fontSize: 13,
