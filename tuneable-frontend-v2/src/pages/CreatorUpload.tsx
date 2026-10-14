@@ -165,6 +165,21 @@ const CreatorUpload: React.FC = () => {
   const isAdmin = user && (user as any).role?.includes('admin');
   const isPermittedUpload = Boolean(isAdmin) && adminRightsMode === 'permitted';
   const permissionComplete = permission.fromName.trim().length > 0 && permission.note.trim().length >= 10;
+  const uploadBlockers: string[] = [];
+  if (!file) uploadBlockers.push('Choose an audio file');
+  if (!formData.title.trim()) uploadBlockers.push('Enter a track title');
+  if (isPermittedUpload && !permission.fromName.trim()) {
+    uploadBlockers.push('Add who gave permission');
+  }
+  if (isPermittedUpload && permission.note.trim().length < 10) {
+    uploadBlockers.push(
+      permission.note.trim()
+        ? 'Add a bit more detail on how and when they gave permission (at least 10 characters)'
+        : 'Describe how and when they gave permission',
+    );
+  }
+  if (!rightsConfirmed) uploadBlockers.push('Confirm you have the rights to upload this audio');
+  const canSubmitUpload = !isUploading && uploadBlockers.length === 0;
   const isCreator = user && (user as any).role?.includes('creator');
 
   useEffect(() => {
@@ -709,7 +724,19 @@ const CreatorUpload: React.FC = () => {
 
   return (
     <div className="min-h-screen py-8 px-4">
+      {uploadProgress.phase !== 'idle' && (
+        <div className="fixed top-12 sm:top-16 inset-x-0 z-40 px-4 pt-3">
+          <div className="max-w-3xl mx-auto">
+            <UploadProgress
+              progress={uploadProgress}
+              fileName={file?.name}
+              onCancel={uploadProgress.cancel}
+            />
+          </div>
+        </div>
+      )}
       <div className="max-w-3xl mx-auto">
+        {uploadProgress.phase !== 'idle' && <div className="h-28" aria-hidden />}
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Upload Your Music</h1>
@@ -744,19 +771,37 @@ const CreatorUpload: React.FC = () => {
             </label>
             
             <div
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all ${
-                file
-                  ? 'border-green-500/50 bg-green-900/10'
-                  : 'border-purple-500/30 bg-purple-900/10 hover:border-purple-500/50 hover:bg-purple-900/20'
+              onClick={() => {
+                if (!isUploading) fileInputRef.current?.click();
+              }}
+              className={`border-2 border-dashed rounded-lg p-12 text-center transition-all ${
+                isUploading
+                  ? 'border-purple-500/50 bg-purple-900/10 cursor-default'
+                  : file
+                    ? 'border-purple-400/40 bg-purple-900/10 cursor-pointer'
+                    : 'border-purple-500/30 bg-purple-900/10 hover:border-purple-500/50 hover:bg-purple-900/20 cursor-pointer'
               }`}
             >
-              {file ? (
+              {isUploading ? (
                 <div>
-                  <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
+                  <Loader2 className="h-12 w-12 text-purple-300 mx-auto mb-3 animate-spin" />
+                  <p className="text-white font-semibold mb-1">Uploading {file?.name}</p>
+                  <p className="text-gray-400 text-sm">
+                    {uploadProgress.phase === 'processing'
+                      ? 'File sent. Saving your track…'
+                      : `${uploadProgress.percent}% sent — keep this page open`}
+                  </p>
+                </div>
+              ) : file ? (
+                <div>
+                  <Music className="h-12 w-12 text-purple-300 mx-auto mb-3" />
+                  <p className="text-purple-200 text-sm font-medium mb-2">Selected — not uploaded yet</p>
                   <p className="text-white font-semibold mb-1">{file.name}</p>
                   <p className="text-gray-400 text-sm">
                     {(file.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                  <p className="text-gray-400 text-sm mt-2">
+                    This file stays on your device until you press Upload Track.
                   </p>
                   <button
                     type="button"
@@ -1687,8 +1732,24 @@ const CreatorUpload: React.FC = () => {
             className="mt-8"
           />
 
+          {!isUploading && uploadBlockers.length > 0 && (
+            <div
+              className="mt-6 rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3"
+              role="status"
+            >
+              <p className="text-sm text-amber-100 font-medium mb-2">
+                To upload this track, still needed:
+              </p>
+              <ul className="text-sm text-amber-100/90 space-y-1">
+                {uploadBlockers.map((item) => (
+                  <li key={item}>• {item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Action Buttons */}
-          <div className="flex space-x-4 mt-8">
+          <div className={`flex space-x-4 ${!isUploading && uploadBlockers.length > 0 ? 'mt-4' : 'mt-8'}`}>
             <button
               onClick={() => navigate('/dashboard')}
               disabled={isUploading}
@@ -1698,7 +1759,7 @@ const CreatorUpload: React.FC = () => {
             </button>
             <button
               onClick={handleUpload}
-              disabled={isUploading || !file || !formData.title.trim() || !rightsConfirmed || (isPermittedUpload && !permissionComplete)}
+              disabled={!canSubmitUpload}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center space-x-2"
             >
               {isUploading ? (

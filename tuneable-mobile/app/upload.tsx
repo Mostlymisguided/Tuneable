@@ -55,10 +55,15 @@ export default function UploadScreen() {
 
   const allowed = canUploadMedia(user);
 
-  const canSubmit = useMemo(() => {
-    if (!file || !rightsConfirmed || uploading) return false;
-    return title.trim().length > 0;
-  }, [file, rightsConfirmed, uploading, title]);
+  const missingSteps = useMemo(() => {
+    const steps: string[] = [];
+    if (!file) steps.push('Choose an audio file');
+    if (!title.trim()) steps.push('Enter a track title');
+    if (!rightsConfirmed) steps.push('Confirm you have the rights to upload this audio');
+    return steps;
+  }, [file, title, rightsConfirmed]);
+
+  const canSubmit = missingSteps.length === 0 && !uploading;
 
   if (!authLoading && !isAuthenticated) {
     return <Redirect href="/login" />;
@@ -279,6 +284,17 @@ export default function UploadScreen() {
               />
             ) : null}
 
+            {!uploading && missingSteps.length > 0 ? (
+              <View style={styles.hintCard} accessibilityLiveRegion="polite">
+                <Text style={styles.hintTitle}>To upload, still needed</Text>
+                {missingSteps.map((step) => (
+                  <Text key={step} style={styles.hintItem}>
+                    • {step}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
             <Pressable
               style={[styles.submitBtn, !canSubmit && styles.submitDisabled]}
               disabled={!canSubmit}
@@ -441,6 +457,26 @@ const styles = StyleSheet.create({
     color: '#fca5a5',
     marginBottom: 12,
     fontSize: 13,
+  },
+  hintCard: {
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+  },
+  hintTitle: {
+    color: '#fcd34d',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  hintItem: {
+    color: '#fde68a',
+    fontSize: 13,
+    lineHeight: 19,
   },
   submitBtn: {
     backgroundColor: colors.accent,
