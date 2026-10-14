@@ -17,6 +17,7 @@ struct NowPlayingParams: Record {
 public class NowPlayingModule: Module {
   private var remoteCommandsReady = false
   private var artworkURLString: String?
+  private var artworkGeneration = 0
   private var currentMode = "music"
 
   public func definition() -> ModuleDefinition {
@@ -80,10 +81,9 @@ public class NowPlayingModule: Module {
       self?.emitCommand("pause")
       return .success
     }
-    center.togglePlayPauseCommand.addTarget { [weak self] _ in
-      self?.emitCommand("toggle")
-      return .success
-    }
+    // iOS delivers toggle together with play/pause. Handling both flips
+    // playback straight back to playing.
+    center.togglePlayPauseCommand.isEnabled = false
     center.nextTrackCommand.addTarget { [weak self] _ in
       self?.emitCommand("next")
       return .success
@@ -119,7 +119,7 @@ public class NowPlayingModule: Module {
     let isPodcast = mode == "podcast"
     center.playCommand.isEnabled = true
     center.pauseCommand.isEnabled = true
-    center.togglePlayPauseCommand.isEnabled = true
+    center.togglePlayPauseCommand.isEnabled = false
     center.changePlaybackPositionCommand.isEnabled = true
     center.nextTrackCommand.isEnabled = !isPodcast
     center.previousTrackCommand.isEnabled = !isPodcast
@@ -136,12 +136,15 @@ public class NowPlayingModule: Module {
   private func loadArtwork(from urlString: String) {
     guard urlString != artworkURLString, let url = URL(string: urlString) else { return }
     artworkURLString = urlString
+    artworkGeneration += 1
+    let generation = artworkGeneration
     Task {
       do {
         let (data, _) = try await URLSession.shared.data(from: url)
-        guard let image = UIImage(data: data) else { return }
+        guard generation == self.artworkGeneration, let image = UIImage(data: data) else { return }
         let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         await MainActor.run {
+          guard generation == self.artworkGeneration else { return }
           var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
           info[MPMediaItemPropertyArtwork] = artwork
           MPNowPlayingInfoCenter.default().nowPlayingInfo = info

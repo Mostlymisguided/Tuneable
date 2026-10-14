@@ -10,7 +10,7 @@ import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from '../utils/toast';
-import { clearMediaSession, updateMediaSession } from '../utils/mediaSession';
+import { claimMediaSession, clearMediaSession, updateMediaSession } from '../utils/mediaSession';
 
 /** Almost-complete circle, arrow counter-clockwise, "15" inside (skip back 15s). */
 const SkipBack15Icon: React.FC<{ className?: string }> = ({ className }) => (
@@ -35,6 +35,9 @@ const PersistentPodcastPlayer: React.FC = () => {
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
+  const sessionToken = useRef(0);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
 
   const {
     currentEpisode,
@@ -195,8 +198,18 @@ const PersistentPodcastPlayer: React.FC = () => {
   const skipForward = () => handleSeek(Math.min(duration || 0, currentTime + 30));
 
   useEffect(() => {
+    sessionToken.current = claimMediaSession();
+    return () => clearMediaSession(sessionToken.current);
+  }, []);
+
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+    durationRef.current = duration;
+  }, [currentTime, duration]);
+
+  useEffect(() => {
     if (!currentEpisode) {
-      clearMediaSession();
+      clearMediaSession(sessionToken.current);
       return;
     }
     const coverArt =
@@ -210,33 +223,32 @@ const PersistentPodcastPlayer: React.FC = () => {
       artist,
       artwork: coverArt,
       duration,
-      position: currentTime,
+      position: currentTimeRef.current,
       playbackRate,
       playing: isPlaying,
       handlers: {
         play: () => {
-          if (!isPlaying) togglePlayPause();
+          const state = usePodcastPlayerStore.getState();
+          if (!state.isPlaying) state.play();
         },
         pause: () => {
-          if (isPlaying) togglePlayPause();
+          const state = usePodcastPlayerStore.getState();
+          if (state.isPlaying) state.pause();
         },
-        seekbackward: (offset) => handleSeek(Math.max(0, currentTime - offset)),
+        seekbackward: (offset) =>
+          handleSeek(Math.max(0, currentTimeRef.current - offset)),
         seekforward: (offset) =>
-          handleSeek(Math.min(duration || 0, currentTime + offset)),
+          handleSeek(Math.min(durationRef.current || 0, currentTimeRef.current + offset)),
         seekto: (time) => handleSeek(time),
         nexttrack: () => usePodcastPlayerStore.getState().next(),
       },
-    });
+    }, sessionToken.current);
   }, [
     currentEpisode,
     isPlaying,
-    currentTime,
     duration,
     playbackRate,
-    togglePlayPause,
   ]);
-
-  useEffect(() => () => clearMediaSession(), []);
 
   const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleSeek(parseFloat(e.target.value));

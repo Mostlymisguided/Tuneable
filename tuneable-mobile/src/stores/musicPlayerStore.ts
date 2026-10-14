@@ -9,7 +9,14 @@ import { getUploadUrl, isUploadPlayable, mediaId, getCreatorDisplay } from '@/sr
 import {
   clearNowPlaying,
   ensureNowPlayingRemoteHandlers,
+  bumpPlaybackSession,
+  claimPlaybackMode,
+  getActivePlaybackMode,
+  isPlaybackSession,
+  releasePlaybackOwner,
   setNowPlaying,
+  startPlaybackSession,
+  suppressRemoteCommands,
   updateNowPlayingElapsed,
 } from '@/src/lib/nowPlaying';
 import { showToast } from '@/src/stores/toastStore';
@@ -39,6 +46,10 @@ type MusicPlayerState = {
 
 let sound: Audio.Sound | null = null;
 let audioModeReady = false;
+/** User intent. Status callbacks must not flip this back to playing after pause. */
+let wantsPlay = false;
+/** Item the current sound was loaded for. Status must not publish a different track. */
+let loadedItem: ChartMediaItem | null = null;
 /** Guard against skip loops when many consecutive tracks fail to load. */
 let consecutiveLoadFailures = 0;
 let skipAfterFailureInFlight = false;
@@ -100,6 +111,7 @@ async function skipAfterFailure(reason: string) {
 
     if (exhausted) {
       consecutiveLoadFailures = 0;
+      wantsPlay = false;
       if (noAudio || queue.length === 0) {
         showToast(MUSIC_NO_PLAYABLE);
       }
@@ -116,25 +128,39 @@ async function skipAfterFailure(reason: string) {
   }
 }
 
-function onStatus(status: AVPlaybackStatus) {
+function onStatus(session: number, status: AVPlaybackStatus) {
+  if (!isPlaybackSession(session)) return;
   if (!status.isLoaded) {
-    if (status.error) {
+    if (status.error && wantsPlay) {
       void skipAfterFailure(status.error);
     }
     return;
   }
 
+  if (status.isPlaying && !wantsPlay) {
+    void sound?.pauseAsync().catch(() => {});
+    useMusicPlayerStore.setState({
+      isPlaying: false,
+      isLoading: false,
+      positionMs: status.positionMillis ?? 0,
+      durationMs: status.durationMillis ?? getStore().durationMs,
+    });
+    publishTransport(false, status.positionMillis ?? 0);
+    return;
+  }
+
+  const playing = wantsPlay && status.isPlaying;
   consecutiveLoadFailures = 0;
   skipNoticeShown = false;
   useMusicPlayerStore.setState({
-    isPlaying: status.isPlaying,
-    isLoading: status.isBuffering,
+    isPlaying: playing,
+    isLoading: wantsPlay ? status.isBuffering : false,
     positionMs: status.positionMillis ?? 0,
     durationMs: status.durationMillis ?? 0,
     error: null,
   });
 
-  const item = getStore().queue[getStore().currentIndex];
+  const item = loadedItem;
   if (item) {
     syncListeningHistory({
       mediaId: mediaId(item),
@@ -144,34 +170,60 @@ function onStatus(status: AVPlaybackStatus) {
       currentTime: (status.positionMillis ?? 0) / 1000,
       duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
       sourceType: 'direct',
-      isPlaying: status.isPlaying,
+      isPlaying: playing,
     });
     updateNowPlayingElapsed({
       positionMs: status.positionMillis ?? 0,
       durationMs: status.durationMillis ?? (item.duration ?? 0) * 1000,
       playbackRate: 1,
-      isPlaying: status.isPlaying,
+      isPlaying: playing,
+      mode: 'music',
     });
   }
 
-  if (status.didJustFinish && !status.isLooping) {
+  if (status.didJustFinish && !status.isLooping && wantsPlay) {
     completeListeningHistory();
     void getStore().next();
   }
 }
 
 async function unloadSound() {
-  if (!sound) return;
+  const current = sound;
+  sound = null;
+  if (!current) return;
   try {
-    sound.setOnPlaybackStatusUpdate(null);
-    await sound.unloadAsync();
+    current.setOnPlaybackStatusUpdate(null);
+  } catch {
+    // ignore
+  }
+  try {
+    await current.stopAsync();
+  } catch {
+    // ignore
+  }
+  try {
+    await current.unloadAsync();
   } catch {
     // ignore unload races
   }
-  sound = null;
 }
 
-async function loadAndPlay(item: ChartMediaItem) {
+function publishTransport(isPlaying: boolean, positionMs = 0) {
+  const item = loadedItem;
+  if (!item || getActivePlaybackMode() !== 'music') return;
+  updateNowPlayingElapsed({
+    positionMs,
+    durationMs: getStore().durationMs || (item.duration ?? 0) * 1000,
+    playbackRate: 1,
+    isPlaying,
+    mode: 'music',
+  });
+}
+
+async function loadAndPlay(item: ChartMediaItem, session = startPlaybackSession('music')) {
+  if (!isPlaybackSession(session)) return;
+  wantsPlay = true;
+  loadedItem = item;
   const uri = getUploadUrl(item);
   if (!uri) {
     await skipAfterFailure('No upload audio for this track');
@@ -181,9 +233,11 @@ async function loadAndPlay(item: ChartMediaItem) {
   endListeningHistorySession();
   await ensureAudioMode();
   await unloadSound();
+  if (!isPlaybackSession(session) || !wantsPlay) return;
 
   useMusicPlayerStore.setState({
     isLoading: true,
+    isPlaying: false,
     positionMs: 0,
     durationMs: (item.duration ?? 0) * 1000,
     error: null,
@@ -192,10 +246,21 @@ async function loadAndPlay(item: ChartMediaItem) {
   try {
     const created = await Audio.Sound.createAsync(
       { uri },
-      { shouldPlay: true, progressUpdateIntervalMillis: 500 },
-      onStatus
+      { shouldPlay: false, progressUpdateIntervalMillis: 500 },
+      (status) => onStatus(session, status)
     );
-    sound = created.sound;
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      try {
+        created.sound.setOnPlaybackStatusUpdate(null);
+        await created.sound.unloadAsync();
+      } catch {
+        // stale load
+      }
+      return;
+    }
+    const player = created.sound;
+    sound = player;
+    loadedItem = item;
     setNowPlaying({
       title: item.title,
       artist: getCreatorDisplay(item),
@@ -206,7 +271,12 @@ async function loadAndPlay(item: ChartMediaItem) {
       isPlaying: true,
       mode: 'music',
     });
+    await player.playAsync();
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      await player.pauseAsync().catch(() => {});
+    }
   } catch (err) {
+    if (!isPlaybackSession(session) || !wantsPlay) return;
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
   }
@@ -235,8 +305,11 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   error: null,
 
   setQueueAndPlay: async (items, startIndex = 0) => {
+    const session = bumpPlaybackSession();
     const { usePodcastPlayerStore } = await import('./podcastPlayerStore');
     await usePodcastPlayerStore.getState().clear();
+    if (!isPlaybackSession(session)) return;
+    claimPlaybackMode('music');
 
     if (!items.length) {
       set({ error: MUSIC_NO_PLAYABLE, queue: [], isPlaying: false });
@@ -278,26 +351,43 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
     consecutiveLoadFailures = 0;
     if (requestedPlayable) skipNoticeShown = false;
     set({ queue: playable, currentIndex: playIndex, error: null });
-    await loadAndPlay(playable[playIndex]);
+    await loadAndPlay(playable[playIndex], session);
   },
 
   play: async () => {
-    if (!sound) {
+    wantsPlay = true;
+    set({ isPlaying: true });
+    const player = sound;
+    if (!player) {
       const { queue, currentIndex } = get();
       const item = queue[currentIndex];
       if (item) await loadAndPlay(item);
+      else set({ isPlaying: false });
       return;
     }
-    await sound.playAsync();
+    await player.playAsync();
+    if (!wantsPlay) {
+      await player.pauseAsync().catch(() => {});
+      set({ isPlaying: false, isLoading: false });
+    }
   },
 
   pause: async () => {
-    if (!sound) return;
-    await sound.pauseAsync();
+    wantsPlay = false;
+    suppressRemoteCommands();
+    set({ isPlaying: false, isLoading: false });
+    if (sound) {
+      try {
+        await sound.pauseAsync();
+      } catch {
+        // already stopped
+      }
+    }
+    publishTransport(false, get().positionMs);
   },
 
   togglePlayPause: async () => {
-    if (get().isPlaying) {
+    if (wantsPlay) {
       await get().pause();
     } else {
       await get().play();
@@ -313,8 +403,9 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
       consecutiveLoadFailures = 0;
       return;
     }
+    const session = startPlaybackSession('music');
     set({ currentIndex: nextIndex });
-    await loadAndPlay(queue[nextIndex]);
+    await loadAndPlay(queue[nextIndex], session);
   },
 
   previous: async () => {
@@ -328,8 +419,9 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
       await get().seek(0);
       return;
     }
+    const session = startPlaybackSession('music');
     set({ currentIndex: prevIndex });
-    await loadAndPlay(queue[prevIndex]);
+    await loadAndPlay(queue[prevIndex], session);
   },
 
   seek: async (positionMs) => {
@@ -338,9 +430,14 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
   },
 
   clear: async () => {
+    wantsPlay = false;
+    loadedItem = null;
     endListeningHistorySession();
     await unloadSound();
-    clearNowPlaying();
+    if (getActivePlaybackMode() === 'music') {
+      clearNowPlaying();
+      releasePlaybackOwner('music');
+    }
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
     set({

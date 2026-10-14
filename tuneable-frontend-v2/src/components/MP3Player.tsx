@@ -22,7 +22,7 @@ import {
   getNativeDuration,
   seekNativeAudio,
 } from '../services/nativeAudioPlayer';
-import { clearMediaSession, updateMediaSession } from '../utils/mediaSession';
+import { claimMediaSession, clearMediaSession, updateMediaSession } from '../utils/mediaSession';
 
 interface PlayerMedia {
   id: string;
@@ -49,6 +49,9 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
+  const sessionToken = useRef(0);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -162,7 +165,13 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   }, [togglePlayPause, next, previous]);
 
   useEffect(() => {
+    sessionToken.current = claimMediaSession();
+    return () => clearMediaSession(sessionToken.current);
+  }, []);
+
+  useEffect(() => {
     if (!media) return;
+    let cancelled = false;
 
     const audioUrl = getAudioUrl(media);
     if (!audioUrl || !audioRef.current) return;
@@ -184,6 +193,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           : (media as any).artist?.[0]?.name || 'Unknown Artist';
 
         setNativeAudioEndedCallback(() => {
+          if (cancelled) return;
           markCompleted();
           if (currentPartyId && media?._id && isHost) {
             partyAPI.completeMedia(currentPartyId, media._id)
@@ -194,24 +204,37 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
           }
         });
 
+        const mediaKey = media._id || media.id;
         loadNativeTrack(fullUrl, {
           title: media.title,
           artist: artistName,
           artwork: media.coverArt,
         })
-          .then(async () => {
+          .then(async (loaded) => {
+            if (cancelled || !loaded) return;
+            const current = useWebPlayerStore.getState().currentMedia;
+            const currentKey = current?._id || current?.id;
+            if (!mediaKey || mediaKey !== currentKey) return;
             const dur = await getNativeDuration().catch(() => 0);
+            if (cancelled) return;
             setDuration(dur || media.duration || 0);
             setIsPlayerReady(true);
             setIsLoading(false);
           })
           .catch((error) => {
+            if (cancelled) return;
             console.error('MP3Player: Native audio init failed:', error);
             setIsLoading(false);
-            useWebPlayerStore.getState().next();
+            const current = useWebPlayerStore.getState().currentMedia;
+            const currentKey = current?._id || current?.id;
+            if (mediaKey && mediaKey === currentKey) {
+              useWebPlayerStore.getState().next();
+            }
           });
 
-        return;
+        return () => {
+          cancelled = true;
+        };
       }
 
       console.log('MP3Player: Setting audio source to:', fullUrl);
@@ -230,6 +253,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
       // Set up event listeners
       audioRef.current.onloadedmetadata = () => {
+        if (cancelled) return;
         console.log('MP3Player: Audio metadata loaded');
         if (audioRef.current && audioRef.current.duration) {
           const dur = audioRef.current.duration;
@@ -240,6 +264,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       };
 
         audioRef.current.onended = () => {
+          if (cancelled) return;
           console.log('MP3Player: Audio ended');
           markCompleted();
           
@@ -259,6 +284,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         };
 
       audioRef.current.onerror = () => {
+        if (cancelled) return;
         const mediaKey = media?._id || media?.id;
         const current = useWebPlayerStore.getState().currentMedia;
         const currentKey = current?._id || current?.id;
@@ -299,6 +325,9 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       audioRef.current.load();
       
       console.log('MP3Player: Audio player initialized successfully');
+      return () => {
+        cancelled = true;
+      };
     } catch (error) {
       console.error('MP3Player: Error initializing audio player:', error);
       setIsLoading(false);
@@ -441,8 +470,13 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   };
 
   useEffect(() => {
+    currentTimeRef.current = currentTime;
+    durationRef.current = duration;
+  }, [currentTime, duration]);
+
+  useEffect(() => {
     if (!media) {
-      clearMediaSession();
+      clearMediaSession(sessionToken.current);
       return;
     }
     const artistName =
@@ -452,35 +486,34 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       artist: artistName,
       artwork: media.coverArt,
       duration,
-      position: currentTime,
+      position: currentTimeRef.current,
       playbackRate: 1,
       playing: isPlaying,
       handlers: {
         play: () => {
-          if (!isPlaying) togglePlayPause();
+          const state = useWebPlayerStore.getState();
+          if (!state.isPlaying) state.play();
         },
         pause: () => {
-          if (isPlaying) togglePlayPause();
+          const state = useWebPlayerStore.getState();
+          if (state.isPlaying) state.pause();
         },
-        seekbackward: (offset) => handleSeek(Math.max(0, currentTime - offset)),
+        seekbackward: (offset) =>
+          handleSeek(Math.max(0, currentTimeRef.current - offset)),
         seekforward: (offset) =>
-          handleSeek(Math.min(duration || 0, currentTime + offset)),
+          handleSeek(Math.min(durationRef.current || 0, currentTimeRef.current + offset)),
         seekto: (time) => handleSeek(time),
         previoustrack: previous,
         nexttrack: next,
       },
-    });
+    }, sessionToken.current);
   }, [
     media,
     isPlaying,
-    currentTime,
     duration,
-    togglePlayPause,
     next,
     previous,
   ]);
-
-  useEffect(() => () => clearMediaSession(), []);
 
   const handleScrubberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTime = parseFloat(e.target.value);

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { requireAuthToPlay } from '../utils/playAuth';
+import { suppressMediaSessionPlay } from '../utils/mediaSession';
 
 /** Minimal episode shape for podcast player (from profile, chart, or search). */
 export interface PodcastPlayerEpisode {
@@ -82,7 +83,10 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
         if (!requireAuthToPlay()) return;
         set({ isPlaying: true });
       },
-      pause: () => set({ isPlaying: false }),
+      pause: () => {
+        suppressMediaSessionPlay();
+        set({ isPlaying: false });
+      },
       togglePlayPause: () => {
         const { isPlaying, play, pause } = get();
         if (isPlaying) {

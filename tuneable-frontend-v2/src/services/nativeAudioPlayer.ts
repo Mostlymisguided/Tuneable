@@ -13,6 +13,17 @@ type EndedCallback = () => void;
 
 let endedCallback: EndedCallback | null = null;
 let listenersRegistered = false;
+let requestId = 0;
+let chain: Promise<void> = Promise.resolve();
+
+function enqueue(task: () => Promise<void>): Promise<void> {
+  const run = chain.then(task, task);
+  chain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
 
 export function isNativeAudioPlatform(): boolean {
   return Capacitor.isNativePlatform();
@@ -36,42 +47,84 @@ export function setNativeAudioEndedCallback(cb: EndedCallback | null) {
 }
 
 export async function destroyNativeAudio(): Promise<void> {
-  try {
-    await AudioPlayer.destroy({ audioId: AUDIO_ID });
-  } catch {
-    // No active player
-  }
+  const id = ++requestId;
+  await enqueue(async () => {
+    if (id !== requestId) return;
+    try {
+      await AudioPlayer.destroy({ audioId: AUDIO_ID });
+    } catch {
+      // No active player
+    }
+  });
 }
 
-export async function loadNativeTrack(url: string, meta: NativeTrackMeta): Promise<void> {
+export async function loadNativeTrack(url: string, meta: NativeTrackMeta): Promise<boolean> {
   ensureListeners();
-  await destroyNativeAudio();
-
-  await AudioPlayer.create({
-    audioId: AUDIO_ID,
-    audioSource: url,
-    friendlyTitle: meta.title,
-    artistName: meta.artist,
-    albumTitle: 'Tuneable',
-    artworkSource: meta.artwork,
-    useForNotification: true,
-    showSeekBackward: true,
-    showSeekForward: true,
+  const id = ++requestId;
+  let loaded = false;
+  await enqueue(async () => {
+    if (id !== requestId) return;
+    try {
+      await AudioPlayer.destroy({ audioId: AUDIO_ID });
+    } catch {
+      // No active player
+    }
+    if (id !== requestId) return;
+    await AudioPlayer.create({
+      audioId: AUDIO_ID,
+      audioSource: url,
+      friendlyTitle: meta.title,
+      artistName: meta.artist,
+      albumTitle: 'Tuneable',
+      artworkSource: meta.artwork,
+      useForNotification: true,
+      showSeekBackward: true,
+      showSeekForward: true,
+    });
+    if (id !== requestId) {
+      try {
+        await AudioPlayer.destroy({ audioId: AUDIO_ID });
+      } catch {
+        // superseded
+      }
+      return;
+    }
+    await AudioPlayer.initialize({ audioId: AUDIO_ID });
+    if (id !== requestId) {
+      try {
+        await AudioPlayer.destroy({ audioId: AUDIO_ID });
+      } catch {
+        // superseded
+      }
+      return;
+    }
+    loaded = true;
   });
-
-  await AudioPlayer.initialize({ audioId: AUDIO_ID });
+  return loaded;
 }
 
 export async function playNativeAudio(): Promise<void> {
-  await AudioPlayer.play({ audioId: AUDIO_ID });
+  const id = requestId;
+  await enqueue(async () => {
+    if (id !== requestId) return;
+    await AudioPlayer.play({ audioId: AUDIO_ID });
+  });
 }
 
 export async function pauseNativeAudio(): Promise<void> {
-  await AudioPlayer.pause({ audioId: AUDIO_ID });
+  const id = requestId;
+  await enqueue(async () => {
+    if (id !== requestId) return;
+    await AudioPlayer.pause({ audioId: AUDIO_ID });
+  });
 }
 
 export async function seekNativeAudio(timeInSeconds: number): Promise<void> {
-  await AudioPlayer.seek({ audioId: AUDIO_ID, timeInSeconds });
+  const id = requestId;
+  await enqueue(async () => {
+    if (id !== requestId) return;
+    await AudioPlayer.seek({ audioId: AUDIO_ID, timeInSeconds });
+  });
 }
 
 export async function getNativeCurrentTime(): Promise<number> {

@@ -20,7 +20,14 @@ import {
 import {
   clearNowPlaying,
   ensureNowPlayingRemoteHandlers,
+  bumpPlaybackSession,
+  claimPlaybackMode,
+  getActivePlaybackMode,
+  isPlaybackSession,
+  releasePlaybackOwner,
   setNowPlaying,
+  startPlaybackSession,
+  suppressRemoteCommands,
   updateNowPlayingElapsed,
 } from '@/src/lib/nowPlaying';
 import { showToast } from '@/src/stores/toastStore';
@@ -55,6 +62,8 @@ type PodcastPlayerState = {
 
 let sound: Audio.Sound | null = null;
 let audioModeReady = false;
+let wantsPlay = false;
+let loadedItem: PodcastEpisode | null = null;
 let consecutiveLoadFailures = 0;
 let skipAfterFailureInFlight = false;
 let skipNoticeShown = false;
@@ -73,14 +82,36 @@ async function ensureAudioMode() {
 }
 
 async function unloadSound() {
-  if (!sound) return;
+  const current = sound;
+  sound = null;
+  if (!current) return;
   try {
-    sound.setOnPlaybackStatusUpdate(null);
-    await sound.unloadAsync();
+    current.setOnPlaybackStatusUpdate(null);
   } catch {
     // ignore
   }
-  sound = null;
+  try {
+    await current.stopAsync();
+  } catch {
+    // ignore
+  }
+  try {
+    await current.unloadAsync();
+  } catch {
+    // ignore
+  }
+}
+
+function publishTransport(isPlaying: boolean, positionMs = 0) {
+  const item = loadedItem;
+  if (!item || getActivePlaybackMode() !== 'podcast') return;
+  updateNowPlayingElapsed({
+    positionMs,
+    durationMs: getStore().durationMs || (item.duration ?? 0) * 1000,
+    playbackRate: getStore().playbackRate,
+    isPlaying,
+    mode: 'podcast',
+  });
 }
 
 function getStore(): PodcastPlayerState {
@@ -134,6 +165,7 @@ async function skipAfterFailure(reason: string) {
 
     if (exhausted) {
       consecutiveLoadFailures = 0;
+      wantsPlay = false;
       if (noAudio || queue.length === 0) {
         showToast(PODCAST_NO_PLAYABLE);
       }
@@ -150,25 +182,39 @@ async function skipAfterFailure(reason: string) {
   }
 }
 
-function onStatus(status: AVPlaybackStatus) {
+function onStatus(session: number, status: AVPlaybackStatus) {
+  if (!isPlaybackSession(session)) return;
   if (!status.isLoaded) {
-    if (status.error) {
+    if (status.error && wantsPlay) {
       void skipAfterFailure(status.error);
     }
     return;
   }
 
+  if (status.isPlaying && !wantsPlay) {
+    void sound?.pauseAsync().catch(() => {});
+    usePodcastPlayerStore.setState({
+      isPlaying: false,
+      isLoading: false,
+      positionMs: status.positionMillis ?? 0,
+      durationMs: status.durationMillis ?? getStore().durationMs,
+    });
+    publishTransport(false, status.positionMillis ?? 0);
+    return;
+  }
+
+  const playing = wantsPlay && status.isPlaying;
   consecutiveLoadFailures = 0;
   skipNoticeShown = false;
   usePodcastPlayerStore.setState({
-    isPlaying: status.isPlaying,
-    isLoading: status.isBuffering,
+    isPlaying: playing,
+    isLoading: wantsPlay ? status.isBuffering : false,
     positionMs: status.positionMillis ?? 0,
     durationMs: status.durationMillis ?? 0,
     error: null,
   });
 
-  const item = getStore().queue[getStore().currentIndex];
+  const item = loadedItem;
   if (item) {
     syncListeningHistory({
       mediaId: episodeId(item),
@@ -178,35 +224,41 @@ function onStatus(status: AVPlaybackStatus) {
       currentTime: (status.positionMillis ?? 0) / 1000,
       duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
       sourceType: 'direct',
-      isPlaying: status.isPlaying,
+      isPlaying: playing,
     });
     updateNowPlayingElapsed({
       positionMs: status.positionMillis ?? 0,
       durationMs: status.durationMillis ?? (item.duration ?? 0) * 1000,
       playbackRate: getStore().playbackRate,
-      isPlaying: status.isPlaying,
+      isPlaying: playing,
+      mode: 'podcast',
     });
   }
 
-  if (status.didJustFinish && !status.isLooping) {
+  if (status.didJustFinish && !status.isLooping && wantsPlay) {
     completeListeningHistory();
     void getStore().next();
   }
 }
 
-async function loadAndPlay(item: PodcastEpisode) {
+async function loadAndPlay(item: PodcastEpisode, session = startPlaybackSession('podcast')) {
+  if (!isPlaybackSession(session)) return;
+  wantsPlay = true;
+  loadedItem = item;
   const uri = getEpisodeAudioUrl(item);
   if (!uri) {
     await skipAfterFailure('No audio URL for this episode');
     return;
   }
 
-  await endListeningHistorySession();
+  endListeningHistorySession();
   await ensureAudioMode();
   await unloadSound();
+  if (!isPlaybackSession(session) || !wantsPlay) return;
 
   usePodcastPlayerStore.setState({
     isLoading: true,
+    isPlaying: false,
     positionMs: 0,
     durationMs: (item.duration ?? 0) * 1000,
     error: null,
@@ -216,15 +268,30 @@ async function loadAndPlay(item: PodcastEpisode) {
     const created = await Audio.Sound.createAsync(
       { uri },
       {
-        shouldPlay: true,
+        shouldPlay: false,
         progressUpdateIntervalMillis: 500,
         rate: getStore().playbackRate,
         shouldCorrectPitch: true,
       },
-      onStatus
+      (status) => onStatus(session, status)
     );
-    sound = created.sound;
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      try {
+        created.sound.setOnPlaybackStatusUpdate(null);
+        await created.sound.unloadAsync();
+      } catch {
+        // stale load
+      }
+      return;
+    }
+    const player = created.sound;
+    sound = player;
+    loadedItem = item;
     await applyPlaybackRate();
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      await unloadSound();
+      return;
+    }
     setNowPlaying({
       title: item.title,
       artist: seriesTitle(item),
@@ -235,7 +302,12 @@ async function loadAndPlay(item: PodcastEpisode) {
       isPlaying: true,
       mode: 'podcast',
     });
+    await player.playAsync();
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      await player.pauseAsync().catch(() => {});
+    }
   } catch (err) {
+    if (!isPlaybackSession(session) || !wantsPlay) return;
     const message = err instanceof Error ? err.message : 'Failed to load audio';
     await skipAfterFailure(message);
   }
@@ -265,8 +337,11 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
   error: null,
 
   setQueueAndPlay: async (items, startIndex = 0) => {
+    const session = bumpPlaybackSession();
     const { useMusicPlayerStore } = await import('./musicPlayerStore');
     await useMusicPlayerStore.getState().clear();
+    if (!isPlaybackSession(session)) return;
+    claimPlaybackMode('podcast');
 
     if (!items.length) {
       set({ error: PODCAST_NO_PLAYABLE, queue: [], isPlaying: false });
@@ -308,25 +383,42 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
     consecutiveLoadFailures = 0;
     if (requestedPlayable) skipNoticeShown = false;
     set({ queue: playable, currentIndex: playIndex, error: null });
-    await loadAndPlay(playable[playIndex]);
+    await loadAndPlay(playable[playIndex], session);
   },
 
   play: async () => {
-    if (!sound) {
+    wantsPlay = true;
+    set({ isPlaying: true });
+    const player = sound;
+    if (!player) {
       const item = get().queue[get().currentIndex];
       if (item) await loadAndPlay(item);
+      else set({ isPlaying: false });
       return;
     }
-    await sound.playAsync();
+    await player.playAsync();
+    if (!wantsPlay) {
+      await player.pauseAsync().catch(() => {});
+      set({ isPlaying: false, isLoading: false });
+    }
   },
 
   pause: async () => {
-    if (!sound) return;
-    await sound.pauseAsync();
+    wantsPlay = false;
+    suppressRemoteCommands();
+    set({ isPlaying: false, isLoading: false });
+    if (sound) {
+      try {
+        await sound.pauseAsync();
+      } catch {
+        // already stopped
+      }
+    }
+    publishTransport(false, get().positionMs);
   },
 
   togglePlayPause: async () => {
-    if (get().isPlaying) await get().pause();
+    if (wantsPlay) await get().pause();
     else await get().play();
   },
 
@@ -339,8 +431,9 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
       consecutiveLoadFailures = 0;
       return;
     }
+    const session = startPlaybackSession('podcast');
     set({ currentIndex: nextIndex });
-    await loadAndPlay(queue[nextIndex]);
+    await loadAndPlay(queue[nextIndex], session);
   },
 
   previous: async () => {
@@ -354,8 +447,9 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
       await get().seek(0);
       return;
     }
+    const session = startPlaybackSession('podcast');
     set({ currentIndex: prevIndex });
-    await loadAndPlay(queue[prevIndex]);
+    await loadAndPlay(queue[prevIndex], session);
   },
 
   seek: async (positionMs) => {
@@ -387,13 +481,19 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>((set, get) => ({
       durationMs,
       playbackRate: next,
       isPlaying,
+      mode: 'podcast',
     });
   },
 
   clear: async () => {
+    wantsPlay = false;
+    loadedItem = null;
     endListeningHistorySession();
     await unloadSound();
-    clearNowPlaying();
+    if (getActivePlaybackMode() === 'podcast') {
+      clearNowPlaying();
+      releasePlaybackOwner('podcast');
+    }
     consecutiveLoadFailures = 0;
     skipNoticeShown = false;
     set({

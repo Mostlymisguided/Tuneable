@@ -16,6 +16,7 @@ import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
+import { shownPlayback, usePlaybackOwner } from '@/src/lib/nowPlaying';
 import { episodeId, seriesTitle } from '@/src/lib/podcast';
 import {
   useCurrentTrack,
@@ -26,12 +27,14 @@ import {
   usePodcastPlayerStore,
 } from '@/src/stores/podcastPlayerStore';
 
-/** Shows music or podcast — podcast wins if both somehow set (shouldn't happen). */
+/** Shows whichever engine last started playback. */
 export function PlayerMiniBar() {
   const { user, updateBalance } = useAuth();
   const [tipOpen, setTipOpen] = useState(false);
   const episode = useCurrentEpisode();
   const track = useCurrentTrack();
+  const playbackMode = usePlaybackOwner((s) => s.mode);
+  const shown = shownPlayback(playbackMode, Boolean(episode), Boolean(track));
 
   const musicPlaying = useMusicPlayerStore((s) => s.isPlaying);
   const musicLoading = useMusicPlayerStore((s) => s.isLoading);
@@ -45,20 +48,22 @@ export function PlayerMiniBar() {
 
   const openNowPlaying = () => router.push('/now-playing');
 
-  const tipTitle = episode?.title || track?.title || 'Untitled';
-  const tipSubtitle = episode
-    ? seriesTitle(episode)
-    : track
-      ? getCreatorDisplay(track)
+  const tipEpisode = shown === 'podcast' ? episode : null;
+  const tipTrack = shown === 'music' ? track : null;
+  const tipTitle = tipEpisode?.title || tipTrack?.title || 'Untitled';
+  const tipSubtitle = tipEpisode
+    ? seriesTitle(tipEpisode)
+    : tipTrack
+      ? getCreatorDisplay(tipTrack)
       : undefined;
-  const tipMedia = episode ?? track ?? undefined;
+  const tipMedia = tipEpisode ?? tipTrack ?? undefined;
   const defaultTip = user?.preferences?.defaultTip ?? 1.11;
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
-    const id = episode
-      ? episodeId(episode)
-      : track
-        ? mediaId(track)
+    const id = tipEpisode
+      ? episodeId(tipEpisode)
+      : tipTrack
+        ? mediaId(tipTrack)
         : '';
     if (!id) throw new Error('Missing media id');
     const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
@@ -68,7 +73,7 @@ export function PlayerMiniBar() {
     return res;
   };
 
-  const chrome = episode ? (
+  const chrome = shown === 'podcast' && episode ? (
     <MiniBarChrome
       coverUri={
         episode.coverArt ||
@@ -84,7 +89,7 @@ export function PlayerMiniBar() {
       onTip={() => setTipOpen(true)}
       onOpen={openNowPlaying}
     />
-  ) : track ? (
+  ) : shown === 'music' && track ? (
     <MiniBarChrome
       coverUri={track.coverArt || DEFAULT_COVER_ART}
       title={track.title || 'Untitled'}

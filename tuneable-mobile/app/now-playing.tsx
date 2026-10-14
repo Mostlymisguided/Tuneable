@@ -17,6 +17,7 @@ import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
+import { shownPlayback, usePlaybackOwner } from '@/src/lib/nowPlaying';
 import { formatPlaybackSpeed } from '@/src/lib/playbackAudio';
 import { episodeId, seriesId, seriesTitle } from '@/src/lib/podcast';
 import {
@@ -41,10 +42,11 @@ export default function NowPlayingScreen() {
   const music = useMusicPlayerStore();
   const podcast = usePodcastPlayerStore();
 
-  const active = episode ? 'podcast' : track ? 'music' : null;
+  const playbackMode = usePlaybackOwner((s) => s.mode);
+  const active = shownPlayback(playbackMode, Boolean(episode), Boolean(track));
 
   const coverUri = useMemo(() => {
-    if (episode) {
+    if (active === 'podcast' && episode) {
       return (
         episode.coverArt ||
         episode.podcastSeries?.coverArt ||
@@ -52,14 +54,20 @@ export default function NowPlayingScreen() {
       );
     }
     return track?.coverArt || DEFAULT_COVER_ART;
-  }, [episode, track]);
+  }, [active, episode, track]);
 
-  const title = episode?.title || track?.title || 'Nothing playing';
-  const subtitle = episode
-    ? seriesTitle(episode)
-    : track
-      ? getCreatorDisplay(track)
-      : '';
+  const title =
+    active === 'podcast'
+      ? episode?.title || 'Nothing playing'
+      : active === 'music'
+        ? track?.title || 'Nothing playing'
+        : 'Nothing playing';
+  const subtitle =
+    active === 'podcast' && episode
+      ? seriesTitle(episode)
+      : active === 'music' && track
+        ? getCreatorDisplay(track)
+        : '';
 
   const isPlaying = active === 'podcast' ? podcast.isPlaying : music.isPlaying;
   const isLoading = active === 'podcast' ? podcast.isLoading : music.isLoading;
@@ -72,16 +80,17 @@ export default function NowPlayingScreen() {
   const error = active === 'podcast' ? podcast.error : music.error;
   const playbackRate = podcast.playbackRate;
 
-  const tuneId = track && !episode ? mediaId(track) : '';
-  const podcastId = episode ? episodeId(episode) : '';
-  const showId = episode ? seriesId(episode) : '';
+  const tuneId = active === 'music' && track ? mediaId(track) : '';
+  const podcastId = active === 'podcast' && episode ? episodeId(episode) : '';
+  const showId = active === 'podcast' && episode ? seriesId(episode) : '';
   const profileHref = podcastId
     ? (`/podcast/${podcastId}` as const)
     : tuneId
       ? (`/tune/${tuneId}` as const)
       : null;
   const showHref = showId ? (`/show/${showId}` as const) : null;
-  const tipMedia = episode ?? track ?? undefined;
+  const tipMedia =
+    active === 'podcast' ? episode ?? undefined : active === 'music' ? track ?? undefined : undefined;
   const defaultTip = user?.preferences?.defaultTip ?? 1.11;
   const championsMediaId = podcastId || tuneId;
 

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { isMediaPlayable } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
+import { suppressMediaSessionPlay } from '../utils/mediaSession';
 
 // Lightweight Media interface for webplayer (subset of full Media)
 interface PlayerMedia {
@@ -190,6 +191,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       },
       
       pause: () => {
+        suppressMediaSessionPlay();
         set({ isPlaying: false });
         const { sendWebSocketMessage, isHost } = get();
         if (isHost && sendWebSocketMessage) {

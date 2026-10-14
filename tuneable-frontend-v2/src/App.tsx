@@ -89,6 +89,19 @@ const PlayerRenderer = () => {
   };
 
   const mediaId = currentMedia?._id || currentMedia?.id;
+  const episodeKey = currentEpisode?._id || currentEpisode?.id || '';
+
+  useEffect(() => {
+    if (episodeKey) {
+      if (useWebPlayerStore.getState().isPlaying) {
+        useWebPlayerStore.getState().pause();
+      }
+      return;
+    }
+    if (mediaId && usePodcastPlayerStore.getState().isPlaying) {
+      usePodcastPlayerStore.getState().pause();
+    }
+  }, [episodeKey, mediaId]);
   const canPlayCurrent =
     hasAuthToken() &&
     !!currentMedia &&
