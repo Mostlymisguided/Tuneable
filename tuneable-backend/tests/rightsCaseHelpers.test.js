@@ -132,7 +132,10 @@ describe('buildOutreachContent', () => {
     expect(content.text).toContain('Reply YES to this email');
     expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
-    expect(content.text).toContain('founding artist');
+    expect(content.text).toContain('Become a founding creator here:');
+    expect(content.text).toContain('reply NO');
+    expect(content.text).toContain('✨Your Rights✨');
+    expect(content.text).toContain('✌️🎶🖤');
     expect(content.text).toContain('escrow');
     expect(content.tuneUrl).toBe('https://tuneable.stream/tune/abc');
     expect(content.registerUrl).toContain('/creator/register');
@@ -149,7 +152,10 @@ describe('buildOutreachContent', () => {
     expect(content.subject).toBe('');
     expect(content.text).toContain('has been tipped on Tuneable');
     expect(content.text).toContain('Reply YES');
-    expect(content.text).toContain('founding artist');
+    expect(content.text).toContain('Become a founding creator here:');
+    expect(content.text).toContain('reply NO');
+    expect(content.text).toContain('✨Your Rights✨');
+    expect(content.text).toContain('✌️🎶🖤');
     expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
     expect(content.text.startsWith('Hey Thomas')).toBe(true);
@@ -190,7 +196,10 @@ describe('buildOutreachContent', () => {
     expect(content.format).toBe('link');
     expect(content.text).toContain('Your tune "Around the World" has been tipped on Tuneable.');
     expect(content.text).toContain('Reply YES');
-    expect(content.text).toContain('Become a founding artist: https://tuneable.stream/creator/register?from=rights&tune=abc');
+    expect(content.text).toContain('Become a founding creator here: https://tuneable.stream/creator/register?from=rights&tune=abc');
+    expect(content.text).toContain('reply NO');
+    expect(content.text).toContain('✨Your Rights✨');
+    expect(content.text).toContain('✌️🎶🖤');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
   });
 

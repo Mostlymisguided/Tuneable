@@ -306,8 +306,12 @@ function buildOutreachContent({
   const registerUrl = creatorRegisterUrl(media, frontendUrl, inviteCode);
   const yesCta = 'Reply YES to this email and we will make it playable so you can start receiving those tips.';
   const founderCta = `Or become a founding artist here: ${registerUrl}`;
+  const founderCreatorCta = `Become a founding creator here: ${registerUrl}`;
   const listingLine = `Check it out: ${tuneUrl}`;
-  const takedownLine = 'If this is not your work or you want it taken down, just say so.';
+  const takedownLine = 'If this is not your work or you want it taken down, reply NO';
+  const rightsLine =
+    '✨Your Rights✨ You retain full rights over your works. You may revoke any rights granted to Tuneable at any time by removing your works from the platform.';
+  const signOff = '✌️🎶🖤';
   const note = customMessage?.trim() || '';
   const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
   const resolvedTemplate = OUTREACH_TEMPLATES.includes(template) ? template : 'custom';
@@ -320,9 +324,11 @@ function buildOutreachContent({
         `Your tune "${title}" (${artistLine}) has been tipped on Tuneable. ` +
         `Tips for this listing are waiting in escrow.\n\n` +
         `${yesCta}\n\n` +
-        `${founderCta}\n\n` +
+        `${takedownLine}\n\n` +
+        `${founderCreatorCta}\n\n` +
+        `${rightsLine}\n\n` +
         `${listingLine}\n\n` +
-        takedownLine,
+        signOff,
     },
     takedown_option: {
       subject: `Take-down option for "${title}" on Tuneable`,
@@ -360,7 +366,11 @@ function buildOutreachContent({
     claim_keep_invite:
       `Hey ${greetName} — your tune "${title}" has been tipped on Tuneable.\n\n` +
       `Reply YES and we'll make it playable so you can start receiving those tips.\n\n` +
-      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
+      `${takedownLine}\n\n` +
+      `${founderCreatorCta}\n\n` +
+      `${rightsLine}\n\n` +
+      `${tuneUrl}\n\n` +
+      signOff,
     takedown_option:
       `Hey ${greetName} — "${title}" is on Tuneable in rights-pending limbo. ` +
       `If you want it taken down, just reply.\n\n${tuneUrl}`,
@@ -378,8 +388,12 @@ function buildOutreachContent({
   const linkTemplates = {
     claim_keep_invite:
       `Your tune "${title}" has been tipped on Tuneable.\n\n` +
-      `Reply YES and we'll make it playable so you can start receiving those tips.\n` +
-      `Become a founding artist: ${registerUrl}\n\n${tuneUrl}`,
+      `Reply YES and we'll make it playable so you can start receiving those tips.\n\n` +
+      `${takedownLine}\n\n` +
+      `${founderCreatorCta}\n\n` +
+      `${rightsLine}\n\n` +
+      `${tuneUrl}\n\n` +
+      signOff,
     takedown_option: `Take-down option for "${title}" on Tuneable.\n\n${tuneUrl}`,
     follow_up:
       `Following up: your tune "${title}" has been tipped on Tuneable.\n\n` +
