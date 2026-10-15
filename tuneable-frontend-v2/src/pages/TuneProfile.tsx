@@ -4,8 +4,6 @@ import { toast } from '../utils/toast';
 import {
   DEFAULT_PROFILE_PIC,
   DEFAULT_COVER_ART,
-  ARTIST_INVITE_AFFILIATE_PERCENT,
-  FOUNDING_CREATOR_CAP,
 } from '../constants';
 import { 
   Music, 
