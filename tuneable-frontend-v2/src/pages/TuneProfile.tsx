@@ -4,8 +4,6 @@ import { toast } from '../utils/toast';
 import {
   DEFAULT_PROFILE_PIC,
   DEFAULT_COVER_ART,
-  ARTIST_INVITE_AFFILIATE_PERCENT,
-  FOUNDING_CREATOR_CAP,
 } from '../constants';
 import { 
   Music, 
@@ -1588,11 +1586,9 @@ const TuneProfile: React.FC = () => {
     }
     const artistName = media?.artist || 'this artist';
     const title = media?.title || 'this track';
-    const link = `${window.location.origin}/creator/register?invite=${inviteCode}`;
-    const affiliateLine = user?.isFoundingCreator
-      ? `If you upload your own music and your profile is verified, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for the year after verification — taken from Tuneable's share, not yours.`
-      : `Use my invite code to become eligible for a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}). A seat is claimed when you upload your own music. Status benefits only, not equity.`;
-    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator with my invite code ${inviteCode}, then upload or claim it so tips can reach you.\n\n${affiliateLine}\n\n${link}`;
+    const mediaLink = window.location.href;
+    const inviteLink = `${window.location.origin}/creator/register?invite=${inviteCode}`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator and claim it so tips can reach you.\n\n${mediaLink}\n\n${inviteLink}`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(message);
