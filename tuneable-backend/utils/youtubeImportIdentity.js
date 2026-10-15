@@ -9,6 +9,13 @@ function youtubeItemNeedsIdentity(item) {
   if (item.matchStatus === 'possible_match' && item.useSuggestedMatch !== false) return false;
   if (item.needsIdentity) return true;
   if (item.parseStatus === 'unparsed') return true;
+  // Parsed new tracks (with artist/title from YouTube) don't need admin identity confirmation
+  const isParsedNew = item.matchStatus === 'new' 
+    && item.identityConfidence !== 'verified'
+    && item.parseStatus !== 'unparsed'
+    && item.title
+    && item.artist;
+  if (isParsedNew) return false;
   return item.matchStatus === 'new' && item.identityConfidence !== 'verified';
 }
 
@@ -52,8 +59,11 @@ function filterYouTubePreviewItems(items, { keepUnmatched = false } = {}) {
         continue;
       }
       // Parsed tracks (with artist/title from YouTube) can be imported by all users
-      // even if not verified by MusicBrainz
-      kept.push(item);
+      // even if not verified by MusicBrainz - explicitly clear needsIdentity flag
+      kept.push({
+        ...item,
+        needsIdentity: false,
+      });
       continue;
     }
     kept.push(item);
