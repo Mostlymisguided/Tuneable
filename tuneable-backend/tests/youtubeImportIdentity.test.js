@@ -25,29 +25,30 @@ function unmatchedItem(overrides = {}) {
 }
 
 describe('filterYouTubePreviewItems', () => {
-  it('drops unmatched rows for regular import', () => {
+  it('keeps parsed new tracks for regular import but drops unparsed ones', () => {
     const verified = unmatchedItem({
       key: 'v',
       identityConfidence: 'verified',
       matchStatus: 'new',
       selected: true,
     });
-    const unmatched = unmatchedItem();
+    const parsedUnmatched = unmatchedItem({ key: 'u' });
+    const unparsedUnmatched = unmatchedItem({ key: 'up', parseStatus: 'unparsed' });
     const possible = unmatchedItem({
       key: 'p',
       matchStatus: 'possible_match',
       identityConfidence: 'likely',
     });
 
-    const out = filterYouTubePreviewItems([verified, unmatched, possible], { keepUnmatched: false });
+    const out = filterYouTubePreviewItems([verified, parsedUnmatched, unparsedUnmatched, possible], { keepUnmatched: false });
     expect(out.skippedNoMatch).toBe(1);
     expect(out.needsIdentity).toBe(0);
-    expect(out.items.map((i) => i.key)).toEqual(['v', 'p']);
+    expect(out.items.map((i) => i.key)).toEqual(['v', 'u', 'p']);
   });
 
-  it('keeps unmatched rows for admin review', () => {
-    const unmatched = unmatchedItem({ selected: true });
-    const out = filterYouTubePreviewItems([unmatched], { keepUnmatched: true });
+  it('keeps unparsed rows for admin review', () => {
+    const unparsed = unmatchedItem({ selected: true, parseStatus: 'unparsed' });
+    const out = filterYouTubePreviewItems([unparsed], { keepUnmatched: true });
     expect(out.skippedNoMatch).toBe(0);
     expect(out.needsIdentity).toBe(1);
     expect(out.items).toHaveLength(1);
@@ -92,8 +93,18 @@ describe('applyAdminConfirmedYoutubeIdentity', () => {
 });
 
 describe('resolveYoutubeExecuteItem', () => {
-  it('skips unverified youtube without a catalog id', () => {
+  it('allows parsed new tracks with artist and title', () => {
     const out = resolveYoutubeExecuteItem(unmatchedItem(), { isAdminUser: false });
+    expect(out.allowed).toBe(true);
+  });
+
+  it('skips unparsed youtube tracks without artist/title', () => {
+    const out = resolveYoutubeExecuteItem({
+      ...unmatchedItem(),
+      parseStatus: 'unparsed',
+      title: 'Video Title',
+      artist: '',
+    }, { isAdminUser: false });
     expect(out.allowed).toBe(false);
     expect(out.reason).toBe('unverified_youtube');
   });
