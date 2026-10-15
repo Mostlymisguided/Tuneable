@@ -37,15 +37,23 @@ function filterYouTubePreviewItems(items, { keepUnmatched = false } = {}) {
   for (const item of items || []) {
     const unmatchedNew = item.matchStatus === 'new' && item.identityConfidence !== 'verified';
     if (unmatchedNew) {
-      skippedNoMatch += 1;
-      if (!keepUnmatched) continue;
-      needsIdentity += 1;
-      kept.push({
-        ...item,
-        selected: false,
-        needsIdentity: true,
-        manualIdentityConfirmed: false,
-      });
+      // Truly unparsed tracks (no artist/title extracted) need admin confirmation
+      const isUnparsed = item.parseStatus === 'unparsed';
+      if (isUnparsed) {
+        skippedNoMatch += 1;
+        if (!keepUnmatched) continue;
+        needsIdentity += 1;
+        kept.push({
+          ...item,
+          selected: false,
+          needsIdentity: true,
+          manualIdentityConfirmed: false,
+        });
+        continue;
+      }
+      // Parsed tracks (with artist/title from YouTube) can be imported by all users
+      // even if not verified by MusicBrainz
+      kept.push(item);
       continue;
     }
     kept.push(item);
@@ -113,6 +121,7 @@ function youtubeIdentityVerified(item) {
 /**
  * Decide whether a YouTube import row may be created/tipped.
  * Admin confirm-as-new wins over a rejected fuzzy suggestion.
+ * Parsed tracks (with artist/title from YouTube) can be imported even if not MusicBrainz-verified.
  */
 function resolveYoutubeExecuteItem(item, { isAdminUser } = {}) {
   if (item?.manualIdentityConfirmed) {
@@ -129,6 +138,17 @@ function resolveYoutubeExecuteItem(item, { isAdminUser } = {}) {
   if (item?.mediaId || youtubeIdentityVerified(item)) {
     return { allowed: true, item };
   }
+
+  // Allow parsed new tracks (those with artist/title from YouTube metadata)
+  const isParsedNew = item?.matchStatus === 'new'
+    && item?.identityConfidence !== 'verified'
+    && item?.parseStatus !== 'unparsed'
+    && item?.title
+    && item?.artist;
+  if (isParsedNew) {
+    return { allowed: true, item };
+  }
+
   return { allowed: false, reason: 'unverified_youtube', item };
 }
 
