@@ -55,15 +55,15 @@ const AddMediaModal: React.FC<AddMediaModalProps> = ({ isOpen, onClose }) => {
       className: 'hover:bg-purple-600/30 border-purple-500/50',
     },
     {
-      label: 'Import from likes',
-      description: 'Import Spotify or SoundCloud likes',
+      label: 'Import',
+      description: 'Spotify, SoundCloud, Youtube',
       icon: Download,
       onClick: handleImport,
       className: 'hover:bg-purple-600/30 border-purple-500/50',
     },
     {
       label: 'Upload',
-      description: 'Upload your own tunes',
+      description: 'Upload tunes',
       icon: Upload,
       onClick: handleUpload,
       className: 'hover:bg-pink-600/30 border-pink-500/50',
