@@ -45,6 +45,18 @@ describe('chartSort', () => {
     expect(sorted.map((item) => item.title)).toEqual(['Old', 'New']);
   });
 
+  it('sorts most-tunebytes by tuneBytesEarned, newest as tie-break', () => {
+    const sorted = sortChartItems(
+      [
+        { title: 'A', tuneBytesEarned: 10, createdAt: '2024-01-01' },
+        { title: 'B', tuneBytesEarned: 30, createdAt: '2023-01-01' },
+        { title: 'C', tuneBytesEarned: 30, createdAt: '2025-01-01' },
+      ],
+      'most-tunebytes'
+    );
+    expect(sorted.map((item) => item.title)).toEqual(['C', 'B', 'A']);
+  });
+
   it('maps mongo sort for all-time charts', () => {
     expect(mediaChartMongoSort('newest')).toEqual({
       createdAt: -1,
@@ -55,6 +67,10 @@ describe('chartSort', () => {
       createdAt: 1,
       uploadedAt: 1,
       globalMediaAggregate: -1,
+    });
+    expect(mediaChartMongoSort('most-tunebytes')).toEqual({
+      tuneBytesEarned: -1,
+      createdAt: -1,
     });
   });
 });

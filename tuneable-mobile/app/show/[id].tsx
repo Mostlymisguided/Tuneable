@@ -296,6 +296,12 @@ export default function PodcastShowScreen() {
             (b.globalMediaAggregate ?? 0) - (a.globalMediaAggregate ?? 0)
         );
       }
+      if (sortBy === 'mostTuneBytes') {
+        next.sort(
+          (a, b) =>
+            (b.tuneBytesEarned ?? 0) - (a.tuneBytesEarned ?? 0)
+        );
+      }
       return next;
     });
     return res;
