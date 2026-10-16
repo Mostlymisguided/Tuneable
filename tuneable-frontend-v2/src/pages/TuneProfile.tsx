@@ -3989,48 +3989,6 @@ const TuneProfile: React.FC = () => {
                 </div>
               </div>
 
-              {/* Minimum Tip/Bid */}
-              <div className="mb-4">
-                <label className="block text-white font-medium mb-2">
-                  Minimum Tip Amount (Optional)
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-400">£</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={editForm.minimumBid ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setEditForm({ 
-                          ...editForm, 
-                          minimumBid: value === '' ? null : parseFloat(value) || null 
-                        });
-                      }}
-                      className="input pl-8"
-                      placeholder="Leave empty to use party default"
-                    />
-                  </div>
-                  {editForm.minimumBid !== null && (
-                    <button
-                      type="button"
-                      onClick={() => setEditForm({ ...editForm, minimumBid: null })}
-                      className="px-3 py-2 text-sm text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
-                      title="Clear to use party default"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  Set a custom minimum tip amount for this media. If not set, the party's minimum tip will be used.
-                </p>
-              </div>
-
               <div className="mb-4">
                 <label className="block text-white font-medium mb-2">
                   Who can keep a copy

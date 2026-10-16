@@ -162,8 +162,7 @@ const About: React.FC = () => {
           id="download-offline"
           className="mx-auto mt-8 max-w-2xl scroll-mt-24 px-4 text-center text-base leading-relaxed text-gray-600"
         >
-          *Creators can set minimum tips and choose the level at which a user can download and keep
-          offline
+          *Creators can choose the level at which a user can download and keep offline
         </p>
       </section>
 
