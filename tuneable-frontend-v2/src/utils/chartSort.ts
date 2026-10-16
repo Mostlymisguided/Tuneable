@@ -1,5 +1,6 @@
 export const CHART_SORT_OPTIONS = [
   { key: 'most-tipped', label: 'Most Tipped' },
+  { key: 'most-tunebytes', label: 'Most TuneBytes' },
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },
 ] as const;
@@ -7,7 +8,7 @@ export const CHART_SORT_OPTIONS = [
 export type ChartSortKey = (typeof CHART_SORT_OPTIONS)[number]['key'];
 
 export function normalizeChartSort(sortBy?: string | null): ChartSortKey {
-  if (sortBy === 'newest' || sortBy === 'oldest' || sortBy === 'most-tipped') {
+  if (sortBy === 'newest' || sortBy === 'oldest' || sortBy === 'most-tipped' || sortBy === 'most-tunebytes') {
     return sortBy;
   }
   return 'most-tipped';
@@ -58,21 +59,40 @@ export function defaultChartTip(item: Record<string, unknown> | null | undefined
   return 0;
 }
 
+export function defaultChartTuneBytes(item: Record<string, unknown> | null | undefined): number {
+  if (!item) return 0;
+  const nested = item.mediaId && typeof item.mediaId === 'object'
+    ? (item.mediaId as Record<string, unknown>)
+    : null;
+  const candidates = [
+    item.tuneBytesEarned,
+    nested?.tuneBytesEarned,
+  ];
+  for (const value of candidates) {
+    if (typeof value === 'number') return value;
+  }
+  return 0;
+}
+
 export function sortChartItems<T>(
   items: T[],
   sortBy: string | null | undefined,
   accessors?: {
     getDate?: (item: T) => unknown;
     getTip?: (item: T) => number;
+    getTuneBytes?: (item: T) => number;
   }
 ): T[] {
   const key = normalizeChartSort(sortBy);
   const getDate = accessors?.getDate ?? ((item: T) => defaultChartDate(item as Record<string, unknown>));
   const getTip = accessors?.getTip ?? ((item: T) => defaultChartTip(item as Record<string, unknown>));
+  const getTuneBytes = accessors?.getTuneBytes ?? ((item: T) => defaultChartTuneBytes(item as Record<string, unknown>));
 
   return [...items].sort((a, b) => {
     const tipA = getTip(a) || 0;
     const tipB = getTip(b) || 0;
+    const tuneBytesA = getTuneBytes(a) || 0;
+    const tuneBytesB = getTuneBytes(b) || 0;
     const dateA = dateMs(getDate(a));
     const dateB = dateMs(getDate(b));
 
@@ -83,6 +103,11 @@ export function sortChartItems<T>(
         return key === 'newest' ? dateB - dateA : dateA - dateB;
       }
       return tipB - tipA;
+    }
+
+    if (key === 'most-tunebytes') {
+      if (tuneBytesA !== tuneBytesB) return tuneBytesB - tuneBytesA;
+      return dateB - dateA;
     }
 
     if (tipA !== tipB) return tipB - tipA;

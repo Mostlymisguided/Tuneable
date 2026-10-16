@@ -36,6 +36,7 @@ export interface PodcastEpisode {
   coverArt?: string;
   duration?: number;
   globalMediaAggregate?: number;
+  tuneBytesEarned?: number;
   releaseDate?: string;
   publishedAt?: string;
   podcastSeries?: PodcastSeriesRef;
@@ -97,6 +98,7 @@ export interface PodcastSeriesStats {
 
 export const PODCAST_SHOW_SORT_OPTIONS = [
   { key: 'mostTipped', label: 'Most tipped' },
+  { key: 'mostTuneBytes', label: 'Most TuneBytes' },
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },
   { key: 'duration', label: 'Longest' },
