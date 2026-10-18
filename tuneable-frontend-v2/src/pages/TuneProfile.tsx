@@ -117,6 +117,7 @@ import { type RightsStatus } from '../utils/rightsStatus';
 interface Media {
   _id: string;
   uuid: string;
+  slug?: string;
   title: string;
   artist: string;
   producer?: string;
@@ -1586,9 +1587,11 @@ const TuneProfile: React.FC = () => {
     }
     const artistName = media?.artist || 'this artist';
     const title = media?.title || 'this track';
-    const mediaLink = window.location.href;
+    const mediaLink = media
+      ? `${window.location.origin}${getMediaProfileUrl(media)}`
+      : window.location.href;
     const inviteLink = `${window.location.origin}/creator/register?invite=${inviteCode}`;
-    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator and claim it so tips can reach you.\n\n${mediaLink}\n\n${inviteLink}`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator and claim it so tips can reach you.\n\nCheck it out: ${mediaLink}\n\n${inviteLink}\n\n✨Your Rights✨ You retain full rights over your works. You may revoke any rights granted to Tuneable at any time by removing your works from the platform.`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(message);
@@ -1607,7 +1610,7 @@ const TuneProfile: React.FC = () => {
     } catch {
       toast.error('Could not copy invite');
     }
-  }, [media?.artist, media?.title, navigate, user]);
+  }, [media, navigate, user]);
 
   const handleRightsStatusChange = async (status: RightsStatus) => {
     if (!media?._id || savingRightsStatus) return;
