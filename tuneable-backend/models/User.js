@@ -48,6 +48,8 @@ const userSchema = new mongoose.Schema({
   parentInviteCode: { type: String, required: false },
   parentInviteCodeId: { type: mongoose.Schema.Types.ObjectId }, // Reference to specific invite code object (optional, for tracking)
   invitedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  // True only when the inviter was an active ambassador at signup. Revocation does not rewrite this.
+  invitedByAmbassador: { type: Boolean, default: false },
   balance: { type: Number, default: 0 }, // Wallet balance stored in PENCE (integer), not pounds
   // Example: 1050 represents £10.50, 3300 represents £33.00
   // Unspent promotional welcome credit still in the wallet (pence). Spent promo-first; revocable by admin.
@@ -155,6 +157,21 @@ const userSchema = new mongoose.Schema({
   foundingRequestedAt: { type: Date, default: null },
   foundingRequestReviewedAt: { type: Date, default: null },
   foundingRequestReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+  // Ambassador program — recruitment status, not a platform permission role.
+  // Earnings stay on the founding-creator affiliate ledger. This does not add a second cut.
+  ambassador: {
+    status: {
+      type: String,
+      enum: ['none', 'active', 'paused', 'revoked'],
+      default: 'none',
+    },
+    assignedAt: { type: Date, default: null },
+    assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    pausedAt: { type: Date, default: null },
+    revokedAt: { type: Date, default: null },
+    note: { type: String, default: null, maxlength: 500 },
+  },
   totalEscrowEarned: { 
     type: Number, 
     default: 0 
@@ -618,6 +635,8 @@ userSchema.virtual('primaryInviteCode').get(function() {
 // Indexes
 // Index for invite code lookups
 userSchema.index({ 'personalInviteCodes.code': 1 });
+userSchema.index({ 'ambassador.status': 1 });
+userSchema.index({ invitedByUserId: 1, invitedByAmbassador: 1 });
 userSchema.index({ 'pendingCollectiveInvites.collectiveId': 1 });
 userSchema.index({ 'playbackQueue.mediaId': 1 });
 userSchema.index({ blockedUsers: 1 });

@@ -27,7 +27,21 @@ export type SpotifyImportAccess = {
   } | null;
 };
 
+export type AmbassadorSummary = {
+  status: 'none' | 'active' | 'paused' | 'revoked';
+  note?: string | null;
+  signupCount: number;
+  verifiedCreatorCount: number;
+  activeWindowCount: number;
+  commissionPence: number;
+};
+
 export const userAPI = {
+  getAmbassadorSummary: async (): Promise<{ status: string; ambassador: AmbassadorSummary | null }> => {
+    const response = await api.get<{ status: string; ambassador: AmbassadorSummary | null }>('/users/me/ambassador');
+    return response.data;
+  },
+
   getProfileById: async (userId: string): Promise<UserProfileResponse> => {
     const response = await api.get<UserProfileResponse>(`/users/${userId}/profile`);
     return response.data;

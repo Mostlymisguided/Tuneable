@@ -30,6 +30,7 @@ type Props = {
   inviteCode?: string | null;
   username?: string;
   isFoundingCreator?: boolean;
+  ambassadorStatus?: 'none' | 'active' | 'paused' | 'revoked' | null;
   canUpload?: boolean;
   deleting?: boolean;
   onClose: () => void;
@@ -47,6 +48,7 @@ export function ProfileSettingsSheet({
   inviteCode,
   username,
   isFoundingCreator = false,
+  ambassadorStatus = null,
   canUpload = false,
   deleting = false,
   onClose,
@@ -225,6 +227,7 @@ export function ProfileSettingsSheet({
             inviteCode={inviteCode}
             username={username}
             isFoundingCreator={isFoundingCreator}
+            ambassadorStatus={ambassadorStatus}
           />
 
           <LegalLinks compact />

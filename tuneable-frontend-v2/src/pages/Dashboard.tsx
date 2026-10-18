@@ -12,7 +12,8 @@ import {
   FOUNDING_CREATOR_CAP,
   FOUNDING_UPLOAD_QUOTA_MB,
 } from '../constants';
-import type { FoundingCreatorsStatus } from '../types';
+import type { AmbassadorSummary, FoundingCreatorsStatus } from '../types';
+import AmbassadorProgramCard from '../components/AmbassadorProgramCard';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -58,6 +59,7 @@ const Dashboard: React.FC = () => {
   const location = useLocation();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
   const [invitedUsers, setInvitedUsers] = useState<any[]>([]);
+  const [ambassadorProgram, setAmbassadorProgram] = useState<AmbassadorSummary | null>(null);
   const [isLoadingInvited, setIsLoadingInvited] = useState(false);
   const [tuneLibrary, setTuneLibrary] = useState<LibraryItem[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
@@ -412,6 +414,7 @@ Join here: ${inviteLink}`.trim();
         setIsLoadingInvited(true);
         const data = await userAPI.getInvitedUsers();
         setInvitedUsers(data.invitedUsers || []);
+        setAmbassadorProgram(data.ambassador || null);
       } catch (error) {
         console.error('Failed to load invited users:', error);
       } finally {
@@ -2726,6 +2729,7 @@ Join here: ${inviteLink}`.trim();
 
       {/* Invite Codes Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        {ambassadorProgram && <AmbassadorProgramCard ambassador={ambassadorProgram} />}
         <div className="bg-black/30 border border-amber-500/25 rounded-lg p-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -2916,6 +2920,9 @@ Join here: ${inviteLink}`.trim();
                           <span>
                             {penceToPounds(invitedUser.commissionPence || 0)} earned
                           </span>
+                          {ambassadorProgram && invitedUser.invitedByAmbassador && (
+                            <span className="text-purple-300">Counted</span>
+                          )}
                         </div>
                       </div>
                     </div>

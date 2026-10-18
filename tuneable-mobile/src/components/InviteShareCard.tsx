@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -10,6 +10,9 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
+import { userAPI, type AmbassadorSummary } from '@/src/api/user';
+
+type AmbassadorStatus = 'none' | 'active' | 'paused' | 'revoked';
 
 type Props = {
   inviteCode?: string | null;
@@ -19,6 +22,7 @@ type Props = {
   defaultCollapsed?: boolean;
   /** Founding creators earn the 3% invite commission; others get growth-only invites. */
   isFoundingCreator?: boolean;
+  ambassadorStatus?: AmbassadorStatus | null;
 };
 
 export const CREATOR_REGISTER_URL = 'https://tuneable.stream/creator/register';
@@ -33,10 +37,30 @@ export function InviteShareCard({
   collapsible = false,
   defaultCollapsed = true,
   isFoundingCreator = false,
+  ambassadorStatus = null,
 }: Props) {
   const code = (inviteCode || '').trim().toUpperCase();
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [ambassador, setAmbassador] = useState<AmbassadorSummary | null>(null);
+
+  useEffect(() => {
+    if (!ambassadorStatus || ambassadorStatus === 'none') {
+      setAmbassador(null);
+      return;
+    }
+    let cancelled = false;
+    userAPI.getAmbassadorSummary()
+      .then((data) => {
+        if (!cancelled) setAmbassador(data.ambassador);
+      })
+      .catch(() => {
+        if (!cancelled) setAmbassador(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ambassadorStatus]);
 
   if (!code) return null;
 
@@ -73,6 +97,18 @@ export function InviteShareCard({
           ? "Invite an artist with this code and earn 3% of their paid tips for year one (from Tuneable's share, on music they upload)."
           : 'Invite creators with this code. It makes them eligible for a founding seat (first 1,111), claimed when they upload. The 3% invite commission is exclusive to verified founding creators.'}
       </Text>
+      {ambassador ? (
+        <View style={styles.stats}>
+          <Text style={styles.statLine}>
+            {ambassador.status === 'active'
+              ? 'Ambassador'
+              : `Ambassador · ${ambassador.status}`}
+          </Text>
+          <Text style={styles.statLine}>
+            {ambassador.signupCount} signed up · {ambassador.verifiedCreatorCount} verified creators · {ambassador.activeWindowCount} in window · £{((ambassador.commissionPence || 0) / 100).toFixed(2)} earned
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.actions}>
         <Pressable style={styles.actionBtn} onPress={() => void onCopy()}>
           <Ionicons
@@ -184,6 +220,15 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 6,
     color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  stats: {
+    marginTop: 10,
+    gap: 2,
+  },
+  statLine: {
+    color: colors.text,
     fontSize: 13,
     lineHeight: 18,
   },

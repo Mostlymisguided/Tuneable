@@ -4,12 +4,14 @@ import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, 
 import { toast } from '../utils/toast';
 import { authAPI } from '../lib/api';
 import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP } from '../constants';
-import type { InviteCode, Referral, ReferralsResponse } from '../types';
+import type { AmbassadorSummary, InviteCode, Referral, ReferralsResponse } from '../types';
+import AmbassadorProgramCard from './AmbassadorProgramCard';
 import { useAuth } from '../contexts/AuthContext';
 
 const InviteReferrals: React.FC = () => {
   const { user } = useAuth();
   const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [ambassadorProgram, setAmbassadorProgram] = useState<AmbassadorSummary | null>(null);
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [selectedCodeFilter, setSelectedCodeFilter] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -40,6 +42,7 @@ const InviteReferrals: React.FC = () => {
       const response = await authAPI.getReferrals(code) as ReferralsResponse;
       setReferrals(response.referrals || []);
       setInviteCodes(response.personalInviteCodes || []);
+      setAmbassadorProgram(response.ambassador || null);
     } catch (error) {
       console.error('Error loading referrals:', error);
       toast.error('Failed to load referrals');
@@ -131,6 +134,7 @@ const InviteReferrals: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {ambassadorProgram && <AmbassadorProgramCard ambassador={ambassadorProgram} />}
       {/* Invite Codes Management */}
       <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-6">
         <div className="flex items-center justify-between gap-3">
@@ -487,6 +491,9 @@ const InviteReferrals: React.FC = () => {
                           <span className="text-indigo-300">
                             {((referral.commissionPence || 0) / 100).toLocaleString('en-GB', { style: 'currency', currency: 'GBP' })}
                           </span>
+                          {ambassadorProgram && referral.invitedByAmbassador && (
+                            <span className="text-purple-300">Counted</span>
+                          )}
                           {referral.location?.city && (
                             <div className="flex items-center space-x-1">
                               <MapPin className="h-3 w-3" />

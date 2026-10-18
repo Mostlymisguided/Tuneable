@@ -103,6 +103,10 @@ export interface User {
   };
   /** Founding Creators — status/benefits only, not equity */
   isFoundingCreator?: boolean;
+  ambassador?: {
+    status?: 'none' | 'active' | 'paused' | 'revoked';
+    note?: string | null;
+  };
   foundingSeatNumber?: number | null;
   foundingSeatAssignedAt?: string | null;
   foundingUploadQuotaBytes?: number | null;

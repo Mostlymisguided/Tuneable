@@ -266,6 +266,7 @@ export default function ProfileScreen() {
         inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
         username={user?.username}
         isFoundingCreator={Boolean(user?.isFoundingCreator)}
+        ambassadorStatus={user?.ambassador?.status || null}
         canUpload={canUpload}
         onClose={() => setSettingsOpen(false)}
         onWallet={() => {

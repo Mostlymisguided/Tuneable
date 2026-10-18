@@ -43,6 +43,7 @@ import IssueWarningModal from '../components/IssueWarningModal';
 import CreateTestUserModal from '../components/CreateTestUserModal';
 import DeleteUserModal from '../components/DeleteUserModal';
 import InviteReferrals from '../components/InviteReferrals';
+import AmbassadorsAdmin from '../components/AmbassadorsAdmin';
 import UserTopUpModal from '../components/UserTopUpModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from '../utils/toast';
@@ -71,6 +72,7 @@ interface User {
   welcomeCreditRemainingPence?: number;
   walletFrozenAt?: string | null;
   payoutHeldAt?: string | null;
+  ambassador?: { status?: 'none' | 'active' | 'paused' | 'revoked' };
   createdAt: string;
   lastLoginAt?: string;
   oauthVerified?: {
@@ -1667,6 +1669,7 @@ const Admin: React.FC = () => {
             {/* Users Content */}
             {usersLabelsSubTab === 'users' && (
               <div className="space-y-6">
+                <AmbassadorsAdmin onChanged={() => loadUsers()} />
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-white">User Management</h2>
                   <div className="flex items-center gap-2">
@@ -1818,6 +1821,17 @@ const Admin: React.FC = () => {
                             {user.isTestUser && (
                               <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-900 text-amber-200">
                                 Test
+                              </span>
+                            )}
+                            {user.ambassador?.status && user.ambassador.status !== 'none' && (
+                              <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full capitalize ${
+                                user.ambassador.status === 'active'
+                                  ? 'bg-purple-900 text-purple-200'
+                                  : user.ambassador.status === 'paused'
+                                    ? 'bg-amber-900 text-amber-200'
+                                    : 'bg-gray-700 text-gray-300'
+                              }`}>
+                                {user.ambassador.status === 'active' ? 'Ambassador' : `Ambassador · ${user.ambassador.status}`}
                               </span>
                             )}
                           </div>

@@ -11,6 +11,10 @@ export interface User {
   personalInviteCode?: string;
   primaryInviteCode?: string;
   isFoundingCreator?: boolean;
+  ambassador?: {
+    status?: 'none' | 'active' | 'paused' | 'revoked';
+    note?: string | null;
+  };
   foundingSeatNumber?: number | null;
   balance: number; // pence
   tuneBytes?: number;

@@ -826,6 +826,31 @@ router.delete('/me/push-devices', authMiddleware, async (req, res) => {
   }
 });
 
+// Ambassador counts for the signed-in user. Empty program membership returns status none.
+router.get('/me/ambassador', authMiddleware, async (req, res) => {
+  try {
+    const {
+      isAmbassadorProgramMember,
+      ambassadorClientFields,
+      summarizeForInviter,
+    } = require('../utils/ambassador');
+    const user = await User.findById(req.user._id)
+      .select('username ambassador artistEscrowHistory');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!isAmbassadorProgramMember(user)) {
+      return res.json({ status: 'none', ambassador: null });
+    }
+    const { summary } = await summarizeForInviter(user);
+    res.json({
+      status: user.ambassador.status,
+      ambassador: ambassadorClientFields(user, summary),
+    });
+  } catch (error) {
+    console.error('Error fetching ambassador summary:', error);
+    res.status(500).json({ error: 'Failed to fetch ambassador summary' });
+  }
+});
+
 // Get list of users invited by the current user
 router.get('/invited', authMiddleware, async (req, res) => {
   try {
@@ -850,11 +875,20 @@ router.get('/invited', authMiddleware, async (req, res) => {
     .lean();
 
     const { attachAffiliateInviteStats } = require('../utils/artistInviteAffiliate');
+    const {
+      isAmbassadorProgramMember,
+      ambassadorClientFields,
+      summarizeAmbassadorInvitees,
+    } = require('../utils/ambassador');
     const enriched = await attachAffiliateInviteStats(user, invitedUsers);
+    const ambassador = isAmbassadorProgramMember(user)
+      ? ambassadorClientFields(user, summarizeAmbassadorInvitees(enriched))
+      : null;
     
     res.json({ 
       invitedUsers: enriched,
-      count: enriched.length 
+      count: enriched.length,
+      ambassador,
     });
   } catch (error) {
     console.error('Error fetching invited users:', error);
@@ -1102,6 +1136,92 @@ router.post('/admin/backfill-founding-creators', authMiddleware, adminMiddleware
   } catch (error) {
     console.error('Error backfilling founding creators:', error);
     res.status(500).json({ error: 'Failed to backfill founding creators' });
+  }
+});
+
+// @route   GET /api/users/admin/ambassadors
+// @desc    Ambassadors with signup / verified-creator / window stats
+// @access  Private (Admin)
+router.get('/admin/ambassadors', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { listAmbassadorRows } = require('../utils/ambassador');
+    const ambassadors = await listAmbassadorRows();
+    res.json({ ambassadors });
+  } catch (error) {
+    console.error('Error listing ambassadors:', error);
+    res.status(500).json({ error: 'Failed to list ambassadors' });
+  }
+});
+
+// @route   POST /api/users/admin/ambassadors
+// @desc    Grant or update ambassador status by username or email
+// @access  Private (Admin)
+router.post('/admin/ambassadors', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { setAmbassadorStatus } = require('../utils/ambassador');
+    const result = await setAmbassadorStatus({
+      identifier: req.body?.identifier,
+      status: req.body?.status,
+      note: req.body?.note,
+      adminId: req.user._id,
+    });
+    if (!result.ok) return res.status(result.statusCode).json({ error: result.error });
+    const message = result.ambassador.hasInviteCode
+      ? `Ambassador status set to ${result.ambassador.status} for ${result.ambassador.username}`
+      : `${result.ambassador.username} is ${result.ambassador.status}, but they have no invite code yet`;
+    res.json({ message, ambassador: result.ambassador });
+  } catch (error) {
+    console.error('Error setting ambassador status:', error);
+    res.status(500).json({ error: 'Failed to update ambassador status' });
+  }
+});
+
+// @route   PATCH /api/users/admin/ambassadors/:userId
+// @desc    Update an ambassador's status or note
+// @access  Private (Admin)
+router.patch('/admin/ambassadors/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { setAmbassadorStatus } = require('../utils/ambassador');
+    const result = await setAmbassadorStatus({
+      userId: req.params.userId,
+      status: req.body?.status,
+      note: req.body?.note,
+      adminId: req.user._id,
+    });
+    if (!result.ok) return res.status(result.statusCode).json({ error: result.error });
+    res.json({
+      message: `Ambassador status set to ${result.ambassador.status} for ${result.ambassador.username}`,
+      ambassador: result.ambassador,
+    });
+  } catch (error) {
+    console.error('Error updating ambassador:', error);
+    res.status(500).json({ error: 'Failed to update ambassador status' });
+  }
+});
+
+// @route   GET /api/users/admin/ambassadors/:userId/invitees
+// @desc    Signups counted for this ambassador (stamped while they were active)
+// @access  Private (Admin)
+router.get('/admin/ambassadors/:userId/invitees', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { summarizeForInviter, isAmbassadorProgramMember } = require('../utils/ambassador');
+    const User = require('../models/User');
+    const user = await User.findById(req.params.userId)
+      .select('username ambassador artistEscrowHistory');
+    if (!user || !isAmbassadorProgramMember(user)) {
+      return res.status(404).json({ error: 'Ambassador not found' });
+    }
+    const { summary, invitees } = await summarizeForInviter(user);
+    res.json({
+      userId: String(user._id),
+      username: user.username,
+      status: user.ambassador.status,
+      ...summary,
+      invitees,
+    });
+  } catch (error) {
+    console.error('Error fetching ambassador invitees:', error);
+    res.status(500).json({ error: 'Failed to fetch ambassador invitees' });
   }
 });
 
@@ -4419,12 +4539,20 @@ router.get('/referrals', authMiddleware, async (req, res) => {
     }
     
     const referrals = await User.find(query)
-      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId creatorProfile.verificationStatus creatorProfile.verifiedAt creatorProfile.artistName creatorProfile.roles creatorProfile.genres')
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId invitedByAmbassador creatorProfile.verificationStatus creatorProfile.verifiedAt creatorProfile.artistName creatorProfile.roles creatorProfile.genres')
       .sort({ createdAt: -1 })
       .lean();
 
     const { attachAffiliateInviteStats } = require('../utils/artistInviteAffiliate');
+    const {
+      isAmbassadorProgramMember,
+      ambassadorClientFields,
+      summarizeForInviter,
+    } = require('../utils/ambassador');
     const enrichedReferrals = await attachAffiliateInviteStats(user, referrals);
+    const ambassador = isAmbassadorProgramMember(user)
+      ? ambassadorClientFields(user, (await summarizeForInviter(user)).summary)
+      : null;
 
     // Get invite codes with stats
     const inviteCodes = user.getActiveInviteCodes().map(ic => ({
@@ -4468,7 +4596,9 @@ router.get('/referrals', authMiddleware, async (req, res) => {
         affiliateWindowActive: r.affiliateWindowActive,
         affiliateDaysRemaining: r.affiliateDaysRemaining,
         commissionPence: r.commissionPence,
-      }))
+        invitedByAmbassador: Boolean(r.invitedByAmbassador),
+      })),
+      ambassador,
     });
   } catch (error) {
     console.error('Error fetching referrals:', error);

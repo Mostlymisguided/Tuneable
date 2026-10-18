@@ -182,6 +182,8 @@ module.exports = {
   AFFILIATE_WINDOW_MS,
   computeAffiliateSharePence,
   originalUploaderOwner,
+  isCreatorProfileComplete,
+  isCreatorVerified,
   isWithinAffiliateWindow,
   affiliateWindowInfo,
   isAffiliateEligible,

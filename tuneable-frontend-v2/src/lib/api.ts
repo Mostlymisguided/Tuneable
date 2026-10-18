@@ -1554,6 +1554,48 @@ export const userAPI = {
     return response.data;
   },
 
+  getAmbassadors: async () => {
+    const response = await api.get('/users/admin/ambassadors');
+    return response.data as {
+      ambassadors: Array<{
+        userId: string;
+        username: string;
+        email: string | null;
+        artistName: string | null;
+        isFoundingCreator: boolean;
+        hasInviteCode: boolean;
+        status: 'active' | 'paused' | 'revoked';
+        note: string | null;
+        assignedAt: string | null;
+        signupCount: number;
+        verifiedCreatorCount: number;
+        activeWindowCount: number;
+        commissionPence: number;
+      }>;
+    };
+  },
+
+  setAmbassadorStatus: async (body: { identifier?: string; userId?: string; status: string; note?: string }) => {
+    if (body.userId) {
+      const response = await api.patch(`/users/admin/ambassadors/${body.userId}`, {
+        status: body.status,
+        note: body.note,
+      });
+      return response.data;
+    }
+    const response = await api.post('/users/admin/ambassadors', {
+      identifier: body.identifier,
+      status: body.status,
+      note: body.note,
+    });
+    return response.data;
+  },
+
+  getAmbassadorInvitees: async (userId: string) => {
+    const response = await api.get(`/users/admin/ambassadors/${userId}/invitees`);
+    return response.data;
+  },
+
   // Public Founding Creators program status
   getFoundingCreatorsStatus: async () => {
     const response = await api.get('/users/founding-creators');

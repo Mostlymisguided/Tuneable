@@ -489,6 +489,7 @@ export default function HomeScreen() {
             inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
             username={user?.username}
             isFoundingCreator={Boolean(user?.isFoundingCreator)}
+            ambassadorStatus={user?.ambassador?.status || null}
             collapsible
             defaultCollapsed
           />

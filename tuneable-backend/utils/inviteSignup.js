@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { foundingInviteEligibilityFields } = require('./foundingCreators');
+const { hasUnlimitedInvites, isActiveAmbassador } = require('./ambassador');
 
 /**
  * Resolve an optional invite code for signup.
@@ -40,7 +41,7 @@ async function resolveInviteForSignup(rawCode) {
   }
 
   const isInviterAdmin = Boolean(inviter.role && inviter.role.includes('admin'));
-  if (!isInviterAdmin && (!inviter.inviteCredits || inviter.inviteCredits <= 0)) {
+  if (!hasUnlimitedInvites(inviter) && (!inviter.inviteCredits || inviter.inviteCredits <= 0)) {
     return { ok: false, error: 'This invite code has no remaining invites' };
   }
 
@@ -64,6 +65,7 @@ function inviteAttributionFields(invite) {
       ? invite.inviteCodeObj._id
       : undefined,
     invitedByUserId: invite.inviter._id,
+    invitedByAmbassador: isActiveAmbassador(invite.inviter),
     ...foundingInviteEligibilityFields(),
   };
 }
@@ -97,6 +99,7 @@ async function attachInviteForFounding(user, rawCode) {
       ? invite.inviteCodeObj._id
       : undefined;
     user.invitedByUserId = invite.inviter._id;
+    user.invitedByAmbassador = isActiveAmbassador(invite.inviter);
   }
 
   if (!user.foundingEligible) {
@@ -161,7 +164,8 @@ async function applyInviteUsage({ inviter, inviteCodeObj, code, isInviterAdmin }
     await inviter.save();
   }
 
-  if (!isInviterAdmin && inviter.inviteCredits > 0) {
+  const skipCreditDecrement = Boolean(isInviterAdmin) || hasUnlimitedInvites(inviter);
+  if (!skipCreditDecrement && inviter.inviteCredits > 0) {
     inviter.inviteCredits -= 1;
     await inviter.save();
     console.log(
