@@ -11,9 +11,17 @@ import {
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { collectiveAPI } from '@/src/api/collectives';
+import { labelAPI } from '@/src/api/labels';
 import { notificationAPI } from '@/src/api/notifications';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
+import {
+  collectiveInviteSlug,
+  isCollectiveInvite,
+  isLabelInvite,
+  labelInviteSlug,
+} from '@/src/lib/notificationInvites';
 import { openNotificationUrl } from '@/src/lib/pushNotifications';
 import { useNotificationStore } from '@/src/stores/notificationStore';
 import { showToast } from '@/src/stores/toastStore';
@@ -48,6 +56,7 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const paging = useRef(false);
   const appendFailed = useRef(false);
@@ -131,6 +140,40 @@ export default function NotificationsScreen() {
         });
     }
     if (item.link) void openNotificationUrl(item.link);
+  };
+
+  const respondToInvite = async (item: AppNotification, action: 'accept' | 'decline') => {
+    if (processingInviteId) return;
+    const collectiveSlug = collectiveInviteSlug(item);
+    const labelSlug = labelInviteSlug(item);
+    const labelType = item.inviteType === 'admin' || item.inviteType === 'artist' ? item.inviteType : null;
+    if (!collectiveSlug && !(labelSlug && labelType)) {
+      showToast('This invitation is missing its link.', 'error');
+      return;
+    }
+
+    setProcessingInviteId(item._id);
+    try {
+      if (collectiveSlug && isCollectiveInvite(item)) {
+        if (action === 'accept') await collectiveAPI.acceptInvite(collectiveSlug);
+        else await collectiveAPI.declineInvite(collectiveSlug);
+      } else if (labelSlug && labelType) {
+        if (action === 'accept') await labelAPI.acceptInvite(labelSlug, labelType);
+        else await labelAPI.declineInvite(labelSlug, labelType);
+      }
+      setItems((prev) => prev.filter((entry) => entry._id !== item._id));
+      showToast(action === 'accept' ? 'Invitation accepted' : 'Invitation declined');
+    } catch (err) {
+      showToast(
+        getApiErrorMessage(
+          err,
+          action === 'accept' ? 'Could not accept the invitation.' : 'Could not decline the invitation.'
+        ),
+        'error'
+      );
+    } finally {
+      setProcessingInviteId(null);
+    }
   };
 
   const markAllRead = async () => {
@@ -224,29 +267,57 @@ export default function NotificationsScreen() {
           }
           renderItem={({ item }) => {
             const when = formatNotificationTime(item.createdAt);
+            const invite = isCollectiveInvite(item) || isLabelInvite(item);
+            const busy = processingInviteId === item._id;
             return (
-              <Pressable
-                onPress={() => openItem(item)}
-                style={[styles.row, !item.isRead && styles.rowUnread]}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.title}. ${item.message}`}>
-                {!item.isRead ? <View style={styles.unreadDot} /> : <View style={styles.dotSpacer} />}
-                <View style={styles.rowCopy}>
-                  <View style={styles.rowTop}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    {when ? <Text style={styles.time}>{when}</Text> : null}
+              <View style={[styles.row, !item.isRead && styles.rowUnread]}>
+                <Pressable
+                  onPress={() => openItem(item)}
+                  style={styles.rowBody}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title}. ${item.message}`}>
+                  {!item.isRead ? <View style={styles.unreadDot} /> : <View style={styles.dotSpacer} />}
+                  <View style={styles.rowCopy}>
+                    <View style={styles.rowTop}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      {when ? <Text style={styles.time}>{when}</Text> : null}
+                    </View>
+                    <Text style={styles.rowMessage}>{item.message}</Text>
+                    {item.link ? (
+                      <Text style={styles.rowLink}>{item.linkText || 'Open'}</Text>
+                    ) : null}
                   </View>
-                  <Text style={styles.rowMessage}>{item.message}</Text>
                   {item.link ? (
-                    <Text style={styles.rowLink}>{item.linkText || 'Open'}</Text>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
                   ) : null}
-                </View>
-                {item.link ? (
-                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                </Pressable>
+                {invite ? (
+                  <View style={styles.inviteActions}>
+                    <Pressable
+                      onPress={() => void respondToInvite(item, 'accept')}
+                      disabled={processingInviteId != null}
+                      style={[styles.inviteBtn, styles.acceptBtn, processingInviteId != null && styles.inviteBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Accept invitation">
+                      {busy ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={styles.inviteBtnText}>Accept</Text>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      onPress={() => void respondToInvite(item, 'decline')}
+                      disabled={processingInviteId != null}
+                      style={[styles.inviteBtn, styles.declineBtn, processingInviteId != null && styles.inviteBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Decline invitation">
+                      <Text style={styles.inviteBtnText}>Decline</Text>
+                    </Pressable>
+                  </View>
                 ) : null}
-              </Pressable>
+              </View>
             );
           }}
         />
@@ -286,15 +357,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     backgroundColor: colors.card,
     marginBottom: 8,
+  },
+  rowBody: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   rowUnread: {
     backgroundColor: 'rgba(147, 51, 234, 0.18)',
@@ -335,6 +408,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    marginLeft: 18,
+  },
+  inviteBtn: {
+    minWidth: 88,
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  acceptBtn: { backgroundColor: '#16a34a' },
+  declineBtn: { backgroundColor: '#dc2626' },
+  inviteBtnDisabled: { opacity: 0.55 },
+  inviteBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   empty: {
     flex: 1,

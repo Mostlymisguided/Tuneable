@@ -206,6 +206,11 @@ export function hrefFromNotificationUrl(url?: string | null): Href | null {
   const tag = path.match(/^\/tag\/([^/]+)$/);
   if (tag) return { pathname: '/tag/[slug]', params: { slug: decodeURIComponent(tag[1]) } };
 
+  const collective = path.match(/^\/collective\/([^/]+)$/);
+  if (collective) {
+    return `/collective/${decodeURIComponent(collective[1])}` as Href;
+  }
+
   if (path === '/wallet') return '/wallet';
   if (path === '/dashboard') return '/(tabs)/profile';
   if (path === '/notifications') return '/notifications';
@@ -218,7 +223,7 @@ export function hrefFromNotificationUrl(url?: string | null): Href | null {
   return null;
 }
 
-/** Website URL for notification links that live on the platform, such as a collective. */
+/** Website URL for notification links the app cannot open itself, such as a label. */
 export function webUrlForNotification(url?: string | null): string | null {
   const target = notificationTarget(url);
   if (!target || hrefFromNotificationUrl(url)) return null;

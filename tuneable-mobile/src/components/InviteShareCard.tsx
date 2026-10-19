@@ -20,7 +20,7 @@ type Props = {
   /** Compact header that expands to copy/share — used on home. */
   collapsible?: boolean;
   defaultCollapsed?: boolean;
-  /** Founding creators earn the 3% invite commission; others get growth-only invites. */
+  /** Founding creators earn the 3% invite commission on music the invitee uploads. */
   isFoundingCreator?: boolean;
   ambassadorStatus?: AmbassadorStatus | null;
 };
@@ -64,9 +64,11 @@ export function InviteShareCard({
 
   if (!code) return null;
 
-  const shareMessage = isFoundingCreator
-    ? `You are invited to join Tuneable as a founding creator - use my invite code ${code}, get your music in the charts and start earning tips.\n\nVerify your profile, Upload your music and claim a founding share in the platform ✨\n\nBe part of the future of music 🎶\n\n${getInviteShareUrl(code)}`
-    : `Join Tuneable as a creator — use my invite code ${code}. That makes you eligible for a founding creator seat (first 1,111), claimed when you upload your own music. You keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
+  const commissionLine = isFoundingCreator
+    ? `\n\nIf you upload your own music and your profile is verified, I earn 3% of your paid tips for the first year after verification, from Tuneable's share, not yours.`
+    : '';
+
+  const shareMessage = `You are invited to join Tuneable as a founding ambassador - use my invite code ${code}.\n\nChampion the music you love and get it in the charts. You can take part without uploading music of your own. Creators keep 70% of paid tips on music they upload.${commissionLine}\n\nVerify your profile and be part of the future of music 🎶\n\n${getInviteShareUrl(code)}`;
 
   const onCopy = async () => {
     try {
@@ -94,8 +96,8 @@ export function InviteShareCard({
       {!collapsible ? <Text style={styles.code}>{code}</Text> : null}
       <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
         {isFoundingCreator
-          ? "Invite an artist with this code and earn 3% of their paid tips for year one (from Tuneable's share, on music they upload)."
-          : 'Invite creators with this code. It makes them eligible for a founding seat (first 1,111), claimed when they upload. The 3% invite commission is exclusive to verified founding creators.'}
+          ? 'Listeners, DJs, and creators can use this code without uploading music of their own. If they upload and verify, you earn 3% of their paid tips for year one, from Tuneable's share.'
+          : 'Listeners, DJs, and creators can use this code without uploading music of their own. Creators keep 70% of paid tips on music they upload.'}
       </Text>
       {ambassador ? (
         <View style={styles.stats}>

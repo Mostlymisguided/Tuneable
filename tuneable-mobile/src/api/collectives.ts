@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { api } from './client';
 import type { CollectiveType } from '../lib/collectiveTypes';
 import type { ResolvedLocation } from '../types/user';
 
@@ -73,7 +73,17 @@ export interface CollectiveProfileResponse {
 
 export const collectiveAPI = {
   async getProfile(slug: string): Promise<CollectiveProfileResponse> {
-    const response = await apiClient.get(`/api/collectives/${slug}`);
+    const response = await api.get(`/collectives/${encodeURIComponent(slug)}`);
+    return response.data;
+  },
+
+  async acceptInvite(slug: string): Promise<{ success: boolean; message?: string }> {
+    const response = await api.post(`/collectives/${encodeURIComponent(slug)}/accept-invite`);
+    return response.data;
+  },
+
+  async declineInvite(slug: string): Promise<{ success: boolean; message?: string }> {
+    const response = await api.post(`/collectives/${encodeURIComponent(slug)}/decline-invite`);
     return response.data;
   },
 
@@ -92,7 +102,7 @@ export const collectiveAPI = {
     currentPage: number;
     total: number;
   }> {
-    const response = await apiClient.get('/api/collectives', { params });
+    const response = await api.get('/collectives', { params });
     return response.data;
   },
 };
