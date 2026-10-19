@@ -34,6 +34,15 @@ export type AmbassadorSummary = {
   verifiedCreatorCount: number;
   activeWindowCount: number;
   commissionPence: number;
+  assignments?: Array<{
+    id: string;
+    label: string;
+    status: 'active' | 'paused' | 'revoked';
+    signupCount: number;
+    verifiedCreatorCount: number;
+    activeWindowCount: number;
+    sceneCount: number;
+  }>;
 };
 
 export const userAPI = {

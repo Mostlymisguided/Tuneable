@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { usePageMeta } from '../seo/usePageMeta';
 import { DEFAULT_PROFILE_PIC } from '../constants';
+import ProfileAmbassadors, { type ProfileAmbassador } from '../components/ProfileAmbassadors';
 
 interface PlaceEntity {
   placeId: string;
@@ -72,6 +73,8 @@ const LocationProfile: React.FC = () => {
   const [relatedPlaces, setRelatedPlaces] = useState<RelatedPlace[]>([]);
   const [relatedTags, setRelatedTags] = useState<RelatedTag[]>([]);
   const [venues, setVenues] = useState<PlaceVenue[]>([]);
+  const [ambassadors, setAmbassadors] = useState<ProfileAmbassador[]>([]);
+  const [ambassadorScope, setAmbassadorScope] = useState<{ viaAncestor?: boolean; label?: string | null } | null>(null);
   const [media, setMedia] = useState<PlaceMediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -92,6 +95,8 @@ const LocationProfile: React.FC = () => {
         setRelatedPlaces(data.relatedPlaces || []);
         setRelatedTags(data.relatedTags || []);
         setVenues(data.venues || []);
+        setAmbassadors(data.ambassadors || []);
+        setAmbassadorScope(data.ambassadorScope || null);
         setMedia(data.media || []);
         setTotal(data.pagination?.total ?? (data.media?.length || 0));
       } catch (err: unknown) {
@@ -193,6 +198,13 @@ const LocationProfile: React.FC = () => {
                   </span>
                 )}
               </div>
+
+              <ProfileAmbassadors
+                ambassadors={ambassadors}
+                heading={ambassadorScope?.viaAncestor && ambassadorScope.label
+                  ? `Ambassadors for ${ambassadorScope.label}`
+                  : 'Ambassadors'}
+              />
 
               {!loading && relatedPlaces.length > 0 && (
                 <div className="flex flex-wrap justify-center md:justify-start gap-1.5 mb-3">

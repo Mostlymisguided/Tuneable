@@ -529,6 +529,20 @@ export interface TuneBytesHistoryResponse {
 // Referrals response interface
 export type AmbassadorStatus = 'none' | 'active' | 'paused' | 'revoked';
 
+export interface AmbassadorAssignmentSummary {
+  id: string;
+  tag: string | null;
+  placeId: string | null;
+  placeLabel: string | null;
+  status: 'active' | 'paused' | 'revoked';
+  label: string;
+  signupCount: number;
+  verifiedCreatorCount: number;
+  activeWindowCount: number;
+  commissionPence: number;
+  sceneCount: number;
+}
+
 export interface AmbassadorSummary {
   status: AmbassadorStatus;
   note?: string | null;
@@ -539,6 +553,7 @@ export interface AmbassadorSummary {
   verifiedCreatorCount: number;
   activeWindowCount: number;
   commissionPence: number;
+  assignments?: AmbassadorAssignmentSummary[];
 }
 
 export interface ReferralsResponse {
@@ -570,4 +585,6 @@ export interface Referral {
   affiliateDaysRemaining?: number;
   commissionPence?: number;
   invitedByAmbassador?: boolean;
+  inviteTag?: string | null;
+  invitePlaceLabel?: string | null;
 }

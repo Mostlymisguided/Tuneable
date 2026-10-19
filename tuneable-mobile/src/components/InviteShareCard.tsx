@@ -107,6 +107,11 @@ export function InviteShareCard({
           <Text style={styles.statLine}>
             {ambassador.signupCount} signed up · {ambassador.verifiedCreatorCount} verified creators · {ambassador.activeWindowCount} in window · £{((ambassador.commissionPence || 0) / 100).toFixed(2)} earned
           </Text>
+          {(ambassador.assignments || []).map((beat) => (
+            <Text key={beat.id} style={styles.statLine}>
+              {beat.label}{beat.status !== 'active' ? ` · ${beat.status}` : ''}: {beat.signupCount} signed up · {beat.sceneCount} in scene
+            </Text>
+          ))}
         </View>
       ) : null}
       <View style={styles.actions}>

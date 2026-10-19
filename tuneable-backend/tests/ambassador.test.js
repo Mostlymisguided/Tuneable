@@ -6,6 +6,10 @@ const {
   isActiveAmbassador,
   hasUnlimitedInvites,
   summarizeAmbassadorInvitees,
+  summarizeAssignments,
+  assignmentMatchesContext,
+  stampAssignmentIds,
+  canonicalAssignmentTag,
   applyAmbassadorStatus,
   ambassadorClientFields,
 } = require('../utils/ambassador');
@@ -76,6 +80,78 @@ describe('ambassador status', () => {
     expect(applyAmbassadorStatus(user, { status: 'owner' }).ok).toBe(false);
     expect(applyAmbassadorStatus(user, { status: 'active', note: 'x'.repeat(501) }).ok).toBe(false);
     expect(user.ambassador).toBeUndefined();
+  });
+});
+
+describe('ambassador beats', () => {
+  const england = 'england';
+  const manchester = 'manchester';
+  const context = {
+    tag: 'House',
+    placeId: manchester,
+    ancestorIds: [manchester, england],
+  };
+
+  it('stores a canonical tag', () => {
+    expect(canonicalAssignmentTag('dnb')).toBe('DnB');
+    expect(canonicalAssignmentTag('  ')).toBeNull();
+  });
+
+  it('matches a tag anywhere, a place through its ancestors, and a pair only when both fit', () => {
+    expect(assignmentMatchesContext({ tag: 'House' }, context)).toBe(true);
+    expect(assignmentMatchesContext({ tag: 'dnb' }, context)).toBe(false);
+    expect(assignmentMatchesContext({ placeId: england }, context)).toBe(true);
+    expect(assignmentMatchesContext({ placeId: manchester }, context)).toBe(true);
+    expect(assignmentMatchesContext({ placeId: manchester }, { placeId: england, ancestorIds: [england] })).toBe(false);
+    expect(assignmentMatchesContext({ tag: 'House', placeId: england }, context)).toBe(true);
+    expect(assignmentMatchesContext({ tag: 'House', placeId: 'bristol' }, context)).toBe(false);
+  });
+
+  it('stamps only active beats on an active ambassador', () => {
+    const inviter = {
+      ambassador: {
+        status: 'active',
+        assignments: [
+          { _id: 'house', tag: 'House', status: 'active' },
+          { _id: 'paused', tag: 'Techno', status: 'paused' },
+          { _id: 'pair', tag: 'House', placeId: england, status: 'active' },
+        ],
+      },
+    };
+    const stamped = stampAssignmentIds(inviter, { ...context, tag: 'House' });
+    expect(stamped.assignmentIds).toEqual(['house', 'pair']);
+
+    inviter.ambassador.status = 'paused';
+    expect(stampAssignmentIds(inviter, context).assignmentIds).toEqual([]);
+  });
+
+  it('counts signups on the beat they were stamped to, and scene membership separately', () => {
+    const assignment = { _id: 'house', tag: 'House', placeId: null, status: 'active' };
+    const invitees = [
+      {
+        _id: 'a',
+        invitedByAmbassador: true,
+        inviteContext: { assignmentIds: ['house'] },
+        creatorProfile: verifiedProfile,
+        originalUploadCount: 1,
+        affiliateWindowActive: true,
+        commissionPence: 20,
+        homeLocation: { placeId: manchester, ancestorIds: [manchester, england] },
+      },
+      {
+        _id: 'b',
+        invitedByAmbassador: true,
+        inviteContext: { assignmentIds: [] },
+        creatorProfile: { ...verifiedProfile, genres: ['House'] },
+        homeLocation: { placeId: 'bristol' },
+      },
+    ];
+    const tags = new Map([['a', ['House']], ['b', ['House']]]);
+    const [summary] = summarizeAssignments([assignment], invitees, tags);
+    expect(summary.signupCount).toBe(1);
+    expect(summary.verifiedCreatorCount).toBe(1);
+    expect(summary.commissionPence).toBe(20);
+    expect(summary.sceneCount).toBe(2);
   });
 });
 

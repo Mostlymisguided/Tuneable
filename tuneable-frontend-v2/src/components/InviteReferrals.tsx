@@ -134,7 +134,12 @@ const InviteReferrals: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {ambassadorProgram && <AmbassadorProgramCard ambassador={ambassadorProgram} />}
+      {ambassadorProgram && (
+        <AmbassadorProgramCard
+          ambassador={ambassadorProgram}
+          inviteCode={user?.primaryInviteCode || user?.personalInviteCode || activeCodes[0]?.code}
+        />
+      )}
       {/* Invite Codes Management */}
       <div className="card bg-gradient-to-br from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-6">
         <div className="flex items-center justify-between gap-3">
@@ -493,6 +498,9 @@ const InviteReferrals: React.FC = () => {
                           </span>
                           {ambassadorProgram && referral.invitedByAmbassador && (
                             <span className="text-purple-300">Counted</span>
+                          )}
+                          {(referral.inviteTag || referral.invitePlaceLabel) && (
+                            <span>{[referral.inviteTag, referral.invitePlaceLabel].filter(Boolean).join(' · ')}</span>
                           )}
                           {referral.location?.city && (
                             <div className="flex items-center space-x-1">

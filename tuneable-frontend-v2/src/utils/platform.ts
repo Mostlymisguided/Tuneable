@@ -33,6 +33,8 @@ export function getOAuthCallbackRedirect(): string {
 
 export function buildOAuthStartUrl(provider: 'facebook' | 'google' | 'instagram' | 'soundcloud', options?: {
   inviteCode?: string;
+  inviteTag?: string;
+  invitePlaceId?: string;
   linkAccount?: boolean;
   token?: string;
   customRedirect?: string;
@@ -41,6 +43,8 @@ export function buildOAuthStartUrl(provider: 'facebook' | 'google' | 'instagram'
   const params = new URLSearchParams();
   params.set('redirect', options?.customRedirect || getOAuthCallbackRedirect());
   if (options?.inviteCode) params.set('invite', options.inviteCode);
+  if (options?.inviteTag) params.set('tag', options.inviteTag);
+  if (options?.invitePlaceId) params.set('place', options.invitePlaceId);
   if (options?.linkAccount) params.set('link_account', 'true');
   if (options?.token) params.set('token', options.token);
   if (options?.youtubeImport) params.set('youtube_import', 'true');

@@ -3,6 +3,8 @@ import { ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { userAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
+import LocationAutocomplete from './LocationAutocomplete';
+import type { ResolvedLocation } from '../utils/locationHelpers';
 
 type AmbassadorStatus = 'active' | 'paused' | 'revoked';
 
@@ -19,6 +21,14 @@ type AmbassadorRow = {
   verifiedCreatorCount: number;
   activeWindowCount: number;
   commissionPence: number;
+  assignments?: Array<{
+    id: string;
+    label: string;
+    status: 'active' | 'paused' | 'revoked';
+    signupCount: number;
+    verifiedCreatorCount: number;
+    sceneCount: number;
+  }>;
 };
 
 type Invitee = {
@@ -42,6 +52,8 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
   const [openId, setOpenId] = useState<string | null>(null);
   const [invitees, setInvitees] = useState<Record<string, Invitee[]>>({});
   const [loadingInvitees, setLoadingInvitees] = useState<string | null>(null);
+  const [beatTag, setBeatTag] = useState('');
+  const [beatPlace, setBeatPlace] = useState<ResolvedLocation | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +112,46 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
       onChanged?.();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update ambassador');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addBeat = async (userId: string) => {
+    if (!beatTag.trim() && !beatPlace?.placeId) {
+      toast.error('Choose a tag, a place, or both');
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await userAPI.addAmbassadorAssignment(userId, {
+        tag: beatTag.trim() || null,
+        place: beatPlace?.placeId ? {
+          placeId: beatPlace.placeId,
+          placeLabel: beatPlace.display || beatPlace.label || beatPlace.city || beatPlace.country || null,
+          featureType: beatPlace.featureType || null,
+          ancestorIds: beatPlace.ancestorIds || [],
+        } : null,
+      });
+      toast.success(result.message || 'Beat assigned');
+      setBeatTag('');
+      setBeatPlace(null);
+      await load();
+      onChanged?.();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to assign beat');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateBeat = async (userId: string, assignmentId: string, status: AmbassadorStatus) => {
+    setSaving(true);
+    try {
+      await userAPI.setAmbassadorAssignmentStatus(userId, assignmentId, status);
+      await load();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update beat');
     } finally {
       setSaving(false);
     }
@@ -201,6 +253,11 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
                             {!row.hasInviteCode ? ' · No invite code' : ''}
                           </div>
                           {row.note && <div className="text-xs text-gray-500 mt-1">{row.note}</div>}
+                          {(row.assignments || []).length > 0 && (
+                            <div className="text-xs text-purple-200 mt-1">
+                              {(row.assignments || []).map((beat) => beat.label).filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 pr-4 capitalize">{row.status}</td>
                         <td className="py-3 pr-4 tabular-nums">{row.signupCount}</td>
@@ -219,14 +276,55 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
                               <button type="button" disabled={saving} onClick={() => updateStatus(row, 'revoked')} className="text-xs text-red-300 hover:text-red-200">Revoke</button>
                             )}
                             <button type="button" onClick={() => toggleInvitees(row.userId)} className="text-xs text-purple-300 hover:text-purple-200">
-                              {openId === row.userId ? 'Hide' : 'Invitees'}
+                              {openId === row.userId ? 'Hide' : 'Beats'}
                             </button>
                           </div>
                         </td>
                       </tr>
                       {openId === row.userId && (
                         <tr className="border-t border-gray-700/60">
-                          <td colSpan={7} className="py-3">
+                          <td colSpan={7} className="py-3 space-y-3">
+                            <div className="space-y-2">
+                              {(row.assignments || []).map((beat) => (
+                                <div key={beat.id} className="flex flex-wrap items-center gap-2 text-xs text-gray-300">
+                                  <span className="text-white">{beat.label}</span>
+                                  <span className="capitalize text-gray-400">{beat.status}</span>
+                                  <span>{beat.signupCount} signed up · {beat.verifiedCreatorCount} verified · {beat.sceneCount} in scene</span>
+                                  {beat.status !== 'active' && (
+                                    <button type="button" disabled={saving} onClick={() => updateBeat(row.userId, beat.id, 'active')} className="text-green-300">Activate</button>
+                                  )}
+                                  {beat.status !== 'paused' && (
+                                    <button type="button" disabled={saving} onClick={() => updateBeat(row.userId, beat.id, 'paused')} className="text-amber-300">Pause</button>
+                                  )}
+                                  {beat.status !== 'revoked' && (
+                                    <button type="button" disabled={saving} onClick={() => updateBeat(row.userId, beat.id, 'revoked')} className="text-red-300">Revoke</button>
+                                  )}
+                                </div>
+                              ))}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                                <input
+                                  type="text"
+                                  value={openId === row.userId ? beatTag : ''}
+                                  onChange={(e) => setBeatTag(e.target.value)}
+                                  placeholder="Tag, e.g. House"
+                                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
+                                />
+                                <LocationAutocomplete
+                                  value={openId === row.userId ? beatPlace : null}
+                                  onChange={setBeatPlace}
+                                  placeholder="Place"
+                                  variant="dark"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={saving}
+                                  onClick={() => addBeat(row.userId)}
+                                  className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded-lg text-sm"
+                                >
+                                  Add beat
+                                </button>
+                              </div>
+                            </div>
                             {loadingInvitees === row.userId ? (
                               <p className="text-xs text-gray-400">Loading invitees…</p>
                             ) : (invitees[row.userId] || []).length === 0 ? (

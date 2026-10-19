@@ -147,6 +147,8 @@ const CreatorRegister: React.FC = () => {
   });
 
   const [parentInviteCode, setParentInviteCode] = useState('');
+  const [inviteTag, setInviteTag] = useState('');
+  const [invitePlaceId, setInvitePlaceId] = useState('');
   const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
   const [inviterUsername, setInviterUsername] = useState('');
   const [isValidatingCode, setIsValidatingCode] = useState(false);
@@ -190,6 +192,10 @@ const CreatorRegister: React.FC = () => {
 
   useEffect(() => {
     const inviteParam = searchParams.get('invite');
+    const tagParam = searchParams.get('tag');
+    const placeParam = searchParams.get('place');
+    if (tagParam) setInviteTag(tagParam);
+    if (placeParam) setInvitePlaceId(placeParam);
     if (!inviteParam || inviteLocked) return;
     const code = inviteParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
     setParentInviteCode(code);
@@ -329,6 +335,8 @@ const CreatorRegister: React.FC = () => {
             ...(parentInviteCode.length === 5 && inviteCodeValid !== false
               ? { parentInviteCode }
               : {}),
+            ...(inviteTag ? { inviteTag } : {}),
+            ...(invitePlaceId ? { invitePlaceId } : {}),
             acceptPasswordWarnings,
           })
         );
@@ -390,7 +398,10 @@ const CreatorRegister: React.FC = () => {
     try {
       let eligibleNow = foundingEligible || inviteLocked;
       if (parentInviteCode.length === 5 && inviteCodeValid && !inviteLocked) {
-        const attached = await userAPI.attachFoundingInvite(parentInviteCode);
+        const attached = await userAPI.attachFoundingInvite(parentInviteCode, {
+          inviteTag: inviteTag || undefined,
+          invitePlaceId: invitePlaceId || undefined,
+        });
         eligibleNow = true;
         setFoundingEligible(true);
         setInviteLocked(true);

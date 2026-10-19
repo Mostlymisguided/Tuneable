@@ -109,6 +109,8 @@ const AuthPage: React.FC = () => {
     givenName: '',
     familyName: '',
     parentInviteCode: '',
+    inviteTag: '',
+    invitePlaceId: '',
   });
 
   const { login, register, handleOAuthCallback } = useAuth();
@@ -155,6 +157,17 @@ const AuthPage: React.FC = () => {
       setFormData(prev => ({ ...prev, parentInviteCode: code }));
       if (code.length === 5) {
         validateInviteCode(code);
+      }
+    }
+    if (isRegisterPage) {
+      const tagParam = params.get('tag');
+      const placeParam = params.get('place');
+      if (tagParam || placeParam) {
+        setFormData(prev => ({
+          ...prev,
+          inviteTag: tagParam || prev.inviteTag,
+          invitePlaceId: placeParam || prev.invitePlaceId,
+        }));
       }
     }
 
@@ -262,6 +275,8 @@ const AuthPage: React.FC = () => {
 
     const oauthUrl = buildOAuthStartUrl(provider, {
       inviteCode: formData.parentInviteCode || undefined,
+      inviteTag: formData.inviteTag || undefined,
+      invitePlaceId: formData.invitePlaceId || undefined,
     });
 
     if (isNativeApp()) {
@@ -295,6 +310,8 @@ const AuthPage: React.FC = () => {
       const response = await authAPI.appleSignIn({
         identityToken: credential.identityToken,
         invite: formData.parentInviteCode || undefined,
+        inviteTag: formData.inviteTag || undefined,
+        invitePlaceId: formData.invitePlaceId || undefined,
         email: credential.email,
         fullName: credential.fullName,
       });
@@ -874,10 +891,12 @@ const AuthPage: React.FC = () => {
         <button
           type="button"
           onClick={() => {
-            const code = formData.parentInviteCode;
-            navigate(code
-              ? `/creator/register?invite=${encodeURIComponent(code)}`
-              : '/creator/register');
+            const params = new URLSearchParams();
+            if (formData.parentInviteCode) params.set('invite', formData.parentInviteCode);
+            if (formData.inviteTag) params.set('tag', formData.inviteTag);
+            if (formData.invitePlaceId) params.set('place', formData.invitePlaceId);
+            const query = params.toString();
+            navigate(query ? `/creator/register?${query}` : '/creator/register');
           }}
           className="font-medium text-zinc-100 underline-offset-2 hover:underline"
         >

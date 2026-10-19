@@ -2729,7 +2729,12 @@ Join here: ${inviteLink}`.trim();
 
       {/* Invite Codes Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-        {ambassadorProgram && <AmbassadorProgramCard ambassador={ambassadorProgram} />}
+        {ambassadorProgram && (
+          <AmbassadorProgramCard
+            ambassador={ambassadorProgram}
+            inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
+          />
+        )}
         <div className="bg-black/30 border border-amber-500/25 rounded-lg p-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -2922,6 +2927,11 @@ Join here: ${inviteLink}`.trim();
                           </span>
                           {ambassadorProgram && invitedUser.invitedByAmbassador && (
                             <span className="text-purple-300">Counted</span>
+                          )}
+                          {(invitedUser.inviteContext?.tag || invitedUser.inviteContext?.placeLabel) && (
+                            <span>
+                              {[invitedUser.inviteContext.tag, invitedUser.inviteContext.placeLabel].filter(Boolean).join(' · ')}
+                            </span>
                           )}
                         </div>
                       </div>

@@ -115,6 +115,10 @@ router.get('/:placeId/profile', optionalAuthMiddleware, async (req, res) => {
       sortBy,
       authenticated: Boolean(req.user),
     });
+    const { publicAmbassadorsForPlace } = require('../utils/ambassador');
+    const ambassadorResult = await publicAmbassadorsForPlace(profile.place?.placeId || placeId);
+    profile.ambassadors = ambassadorResult.ambassadors;
+    profile.ambassadorScope = ambassadorResult.scope;
     res.json(profile);
   } catch (error) {
     if (error.status === 404) {

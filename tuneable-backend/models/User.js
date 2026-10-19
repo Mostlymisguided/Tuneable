@@ -50,6 +50,14 @@ const userSchema = new mongoose.Schema({
   invitedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   // True only when the inviter was an active ambassador at signup. Revocation does not rewrite this.
   invitedByAmbassador: { type: Boolean, default: false },
+  // Beat carried on the invite link. assignmentIds are the active beats that matched at signup.
+  inviteContext: {
+    tag: { type: String, default: null },
+    placeId: { type: String, default: null },
+    placeLabel: { type: String, default: null },
+    ancestorIds: [{ type: String }],
+    assignmentIds: [{ type: mongoose.Schema.Types.ObjectId }],
+  },
   balance: { type: Number, default: 0 }, // Wallet balance stored in PENCE (integer), not pounds
   // Example: 1050 represents £10.50, 3300 represents £33.00
   // Unspent promotional welcome credit still in the wallet (pence). Spent promo-first; revocable by admin.
@@ -171,6 +179,23 @@ const userSchema = new mongoose.Schema({
     pausedAt: { type: Date, default: null },
     revokedAt: { type: Date, default: null },
     note: { type: String, default: null, maxlength: 500 },
+    // Tag, place, or both. Pausing the person pauses every beat. A beat can be paused on its own.
+    assignments: [{
+      tag: { type: String, default: null },
+      placeId: { type: String, default: null },
+      placeLabel: { type: String, default: null },
+      featureType: { type: String, default: null },
+      ancestorIds: [{ type: String }],
+      status: {
+        type: String,
+        enum: ['active', 'paused', 'revoked'],
+        default: 'active',
+      },
+      assignedAt: { type: Date, default: Date.now },
+      assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      pausedAt: { type: Date, default: null },
+      revokedAt: { type: Date, default: null },
+    }],
   },
   totalEscrowEarned: { 
     type: Number, 
@@ -636,6 +661,8 @@ userSchema.virtual('primaryInviteCode').get(function() {
 // Index for invite code lookups
 userSchema.index({ 'personalInviteCodes.code': 1 });
 userSchema.index({ 'ambassador.status': 1 });
+userSchema.index({ 'ambassador.assignments.tag': 1, 'ambassador.assignments.status': 1 });
+userSchema.index({ 'ambassador.assignments.placeId': 1, 'ambassador.assignments.status': 1 });
 userSchema.index({ invitedByUserId: 1, invitedByAmbassador: 1 });
 userSchema.index({ 'pendingCollectiveInvites.collectiveId': 1 });
 userSchema.index({ 'playbackQueue.mediaId': 1 });

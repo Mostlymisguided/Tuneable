@@ -243,6 +243,8 @@ export const authAPI = {
   appleSignIn: async (body: {
     identityToken: string;
     invite?: string;
+    inviteTag?: string;
+    invitePlaceId?: string;
     email?: string;
     fullName?: { givenName?: string; familyName?: string };
   }) => {
@@ -1190,6 +1192,15 @@ export const tagAPI = {
       media?: unknown[];
       pagination?: { page: number; limit: number; total: number; pages: number };
       relatedParty?: unknown;
+      ambassadors?: Array<{
+        username: string;
+        uuid?: string;
+        profilePic?: string | null;
+        artistName?: string | null;
+        label?: string | null;
+        tag?: string | null;
+        placeLabel?: string | null;
+      }>;
     };
   },
   getChampions: async (
@@ -1571,8 +1582,39 @@ export const userAPI = {
         verifiedCreatorCount: number;
         activeWindowCount: number;
         commissionPence: number;
+        assignments?: Array<{
+          id: string;
+          tag: string | null;
+          placeId: string | null;
+          placeLabel: string | null;
+          status: 'active' | 'paused' | 'revoked';
+          label: string;
+          signupCount: number;
+          verifiedCreatorCount: number;
+          activeWindowCount: number;
+          commissionPence: number;
+          sceneCount: number;
+        }>;
       }>;
     };
+  },
+
+  addAmbassadorAssignment: async (userId: string, body: {
+    tag?: string | null;
+    place?: {
+      placeId: string;
+      placeLabel?: string | null;
+      featureType?: string | null;
+      ancestorIds?: string[];
+    } | null;
+  }) => {
+    const response = await api.post(`/users/admin/ambassadors/${userId}/assignments`, body);
+    return response.data;
+  },
+
+  setAmbassadorAssignmentStatus: async (userId: string, assignmentId: string, status: string) => {
+    const response = await api.patch(`/users/admin/ambassadors/${userId}/assignments/${assignmentId}`, { status });
+    return response.data;
   },
 
   setAmbassadorStatus: async (body: { identifier?: string; userId?: string; status: string; note?: string }) => {
@@ -1609,8 +1651,12 @@ export const userAPI = {
   },
 
   // Attach an invite to the current account and become eligible for a founding seat
-  attachFoundingInvite: async (code: string) => {
-    const response = await api.post('/users/me/founding-invite', { code });
+  attachFoundingInvite: async (code: string, context?: { inviteTag?: string; invitePlaceId?: string }) => {
+    const response = await api.post('/users/me/founding-invite', {
+      code,
+      inviteTag: context?.inviteTag || undefined,
+      invitePlaceId: context?.invitePlaceId || undefined,
+    });
     return response.data as { message: string; code: string; inviterUsername?: string; eligible: boolean };
   },
 

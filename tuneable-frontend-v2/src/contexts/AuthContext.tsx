@@ -119,6 +119,8 @@ interface RegisterData {
   email: string;
   password: string;
   parentInviteCode?: string;
+  inviteTag?: string;
+  invitePlaceId?: string;
   cellPhone?: string;
   givenName?: string;
   familyName?: string;

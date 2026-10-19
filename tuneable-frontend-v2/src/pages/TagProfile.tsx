@@ -33,6 +33,7 @@ import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
 import EntertainingLoader from '../components/EntertainingLoader';
+import ProfileAmbassadors, { type ProfileAmbassador } from '../components/ProfileAmbassadors';
 import { usePageMeta } from '../seo/usePageMeta';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import {
@@ -162,6 +163,7 @@ const TagProfile: React.FC = () => {
   const [tag, setTag] = useState<TagEntity | null>(null);
   const [stats, setStats] = useState<TagStats | null>(null);
   const [relatedTags, setRelatedTags] = useState<RelatedTag[]>([]);
+  const [ambassadors, setAmbassadors] = useState<ProfileAmbassador[]>([]);
   const [topOriginPlaces, setTopOriginPlaces] = useState<TagPlaceChip[]>([]);
   const [topSupportPlaces, setTopSupportPlaces] = useState<TagPlaceChip[]>([]);
   const [media, setMedia] = useState<TagMediaItem[]>([]);
@@ -236,9 +238,11 @@ const TagProfile: React.FC = () => {
           setRelatedTags(relatedPodcastTags(matched, nextTag.name));
           setTopOriginPlaces([]);
           setTopSupportPlaces([]);
+          setAmbassadors([]);
         } else {
           setStats(data?.stats || null);
           setRelatedTags(data?.relatedTags || []);
+          setAmbassadors(data?.ambassadors || []);
           setTopOriginPlaces(data?.topOriginPlaces || []);
           setTopSupportPlaces(data?.topSupportPlaces || []);
           setMedia(profileMedia);
@@ -543,6 +547,8 @@ const TagProfile: React.FC = () => {
                   </span>
                 )}
               </div>
+
+              <ProfileAmbassadors ambassadors={ambassadors} />
 
               {/* Related tags */}
               {!loading && relatedTags.length > 0 && (

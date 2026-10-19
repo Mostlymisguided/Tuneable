@@ -198,6 +198,12 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
     if (req.query.invite) {
       req.session.pendingInviteCode = req.query.invite;
     }
+    if (req.query.tag) {
+      req.session.pendingInviteTag = String(req.query.tag).slice(0, 80);
+    }
+    if (req.query.place) {
+      req.session.pendingInvitePlaceId = String(req.query.place).slice(0, 200);
+    }
     // Store redirect URL and link_account flag in session for account linking
     if (req.query.redirect) {
       // Express already decodes query params once — do not decodeURIComponent again
@@ -396,6 +402,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     // Store invite code in session if provided
     if (req.query.invite) {
       req.session.pendingInviteCode = req.query.invite;
+    }
+    if (req.query.tag) {
+      req.session.pendingInviteTag = String(req.query.tag).slice(0, 80);
+    }
+    if (req.query.place) {
+      req.session.pendingInvitePlaceId = String(req.query.place).slice(0, 200);
     }
     // Store redirect URL and link_account flag in session for account linking
     if (req.query.redirect) {
@@ -644,6 +656,12 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
     if (req.query.invite) {
       req.session.pendingInviteCode = req.query.invite;
     }
+    if (req.query.tag) {
+      req.session.pendingInviteTag = String(req.query.tag).slice(0, 80);
+    }
+    if (req.query.place) {
+      req.session.pendingInvitePlaceId = String(req.query.place).slice(0, 200);
+    }
     
     // Passport manages OAuth 2.1 state + PKCE code_verifier in the session
     console.log('🎵 Starting SoundCloud OAuth (OAuth 2.1 + PKCE)');
@@ -841,6 +859,14 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
     if (req.query.invite) {
       req.session = req.session || {};
       req.session.pendingInviteCode = req.query.invite;
+    }
+    if (req.query.tag) {
+      req.session = req.session || {};
+      req.session.pendingInviteTag = String(req.query.tag).slice(0, 80);
+    }
+    if (req.query.place) {
+      req.session = req.session || {};
+      req.session.pendingInvitePlaceId = String(req.query.place).slice(0, 200);
     }
     // Store redirect URL and link_account flag in session for account linking
     if (req.query.redirect) {
@@ -1211,9 +1237,9 @@ router.post('/apple', async (req, res) => {
     const { verifyAppleIdentityToken } = require('../services/appleSignInService');
     const { generateUniqueOAuthUsername } = require('../utils/oauthUsername');
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
-    const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
+    const { resolveInviteForSignup, applyInviteUsage, inviteAttributionForSignup } = require('../utils/inviteSignup');
 
-    const { identityToken, invite, fullName, email: clientEmail } = req.body || {};
+    const { identityToken, invite, inviteTag, invitePlaceId, fullName, email: clientEmail } = req.body || {};
     const verified = await verifyAppleIdentityToken(identityToken);
     const appleId = verified.appleId;
     const email =
@@ -1327,7 +1353,10 @@ router.post('/apple', async (req, res) => {
       parentInviteCode: inviteCode || undefined,
       parentInviteCodeId:
         inviteCodeObj && inviteCodeObj._id ? inviteCodeObj._id : undefined,
-      ...inviteAttributionFields(inviteResult),
+      ...(await inviteAttributionForSignup(inviteResult, {
+        tag: inviteTag,
+        placeId: invitePlaceId,
+      })),
       oauthVerified: {
         apple: true,
         google: false,

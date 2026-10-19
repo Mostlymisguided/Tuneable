@@ -239,7 +239,7 @@ const { checkNewPassword } = require('../utils/passwordPolicy');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
 const { getBlockState, getBlockedUserIds, isBlockedBetween } = require('../utils/userBlocks');
 const { createProfilePictureUpload, processAndUploadImage, getPublicUrl } = require('../utils/r2Upload');
-const { resolveInviteForSignup, applyInviteUsage, inviteAttributionFields } = require('../utils/inviteSignup');
+const { resolveInviteForSignup, applyInviteUsage, inviteAttributionForSignup } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
 
@@ -498,7 +498,10 @@ router.post(
         }],
         parentInviteCode: resolvedParentCode || undefined,
         parentInviteCodeId: parentInviteCodeId || undefined, // Track which specific code was used
-        ...inviteAttributionFields(invite),
+        ...(await inviteAttributionForSignup(invite, {
+          tag: req.body?.inviteTag,
+          placeId: req.body?.invitePlaceId,
+        })),
         cellPhone: cellPhone || '',
         givenName: givenName || '',
         familyName: familyName || '',
@@ -878,11 +881,11 @@ router.get('/invited', authMiddleware, async (req, res) => {
     const {
       isAmbassadorProgramMember,
       ambassadorClientFields,
-      summarizeAmbassadorInvitees,
+      buildAmbassadorSummary,
     } = require('../utils/ambassador');
     const enriched = await attachAffiliateInviteStats(user, invitedUsers);
     const ambassador = isAmbassadorProgramMember(user)
-      ? ambassadorClientFields(user, summarizeAmbassadorInvitees(enriched))
+      ? ambassadorClientFields(user, await buildAmbassadorSummary(user, enriched))
       : null;
     
     res.json({ 
@@ -972,7 +975,10 @@ router.post('/me/founding-invite', authMiddleware, async (req, res) => {
     const { attachInviteForFounding } = require('../utils/inviteSignup');
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    const result = await attachInviteForFounding(user, req.body?.code);
+    const result = await attachInviteForFounding(user, req.body?.code, {
+      tag: req.body?.inviteTag,
+      placeId: req.body?.invitePlaceId,
+    });
     if (!result.ok) {
       return res.status(result.status || 400).json({ error: result.error });
     }
@@ -1222,6 +1228,51 @@ router.get('/admin/ambassadors/:userId/invitees', authMiddleware, adminMiddlewar
   } catch (error) {
     console.error('Error fetching ambassador invitees:', error);
     res.status(500).json({ error: 'Failed to fetch ambassador invitees' });
+  }
+});
+
+// @route   POST /api/users/admin/ambassadors/:userId/assignments
+// @desc    Assign a tag, a place, or both to an ambassador
+// @access  Private (Admin)
+router.post('/admin/ambassadors/:userId/assignments', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { addAmbassadorAssignment } = require('../utils/ambassador');
+    const result = await addAmbassadorAssignment({
+      userId: req.params.userId,
+      tag: req.body?.tag,
+      place: req.body?.place,
+      adminId: req.user._id,
+    });
+    if (!result.ok) return res.status(result.statusCode).json({ error: result.error });
+    res.status(201).json({
+      message: 'Beat assigned',
+      ambassador: result.ambassador,
+    });
+  } catch (error) {
+    console.error('Error assigning ambassador beat:', error);
+    res.status(500).json({ error: 'Failed to assign beat' });
+  }
+});
+
+// @route   PATCH /api/users/admin/ambassadors/:userId/assignments/:assignmentId
+// @desc    Pause, revoke, or reactivate one beat
+// @access  Private (Admin)
+router.patch('/admin/ambassadors/:userId/assignments/:assignmentId', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { setAssignmentStatus } = require('../utils/ambassador');
+    const result = await setAssignmentStatus({
+      userId: req.params.userId,
+      assignmentId: req.params.assignmentId,
+      status: req.body?.status,
+    });
+    if (!result.ok) return res.status(result.statusCode).json({ error: result.error });
+    res.json({
+      message: 'Beat updated',
+      ambassador: result.ambassador,
+    });
+  } catch (error) {
+    console.error('Error updating ambassador beat:', error);
+    res.status(500).json({ error: 'Failed to update beat' });
   }
 });
 
@@ -4539,7 +4590,7 @@ router.get('/referrals', authMiddleware, async (req, res) => {
     }
     
     const referrals = await User.find(query)
-      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId invitedByAmbassador creatorProfile.verificationStatus creatorProfile.verifiedAt creatorProfile.artistName creatorProfile.roles creatorProfile.genres')
+      .select('username profilePic createdAt homeLocation secondaryLocation uuid parentInviteCode parentInviteCodeId invitedByAmbassador inviteContext creatorProfile.verificationStatus creatorProfile.verifiedAt creatorProfile.artistName creatorProfile.roles creatorProfile.genres')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -4597,6 +4648,8 @@ router.get('/referrals', authMiddleware, async (req, res) => {
         affiliateDaysRemaining: r.affiliateDaysRemaining,
         commissionPence: r.commissionPence,
         invitedByAmbassador: Boolean(r.invitedByAmbassador),
+        inviteTag: r.inviteContext?.tag || null,
+        invitePlaceLabel: r.inviteContext?.placeLabel || null,
       })),
       ambassador,
     });

@@ -1,6 +1,12 @@
 const User = require('../models/User');
 const { foundingInviteEligibilityFields } = require('./foundingCreators');
-const { hasUnlimitedInvites, isActiveAmbassador } = require('./ambassador');
+const {
+  hasUnlimitedInvites,
+  isActiveAmbassador,
+  canonicalAssignmentTag,
+  stampAssignmentIds,
+  resolveInvitePlace,
+} = require('./ambassador');
 
 /**
  * Resolve an optional invite code for signup.
@@ -57,9 +63,9 @@ async function resolveInviteForSignup(rawCode) {
 /**
  * Fields to stamp on a new User so affiliate attribution survives code edits.
  */
-function inviteAttributionFields(invite) {
+function inviteAttributionFields(invite, context = null) {
   if (!invite || !invite.ok || !invite.inviter) return {};
-  return {
+  const fields = {
     parentInviteCode: invite.code || undefined,
     parentInviteCodeId: invite.inviteCodeObj && invite.inviteCodeObj._id
       ? invite.inviteCodeObj._id
@@ -68,13 +74,63 @@ function inviteAttributionFields(invite) {
     invitedByAmbassador: isActiveAmbassador(invite.inviter),
     ...foundingInviteEligibilityFields(),
   };
+  if (context && (context.tag || context.placeId)) {
+    fields.inviteContext = context;
+  }
+  return fields;
+}
+
+/**
+ * Resolve ?tag= and ?place= from an invite link into a stored beat.
+ * Place ancestors come from Mapbox when the caller only has a place id.
+ * assignmentIds are stamped only for beats that are active on an active ambassador.
+ */
+async function resolveInviteContext(invite, { tag, placeId, placeLabel, ancestorIds } = {}) {
+  const canonicalTag = canonicalAssignmentTag(tag);
+  const rawPlaceId = typeof placeId === 'string' && placeId.trim() ? placeId.trim() : null;
+  if (!canonicalTag && !rawPlaceId) return null;
+
+  let resolvedPlace = null;
+  if (rawPlaceId) {
+    const providedAncestors = Array.isArray(ancestorIds) ? ancestorIds.filter(Boolean) : [];
+    if (providedAncestors.length) {
+      resolvedPlace = {
+        placeId: rawPlaceId,
+        placeLabel: placeLabel || null,
+        ancestorIds: providedAncestors.includes(rawPlaceId)
+          ? providedAncestors
+          : [rawPlaceId, ...providedAncestors],
+      };
+    } else {
+      try {
+        resolvedPlace = await resolveInvitePlace(rawPlaceId);
+      } catch (error) {
+        console.warn('Invite place resolve failed:', error.message);
+      }
+      if (!resolvedPlace) {
+        resolvedPlace = { placeId: rawPlaceId, placeLabel: placeLabel || null, ancestorIds: [rawPlaceId] };
+      }
+    }
+  }
+
+  return stampAssignmentIds(invite?.inviter, {
+    tag: canonicalTag,
+    placeId: resolvedPlace?.placeId || null,
+    placeLabel: resolvedPlace?.placeLabel || placeLabel || null,
+    ancestorIds: resolvedPlace?.ancestorIds || [],
+  });
+}
+
+async function inviteAttributionForSignup(invite, rawContext = {}) {
+  const context = await resolveInviteContext(invite, rawContext);
+  return inviteAttributionFields(invite, context);
 }
 
 /**
  * Attach a valid invite to an existing account and mark them eligible for a founding seat.
  * Same code is idempotent and does not spend another invite credit.
  */
-async function attachInviteForFounding(user, rawCode) {
+async function attachInviteForFounding(user, rawCode, rawContext = {}) {
   if (!user) return { ok: false, status: 404, error: 'User not found' };
 
   const invite = await resolveInviteForSignup(rawCode);
@@ -100,6 +156,8 @@ async function attachInviteForFounding(user, rawCode) {
       : undefined;
     user.invitedByUserId = invite.inviter._id;
     user.invitedByAmbassador = isActiveAmbassador(invite.inviter);
+    const context = await resolveInviteContext(invite, rawContext);
+    if (context) user.inviteContext = context;
   }
 
   if (!user.foundingEligible) {
@@ -178,5 +236,7 @@ module.exports = {
   resolveInviteForSignup,
   applyInviteUsage,
   inviteAttributionFields,
+  resolveInviteContext,
+  inviteAttributionForSignup,
   attachInviteForFounding,
 };
