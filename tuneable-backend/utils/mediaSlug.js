@@ -4,9 +4,11 @@
  */
 
 const { slugifySegment, artistDisplayName } = require('./readableUploadKey');
-const { isUuidString, isMongoObjectIdString } = require('./identifierFormat');
+const { isUuidString, isMongoObjectIdString, escapeRegex } = require('./identifierFormat');
 
 const MAX_SLUG_LENGTH = 80;
+const MAX_SLUG_ALIASES = 20;
+const SLUG_SOURCE_FIELDS = ['title', 'artist', 'author', 'host', 'contentForm'];
 
 function firstCreatorName(creators) {
   if (!creators) return '';
@@ -65,8 +67,68 @@ function buildMediaSlugBase(media) {
   return base || 'untitled';
 }
 
+/** Current slug is the canonical base, or a collision suffix of that base (`-2`, `-3`). */
+function slugMatchesBase(currentSlug, base) {
+  if (!currentSlug || !base) return false;
+  const current = String(currentSlug).toLowerCase();
+  const root = String(base).toLowerCase();
+  if (current === root) return true;
+  return new RegExp(`^${escapeRegex(root)}-\\d+$`).test(current);
+}
+
+function normalizeAliasList(slugAliases, forbidden) {
+  const skip = new Set((forbidden || []).filter(Boolean).map((slug) => String(slug).toLowerCase()));
+  const aliases = [];
+  const seen = new Set();
+  for (const alias of slugAliases || []) {
+    const value = String(alias || '').toLowerCase().trim();
+    if (!value || skip.has(value) || seen.has(value)) continue;
+    seen.add(value);
+    aliases.push(value);
+  }
+  return aliases;
+}
+
+/**
+ * Decide the stored slug after a title/artist change.
+ * `availableSlug` is the unique slug the caller already reserved (base, or base-N).
+ * The previous slug is kept as an alias so existing links still open the tune.
+ */
+function planSlugUpdate({ currentSlug, slugAliases, availableSlug, base }) {
+  const current = currentSlug ? String(currentSlug).toLowerCase() : '';
+  const next = availableSlug ? String(availableSlug).toLowerCase() : '';
+  const aliases = normalizeAliasList(slugAliases, [next]);
+
+  if (!next) {
+    return { slug: current || null, slugAliases: aliases, changed: false };
+  }
+  if (!current) {
+    return { slug: next, slugAliases: aliases, changed: true };
+  }
+  if (current === next) {
+    const original = normalizeAliasList(slugAliases, []);
+    const changed = original.length !== aliases.length || original.some((alias, i) => alias !== aliases[i]);
+    return { slug: current, slugAliases: aliases, changed };
+  }
+  // Numbered collision slug, and the bare artist-title URL is still taken.
+  if (slugMatchesBase(current, base) && next !== base && slugMatchesBase(next, base)) {
+    return { slug: current, slugAliases: aliases, changed: false };
+  }
+
+  if (!aliases.includes(current)) aliases.push(current);
+  return {
+    slug: next,
+    slugAliases: aliases.slice(-MAX_SLUG_ALIASES),
+    changed: true,
+  };
+}
+
 module.exports = {
   MAX_SLUG_LENGTH,
+  MAX_SLUG_ALIASES,
+  SLUG_SOURCE_FIELDS,
   firstCreatorName,
   buildMediaSlugBase,
+  slugMatchesBase,
+  planSlugUpdate,
 };

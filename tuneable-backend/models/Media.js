@@ -602,9 +602,13 @@ mediaSchema.pre('save', function (next) {
 });
 
 mediaSchema.pre('save', async function generateMediaSlug(next) {
-  if (this.slug) return next();
+  // Deleted rows release their slug on purpose (merge, handoff). Don't mint a new one.
+  if (this.status === 'deleted') return next();
+  const { SLUG_SOURCE_FIELDS } = require('../utils/mediaSlug');
+  const identityChanged = SLUG_SOURCE_FIELDS.some((field) => this.isModified(field));
+  if (this.slug && !identityChanged) return next();
   try {
-    this.slug = await this.constructor.generateUniqueSlug(this);
+    await this.constructor.refreshSlug(this);
     next();
   } catch (err) {
     next(err);
@@ -1276,6 +1280,64 @@ mediaSchema.statics.generateUniqueSlug = async function generateUniqueSlug(media
 };
 
 /**
+ * Point the public slug at the current artist/title.
+ * The previous slug is kept on slugAliases so old links still resolve.
+ */
+mediaSchema.statics.refreshSlug = async function refreshSlug(media) {
+  if (!media || media.status === 'deleted') return media;
+  const { buildMediaSlugBase, planSlugUpdate } = require('../utils/mediaSlug');
+  const availableSlug = await this.generateUniqueSlug(media, media._id || null);
+  const plan = planSlugUpdate({
+    currentSlug: media.slug,
+    slugAliases: media.slugAliases,
+    availableSlug,
+    base: buildMediaSlugBase(media),
+  });
+  if (!plan.changed) return media;
+  media.slug = plan.slug;
+  media.slugAliases = plan.slugAliases;
+  return media;
+};
+
+/**
+ * A title edit used to leave the old longer slug in place, so the new
+ * artist-title URL 404'd. When nothing owns the requested slug, adopt it
+ * onto the single live tune whose current title slugifies to that exact URL.
+ */
+mediaSchema.statics.adoptCurrentTitleSlug = async function adoptCurrentTitleSlug(requestedSlug) {
+  const { buildMediaSlugBase } = require('../utils/mediaSlug');
+  const { escapeRegex } = require('../utils/identifierFormat');
+  const slug = String(requestedSlug || '').toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length < 3) return null;
+
+  const candidates = await this.find({
+    status: { $ne: 'deleted' },
+    slug: new RegExp(`^${escapeRegex(slug)}-`),
+  })
+    .select('_id title artist author host creatorDisplay contentForm slug status')
+    .limit(15)
+    .lean();
+
+  if (candidates.length >= 15) return null;
+  const matches = candidates.filter((media) => buildMediaSlugBase(media) === slug);
+  if (matches.length !== 1) return null;
+
+  const media = await this.findById(matches[0]._id);
+  if (!media || media.status === 'deleted') return null;
+  try {
+    await this.refreshSlug(media);
+    if (String(media.slug || '').toLowerCase() !== slug) return null;
+    if (media.isModified('slug') || media.isModified('slugAliases')) {
+      await media.save();
+    }
+  } catch (err) {
+    console.error('adoptCurrentTitleSlug failed:', err.message);
+    return null;
+  }
+  return media;
+};
+
+/**
  * Persist a public slug if this media does not have one yet.
  * Used on profile reads so UUID/ObjectId URLs can canonical-redirect.
  */
@@ -1346,7 +1408,11 @@ mediaSchema.statics.findByIdentifier = async function findByIdentifier(identifie
   // Artist-title URLs should open the living tune when a deleted copy still
   // holds the same slug or lists it as an alias.
   const matches = await this.find(filter).select('_id status').limit(8).lean();
-  if (!matches.length) return null;
+  if (!matches.length) {
+    const adopted = await this.adoptCurrentTitleSlug(slug);
+    if (!adopted) return null;
+    return applyReadOptions(this.findById(adopted._id));
+  }
   const chosen = matches.find((match) => match.status !== 'deleted') || matches[0];
   return applyReadOptions(this.findById(chosen._id));
 };
