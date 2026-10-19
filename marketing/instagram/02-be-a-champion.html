@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="post.css" />
+    <style>
+      .frame {
+        --glow: rgba(251, 191, 36, 0.42);
+        --accent: #fbbf24;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="frame">
+      <svg class="grain" aria-hidden="true">
+        <filter id="n">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#n)" />
+      </svg>
+      <div class="stage">
+        <div class="halo">
+          <svg width="210" height="210" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="#fbbf24"
+              d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"
+            />
+            <path d="M4.2 17.7h15.6" fill="none" stroke="#fde68a" stroke-width="2.3" stroke-linecap="round" />
+          </svg>
+        </div>
+      </div>
+      <h1>
+        <span class="a">Be A</span>
+        <span class="b">Champion</span>
+      </h1>
+      <div class="lockup">
+        <svg width="40" height="40" viewBox="0 0 180 180" aria-hidden="true">
+          <circle cx="90" cy="90" r="90" fill="#783CC8" />
+          <path fill="#fff" d="M78.49 17.95 19.66 77.11l16.66 16.7 20.9-20.77 43.96 43.46c2.55 1.58 5.32 2.21 8.29 1.91 2.98-.3 5.48-1.65 7.5-4.05 2.01-2.37 3.01-4.95 3.01-7.73s-.9-5.32-2.71-7.62L74.58 56.07l20.86-21.22z" />
+          <path fill="#fff" d="M99.48 39.24 82.65 55.94l38.33 38.44c6.62 9.04 6.46 17.25-.48 24.63-6.93 7.38-15.47 7.21-25.61-.53L57.55 80.95 40.54 97.94l41.55 41.38c6.75 5.23 14.12 8.14 22.1 8.72 7.99.58 15.79-.98 23.39-4.68l15.06 19.35c5.11-3.93 8.9-7.16 11.36-9.67 2.46-2.52 5.8-6.58 10.02-12.19l-19.28-14.68c4.28-7.52 5.73-16.11 4.36-25.77-1.37-9.65-5.05-17.21-11.06-22.69z" />
+        </svg>
+        <span>Tuneable</span>
+      </div>
+    </div>
+  </body>
+</html>

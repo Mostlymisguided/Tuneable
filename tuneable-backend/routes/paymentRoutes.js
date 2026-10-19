@@ -304,6 +304,55 @@ router.get('/iap/products', authMiddleware, async (_req, res) => {
 });
 
 /**
+ * Preview whether each store price is high enough for its GBP credit.
+ * The app uses this to disable a pack before the store charges the user.
+ * Body: { items: [{ productId, amountMajor, currency }] }
+ */
+router.post('/iap/price-preview', authMiddleware, async (req, res) => {
+  try {
+    const { getProductById } = require('../services/iapProducts');
+    const { assessStorePrice } = require('../services/iapPriceGuard');
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 8) : [];
+    const results = [];
+
+    for (const item of items) {
+      const productId = item?.productId;
+      const product = getProductById(productId);
+      if (!product) {
+        results.push({ productId, accepted: false, reason: 'unknown_product' });
+        continue;
+      }
+      try {
+        const assessment = await assessStorePrice({
+          amountMajor: Number(item.amountMajor),
+          currency: item.currency,
+          creditPence: product.creditPence,
+        });
+        results.push({
+          productId,
+          accepted: assessment.accepted,
+          paidPenceEstimate: assessment.paidPenceEstimate,
+          currency: assessment.currency,
+          amountMajor: assessment.amountMajor,
+        });
+      } catch (err) {
+        const unavailable = err.status === 503 || err.code === 'iap_fx_unavailable';
+        results.push({
+          productId,
+          accepted: unavailable ? null : false,
+          reason: err.message,
+        });
+      }
+    }
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Error previewing IAP prices:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * Verify Apple / Google purchase and credit wallet.
  * Body: {
  *   platform: 'ios' | 'android',
@@ -354,6 +403,15 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
       });
     }
 
+    const { resolveIapCreditPrice } = require('../services/iapPriceGuard');
+    const priceCheck = await resolveIapCreditPrice({
+      environment: verified.environment,
+      priceCheckSkip: verified.priceCheckSkip,
+      storePrice: verified.storePrice,
+      creditPence: verified.product.creditPence,
+      platform,
+    });
+
     const paymentMethod = platform === 'ios' ? 'apple_iap' : 'google_play';
     const result = await creditIapTopUp({
       userId: req.user._id,
@@ -364,8 +422,19 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
       platform,
       metadata: {
         environment: verified.environment,
+        ...priceCheck,
+        ...(verified.storefront ? { storefront: verified.storefront } : {}),
+        ...(verified.regionCode ? { regionCode: verified.regionCode } : {}),
       },
     });
+
+    if (typeof verified.acknowledge === 'function') {
+      try {
+        await verified.acknowledge();
+      } catch (ackErr) {
+        console.warn('Google Play acknowledge warning:', ackErr.message);
+      }
+    }
 
     res.json({
       message: result.alreadyProcessed
@@ -383,7 +452,10 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
     // store error from the app. 424 passes through with the JSON intact.
     const status = error.status >= 502 ? 424 : error.status || 500;
     console.error('IAP verify error:', error.message);
-    res.status(status).json({ error: error.message || 'IAP verification failed' });
+    res.status(status).json({
+      error: error.message || 'IAP verification failed',
+      ...(error.code ? { code: error.code } : {}),
+    });
   }
 });
 

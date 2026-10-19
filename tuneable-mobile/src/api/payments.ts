@@ -52,6 +52,20 @@ export const paymentAPI = {
     return response.data.products;
   },
 
+  previewIapPrices: async (
+    items: Array<{ productId: string; amountMajor: number; currency: string }>
+  ) => {
+    const response = await api.post<{
+      results: Array<{
+        productId: string;
+        accepted: boolean | null;
+        paidPenceEstimate?: number;
+        reason?: string;
+      }>;
+    }>('/payments/iap/price-preview', { items });
+    return response.data.results;
+  },
+
   verifyIapPurchase: async (payload: {
     platform: IapPlatform;
     productId: string;

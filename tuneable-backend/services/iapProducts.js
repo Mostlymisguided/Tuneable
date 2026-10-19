@@ -2,8 +2,9 @@
  * Wallet top-up packs sold via Apple IAP / Google Play Billing.
  * Product IDs must match App Store Connect + Play Console exactly.
  *
- * Wallet credit is always GBP (pence). Store price is set per territory
- * in the consoles; we credit the pack face value after server verification.
+ * Wallet credit is always GBP (pence). Each store territory should be priced
+ * from that GBP base. Verification refuses a purchase whose local price
+ * converts to less than the configured share of this credit.
  */
 
 const WALLET_IAP_PRODUCTS = [

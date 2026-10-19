@@ -35,6 +35,23 @@ WebBrowser.maybeCompleteAuthSession();
 
 const useStoreIap = shouldUseStoreIap();
 const AMOUNT_KEYBOARD_ACCESSORY_ID = 'wallet-amount-keyboard-done';
+const rejectedPriceTxnIds = new Set<string>();
+
+function storeListPrice(product: Product): { amountMajor: number; currency: string } | null {
+  if (product.currency && product.price != null && Number.isFinite(product.price)) {
+    return { amountMajor: product.price, currency: product.currency };
+  }
+  if (product.platform === 'android') {
+    const offer = product.oneTimePurchaseOfferDetailsAndroid?.[0];
+    if (offer?.priceCurrencyCode && offer.priceAmountMicros) {
+      const micros = Number(offer.priceAmountMicros);
+      if (Number.isFinite(micros)) {
+        return { amountMajor: micros / 1_000_000, currency: offer.priceCurrencyCode };
+      }
+    }
+  }
+  return null;
+}
 
 function isWalletIapSku(productId: string): boolean {
   return (WALLET_IAP_SKUS as readonly string[]).includes(productId);
@@ -67,6 +84,7 @@ export default function WalletScreen() {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
+  const [blockedSkus, setBlockedSkus] = useState<Set<string>>(new Set());
   const [iapReady, setIapReady] = useState(false);
   const [iapError, setIapError] = useState<string | null>(null);
   const verifyChain = useRef(Promise.resolve());
@@ -111,7 +129,12 @@ export default function WalletScreen() {
     (purchase: Purchase) => {
       if (!isWalletIapSku(purchase.productId)) return;
       const txnId = storeTransactionId(purchase);
-      if (!txnId || inFlightTxnIds.current.has(txnId) || settledTxnIds.current.has(txnId)) {
+      if (
+        !txnId ||
+        inFlightTxnIds.current.has(txnId) ||
+        settledTxnIds.current.has(txnId) ||
+        rejectedPriceTxnIds.has(txnId)
+      ) {
         return;
       }
 
@@ -152,8 +175,21 @@ export default function WalletScreen() {
           } catch (err: unknown) {
             console.error(err);
             const response = (
-              err as { response?: { status?: number; data?: { error?: string } } }
+              err as {
+                response?: { status?: number; data?: { error?: string; code?: string } };
+              }
             )?.response;
+            if (response?.data?.code === 'iap_price_too_low') {
+              rejectedPriceTxnIds.add(txnId);
+              if (Platform.OS === 'ios') {
+                try {
+                  await iap.finishTransaction({ purchase, isConsumable: true });
+                  settledTxnIds.current.add(txnId);
+                } catch (finishErr) {
+                  console.warn('Could not finish rejected Apple purchase', finishErr);
+                }
+              }
+            }
             const message =
               response?.data?.error ||
               (response?.status && response.status >= 500
@@ -259,6 +295,31 @@ export default function WalletScreen() {
   }, []);
 
   useEffect(() => {
+    if (!useStoreIap || !isAuthenticated || storeProducts.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const items = storeProducts.flatMap((product) => {
+        const price = storeListPrice(product);
+        if (!price) return [];
+        return [{ productId: product.id, ...price }];
+      });
+      if (items.length === 0) return;
+      try {
+        const results = await paymentAPI.previewIapPrices(items);
+        if (cancelled) return;
+        setBlockedSkus(
+          new Set(results.filter((result) => result.accepted === false).map((result) => result.productId))
+        );
+      } catch (err) {
+        console.warn('IAP price preview failed', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, storeProducts]);
+
+  useEffect(() => {
     if (useStoreIap) return;
     if (params.success === 'true' && params.amount) {
       const amount = Number.parseFloat(params.amount);
@@ -280,6 +341,13 @@ export default function WalletScreen() {
   ]);
 
   const startIapPurchase = async (productId: string) => {
+    if (blockedSkus.has(productId)) {
+      Alert.alert(
+        'Price too low',
+        'This store price is too low for the wallet credit. It needs a higher local price before it can be sold.'
+      );
+      return;
+    }
     const iap = getExpoIap();
     if (!iap || !iapReady) {
       Alert.alert(
@@ -433,28 +501,34 @@ export default function WalletScreen() {
           <View style={styles.quickRow}>
             {WALLET_IAP_PRODUCTS.map((pack) => {
               const displayPrice = storePriceBySku.get(pack.productId);
+              const blocked = blockedSkus.has(pack.productId);
               return (
                 <Pressable
                   key={pack.productId}
-                  style={[styles.quickBtn, (loading || !iapReady) && styles.disabled]}
-                  disabled={loading || !iapReady}
+                  style={[styles.quickBtn, (loading || !iapReady || blocked) && styles.disabled]}
+                  disabled={loading || !iapReady || blocked}
                   onPress={() => void startIapPurchase(pack.productId)}>
-                  <Text style={styles.quickText}>{pack.label}</Text>
+                  <Text style={styles.quickText}>{displayPrice || pack.label}</Text>
                   <Text style={styles.feeHint}>
-                    {displayPrice
-                      ? displayPrice
-                      : iapReady
-                        ? 'Price unavailable'
-                        : 'Loading…'}
+                    {blocked
+                      ? `Too low for ${pack.label} credit`
+                      : displayPrice
+                        ? `${pack.label} credit`
+                        : iapReady
+                          ? 'Price unavailable'
+                          : 'Loading…'}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
           <Text style={styles.note}>
-            Paid via {Platform.OS === 'ios' ? 'Apple' : 'Google Play'}. Wallet
-            credit matches the pack amount. Custom amounts are available on the
-            website via card.
+            You pay the {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} price
+            in your local currency. The pound amount is added to your wallet.
+            {blockedSkus.size > 0
+              ? ' A pack stays unavailable when that store price is too low for its credit.'
+              : ''}{' '}
+            Custom amounts are available on the website via card.
           </Text>
         </>
       ) : (

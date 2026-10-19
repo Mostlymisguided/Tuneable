@@ -2,6 +2,7 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const { google } = require('googleapis');
 const { getProductById } = require('./iapProducts');
+const { storePriceFromApplePayload, priceFromGoogleOrder } = require('./iapPriceGuard');
 
 const APPLE_PRODUCTION_VERIFY = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_SANDBOX_VERIFY = 'https://sandbox.itunes.apple.com/verifyReceipt';
@@ -223,6 +224,8 @@ async function verifyApplePurchase({ productId, transactionId, purchaseToken, re
       product,
       storeTransactionId: String(payload.transactionId),
       environment: payload.environment || 'Production',
+      storePrice: storePriceFromApplePayload(payload),
+      storefront: payload.storefront || null,
       raw: payload,
     };
   }
@@ -257,6 +260,8 @@ async function verifyApplePurchase({ productId, transactionId, purchaseToken, re
       product,
       storeTransactionId: String(match.transaction_id),
       environment: receiptResult.environment || 'unknown',
+      storePrice: null,
+      storefront: null,
       raw: match,
     };
   }
@@ -275,6 +280,78 @@ async function verifyApplePurchase({ productId, transactionId, purchaseToken, re
   );
   err.status = 503;
   throw err;
+}
+
+function googleOrderUrl(packageName, orderId) {
+  return `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(packageName)}/orders/${encodeURIComponent(orderId)}`;
+}
+
+async function fetchGoogleOrder(auth, packageName, orderId) {
+  const client = typeof auth.getClient === 'function' ? await auth.getClient() : auth;
+  const url = googleOrderUrl(packageName, orderId);
+  try {
+    const res = await client.request({ url, method: 'GET' });
+    if (res && res.data && (res.data.orderId || res.data.total || res.data.lineItems)) {
+      return res.data;
+    }
+    return res;
+  } catch (err) {
+    const status = err.response?.status || err.status;
+    const permissionDenied = status === 401 || status === 403;
+    const wrapped = new Error(
+      permissionDenied
+        ? 'Google Play could not read the order price. Grant this service account the View financial data permission in Play Console.'
+        : `Google Play order lookup failed${status ? ` (${status})` : ''}: ${err.message}`
+    );
+    wrapped.status = permissionDenied ? 503 : 502;
+    wrapped.code = 'iap_price_missing';
+    throw wrapped;
+  }
+}
+
+/**
+ * Paid Play orders must carry a price. Promo, rewarded, and zero-price
+ * license tests do not, and are marked so the credit floor can skip them.
+ */
+async function resolveGoogleStorePrice(auth, packageName, data) {
+  const purchaseType = data.purchaseType;
+  if (purchaseType === 1 || purchaseType === 2) {
+    return { storePrice: null, priceCheckSkip: 'unpaid_store_grant' };
+  }
+
+  if (!data.orderId) {
+    if (purchaseType === 0) {
+      return { storePrice: null, priceCheckSkip: 'test_purchase' };
+    }
+    const err = new Error('Google Play order id is missing, so the price paid cannot be checked');
+    err.status = 422;
+    err.code = 'iap_price_missing';
+    throw err;
+  }
+
+  let order;
+  try {
+    order = await fetchGoogleOrder(auth, packageName, data.orderId);
+  } catch (err) {
+    if (purchaseType === 0) {
+      console.warn('Google test purchase order price unavailable:', err.message);
+      return { storePrice: null, priceCheckSkip: 'test_purchase' };
+    }
+    throw err;
+  }
+
+  const storePrice = priceFromGoogleOrder(order);
+  if (!storePrice || storePrice.amountMajor <= 0) {
+    if (purchaseType === 0) {
+      return { storePrice: null, priceCheckSkip: 'test_purchase' };
+    }
+    const err = new Error('Google Play order has no price, so the wallet was not credited');
+    err.status = 422;
+    err.code = 'iap_price_missing';
+    throw err;
+  }
+
+  return { storePrice, priceCheckSkip: null };
 }
 
 function getGoogleAuthClient() {
@@ -303,7 +380,8 @@ function getGoogleAuthClient() {
 }
 
 /**
- * Verify a Google Play product purchase and acknowledge it.
+ * Verify a Google Play product purchase. Acknowledgement is returned for the
+ * caller to run after the wallet credit succeeds.
  */
 async function verifyGooglePurchase({ productId, purchaseToken, packageName }) {
   const product = assertKnownProduct(productId);
@@ -349,19 +427,7 @@ async function verifyGooglePurchase({ productId, purchaseToken, packageName }) {
     throw err;
   }
 
-  // Acknowledge if needed (0 = yet to be acknowledged)
-  if (data.acknowledgementState === 0) {
-    try {
-      await androidpublisher.purchases.products.acknowledge({
-        packageName: pkg,
-        productId,
-        token: purchaseToken,
-        requestBody: {},
-      });
-    } catch (ackErr) {
-      console.warn('Google Play acknowledge warning:', ackErr.message);
-    }
-  }
+  const { storePrice, priceCheckSkip } = await resolveGoogleStorePrice(auth, pkg, data);
 
   const storeTransactionId =
     data.orderId || `${pkg}:${productId}:${purchaseToken.slice(0, 32)}`;
@@ -370,7 +436,21 @@ async function verifyGooglePurchase({ productId, purchaseToken, packageName }) {
     product,
     storeTransactionId: String(storeTransactionId),
     environment: data.purchaseType === 0 ? 'test' : 'production',
+    storePrice,
+    priceCheckSkip,
+    regionCode: data.regionCode || null,
     raw: data,
+    // Acknowledge only after the wallet credit succeeds. An unacknowledged
+    // Play purchase is refunded automatically after 3 days.
+    acknowledge: async () => {
+      if (data.acknowledgementState !== 0) return;
+      await androidpublisher.purchases.products.acknowledge({
+        packageName: pkg,
+        productId,
+        token: purchaseToken,
+        requestBody: {},
+      });
+    },
   };
 }
 
