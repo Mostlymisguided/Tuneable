@@ -1587,11 +1587,13 @@ const TuneProfile: React.FC = () => {
     }
     const artistName = media?.artist || 'this artist';
     const title = media?.title || 'this track';
+    const topTag = tagRankings[0]?.tag || rankedTags[0]?.tag || media?.tags?.[0];
+    const chartPhrase = topTag ? `a ${topTag} chart entry` : 'a chart entry';
     const mediaLink = media
       ? `${window.location.origin}${getMediaProfileUrl(media)}`
       : window.location.href;
     const inviteLink = `${window.location.origin}/creator/register?invite=${inviteCode}`;
-    const message = `Hey ${artistName} — "${title}" is on Tuneable waiting for you. Sign up as a creator and claim it so tips can reach you.\n\nCheck it out: ${mediaLink}\n\n${inviteLink}\n\n✨Your Rights✨ You retain full rights over your works. You may revoke any rights granted to Tuneable at any time by removing your works from the platform.`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable as ${chartPhrase}. Sign up as a creator and claim it so tips can reach you.\n\nIt is currently not playable as rights are not cleared - please reply YES to clear rights if you have the permissions or NO to have the title removed from the charts.\n\n✨Your Rights✨\n\nYou grant Tuneable Community Interest Company a non-exclusive, worldwide license to host, stream, display, distribute, and monetise your content within the Tuneable platform.\n\nYou retain full rights over your works. You may revoke any rights granted to Tuneable at any time as per our terms.\n\nCheck it out: ${mediaLink}\n\n${inviteLink}`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(message);
@@ -1610,7 +1612,7 @@ const TuneProfile: React.FC = () => {
     } catch {
       toast.error('Could not copy invite');
     }
-  }, [media, navigate, user]);
+  }, [media, navigate, rankedTags, tagRankings, user]);
 
   const handleRightsStatusChange = async (status: RightsStatus) => {
     if (!media?._id || savingRightsStatus) return;
