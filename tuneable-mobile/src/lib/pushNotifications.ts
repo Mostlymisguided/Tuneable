@@ -207,6 +207,7 @@ export function hrefFromNotificationUrl(url?: string | null): Href | null {
   if (tag) return { pathname: '/tag/[slug]', params: { slug: decodeURIComponent(tag[1]) } };
 
   if (path === '/wallet') return '/wallet';
+  if (path === '/dashboard') return '/(tabs)/profile';
   if (path === '/notifications') return '/notifications';
   if (path === '/profile') return '/(tabs)/profile';
   if (path === '/charts') return '/(tabs)/charts';

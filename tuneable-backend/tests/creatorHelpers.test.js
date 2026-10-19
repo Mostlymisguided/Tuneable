@@ -6,6 +6,7 @@
 const {
   isPlaceholderCreatorLabel,
   resolveCreatorDisplay,
+  newlyLinkedUserIds,
 } = require('../utils/creatorHelpers');
 
 describe('isPlaceholderCreatorLabel', () => {
@@ -79,5 +80,26 @@ describe('resolveCreatorDisplay', () => {
         host: [{ name: 'Ira Glass' }],
       })
     ).toBe('Ira Glass');
+  });
+});
+
+describe('newlyLinkedUserIds', () => {
+  it('returns profiles that were not already linked and skips the editor', () => {
+    const previous = [{ userId: 'already' }, { userId: { _id: 'kept' } }];
+    const next = [
+      { userId: 'already' },
+      { userId: 'kept' },
+      { userId: 'new-one' },
+      { userId: 'editor' },
+      { userId: { _id: 'new-two' } },
+      { userId: 'new-one' },
+      { userId: null },
+    ];
+    expect(newlyLinkedUserIds(previous, next, 'editor')).toEqual(['new-one', 'new-two']);
+  });
+
+  it('treats a first save as new links except the person saving', () => {
+    expect(newlyLinkedUserIds([], [{ userId: 'uploader' }], 'uploader')).toEqual([]);
+    expect(newlyLinkedUserIds(null, [{ userId: 'guest' }], null)).toEqual(['guest']);
   });
 });

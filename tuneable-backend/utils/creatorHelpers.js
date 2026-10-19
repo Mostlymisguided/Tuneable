@@ -163,6 +163,44 @@ function findUserCredits(media, userId) {
  * @param {string} userId - User ObjectId to link to
  * @returns {number} Number of links created
  */
+function creatorUserId(creator) {
+  const value = creator?.userId;
+  if (value == null || value === '') return null;
+  if (typeof value === 'object') {
+    if (value._id != null && value._id !== value) {
+      return creatorUserId({ userId: value._id });
+    }
+    if (typeof value.toString === 'function') {
+      const text = value.toString();
+      if (text && text !== '[object Object]') return text;
+    }
+    return null;
+  }
+  const text = String(value).trim();
+  return text || null;
+}
+
+/**
+ * User ids present on the new credit list that were not already linked.
+ * The person who saved the link is skipped.
+ */
+function newlyLinkedUserIds(previousCreators, nextCreators, actorId = null) {
+  const before = new Set(
+    (previousCreators || []).map(creatorUserId).filter(Boolean)
+  );
+  const actor = actorId ? String(actorId) : null;
+  const seen = new Set();
+  const added = [];
+  for (const creator of nextCreators || []) {
+    const id = creatorUserId(creator);
+    if (!id || before.has(id) || seen.has(id)) continue;
+    if (actor && id === actor) continue;
+    seen.add(id);
+    added.push(id);
+  }
+  return added;
+}
+
 async function linkCreatorToUser(media, creatorName, userId) {
   let linksCreated = 0;
   const roles = [
@@ -234,6 +272,8 @@ module.exports = {
   seriesTitleFromMedia,
   resolveCreatorDisplay,
   findUserCredits,
+  creatorUserId,
+  newlyLinkedUserIds,
   linkCreatorToUser,
   getMediaByUser,
   getMediaByCreatorName

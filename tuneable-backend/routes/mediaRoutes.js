@@ -21,6 +21,7 @@ const {
 } = require('../utils/r2Upload');
 const { buildReadableAudioKey, buildReadableCoverKey } = require('../utils/readableUploadKey');
 const { toCreatorSubdocs } = require('../utils/creatorHelpers');
+const notificationService = require('../services/notificationService');
 const { normalizeLanguageInput } = require('../utils/language');
 const { parseArtistString, formatCreatorDisplay } = require('../utils/artistParser');
 const { getMediaCoverArt, DEFAULT_COVER_ART } = require('../utils/coverArtUtils');
@@ -934,6 +935,11 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     });
     
     await media.save();
+    await notificationService.notifyNewlyLinkedMediaUsers({
+      media,
+      previousCreators: [],
+      actorId: userId,
+    });
     await refreshGearStatsForStack(media.productionStack);
 
     const rightsCase = permission
@@ -2241,7 +2247,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
     
     // Artist field (string or array -> array of subdocuments)
     // Parse artist string to extract primary artists and featuring artists
+    let previousLinkedArtists = null;
     if (req.body.artist !== undefined) {
+      previousLinkedArtists = (media.artist || []).map((artist) => ({
+        userId: artist.userId || null,
+      }));
       // Handle array format (from autocomplete selection with userId)
       if (Array.isArray(req.body.artist) && req.body.artist.length > 0) {
         media.artist = req.body.artist.map(artist => {
@@ -2779,6 +2789,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     
     await media.save();
+    if (previousLinkedArtists) {
+      await notificationService.notifyNewlyLinkedMediaUsers({
+        media,
+        previousCreators: previousLinkedArtists,
+        actorId: userId,
+      });
+    }
     if (req.body.productionStack !== undefined) {
       await refreshGearStatsForStack(media.productionStack);
     }
@@ -4480,6 +4497,9 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
     const oldArtist = media.artist && media.artist.length > 0 
       ? media.artist.map(a => a.name).join(', ')
       : '';
+    const previousLinkedArtists = (artists !== undefined || artist !== undefined)
+      ? (media.artist || []).map((entry) => ({ userId: entry.userId || null }))
+      : null;
 
     // Update artist if provided (handle both array and string formats)
     let newArtistNames = null;
@@ -4589,6 +4609,13 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
     }
 
     await media.save();
+    if (previousLinkedArtists) {
+      await notificationService.notifyNewlyLinkedMediaUsers({
+        media,
+        previousCreators: previousLinkedArtists,
+        actorId: req.user._id,
+      });
+    }
 
     if (req.body.copySharePercent !== undefined) {
       try {

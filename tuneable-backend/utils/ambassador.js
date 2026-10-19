@@ -394,6 +394,14 @@ async function setAmbassadorStatus({ userId, identifier, status, note, adminId }
   if (!applied.ok) return { ok: false, statusCode: 400, error: applied.error };
 
   await user.save();
+  if (status === 'active' && applied.previousStatus !== 'active') {
+    try {
+      const notificationService = require('../services/notificationService');
+      await notificationService.notifyAmbassadorAssigned(user._id, adminId);
+    } catch (error) {
+      console.error('Error sending ambassador notification:', error);
+    }
+  }
   const { summary } = await summarizeForInviter(user);
   return {
     ok: true,
@@ -453,6 +461,7 @@ async function addAmbassadorAssignment({ userId, tag, place, adminId }) {
   if (existing && existing.status !== 'revoked') {
     return { ok: false, statusCode: 400, error: 'That beat is already assigned' };
   }
+  let assignment;
   if (existing && existing.status === 'revoked') {
     existing.tag = normalized.assignment.tag;
     existing.placeId = normalized.assignment.placeId;
@@ -461,16 +470,28 @@ async function addAmbassadorAssignment({ userId, tag, place, adminId }) {
     existing.ancestorIds = normalized.assignment.ancestorIds;
     applyAssignmentStatus(existing, 'active');
     existing.assignedBy = adminId || existing.assignedBy;
+    assignment = existing;
   } else {
-    user.ambassador.assignments.push({
+    assignment = {
       ...normalized.assignment,
       status: 'active',
       assignedAt: new Date(),
       assignedBy: adminId || null,
-    });
+    };
+    user.ambassador.assignments.push(assignment);
   }
   user.markModified('ambassador');
   await user.save();
+  try {
+    const notificationService = require('../services/notificationService');
+    await notificationService.notifyAmbassadorBeatAssigned(
+      user._id,
+      assignmentLabel(assignment),
+      adminId
+    );
+  } catch (error) {
+    console.error('Error sending ambassador beat notification:', error);
+  }
   const { summary } = await summarizeForInviter(user);
   return { ok: true, ambassador: ambassadorRow(user, summary) };
 }

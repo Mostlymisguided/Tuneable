@@ -77,7 +77,10 @@ const createNotification = async (params) => {
       'claim_approved',
       'claim_rejected',
       'admin_announcement',
-      'warning'
+      'warning',
+      'media_linked',
+      'ambassador_assigned',
+      'ambassador_beat_assigned'
     ];
 
     if (!alwaysSendTypes.includes(type)) {
@@ -550,6 +553,88 @@ const notifyMediaDeleted = async (userId, mediaId, mediaTitle, refundAmount, rea
   }
 };
 
+const mediaLinkFor = (media) => {
+  const { detectMediaKind, canonicalMediaPath } = require('../services/storyCardCopy');
+  const kind = detectMediaKind(media);
+  const token = media?.uuid || media?._id;
+  return { kind, link: canonicalMediaPath(kind, token) };
+};
+
+/**
+ * Tell a user their profile was just linked on a media credit.
+ */
+const notifyMediaLinked = async (userId, media) => {
+  const { creatorUserId } = require('../utils/creatorHelpers');
+  const title = media?.title || 'a tune';
+  const names = (media?.artist || [])
+    .filter((artist) => creatorUserId(artist) === String(userId))
+    .map((artist) => (typeof artist?.name === 'string' ? artist.name.trim() : ''))
+    .filter(Boolean);
+  const credit = names.length ? ` as ${[...new Set(names)].join(' & ')}` : '';
+  const { link } = mediaLinkFor(media);
+
+  await createNotification({
+    userId,
+    type: 'media_linked',
+    title: 'Linked to a media',
+    message: `Your profile is now linked to "${title}"${credit}.`,
+    link,
+    linkText: link.startsWith('/book/') ? 'View Book' : 'View Media',
+    relatedMediaId: media?._id || null,
+    groupKey: `media_linked_${media?._id || 'unknown'}_${userId}`,
+  });
+};
+
+/**
+ * Notify users whose profile was newly attached to this media's artist credits.
+ */
+const notifyNewlyLinkedMediaUsers = async ({ media, previousCreators, actorId }) => {
+  try {
+    const { newlyLinkedUserIds } = require('../utils/creatorHelpers');
+    const ids = newlyLinkedUserIds(previousCreators, media?.artist, actorId);
+    await Promise.all(ids.map((userId) => notifyMediaLinked(userId, media)));
+  } catch (error) {
+    console.error('Error creating media link notifications:', error);
+  }
+};
+
+const notifyAmbassadorAssigned = async (userId, adminId = null) => {
+  try {
+    await createNotification({
+      userId,
+      type: 'ambassador_assigned',
+      title: "You're an ambassador",
+      message: "You've been assigned as a Tuneable ambassador. Signups with your invite code count while this is active.",
+      link: '/dashboard',
+      linkText: 'View dashboard',
+      relatedUserId: adminId || null,
+      groupKey: `ambassador_assigned_${userId}`,
+    });
+  } catch (error) {
+    console.error('Error creating ambassador notification:', error);
+  }
+};
+
+const notifyAmbassadorBeatAssigned = async (userId, label, adminId = null) => {
+  try {
+    const beat = label && String(label).trim() ? String(label).trim() : null;
+    await createNotification({
+      userId,
+      type: 'ambassador_beat_assigned',
+      title: 'New ambassador beat',
+      message: beat
+        ? `You've been assigned the ${beat} beat.`
+        : "You've been assigned a new ambassador beat.",
+      link: '/dashboard',
+      linkText: 'View dashboard',
+      relatedUserId: adminId || null,
+      groupKey: `ambassador_beat_${userId}_${beat || 'beat'}`,
+    });
+  } catch (error) {
+    console.error('Error creating ambassador beat notification:', error);
+  }
+};
+
 module.exports = {
   createNotification,
   notifyBidReceived,
@@ -561,6 +646,10 @@ module.exports = {
   notifyTuneBytesEarned,
   notifyMediaVetoed,
   notifyMediaUnvetoed,
-  notifyMediaDeleted
+  notifyMediaDeleted,
+  notifyMediaLinked,
+  notifyNewlyLinkedMediaUsers,
+  notifyAmbassadorAssigned,
+  notifyAmbassadorBeatAssigned,
 };
 

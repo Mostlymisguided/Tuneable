@@ -25,6 +25,9 @@ const notificationSchema = new mongoose.Schema({
       'tune_bytes_earned',       // Earned TuneBytes
       'party_media_played',      // Your media played in party
       'media_claimed',           // Your uploaded media was claimed
+      'media_linked',            // Your profile was linked to a media
+      'ambassador_assigned',     // Assigned as an ambassador
+      'ambassador_beat_assigned', // Assigned an ambassador beat
       'label_invite',            // Invited to label
       'collective_invite',       // Invited to collective
       'warning',                 // Admin warning issued to user
