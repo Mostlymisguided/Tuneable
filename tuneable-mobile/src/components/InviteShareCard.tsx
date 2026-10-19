@@ -65,7 +65,7 @@ export function InviteShareCard({
   if (!code) return null;
 
   const shareMessage = isFoundingCreator
-    ? `Join Tuneable as a creator — use my invite code ${code}. Upload your music and keep 70% of paid tips. Once your profile is verified, as a founding creator I earn 3% from Tuneable's share for the first year after verification.\n${getInviteShareUrl(code)}`
+    ? `You are invited to join Tuneable as a founding creator - use my invite code ${code}, get your music in the charts and start earning tips.\n\nVerify your profile, Upload your music and claim a founding share in the platform ✨\n\nBe part of the future of music 🎶\n\n${getInviteShareUrl(code)}`
     : `Join Tuneable as a creator — use my invite code ${code}. That makes you eligible for a founding creator seat (first 1,111), claimed when you upload your own music. You keep 70% of paid tips.\n${getInviteShareUrl(code)}`;
 
   const onCopy = async () => {
