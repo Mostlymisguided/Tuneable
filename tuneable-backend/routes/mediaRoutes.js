@@ -67,6 +67,7 @@ const {
 } = require('../services/gearService');
 const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
+const { normalizeIsbn } = require('../utils/isbn');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
 const Gear = require('../models/Gear');
 const { resolveDeletedSuccessor } = require('../services/mediaSlugHandoff');
@@ -2129,11 +2130,23 @@ router.put('/:id', authMiddleware, async (req, res) => {
     // Note: 'sources' is handled separately below due to Map type
     const allowedUpdates = [
       'title', 'producer', 'album', 'genre',
-      'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'bpm',
+      'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'isbn', 'bpm',
       'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
       'lyrics', 'description', 'language', 'minimumBid', 'copySharePercent'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
+
+    if (req.body.isbn !== undefined) {
+      if (req.body.isbn === '' || req.body.isbn == null) {
+        req.body.isbn = null;
+      } else {
+        const normalizedIsbn = normalizeIsbn(req.body.isbn);
+        if (!normalizedIsbn) {
+          return res.status(400).json({ error: 'ISBN is not valid' });
+        }
+        req.body.isbn = normalizedIsbn;
+      }
+    }
 
     if (req.body.copySharePercent !== undefined && req.body.copySharePercent !== null && req.body.copySharePercent !== '') {
       const share = Math.round(Number(req.body.copySharePercent));
@@ -2358,20 +2371,25 @@ router.put('/:id', authMiddleware, async (req, res) => {
       }
     }
     
-    // Featuring field (array of strings -> array of subdocuments)
-    // Only process if artist wasn't a string (already handled above)
-    if (req.body.featuring !== undefined && typeof req.body.artist !== 'string') {
+    // Featuring field (array of strings or {name,userId} -> subdocuments).
+    // A non-empty artist string is parsed into featuring above; an empty
+    // artist string should still accept an explicit featuring list.
+    const artistIsParsedString = typeof req.body.artist === 'string' && req.body.artist.trim();
+    if (req.body.featuring !== undefined && !artistIsParsedString) {
       if (Array.isArray(req.body.featuring)) {
         // Handle both string arrays and empty arrays
         if (req.body.featuring.length === 0) {
           media.featuring = [];
         } else {
           media.featuring = req.body.featuring
-            .filter(name => name && typeof name === 'string' && name.trim().length > 0)
-            .map(name => ({
-              name: typeof name === 'string' ? name.trim() : name.name,
-              userId: null,
-              verified: false
+            .filter((entry) => {
+              if (typeof entry === 'string') return entry.trim().length > 0;
+              return entry && typeof entry.name === 'string' && entry.name.trim().length > 0;
+            })
+            .map((entry) => ({
+              name: typeof entry === 'string' ? entry.trim() : entry.name.trim(),
+              userId: typeof entry === 'object' && entry.userId ? entry.userId : null,
+              verified: typeof entry === 'object' ? !!entry.verified : false
             }));
         }
       } else if (req.body.featuring === '' || req.body.featuring === null) {
@@ -2682,6 +2700,41 @@ router.put('/:id', authMiddleware, async (req, res) => {
         }];
       } else if (req.body.composer === '') {
         media.composer = [];
+      }
+    }
+
+    // Author, host, and songwriter — same name-list shape as composer.
+    // Books credit `author`; podcast shows often credit `host`.
+    const applyCreatorField = (field) => {
+      if (req.body[field] === undefined) return;
+      const value = req.body[field];
+      if (value === '' || value === null) {
+        media[field] = [];
+        return;
+      }
+      if (typeof value === 'string') {
+        const names = value.split(',').map((name) => name.trim()).filter(Boolean);
+        media[field] = names.map((name) => ({ name, userId: null, verified: false }));
+        return;
+      }
+      if (Array.isArray(value)) {
+        media[field] = toCreatorSubdocs(value);
+      }
+    };
+    applyCreatorField('author');
+    applyCreatorField('host');
+    applyCreatorField('songwriter');
+
+    if (req.body.author !== undefined || req.body.host !== undefined) {
+      const artistDisplay = formatCreatorDisplay(media.artist || [], media.featuring || []);
+      if (!artistDisplay) {
+        const creditNames = []
+          .concat(media.host || [], media.author || [])
+          .map((entry) => (typeof entry === 'string' ? entry : entry?.name))
+          .filter(Boolean);
+        if (creditNames.length) {
+          media.creatorDisplay = creditNames.join(', ');
+        }
       }
     }
 

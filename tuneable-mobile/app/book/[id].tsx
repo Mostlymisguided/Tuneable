@@ -16,6 +16,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
+import { EditMediaButton } from '@/src/components/EditMediaButton';
 import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { booksAPI } from '@/src/api/books';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -113,7 +114,10 @@ export default function BookProfileScreen() {
             <Text style={styles.backText}>Back</Text>
           </Pressable>
           {book ? (
-            <ReportHeaderButton onPress={() => setReportOpen(true)} />
+            <View style={styles.headerActions}>
+              <EditMediaButton media={book} />
+              <ReportHeaderButton onPress={() => setReportOpen(true)} />
+            </View>
           ) : null}
         </View>
 
@@ -266,6 +270,11 @@ const styles = StyleSheet.create({
   backText: {
     color: colors.text,
     fontSize: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   loader: {
     marginTop: 48,

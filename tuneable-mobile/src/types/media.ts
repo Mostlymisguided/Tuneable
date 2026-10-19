@@ -11,8 +11,41 @@ export interface ChartMediaItem {
   title?: string;
   artist?: string | Array<string | { name?: string; userId?: string | { _id?: string; uuid?: string } }>;
   creatorDisplay?: string;
-  host?: Array<string | { name?: string }>;
-  author?: Array<string | { name?: string }>;
+  artists?: Array<string | { name?: string; userId?: string | { _id?: string; id?: string }; collectiveId?: string | { _id?: string }; verified?: boolean; relationToNext?: string | null }>;
+  producer?: Array<string | { name?: string; userId?: string | { _id?: string } }>;
+  featuring?: Array<string | { name?: string; userId?: string | { _id?: string }; verified?: boolean }>;
+  composer?: Array<string | { name?: string }>;
+  songwriter?: Array<string | { name?: string }>;
+  host?: Array<string | { name?: string; userId?: string | { _id?: string }; verified?: boolean }>;
+  author?: Array<string | { name?: string; userId?: string | { _id?: string }; verified?: boolean }>;
+  authors?: string[];
+  label?: string | Array<string | { name?: string; labelId?: string | { _id?: string } }>;
+  mediaOwners?: Array<{
+    userId?: string | { _id?: string; id?: string; uuid?: string };
+    verified?: boolean;
+  }>;
+  contentType?: string[];
+  explicit?: boolean;
+  isrc?: string | null;
+  upc?: string | null;
+  lyrics?: string | null;
+  language?: string | null;
+  timeSignature?: string | null;
+  pitch?: number | null;
+  encodedBy?: string | null;
+  copySharePercent?: number | null;
+  elements?: string[];
+  productionStack?: {
+    daws?: Array<{ name?: string; version?: string; role?: string | null; gearId?: string }>;
+    plugins?: Array<{ name?: string; manufacturer?: string; category?: string; role?: string | null; gearId?: string }>;
+    hardware?: Array<{ name?: string; manufacturer?: string; category?: string; role?: string | null; gearId?: string }>;
+  };
+  aiUsage?: {
+    used?: boolean;
+    disclosure?: string;
+    notes?: string;
+    tools?: Array<{ name?: string; category?: string; provider?: string }>;
+  };
   duration?: number;
   coverArt?: string;
   partyMediaAggregate?: number;
@@ -34,6 +67,7 @@ export interface ChartMediaItem {
   releaseDate?: string | null;
   releaseYear?: number | null;
   primaryLocation?: import('@/src/types/user').ResolvedLocation | null;
+  secondaryLocation?: import('@/src/types/user').ResolvedLocation | null;
   description?: string | null;
   tags?: string[];
   genres?: string[];

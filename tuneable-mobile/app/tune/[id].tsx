@@ -25,6 +25,7 @@ import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { TagClaimSheet } from '@/src/components/TagClaimSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
+import { EditMediaButton } from '@/src/components/EditMediaButton';
 import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -357,7 +358,10 @@ export default function TuneProfileScreen() {
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
         {media ? (
-          <ReportHeaderButton onPress={() => setReportOpen(true)} />
+          <View style={styles.headerActions}>
+            <EditMediaButton media={media} />
+            <ReportHeaderButton onPress={() => setReportOpen(true)} />
+          </View>
         ) : null}
       </View>
 
@@ -816,6 +820,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   back: { marginLeft: -2 },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
   content: {
     paddingHorizontal: 16,
     paddingBottom: 40,

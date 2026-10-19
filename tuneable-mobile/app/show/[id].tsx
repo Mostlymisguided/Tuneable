@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
+import { EditMediaButton } from '@/src/components/EditMediaButton';
 import { Screen } from '@/src/components/Screen';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
@@ -343,6 +344,7 @@ export default function PodcastShowScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
+        {series ? <EditMediaButton media={series} /> : null}
       </View>
 
       {loading && !series ? (
@@ -659,6 +661,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingTop: 8,
     marginBottom: 4,

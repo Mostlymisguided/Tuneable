@@ -147,6 +147,7 @@ function RootNavigator() {
         <Stack.Screen name="book/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="upload" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tune/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="edit-media/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="podcast/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="show/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="user/[id]" options={{ animation: 'slide_from_right' }} />

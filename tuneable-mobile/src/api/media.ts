@@ -191,4 +191,74 @@ export const mediaAPI = {
     );
     return response.data;
   },
+
+  /** Metadata update. Caller must be an admin, media owner, or verified creator. */
+  updateMedia: async (
+    mediaId: string,
+    updates: Record<string, unknown>
+  ): Promise<{ message?: string; media?: ChartMediaItem }> => {
+    const response = await api.put<{ message?: string; media?: ChartMediaItem }>(
+      `/media/${mediaId}`,
+      updates
+    );
+    return response.data;
+  },
+
+  uploadCoverArt: async (
+    mediaId: string,
+    file: { uri: string; name: string; mimeType: string }
+  ): Promise<{ coverArt?: string; message?: string }> => {
+    const form = new FormData();
+    form.append('coverArtFile', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
+    const response = await api.put<{ coverArt?: string; message?: string }>(
+      `/media/${mediaId}/cover-art`,
+      form,
+      { timeout: 120000 }
+    );
+    return response.data;
+  },
+
+  removeCoverArt: async (
+    mediaId: string
+  ): Promise<{ coverArt?: string; message?: string }> => {
+    const response = await api.delete<{ coverArt?: string; message?: string }>(
+      `/media/${mediaId}/cover-art`
+    );
+    return response.data;
+  },
+
+  attachUpload: async (
+    mediaId: string,
+    file: AudioFileAsset,
+    options: { replaceExisting: boolean },
+    request?: Pick<AxiosRequestConfig, 'onUploadProgress' | 'signal'>
+  ): Promise<{ message?: string; media?: ChartMediaItem }> => {
+    const form = new FormData();
+    appendAudioFile(form, file);
+    form.append('rightsConfirmed', 'true');
+    form.append('uploaderRole', 'owner');
+    if (options.replaceExisting) {
+      form.append('replaceExisting', 'true');
+    }
+    const response = await api.post<{ message?: string; media?: ChartMediaItem }>(
+      `/media/${mediaId}/attach-upload`,
+      form,
+      { timeout: UPLOAD_TIMEOUT_MS, ...request }
+    );
+    return response.data;
+  },
+
+  deleteMedia: async (
+    mediaId: string,
+    reason?: string
+  ): Promise<{ message?: string }> => {
+    const response = await api.delete<{ message?: string }>(`/media/${mediaId}`, {
+      data: reason ? { reason } : undefined,
+    });
+    return response.data;
+  },
 };
