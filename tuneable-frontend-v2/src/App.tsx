@@ -8,6 +8,7 @@ import { CurrentLocationProvider } from './contexts/CurrentLocationContext';
 import { useWebPlayerStore } from './stores/webPlayerStore';
 import { usePodcastPlayerStore } from './stores/podcastPlayerStore';
 import Navbar from './components/Navbar';
+import SiteFooter from './components/SiteFooter';
 import SeoManager from './components/SeoManager';
 import AppToaster from './components/AppToaster';
 import PersistentWebPlayer from './components/PersistentWebPlayer';
@@ -224,10 +225,10 @@ const AppContent = () => {
       <SeoManager />
       <AuthDeepLinkListener />
       <PlayAuthRedirectBinder />
-      <div className="min-h-screen">
+      <div className="flex min-h-screen flex-col">
         <Navbar />
         <OnboardingRedirect />
-        <main className="pt-16 pb-32">
+        <main className="flex-1 pt-16">
           <Routes>
             <Route path="/" element={<Navigate to="/party/global?period=all-time" replace />} />
             <Route path="/home" element={<Navigate to="/about" replace />} />
@@ -449,6 +450,7 @@ const AppContent = () => {
             />
           </Routes>
         </main>
+        <SiteFooter />
         <PlayerRenderer />
         <AppToaster />
       </div>

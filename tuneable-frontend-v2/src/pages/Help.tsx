@@ -402,7 +402,7 @@ const Help: React.FC = () => {
               <section 
                 key={section.id} 
                 id={section.id}
-                className="bg-gray-900/50 border border-white/10 rounded-lg p-6 hover:border-purple-500/50 transition-colors"
+                className="scroll-mt-24 bg-gray-900/50 border border-white/10 rounded-lg p-6 hover:border-purple-500/50 transition-colors"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="text-purple-400">

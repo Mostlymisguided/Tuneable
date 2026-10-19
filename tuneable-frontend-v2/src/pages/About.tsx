@@ -311,53 +311,6 @@ const About: React.FC = () => {
           </div>
         </div>
       </section>
-
-      <footer className="bg-gray-900 py-8 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between md:flex-row">
-            <div className="mb-4 md:mb-0">
-              <p className="text-gray-400">&copy; 2025 Tuneable. All rights reserved.</p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-              <Link to="/party/global?period=all-time" className="text-gray-400 transition-colors hover:text-white">
-                Charts
-              </Link>
-              <Link to="/places" className="text-gray-400 transition-colors hover:text-white">
-                Places
-              </Link>
-              <Link to="/join-us" className="text-gray-400 transition-colors hover:text-white">
-                Join Us
-              </Link>
-              <a
-                href="https://discord.gg/hwGMZV89up"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-400 transition-colors hover:text-white"
-              >
-                Discord
-              </a>
-              <Link to="/help" className="text-gray-400 transition-colors hover:text-white">
-                Help
-              </Link>
-              <Link to="/about#how-money-works" className="text-gray-400 transition-colors hover:text-white">
-                How money works
-              </Link>
-              <Link to="/about#tunebytes" className="text-gray-400 transition-colors hover:text-white">
-                TuneBytes
-              </Link>
-              <Link to="/privacy-policy" className="text-gray-400 transition-colors hover:text-white">
-                Privacy Policy
-              </Link>
-              <Link to="/terms-of-service" className="text-gray-400 transition-colors hover:text-white">
-                Terms of Service
-              </Link>
-              <Link to="/data-deletion" className="text-gray-400 transition-colors hover:text-white">
-                Data Deletion
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
