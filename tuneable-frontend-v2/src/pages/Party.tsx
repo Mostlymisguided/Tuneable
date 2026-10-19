@@ -53,9 +53,11 @@ import { hasAuthToken, requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
+  ChartRefreshBar,
   PlayableEmptyState,
   PlayableFilterHint,
   PlayableFilterTrigger,
+  useChartLag,
 } from '../components/PlayableFilterControl';
 
 // Define types directly to avoid import issues
@@ -211,6 +213,40 @@ function isPartyItemPlayable(item: any): boolean {
   return isMediaPlayable(enrichMediaWithPlayability(partyItemMedia(item)));
 }
 
+type ChartCacheEntry = {
+  media: any[];
+  hiddenCount: number | null;
+  party?: any;
+};
+
+function sortedChartCacheKey(parts: {
+  partyId: string;
+  timePeriod: string;
+  locationPlaceId?: string | null;
+  locationScope: string;
+  chartSort: string;
+  playableOnly: boolean;
+}) {
+  return [
+    'sorted',
+    parts.partyId,
+    parts.timePeriod,
+    parts.locationPlaceId || '',
+    parts.locationScope,
+    parts.chartSort,
+    parts.playableOnly ? '1' : '0',
+  ].join('|');
+}
+
+function chartCacheBase(key: string) {
+  const cut = key.lastIndexOf('|');
+  return cut === -1 ? key : key.slice(0, cut);
+}
+
+function partyChartCacheKey(partyId: string, playableOnly: boolean) {
+  return `party|${partyId}|${playableOnly ? '1' : '0'}`;
+}
+
 function buildPlayablePlayerQueue(items: any[]) {
   return items.filter(isPartyItemPlayable).map(toPlayerQueueItem);
 }
@@ -361,6 +397,13 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [sortedMedia, setSortedMedia] = useState<any[]>([]);
   const [sortedHiddenCount, setSortedHiddenCount] = useState<number | null>(null);
   const [isLoadingSortedMedia, setIsLoadingSortedMedia] = useState(false);
+  const [isRefreshingPartyMedia, setIsRefreshingPartyMedia] = useState(false);
+  const [loadedSortedKey, setLoadedSortedKey] = useState<string | null>(null);
+  const [loadedPartyPlayableOnly, setLoadedPartyPlayableOnly] = useState<boolean | null>(null);
+  const chartCacheRef = useRef(new Map<string, ChartCacheEntry>());
+  const partyLoadedRef = useRef(false);
+  const sortedFetchGen = useRef(0);
+  const partyFetchGen = useRef(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(null);
@@ -420,7 +463,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmFilter, setShowBpmFilter] = useState(false);
-  const { playableOnly, setPlayableOnly, togglePlayableOnly } = usePlayableOnly('chart');
+  const { playableOnly, setPlayableOnly } = usePlayableOnly('chart');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareDropdown, setShowShareDropdown] = useState(false);
@@ -593,18 +636,43 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   });
 
   useEffect(() => {
-    if (partyId) {
-      fetchPartyDetails();
-    }
-  }, [partyId, playableOnly]);
+    partyLoadedRef.current = false;
+    setLoadedPartyPlayableOnly(null);
+    setLoadedSortedKey(null);
+    chartCacheRef.current.clear();
+  }, [partyId]);
 
   useEffect(() => {
     if (!partyId) return;
-    if (useSortedQueue) {
-      fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId);
-    } else {
+    // Time, place, and sort charts come from the sorted endpoint. Reloading
+    // party details on every playable toggle repeats the all-time chart query.
+    if (useSortedQueue && partyLoadedRef.current) return;
+    void fetchPartyDetails({ preserveOtherModes: true });
+  }, [partyId, playableOnly, useSortedQueue]);
+
+  useEffect(() => {
+    if (!partyId) return;
+    if (!useSortedQueue) {
       setSortedMedia([]);
+      setSortedHiddenCount(null);
+      setLoadedSortedKey(null);
+      return;
     }
+    const key = sortedChartCacheKey({
+      partyId,
+      timePeriod: selectedTimePeriod,
+      locationPlaceId: selectedLocation?.placeId,
+      locationScope,
+      chartSort,
+      playableOnly,
+    });
+    const cached = chartCacheRef.current.get(key);
+    if (cached) {
+      setSortedMedia(cached.media);
+      setSortedHiddenCount(cached.hiddenCount);
+      setLoadedSortedKey(key);
+    }
+    void fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId, { preserveOtherModes: true });
   }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope, playableOnly]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
@@ -761,18 +829,37 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         setCurrentMedia(cleanedQueue[firstPlayableIndex], firstPlayableIndex);
       }
     }
-  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, bpmFilterRange, useSortedQueue, isLoadingSortedMedia, setQueue, setCurrentMedia]);
+  }, [sortedMedia, selectedTimePeriod, party, queueSearchTerms, searchQuery, bpmFilterRange, useSortedQueue, isLoadingSortedMedia, playableOnly, setQueue, setCurrentMedia]);
 
-  const fetchPartyDetails = async () => {
+  const fetchPartyDetails = async (options?: { preserveOtherModes?: boolean }) => {
+    if (!partyId) return;
+    const requestedPlayable = playableOnly;
+    const key = partyChartCacheKey(partyId, requestedPlayable);
+    const gen = ++partyFetchGen.current;
+    const refreshing = partyLoadedRef.current && !useSortedQueue;
+    if (refreshing) setIsRefreshingPartyMedia(true);
     try {
       // Global Party has no schedule-based status — skip the expensive all-parties update
       if (partyId !== 'global') {
         await partyAPI.updateStatuses();
       }
+      if (gen !== partyFetchGen.current) return;
       
       // Then fetch the updated party details
-      const response = await partyAPI.getPartyDetails(partyId!, { playableOnly });
+      const response = await partyAPI.getPartyDetails(partyId, { playableOnly: requestedPlayable });
+      if (gen !== partyFetchGen.current) return;
+      if (!options?.preserveOtherModes) chartCacheRef.current.clear();
+      const hiddenCount = typeof (response.party as { hiddenCount?: number })?.hiddenCount === 'number'
+        ? (response.party as { hiddenCount?: number }).hiddenCount!
+        : null;
+      chartCacheRef.current.set(key, {
+        media: response.party?.media || [],
+        hiddenCount,
+        party: response.party,
+      });
       setParty(response.party);
+      setLoadedPartyPlayableOnly(requestedPlayable);
+      partyLoadedRef.current = true;
       
       // Check if current user is the host (use UUID)
       // Backend now populates host.uuid, so we can access it directly
@@ -798,7 +885,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         toast.error('Failed to load party details');
       }
     } finally {
+      if (gen !== partyFetchGen.current) return;
       setIsLoading(false);
+      setIsRefreshingPartyMedia(false);
     }
   };
 
@@ -807,9 +896,23 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
 
   // Sorting functions
-  const fetchSortedMedia = async (timePeriod: string, locationPlaceId?: string | null) => {
+  const fetchSortedMedia = async (
+    timePeriod: string,
+    locationPlaceId?: string | null,
+    options?: { preserveOtherModes?: boolean }
+  ) => {
     if (!partyId) return;
-    
+
+    const requestedPlayable = playableOnly;
+    const key = sortedChartCacheKey({
+      partyId,
+      timePeriod,
+      locationPlaceId,
+      locationScope,
+      chartSort,
+      playableOnly: requestedPlayable,
+    });
+    const gen = ++sortedFetchGen.current;
     setIsLoadingSortedMedia(true);
     try {
       const response = await partyAPI.getMediaSortedByTime(
@@ -818,13 +921,17 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         {
           ...(locationPlaceId ? { locationPlaceId, locationScope } : {}),
           sortBy: chartSort,
-          playableOnly,
+          playableOnly: requestedPlayable,
         }
       );
-      setSortedMedia(response.media || []);
-      setSortedHiddenCount(
-        typeof (response as any).hiddenCount === 'number' ? (response as any).hiddenCount : null
-      );
+      if (gen !== sortedFetchGen.current) return;
+      const media = response.media || [];
+      const hiddenCount = typeof (response as any).hiddenCount === 'number' ? (response as any).hiddenCount : null;
+      if (!options?.preserveOtherModes) chartCacheRef.current.clear();
+      chartCacheRef.current.set(key, { media, hiddenCount });
+      setSortedMedia(media);
+      setSortedHiddenCount(hiddenCount);
+      setLoadedSortedKey(key);
       if (Array.isArray((response as any).topLocations)) {
         setParty((prev: any) => prev ? { ...prev, topLocations: (response as any).topLocations } : prev);
       }
@@ -840,7 +947,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         toast.error('Failed to load sorted media');
       }
     } finally {
-      setIsLoadingSortedMedia(false);
+      if (gen === sortedFetchGen.current) setIsLoadingSortedMedia(false);
     }
   };
 
@@ -1667,13 +1774,61 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Removed TuneBytes/user profile fetch for simplicity and performance
 
+  const sortedRequestKey = partyId
+    ? sortedChartCacheKey({
+        partyId,
+        timePeriod: selectedTimePeriod,
+        locationPlaceId: selectedLocation?.placeId,
+        locationScope,
+        chartSort,
+        playableOnly,
+      })
+    : '';
+  const sortedCacheEntry = sortedRequestKey ? chartCacheRef.current.get(sortedRequestKey) : undefined;
+  const usingSortedCache = Boolean(useSortedQueue && sortedCacheEntry && loadedSortedKey !== sortedRequestKey);
+  const sortedSource = usingSortedCache ? sortedCacheEntry!.media : sortedMedia;
+
+  const partyRequestKey = partyId ? partyChartCacheKey(partyId, playableOnly) : '';
+  const partyCacheEntry = partyRequestKey ? chartCacheRef.current.get(partyRequestKey) : undefined;
+  const usingPartyCache = Boolean(!useSortedQueue && partyCacheEntry?.party && loadedPartyPlayableOnly !== playableOnly);
+  const partyMediaSource = usingPartyCache ? (partyCacheEntry!.party.media || []) : getPartyMedia();
+
+  const sameSortedChart = Boolean(
+    loadedSortedKey && sortedRequestKey && chartCacheBase(loadedSortedKey) === chartCacheBase(sortedRequestKey)
+  );
+  const playableTogglePending = useSortedQueue
+    ? isLoadingSortedMedia && sameSortedChart && loadedSortedKey !== sortedRequestKey && !usingSortedCache
+    : isRefreshingPartyMedia && loadedPartyPlayableOnly !== null && loadedPartyPlayableOnly !== playableOnly && !usingPartyCache;
+  const showSortedLoader =
+    isLoadingSortedMedia && !sameSortedChart && selectedTimePeriod !== 'all-time';
+  const showPlayableBar = useChartLag(playableTogglePending);
+
+  const requestPlayableOnly = (next: boolean) => {
+    if (next === playableOnly) return;
+    const nextSortedKey = partyId
+      ? sortedChartCacheKey({
+          partyId,
+          timePeriod: selectedTimePeriod,
+          locationPlaceId: selectedLocation?.placeId,
+          locationScope,
+          chartSort,
+          playableOnly: next,
+        })
+      : '';
+    const hasSortedCache = Boolean(nextSortedKey && chartCacheRef.current.has(nextSortedKey));
+    const hasPartyCache = Boolean(partyId && chartCacheRef.current.has(partyChartCacheKey(partyId, next)));
+    if (useSortedQueue && !hasSortedCache && loadedSortedKey) setIsLoadingSortedMedia(true);
+    else if (!useSortedQueue && !hasPartyCache && partyLoadedRef.current) setIsRefreshingPartyMedia(true);
+    setPlayableOnly(next);
+  };
+
   // Get media to display based on selected time period and search terms
   const displayMedia = useMemo(() => {
     let media;
     if (useSortedQueue) {
-      media = sortedMedia.filter((item: any) => item.status === 'active');
+      media = sortedSource.filter((item: any) => item.status === 'active');
     } else {
-      media = getPartyMedia().filter((item: any) => item.status === 'active');
+      media = partyMediaSource.filter((item: any) => item.status === 'active');
     }
 
     const liveTerm = searchQuery.trim();
@@ -1702,26 +1857,34 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         return mediaItem.globalMediaAggregate || 0;
       },
     });
-  }, [party, useSortedQueue, sortedMedia, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty]);
+  }, [party, useSortedQueue, sortedSource, partyMediaSource, queueSearchTerms, searchQuery, bpmFilterRange, chartSort, isGlobalParty]);
 
   const chartRanks = useMemo(
     () => buildChartRankMap(displayMedia, partyMediaKey),
     [displayMedia]
   );
 
+  const serverListMatchesFilter = useSortedQueue
+    ? usingSortedCache || loadedSortedKey === sortedRequestKey
+    : usingPartyCache || loadedPartyPlayableOnly === playableOnly;
+
   const serverHiddenCount = useSortedQueue
-    ? sortedHiddenCount
-    : (typeof (party as any)?.hiddenCount === 'number' ? (party as any).hiddenCount : null);
+    ? (usingSortedCache ? sortedCacheEntry!.hiddenCount : sortedHiddenCount)
+    : usingPartyCache
+      ? (partyCacheEntry!.hiddenCount)
+      : (typeof (party as any)?.hiddenCount === 'number' ? (party as any).hiddenCount : null);
 
   const chartMedia = useMemo(() => {
     if (!playableOnly) return displayMedia;
-    if (serverHiddenCount !== null) return displayMedia;
+    if (serverListMatchesFilter) return displayMedia;
     return displayMedia.filter(isPartyItemPlayable);
-  }, [displayMedia, playableOnly, serverHiddenCount]);
+  }, [displayMedia, playableOnly, serverListMatchesFilter]);
 
-  const hiddenPlayableCount = playableOnly
-    ? (serverHiddenCount ?? (displayMedia.length - displayMedia.filter(isPartyItemPlayable).length))
-    : 0;
+  const hiddenPlayableCount = !playableOnly
+    ? 0
+    : serverListMatchesFilter
+      ? (serverHiddenCount ?? 0)
+      : displayMedia.length - displayMedia.filter(isPartyItemPlayable).length;
 
   const getDisplayMedia = () => chartMedia;
 
@@ -2786,13 +2949,14 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                       </button>
                       <PlayableFilterTrigger
                         playableOnly={playableOnly}
-                        onToggle={togglePlayableOnly}
+                        busy={playableTogglePending}
+                        onToggle={() => requestPlayableOnly(!playableOnly)}
                       />
                     </div>
                     <PlayableFilterHint
                       playableOnly={playableOnly}
                       hiddenCount={hiddenPlayableCount}
-                      onShowAll={() => setPlayableOnly(false)}
+                      onShowAll={() => requestPlayableOnly(false)}
                     />
                     {getDisplayMedia().length > 0 && (
                       <div className="flex justify-center mt-2 sm:mt-3">
@@ -3040,7 +3204,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           Matches are catalog-only.{' '}
                           <button
                             type="button"
-                            onClick={() => setPlayableOnly(false)}
+                            onClick={() => requestPlayableOnly(false)}
                             className="text-purple-300 hover:text-white"
                           >
                             Show catalog
@@ -3383,7 +3547,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                 </div>
 
                 {/* Media Queue - Show when NOT viewing vetoed */}
-                {!showVetoed && isLoadingSortedMedia && selectedTimePeriod !== 'all-time' && getDisplayMedia().length === 0 && (
+                {!showVetoed && showPlayableBar && (
+                  <ChartRefreshBar
+                    label={playableOnly ? 'Filtering to playable tunes…' : 'Loading the full chart…'}
+                  />
+                )}
+                {!showVetoed && showSortedLoader && getDisplayMedia().length === 0 && (
                   <EntertainingLoader
                     flavor="party"
                     size="section"
@@ -3392,8 +3561,8 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                   />
                 )}
                 {!showVetoed && getDisplayMedia().length > 0 && (
-                  <div className="space-y-3">
-                    {isLoadingSortedMedia && selectedTimePeriod !== 'all-time' ? (
+                  <div className={`space-y-3 transition-opacity duration-200 ${playableTogglePending ? 'opacity-70' : ''}`}>
+                    {showSortedLoader ? (
                       <EntertainingLoader
                         flavor="party"
                         size="section"
@@ -3421,7 +3590,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         );
                       })
                     )}
-                    {!isLoadingSortedMedia && getDisplayMedia().length > visibleMediaCount && (
+                    {!showSortedLoader && getDisplayMedia().length > visibleMediaCount && (
                       <div className="flex justify-center pt-4 pb-2">
                         <button
                           type="button"
@@ -3505,7 +3674,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                 {!showVetoed && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
                   <PlayableEmptyState
                     hiddenCount={hiddenPlayableCount}
-                    onShowAll={() => setPlayableOnly(false)}
+                    onShowAll={() => requestPlayableOnly(false)}
                   />
                 )}
               </div>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { Tag, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
@@ -20,6 +20,7 @@ import {
 import {
   PlayableFilterHint,
   PlayableFilterTrigger,
+  useChartLag,
 } from '../components/PlayableFilterControl';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { type ChartSortKey } from '../utils/chartSort';
@@ -175,6 +176,8 @@ const TagProfile: React.FC = () => {
   const [showTimeFilter, setShowTimeFilter] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const { playableOnly, setPlayableOnly, togglePlayableOnly } = usePlayableOnly('chart');
+  const deferredPlayableOnly = useDeferredValue(playableOnly);
+  const playableFilterPending = useChartLag(deferredPlayableOnly !== playableOnly);
   const [tipTarget, setTipTarget] = useState<PodcastEpisodeCardData | null>(null);
   const [isPlacingTip, setIsPlacingTip] = useState(false);
   const [fetchingPlayId, setFetchingPlayId] = useState<string | null>(null);
@@ -623,6 +626,7 @@ const TagProfile: React.FC = () => {
               {!isPodcast ? (
                 <PlayableFilterTrigger
                   playableOnly={playableOnly}
+                  busy={playableFilterPending}
                   onToggle={togglePlayableOnly}
                 />
               ) : null}

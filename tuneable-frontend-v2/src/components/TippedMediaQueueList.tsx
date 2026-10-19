@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { Play } from 'lucide-react';
@@ -18,9 +18,11 @@ import { requireAuthToPlay } from '../utils/playAuth';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
+  ChartRefreshBar,
   PlayableEmptyState,
   PlayableFilterHint,
   PlayableFilterTrigger,
+  useChartLag,
 } from './PlayableFilterControl';
 import QueueMediaCard, { normalizeQueueMediaData } from './QueueMediaCard';
 import BidConfirmationModal from './BidConfirmationModal';
@@ -169,6 +171,9 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     () => (playableOnly ? items.filter(isQueueItemPlayable) : items),
     [items, playableOnly]
   );
+  const deferredItems = useDeferredValue(visibleItems);
+  const filterPending = deferredItems !== visibleItems;
+  const showFilterLag = useChartLag(filterPending);
 
   const hiddenPlayableCount = items.length - visibleItems.length;
 
@@ -299,6 +304,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
           {showPlayableFilter ? (
             <PlayableFilterTrigger
               playableOnly={playableOnly}
+              busy={filterPending}
               onToggle={() => setPlayableOnly(!playableOnly)}
             />
           ) : null}
@@ -321,6 +327,12 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         onShowAll={() => setPlayableOnly(false)}
       />
 
+      {showFilterLag && visibleItems.length > 0 ? (
+        <ChartRefreshBar
+          label={playableOnly ? 'Filtering to playable tunes…' : 'Showing the full chart…'}
+        />
+      ) : null}
+
       {visibleItems.length === 0 ? (
         playableOnly && hiddenPlayableCount > 0 ? (
           <PlayableEmptyState
@@ -329,8 +341,8 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
           />
         ) : null
       ) : (
-      <div className="space-y-3">
-        {visibleItems.map((item, index) => {
+      <div className={`space-y-3 transition-opacity duration-200 ${filterPending ? 'opacity-70' : ''}`}>
+        {deferredItems.map((item, index) => {
           const queueShape = toQueueShape(item);
           const mediaData = normalizeQueueMediaData(queueShape);
 

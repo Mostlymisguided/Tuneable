@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   Clock,
@@ -22,9 +22,11 @@ import {
   CHART_LIBRARY_SORT_HINT,
 } from './ChartSortControl';
 import {
+  ChartRefreshBar,
   PlayableEmptyState,
   PlayableFilterHint,
   PlayableFilterTrigger,
+  useChartLag,
 } from './PlayableFilterControl';
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
@@ -242,10 +244,13 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
     () => (playableOnly ? filteredItems.filter(libraryItemPlayable) : filteredItems),
     [filteredItems, playableOnly]
   );
+  const deferredDisplayed = useDeferredValue(displayedItems);
+  const filterPending = deferredDisplayed !== displayedItems;
+  const showFilterLag = useChartLag(filterPending);
 
   const hiddenPlayableCount = filteredItems.length - displayedItems.length;
 
-  const visibleItems = displayedItems.slice(0, visibleCount);
+  const visibleItems = deferredDisplayed.slice(0, visibleCount);
 
   const handlePlayQueue = () => {
     if (displayedItems.length === 0) return;
@@ -255,8 +260,8 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
   const handleCardPlay = (_item: unknown, index: number) => {
     const libItem = visibleItems[index];
     if (!libItem) return;
-    const fullIndex = displayedItems.findIndex((i) => i.mediaId === libItem.mediaId);
-    onPlay(libItem, Math.max(fullIndex, 0), displayedItems);
+    const fullIndex = deferredDisplayed.findIndex((i) => i.mediaId === libItem.mediaId);
+    onPlay(libItem, Math.max(fullIndex, 0), filterPending ? deferredDisplayed : displayedItems);
   };
 
   const handleCardTip = (cardItem: unknown) => {
@@ -330,6 +335,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
           </button>
           <PlayableFilterTrigger
             playableOnly={playableOnly}
+            busy={filterPending}
             onToggle={togglePlayableOnly}
           />
         </div>
@@ -535,6 +541,12 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
             </div>
           </div>
         </div>
+
+      {showFilterLag && displayedItems.length > 0 ? (
+        <ChartRefreshBar
+          label={playableOnly ? 'Filtering to playable tunes…' : 'Showing the full chart…'}
+        />
+      ) : null}
 
       {isLoading ? (
         <div className="text-center py-8">
