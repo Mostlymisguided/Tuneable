@@ -13,7 +13,7 @@ import {
   FOUNDING_UPLOAD_QUOTA_MB,
 } from '../constants';
 import type { AmbassadorSummary, FoundingCreatorsStatus } from '../types';
-import AmbassadorProgramCard from '../components/AmbassadorProgramCard';
+import AmbassadorDashboard from '../components/AmbassadorDashboard';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -2460,6 +2460,16 @@ Join here: ${inviteLink}`.trim();
           </div>
         )}
 
+        {ambassadorProgram && (
+          <AmbassadorDashboard
+            ambassador={ambassadorProgram}
+            inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
+            invitedUsers={invitedUsers}
+            loading={isLoadingInvited}
+            isFoundingCreator={isFoundingCreator}
+          />
+        )}
+
       {/* Add Tune Section */}
       <div className="card mb-8">
         <div className="flex items-center justify-center md:justify-start mb-4">
@@ -2729,12 +2739,6 @@ Join here: ${inviteLink}`.trim();
 
       {/* Invite Codes Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-        {ambassadorProgram && (
-          <AmbassadorProgramCard
-            ambassador={ambassadorProgram}
-            inviteCode={user?.primaryInviteCode || user?.personalInviteCode}
-          />
-        )}
         <div className="bg-black/30 border border-amber-500/25 rounded-lg p-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -2851,7 +2855,8 @@ Join here: ${inviteLink}`.trim();
         )}
       </div>
 
-      {/* Invited Users Section */}
+      {/* Invited Users Section — ambassadors see this inside Ambassador Dashboard. */}
+      {!ambassadorProgram && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
         <button
           onClick={() => setIsInvitedUsersCollapsed(prev => !prev)}
@@ -2958,6 +2963,7 @@ Join here: ${inviteLink}`.trim();
           </>
         )}
       </div>
+      )}
 
       {/* Tune Library Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
