@@ -96,7 +96,7 @@ export function InviteShareCard({
       {!collapsible ? <Text style={styles.code}>{code}</Text> : null}
       <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
         {isFoundingCreator
-          ? 'Listeners, DJs, and creators can use this code without uploading music of their own. If they upload and verify, you earn 3% of their paid tips for year one, from Tuneable's share.'
+          ? "Listeners, DJs, and creators can use this code without uploading music of their own. If they upload and verify, you earn 3% of their paid tips for year one, from Tuneable's share."
           : 'Listeners, DJs, and creators can use this code without uploading music of their own. Creators keep 70% of paid tips on music they upload.'}
       </Text>
       {ambassador ? (
