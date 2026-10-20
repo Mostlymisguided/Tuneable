@@ -6,10 +6,10 @@ export const DEFAULT_DESCRIPTION =
 /** Square app icon. Used for the schema.org logo, not chat link previews. */
 export const LOGO_IMAGE = `${SITE_ORIGIN}/android-chrome-512x512.png`;
 /** Landscape share card. Chat apps scale this into the link preview. */
-export const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-share.png`;
+export const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-share-v3.png`;
 export const DEFAULT_IMAGE_WIDTH = 1200;
 export const DEFAULT_IMAGE_HEIGHT = 630;
-export const DEFAULT_IMAGE_ALT = 'Tuneable — Tip what you love, Be a champion, Own your taste';
+export const DEFAULT_IMAGE_ALT = 'Tuneable';
 
 export type JsonLd = Record<string, unknown>;
 

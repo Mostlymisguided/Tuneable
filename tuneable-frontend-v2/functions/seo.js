@@ -7,10 +7,10 @@ export const SITE_ORIGIN = 'https://tuneable.stream';
 
 const DEFAULT_DESCRIPTION =
   'Tip the music, podcasts, and books you love. Your tips support creators and move them up public charts on Tuneable.';
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-share.png`;
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-share-v3.png`;
 const DEFAULT_IMAGE_WIDTH = 1200;
 const DEFAULT_IMAGE_HEIGHT = 630;
-const DEFAULT_IMAGE_ALT = 'Tuneable — Tip what you love, Be a champion, Own your taste';
+const DEFAULT_IMAGE_ALT = 'Tuneable';
 
 const PREVIEW_BOT =
   /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot|WhatsApp|Discordbot|TelegramBot|Pinterest|redditbot|Embedly|Applebot|bingbot|BingPreview|DuckDuckBot|Baiduspider|YandexBot|ia_archiver|PetalBot/i;
