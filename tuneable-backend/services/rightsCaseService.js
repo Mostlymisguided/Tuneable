@@ -499,14 +499,17 @@ async function ownershipSnapshot() {
 
 async function listCatalogue(query = {}) {
   const { page, limit, skip } = parsePage(query);
-  const rightsStatus = query.rightsStatus;
-  if (!isValidRightsStatus(rightsStatus)) {
-    const error = new Error('Invalid rights status');
-    error.status = 400;
-    throw error;
+  const rightsStatus = String(query.rightsStatus || '').trim();
+  const match = { ...LIVE_MEDIA };
+  if (rightsStatus) {
+    if (!isValidRightsStatus(rightsStatus)) {
+      const error = new Error('Invalid rights status');
+      error.status = 400;
+      throw error;
+    }
+    match.rightsStatus = rightsStatus;
   }
 
-  const match = { ...LIVE_MEDIA, rightsStatus };
   const rx = searchRegex(query.search);
   if (rx) Object.assign(match, mediaSearchClause(rx));
 
@@ -515,7 +518,7 @@ async function listCatalogue(query = {}) {
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
-      .select('title artist creatorDisplay coverArt uuid rightsStatus rightsCleared importSource globalMediaAggregate isrc updatedAt')
+      .select('title artist featuring songwriter composer producer host guest narrator director cinematographer editor author label creatorDisplay coverArt uuid rightsStatus rightsCleared importSource globalMediaAggregate isrc updatedAt')
       .lean(),
     Media.countDocuments(match),
   ]);
@@ -555,8 +558,16 @@ async function listCatalogue(query = {}) {
         }
       }
     }
+    const publicItem = { ...item };
+    for (const field of [
+      'featuring', 'songwriter', 'composer', 'producer', 'host', 'guest',
+      'narrator', 'director', 'cinematographer', 'editor', 'author', 'label',
+    ]) {
+      delete publicItem[field];
+    }
     return {
-      ...item,
+      ...publicItem,
+      suggestedParties: suggestedPartiesFromMedia(item),
       caseCount: related.length,
       outreachCount,
       lastOutreach,
