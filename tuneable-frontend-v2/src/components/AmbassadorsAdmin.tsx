@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { userAPI } from '../lib/api';
@@ -31,6 +31,13 @@ type AmbassadorRow = {
   }>;
 };
 
+type UserSuggestion = {
+  _id?: string;
+  id?: string;
+  username: string;
+  artistName?: string | null;
+};
+
 type Invitee = {
   username: string;
   uuid?: string;
@@ -47,7 +54,14 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
   const [rows, setRows] = useState<AmbassadorRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [identifier, setIdentifier] = useState('');
+  const [suggestions, setSuggestions] = useState<UserSuggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(0);
   const [note, setNote] = useState('');
+  const identifierWrapRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeqRef = useRef(0);
   const [saving, setSaving] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [invitees, setInvitees] = useState<Record<string, Invitee[]>>({});
@@ -71,6 +85,77 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
     if (!collapsed) load();
   }, [collapsed, load]);
 
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (identifierWrapRef.current && !identifierWrapRef.current.contains(event.target as Node)) {
+        setSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, []);
+
+  useEffect(() => () => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  }, []);
+
+  const onIdentifierChange = (value: string) => {
+    setIdentifier(value);
+    setHighlightIndex(0);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+    const query = value.trim();
+    if (query.length < 2) {
+      searchSeqRef.current += 1;
+      setSuggestions([]);
+      setSuggestionsOpen(false);
+      setSearchingUsers(false);
+      return;
+    }
+
+    searchTimerRef.current = setTimeout(async () => {
+      const seq = ++searchSeqRef.current;
+      setSearchingUsers(true);
+      try {
+        const data = await userAPI.searchUsers({ search: query, limit: 8 });
+        if (seq !== searchSeqRef.current) return;
+        const users = ((data.users || []) as UserSuggestion[]).filter((user) => user.username);
+        setSuggestions(users);
+        setSuggestionsOpen(users.length > 0);
+      } catch {
+        if (seq !== searchSeqRef.current) return;
+        setSuggestions([]);
+        setSuggestionsOpen(false);
+      } finally {
+        if (seq === searchSeqRef.current) setSearchingUsers(false);
+      }
+    }, 250);
+  };
+
+  const pickSuggestion = (user: UserSuggestion) => {
+    setIdentifier(user.username);
+    setSuggestions([]);
+    setSuggestionsOpen(false);
+    setHighlightIndex(0);
+  };
+
+  const onIdentifierKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suggestionsOpen || suggestions.length === 0) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setHighlightIndex((index) => (index + 1) % suggestions.length);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightIndex((index) => (index - 1 + suggestions.length) % suggestions.length);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const user = suggestions[highlightIndex];
+      if (user) pickSuggestion(user);
+    } else if (event.key === 'Escape') {
+      setSuggestionsOpen(false);
+    }
+  };
+
   const grant = async () => {
     const who = identifier.trim();
     if (!who) {
@@ -86,6 +171,8 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
       });
       toast.success(result.message || 'Ambassador updated');
       setIdentifier('');
+      setSuggestions([]);
+      setSuggestionsOpen(false);
       setNote('');
       await load();
       onChanged?.();
@@ -197,13 +284,55 @@ const AmbassadorsAdmin: React.FC<{ onChanged?: () => void }> = ({ onChanged }) =
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input
-              type="text"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="Username or email"
-              className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
-            />
+            <div ref={identifierWrapRef} className="relative">
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => onIdentifierChange(e.target.value)}
+                onKeyDown={onIdentifierKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0) setSuggestionsOpen(true);
+                }}
+                placeholder="Username or email"
+                role="combobox"
+                aria-expanded={suggestionsOpen}
+                aria-autocomplete="list"
+                aria-controls="ambassador-user-suggestions"
+                autoComplete="off"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400"
+              />
+              {searchingUsers && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              )}
+              {suggestionsOpen && suggestions.length > 0 && (
+                <ul
+                  id="ambassador-user-suggestions"
+                  role="listbox"
+                  className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-gray-900 border border-gray-600 rounded-lg shadow-lg"
+                >
+                  {suggestions.map((user, index) => (
+                    <li key={user._id || user.id || user.username} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={index === highlightIndex}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setHighlightIndex(index)}
+                        onClick={() => pickSuggestion(user)}
+                        className={`w-full px-3 py-2 text-left text-sm ${
+                          index === highlightIndex ? 'bg-purple-700/60 text-white' : 'text-gray-200 hover:bg-gray-800'
+                        }`}
+                      >
+                        <span className="text-white">@{user.username}</span>
+                        {user.artistName ? (
+                          <span className="block text-xs text-gray-400 truncate">{user.artistName}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <input
               type="text"
               value={note}
