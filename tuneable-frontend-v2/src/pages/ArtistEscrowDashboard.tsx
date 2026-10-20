@@ -23,6 +23,40 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 
 const ESCROW_TAKE_RATE_NOTE_KEY = 'tuneable.escrowTakeRateNote.dismissed';
+const PAYOUT_CURRENCY_KEY = 'tuneable.payoutCurrency';
+const PAYOUT_CURRENCIES = [
+  'GBP', 'USD', 'EUR', 'AUD', 'CAD', 'NZD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK',
+  'PLN', 'INR', 'BRL', 'MXN', 'ZAR', 'NGN', 'KES', 'GHS',
+];
+const COUNTRY_CURRENCY: Record<string, string> = {
+  GB: 'GBP', US: 'USD', AU: 'AUD', CA: 'CAD', NZ: 'NZD', JP: 'JPY', CH: 'CHF',
+  SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', IN: 'INR', BR: 'BRL', MX: 'MXN',
+  ZA: 'ZAR', NG: 'NGN', KE: 'KES', GH: 'GHS', DE: 'EUR', FR: 'EUR', ES: 'EUR',
+  IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', AT: 'EUR', BE: 'EUR', FI: 'EUR',
+};
+
+function initialPayoutCurrency(countryCode?: string | null): string {
+  try {
+    const stored = localStorage.getItem(PAYOUT_CURRENCY_KEY);
+    if (stored && PAYOUT_CURRENCIES.includes(stored)) return stored;
+  } catch {
+    /* ignore */
+  }
+  const fromHome = countryCode ? COUNTRY_CURRENCY[countryCode.toUpperCase()] : null;
+  return fromHome || 'GBP';
+}
+
+function formatPayoutAmount(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: currency === 'JPY' ? 0 : 2,
+    }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}
 
 interface EscrowInfo {
   balance: number;
@@ -115,12 +149,45 @@ const ArtistEscrowDashboard: React.FC = () => {
       return true;
     }
   });
+  const [payoutCurrency, setPayoutCurrency] = useState(() =>
+    initialPayoutCurrency(user?.homeLocation?.countryCode)
+  );
+  const [payoutQuote, setPayoutQuote] = useState<{
+    amountMajor: number | null;
+    currency: string;
+    rateAsOf?: string | null;
+    rateSource?: string;
+  } | null>(null);
+  const [payoutQuoteError, setPayoutQuoteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchEscrowInfo();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!escrowInfo || payoutCurrency === 'GBP') {
+      setPayoutQuote(null);
+      setPayoutQuoteError(null);
+      return;
+    }
+    let cancelled = false;
+    artistEscrowAPI.payoutQuote(payoutCurrency)
+      .then((quote) => {
+        if (cancelled) return;
+        setPayoutQuote(quote);
+        setPayoutQuoteError(null);
+      })
+      .catch((error: { response?: { data?: { error?: string } } }) => {
+        if (cancelled) return;
+        setPayoutQuote(null);
+        setPayoutQuoteError(error.response?.data?.error || 'Could not price this payout');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [escrowInfo, payoutCurrency]);
 
   const fetchEscrowInfo = async () => {
     try {
@@ -422,6 +489,43 @@ const ArtistEscrowDashboard: React.FC = () => {
               <p className="text-3xl font-bold text-yellow-400">
                 {penceToPounds(escrowInfo.balance)}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-300">
+                <label htmlFor="payout-currency" className="text-gray-400">
+                  Payout estimate
+                </label>
+                <select
+                  id="payout-currency"
+                  value={payoutCurrency}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setPayoutCurrency(next);
+                    try {
+                      localStorage.setItem(PAYOUT_CURRENCY_KEY, next);
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className="bg-gray-900 border border-purple-500/40 rounded px-2 py-1 text-white"
+                >
+                  {PAYOUT_CURRENCIES.map((code) => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+                {payoutCurrency === 'GBP' ? (
+                  <span>Your balance stays in pounds.</span>
+                ) : payoutQuote?.amountMajor != null ? (
+                  <span>
+                    About {formatPayoutAmount(payoutQuote.amountMajor, payoutQuote.currency)} today
+                    {payoutQuote.rateAsOf ? ` · rate ${payoutQuote.rateAsOf}` : ''}
+                    {payoutQuote.rateSource === 'fallback' ? ' · backup rate' : ''}.
+                    The payout provider sets the rate on the day you are paid.
+                  </span>
+                ) : payoutQuoteError ? (
+                  <span className="text-amber-200">{payoutQuoteError}</span>
+                ) : (
+                  <span>Checking today’s rate…</span>
+                )}
+              </div>
               {(escrowInfo.promoBalance || 0) > 0 && (
                 <p className="text-sm text-amber-200 mt-2">
                   {penceToPounds(escrowInfo.promoBalance || 0)} pending from welcome-credit tips

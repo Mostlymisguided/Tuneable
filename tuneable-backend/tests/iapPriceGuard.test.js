@@ -103,6 +103,19 @@ describe('resolveIapCreditPrice', () => {
     ).resolves.toEqual({ priceCheck: 'dev_bypass' });
   });
 
+  it('records an identity rate when the customer paid pounds', async () => {
+    const result = await resolveIapCreditPrice({
+      environment: 'Production',
+      storePrice: { amountMajor: 5, currency: 'GBP', source: 'apple' },
+      creditPence: 500,
+      platform: 'ios',
+    });
+    expect(result.priceCheck).toBe('ok');
+    expect(result.paidPenceEstimate).toBe(500);
+    expect(result.fxSource).toBe('identity');
+    expect(result.fxAsOf).toBeNull();
+  });
+
   it('refuses a price under the floor without calling FX for GBP', async () => {
     await expect(
       resolveIapCreditPrice({

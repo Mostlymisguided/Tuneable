@@ -144,10 +144,13 @@ async function resolveIapCreditPrice({
     throw err;
   }
 
+  const { quoteGbp } = require('./fxRateService');
+  const quote = await quoteGbp(storePrice.currency);
   const assessment = await assessStorePrice({
     amountMajor: storePrice.amountMajor,
     currency: storePrice.currency,
     creditPence,
+    rateFor: async () => quote.gbpPerUnit,
   });
 
   if (!assessment.accepted) {
@@ -164,6 +167,8 @@ async function resolveIapCreditPrice({
     paidPenceEstimate: assessment.paidPenceEstimate,
     minPaidPence: assessment.minPence,
     gbpPerUnit: Number(assessment.gbpPerUnit.toFixed(6)),
+    fxAsOf: quote.asOf,
+    fxSource: quote.source,
     priceSource: storePrice.source || null,
   };
 }

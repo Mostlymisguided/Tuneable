@@ -2939,6 +2939,18 @@ export const artistEscrowAPI = {
     return response.data;
   },
 
+  payoutQuote: async (currency: string) => {
+    const response = await api.get<{
+      balancePence: number;
+      currency: string;
+      amountMajor: number | null;
+      gbpPerUnit?: number;
+      rateAsOf?: string | null;
+      rateSource?: string;
+    }>('/artist-escrow/payout-quote', { params: { currency } });
+    return response.data;
+  },
+
   // Match unknown artist allocations to current user
   match: async (artistName: string, youtubeChannelId?: string, externalIds?: Record<string, string>) => {
     const response = await api.post('/artist-escrow/match', {

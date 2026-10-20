@@ -57,6 +57,34 @@ const walletTransactionSchema = new mongoose.Schema({
   storeTransactionId: { type: String }, // Unique store transaction / order id
   storeProductId: { type: String },
   platform: { type: String, enum: ['ios', 'android', 'web'] },
+
+  // What the customer was charged, frozen at purchase. gbpPence is a mid-market
+  // estimate of that charge, not the cash Tuneable received.
+  customerPrice: {
+    type: new mongoose.Schema({
+      currency: { type: String },
+      amountMajor: { type: Number },
+      gbpPerUnit: { type: Number },
+      gbpPence: { type: Number },
+      rateAsOf: { type: Date },
+      rateSource: {
+        type: String,
+        enum: ['identity', 'ecb', 'ecb_cached', 'fallback', 'stripe'],
+      },
+    }, { _id: false }),
+  },
+
+  // Cash Tuneable actually received. Set for Stripe from the balance transaction.
+  // Left empty for Apple and Google until a store financial report fills it.
+  proceeds: {
+    type: new mongoose.Schema({
+      currency: { type: String },
+      amountMajor: { type: Number },
+      gbpPence: { type: Number },
+      recordedAt: { type: Date },
+      source: { type: String, enum: ['stripe_balance'] },
+    }, { _id: false }),
+  },
   
   // ========================================
   // BALANCE TRACKING

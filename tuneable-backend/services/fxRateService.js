@@ -82,6 +82,8 @@ const FALLBACK_GBP_PER_UNIT = {
   RUB: 0.008,
 };
 
+const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'UGX', 'XAF', 'XOF', 'PYG']);
+
 let cache = null;
 const fallbackWarnings = new Set();
 
@@ -90,9 +92,25 @@ function resetFxCacheForTests() {
   fallbackWarnings.clear();
 }
 
+function roundMajor(amount, currency) {
+  const digits = ZERO_DECIMAL.has(currency) ? 0 : 2;
+  const factor = 10 ** digits;
+  return Math.round(amount * factor) / factor;
+}
+
+/**
+ * Foreign units a pound balance would buy at `gbpPerUnit` (pounds per 1 foreign unit).
+ */
+function foreignMajorFromGbpPence(gbpPence, gbpPerUnit, currency) {
+  const pounds = Number(gbpPence) / 100;
+  const rate = Number(gbpPerUnit);
+  if (!Number.isFinite(pounds) || !Number.isFinite(rate) || rate <= 0) return null;
+  return roundMajor(pounds / rate, currency);
+}
+
 async function loadLiveRates() {
   if (cache && Date.now() - cache.fetchedAt < LIVE_TTL_MS) {
-    return cache.gbpPerUnit;
+    return { ...cache, fresh: true };
   }
 
   try {
@@ -110,12 +128,16 @@ async function loadLiveRates() {
       const perGbp = Number(foreignPerGbp);
       if (perGbp > 0) gbpPerUnit[String(code).toUpperCase()] = 1 / perGbp;
     }
-    cache = { fetchedAt: Date.now(), gbpPerUnit };
-    return gbpPerUnit;
+    cache = {
+      fetchedAt: Date.now(),
+      asOf: response.data?.date || null,
+      gbpPerUnit,
+    };
+    return { ...cache, fresh: true };
   } catch (err) {
     if (cache && Date.now() - cache.fetchedAt < STALE_TTL_MS) {
       console.warn('FX: Frankfurter unavailable, using cached rates:', err.message);
-      return cache.gbpPerUnit;
+      return { ...cache, fresh: false };
     }
     console.warn('FX: Frankfurter unavailable:', err.message);
     return null;
@@ -123,10 +145,11 @@ async function loadLiveRates() {
 }
 
 /**
- * How many pounds one major unit of `currency` is worth (1.00 USD → ~0.74).
- * GBP is 1. Throws status 422 for a bad code and 503 when no rate exists.
+ * Pounds per one major unit of `currency`, with the rate date and where it came from.
+ * `ecb` is the Frankfurter quote. `ecb_cached` is that quote reused while the feed is down.
+ * `fallback` is the conservative table. GBP is `identity`.
  */
-async function gbpPerMajorUnit(currency) {
+async function quoteGbp(currency) {
   const code = String(currency || '').trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(code)) {
     const err = new Error('Store currency is missing');
@@ -134,10 +157,19 @@ async function gbpPerMajorUnit(currency) {
     err.code = 'iap_price_missing';
     throw err;
   }
-  if (code === 'GBP') return 1;
+  if (code === 'GBP') {
+    return { currency: 'GBP', gbpPerUnit: 1, asOf: null, source: 'identity' };
+  }
 
   const live = await loadLiveRates();
-  if (live && live[code]) return live[code];
+  if (live && live.gbpPerUnit[code]) {
+    return {
+      currency: code,
+      gbpPerUnit: live.gbpPerUnit[code],
+      asOf: live.asOf || null,
+      source: live.fresh ? 'ecb' : 'ecb_cached',
+    };
+  }
 
   const fallback = FALLBACK_GBP_PER_UNIT[code];
   if (fallback) {
@@ -145,7 +177,7 @@ async function gbpPerMajorUnit(currency) {
       fallbackWarnings.add(code);
       console.warn(`FX: using fallback GBP rate for ${code}`);
     }
-    return fallback;
+    return { currency: code, gbpPerUnit: fallback, asOf: null, source: 'fallback' };
   }
 
   const err = new Error(`No GBP exchange rate for ${code}, so the wallet was not credited`);
@@ -154,8 +186,20 @@ async function gbpPerMajorUnit(currency) {
   throw err;
 }
 
+/**
+ * How many pounds one major unit of `currency` is worth (1.00 USD → ~0.74).
+ * GBP is 1. Throws status 422 for a bad code and 503 when no rate exists.
+ */
+async function gbpPerMajorUnit(currency) {
+  const quote = await quoteGbp(currency);
+  return quote.gbpPerUnit;
+}
+
 module.exports = {
   gbpPerMajorUnit,
+  quoteGbp,
+  foreignMajorFromGbpPence,
+  roundMajor,
   resetFxCacheForTests,
   FALLBACK_GBP_PER_UNIT,
 };

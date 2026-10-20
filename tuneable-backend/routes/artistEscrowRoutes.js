@@ -46,6 +46,46 @@ router.get('/info', authMiddleware, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/artist-escrow/payout-quote?currency=USD
+ * @desc    Mid-market value of the pound escrow balance in another currency.
+ *          The payout provider sets the rate on the day the payout is sent.
+ */
+router.get('/payout-quote', authMiddleware, async (req, res) => {
+  try {
+    const { quoteGbp, foreignMajorFromGbpPence } = require('../services/fxRateService');
+    const currency = String(req.query.currency || '').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      return res.status(400).json({ error: 'Choose a payout currency' });
+    }
+
+    const user = await User.findById(req.user._id).select('artistEscrowBalance');
+    const balancePence = Math.max(0, user?.artistEscrowBalance || 0);
+    if (currency === 'GBP') {
+      return res.json({
+        balancePence,
+        currency: 'GBP',
+        amountMajor: balancePence / 100,
+        rateAsOf: null,
+        rateSource: 'identity',
+      });
+    }
+
+    const quote = await quoteGbp(currency);
+    res.json({
+      balancePence,
+      currency,
+      amountMajor: foreignMajorFromGbpPence(balancePence, quote.gbpPerUnit, currency),
+      gbpPerUnit: Number(quote.gbpPerUnit.toFixed(6)),
+      rateAsOf: quote.asOf,
+      rateSource: quote.source,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ error: error.message || 'Could not price this payout' });
+  }
+});
+
+/**
  * @route   POST /api/artist-escrow/match
  * @desc    Match unknown artist allocations to current user
  * @access  Private (artist must be logged in)

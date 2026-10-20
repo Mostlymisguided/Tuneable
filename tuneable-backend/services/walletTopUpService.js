@@ -116,6 +116,7 @@ async function creditIapTopUpOnce({
             description ||
             `Wallet top-up via ${paymentMethod === 'apple_iap' ? 'Apple' : 'Google Play'} (£${(creditPence / 100).toFixed(2)})`,
           username: updatedUser.username,
+          customerPrice: customerPriceFromIapCheck(metadata),
           metadata: {
             ...metadata,
             storeProductId,
@@ -316,7 +317,11 @@ async function resolveStripeCheckoutNetAmount(stripe, session) {
   const amountRequestedPence =
     session.amount_total ||
     Math.round(parseFloat(session.metadata?.totalCharge || session.metadata?.amount) * 100);
-  const stripeFeesPence = amountRequestedPence - amountReceivedPence;
+  const chargeCurrency = String(session.currency || 'gbp').toUpperCase();
+  const settlementCurrency = String(balanceTransaction.currency || chargeCurrency).toUpperCase();
+  const stripeFeesPence = chargeCurrency === settlementCurrency
+    ? amountRequestedPence - amountReceivedPence
+    : (balanceTransaction.fee || 0);
   const walletCreditAmountPence = Math.round(parseFloat(session.metadata?.amount) * 100);
 
   console.log(`💰 Amount breakdown:`);
@@ -332,7 +337,67 @@ async function resolveStripeCheckoutNetAmount(stripe, session) {
     stripeFeesPence,
     walletCreditAmountPence,
     currency: session.currency || 'gbp',
+    settlementCurrency,
+    settlementGrossMinor: balanceTransaction.amount,
   };
+}
+
+/**
+ * Frozen customer charge and, for Stripe, the settled cash. Store payouts are
+ * not known until a financial report arrives, so those top-ups omit proceeds.
+ */
+function customerPriceFromIapCheck(metadata = {}) {
+  if (metadata.priceCheck !== 'ok') return undefined;
+  if (!metadata.storeCurrency || metadata.storeAmountMajor == null || metadata.paidPenceEstimate == null) {
+    return undefined;
+  }
+  return {
+    currency: String(metadata.storeCurrency).toUpperCase(),
+    amountMajor: metadata.storeAmountMajor,
+    gbpPerUnit: metadata.gbpPerUnit ?? null,
+    gbpPence: metadata.paidPenceEstimate,
+    rateAsOf: metadata.fxAsOf ? new Date(`${metadata.fxAsOf}T00:00:00.000Z`) : null,
+    rateSource: metadata.fxSource || null,
+  };
+}
+
+function stripeValueFields(amounts = {}) {
+  const chargeCurrency = String(amounts.currency || 'gbp').toUpperCase();
+  const settlementCurrency = String(amounts.settlementCurrency || chargeCurrency).toUpperCase();
+  const amountMajor = (amounts.amountRequestedPence || 0) / 100;
+  const customerPrice = {
+    currency: chargeCurrency,
+    amountMajor,
+    gbpPerUnit: chargeCurrency === 'GBP' ? 1 : null,
+    gbpPence: chargeCurrency === 'GBP' ? amounts.amountRequestedPence : undefined,
+    rateAsOf: undefined,
+    rateSource: chargeCurrency === 'GBP' ? 'identity' : undefined,
+  };
+
+  if (
+    chargeCurrency !== 'GBP' &&
+    settlementCurrency === 'GBP' &&
+    amounts.settlementGrossMinor > 0 &&
+    amountMajor > 0
+  ) {
+    customerPrice.gbpPence = amounts.settlementGrossMinor;
+    customerPrice.gbpPerUnit = Number(((amounts.settlementGrossMinor / 100) / amountMajor).toFixed(6));
+    customerPrice.rateAsOf = new Date();
+    customerPrice.rateSource = 'stripe';
+  }
+
+  const fields = { customerPrice };
+  if (amounts.amountReceivedPence > 0) {
+    const proceedsAreGbp = settlementCurrency === 'GBP';
+    fields.proceeds = {
+      currency: settlementCurrency,
+      amountMajor: amounts.amountReceivedPence / 100,
+      gbpPence: proceedsAreGbp ? amounts.amountReceivedPence : null,
+      recordedAt: new Date(),
+      source: 'stripe_balance',
+    };
+  }
+  return fields;
 }
 
 async function creditStripeTopUp({
@@ -384,6 +449,7 @@ async function creditStripeTopUp({
           balanceAfter: updatedUser.balance,
           description: `Wallet top-up via Stripe (net: £${amountReceivedPounds.toFixed(2)})`,
           username: updatedUser.username,
+          ...stripeValueFields(amounts),
           metadata: {
             currency: amounts.currency || 'gbp',
             customerEmail,
