@@ -7,7 +7,10 @@ export const SITE_ORIGIN = 'https://tuneable.stream';
 
 const DEFAULT_DESCRIPTION =
   'Tip the music, podcasts, and books you love. Your tips support creators and move them up public charts on Tuneable.';
-const DEFAULT_IMAGE = `${SITE_ORIGIN}/android-chrome-512x512.png`;
+const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-share.png`;
+const DEFAULT_IMAGE_WIDTH = 1200;
+const DEFAULT_IMAGE_HEIGHT = 630;
+const DEFAULT_IMAGE_ALT = 'Tuneable — Tip what you love, Be a champion, Own your taste';
 
 const PREVIEW_BOT =
   /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot|WhatsApp|Discordbot|TelegramBot|Pinterest|redditbot|Embedly|Applebot|bingbot|BingPreview|DuckDuckBot|Baiduspider|YandexBot|ia_archiver|PetalBot/i;
@@ -136,20 +139,22 @@ function chartPage() {
 }
 
 function page(title, description, path, body = '', jsonLd = null, extra = {}) {
+  const image = extra.image || DEFAULT_IMAGE;
+  const shareCard = image === DEFAULT_IMAGE;
   return {
     title,
     description,
     path,
     body,
     jsonLd,
-    image: extra.image || DEFAULT_IMAGE,
-    imageAlt: extra.imageAlt || title,
-    imageWidth: extra.imageWidth,
-    imageHeight: extra.imageHeight,
+    image,
+    imageAlt: extra.imageAlt || (shareCard ? DEFAULT_IMAGE_ALT : title),
+    imageWidth: extra.imageWidth ?? (shareCard ? DEFAULT_IMAGE_WIDTH : undefined),
+    imageHeight: extra.imageHeight ?? (shareCard ? DEFAULT_IMAGE_HEIGHT : undefined),
     type: extra.type || 'website',
     robots: extra.robots || 'index, follow',
     status: extra.status || 200,
-    twitterCard: extra.twitterCard || 'summary',
+    twitterCard: shareCard ? 'summary_large_image' : (extra.twitterCard || 'summary'),
   };
 }
 

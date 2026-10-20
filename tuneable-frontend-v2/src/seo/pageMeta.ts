@@ -3,7 +3,13 @@ export const SITE_NAME = 'Tuneable';
 export const DEFAULT_TITLE = 'Tuneable — Tip what you love';
 export const DEFAULT_DESCRIPTION =
   'Tip the music, podcasts, and books you love. Your tips support creators and move them up public charts on Tuneable.';
-export const DEFAULT_IMAGE = `${SITE_ORIGIN}/android-chrome-512x512.png`;
+/** Square app icon. Used for the schema.org logo, not chat link previews. */
+export const LOGO_IMAGE = `${SITE_ORIGIN}/android-chrome-512x512.png`;
+/** Landscape share card. Chat apps scale this into the link preview. */
+export const DEFAULT_IMAGE = `${SITE_ORIGIN}/og-share.png`;
+export const DEFAULT_IMAGE_WIDTH = 1200;
+export const DEFAULT_IMAGE_HEIGHT = 630;
+export const DEFAULT_IMAGE_ALT = 'Tuneable — Tip what you love, Be a champion, Own your taste';
 
 export type JsonLd = Record<string, unknown>;
 
@@ -28,7 +34,7 @@ export const SITE_JSONLD: JsonLd = {
       '@type': 'Organization',
       name: SITE_NAME,
       url: `${SITE_ORIGIN}/`,
-      logo: DEFAULT_IMAGE,
+      logo: LOGO_IMAGE,
       email: 'hi@tuneable.stream',
     },
     {
@@ -81,9 +87,13 @@ export function applyDocumentMeta(meta: PageMeta) {
   const description = clipText(meta.description, 200) || DEFAULT_DESCRIPTION;
   const url = absoluteUrl(meta.path || '/');
   const image = absoluteImage(meta.image);
+  const usingDefaultImage = image === DEFAULT_IMAGE;
+  const imageWidth = meta.imageWidth ?? (usingDefaultImage ? DEFAULT_IMAGE_WIDTH : undefined);
+  const imageHeight = meta.imageHeight ?? (usingDefaultImage ? DEFAULT_IMAGE_HEIGHT : undefined);
+  const imageAlt = meta.imageAlt || (usingDefaultImage ? DEFAULT_IMAGE_ALT : undefined);
   const robots = meta.robots || 'index, follow';
   const type = meta.type || 'website';
-  const large = meta.twitterCard === 'summary_large_image' || Boolean(meta.imageWidth && meta.imageWidth >= 600);
+  const large = meta.twitterCard === 'summary_large_image' || Boolean(imageWidth && imageWidth >= 600);
   const card = large ? 'summary_large_image' : meta.twitterCard || 'summary';
 
   document.title = title;
@@ -96,11 +106,11 @@ export function applyDocumentMeta(meta: PageMeta) {
   upsertMeta('property', 'og:url', url);
   upsertMeta('property', 'og:image', image);
   upsertMeta('property', 'og:locale', 'en_GB');
-  if (meta.imageAlt) upsertMeta('property', 'og:image:alt', meta.imageAlt);
+  if (imageAlt) upsertMeta('property', 'og:image:alt', imageAlt);
   else removeMeta('property', 'og:image:alt');
-  if (meta.imageWidth && meta.imageHeight) {
-    upsertMeta('property', 'og:image:width', String(meta.imageWidth));
-    upsertMeta('property', 'og:image:height', String(meta.imageHeight));
+  if (imageWidth && imageHeight) {
+    upsertMeta('property', 'og:image:width', String(imageWidth));
+    upsertMeta('property', 'og:image:height', String(imageHeight));
   } else {
     removeMeta('property', 'og:image:width');
     removeMeta('property', 'og:image:height');
