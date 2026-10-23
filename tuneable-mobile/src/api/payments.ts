@@ -59,6 +59,7 @@ export const paymentAPI = {
       results: Array<{
         productId: string;
         accepted: boolean | null;
+        creditPence?: number;
         paidPenceEstimate?: number;
         reason?: string;
       }>;

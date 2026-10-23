@@ -80,10 +80,10 @@ Play Console listing assets:
 
 Product IDs (must match App Store Connect + Play Console):
 
-- `stream.tuneable.app.wallet.5` (£5)
-- `stream.tuneable.app.wallet.10` (£10)
-- `stream.tuneable.app.wallet.20` (£20)
-- `stream.tuneable.app.wallet.50` (£50)
+- `stream.tuneable.app.wallet.5` (Top-up 5)
+- `stream.tuneable.app.wallet.10` (Top-up 10)
+- `stream.tuneable.app.wallet.20` (Top-up 20)
+- `stream.tuneable.app.wallet.50` (Top-up 50)
 
 Backend needs Apple App Store Server API keys and/or Google Play service-account credentials (see `tuneable-backend/env.example`). For local credit-path testing only: `IAP_DEV_BYPASS=true` when `NODE_ENV` is not `production`.
 

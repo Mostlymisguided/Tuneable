@@ -2,9 +2,9 @@
  * Wallet top-up packs sold via Apple IAP / Google Play Billing.
  * Product IDs must match App Store Connect + Play Console exactly.
  *
- * Wallet credit is always GBP (pence). Each store territory should be priced
- * from that GBP base. Verification refuses a purchase whose local price
- * converts to less than the configured share of this credit.
+ * The pack id is the catalogue item. The wallet is credited the pound value
+ * of the price the store charged, not these face amounts. A $4.99 purchase
+ * adds about £3.74 while the pound is strong, which is what was collected.
  */
 
 const WALLET_IAP_PRODUCTS = [
@@ -12,25 +12,25 @@ const WALLET_IAP_PRODUCTS = [
     productId: 'stream.tuneable.app.wallet.5',
     creditPence: 500,
     creditPounds: 5,
-    label: '£5',
+    label: 'Top-up 5',
   },
   {
     productId: 'stream.tuneable.app.wallet.10',
     creditPence: 1000,
     creditPounds: 10,
-    label: '£10',
+    label: 'Top-up 10',
   },
   {
     productId: 'stream.tuneable.app.wallet.20',
     creditPence: 2000,
     creditPounds: 20,
-    label: '£20',
+    label: 'Top-up 20',
   },
   {
     productId: 'stream.tuneable.app.wallet.50',
     creditPence: 5000,
     creditPounds: 50,
-    label: '£50',
+    label: 'Top-up 50',
   },
 ];
 

@@ -304,8 +304,7 @@ router.get('/iap/products', authMiddleware, async (_req, res) => {
 });
 
 /**
- * Preview whether each store price is high enough for its GBP credit.
- * The app uses this to disable a pack before the store charges the user.
+ * Preview the pound value that will be added for each store price.
  * Body: { items: [{ productId, amountMajor, currency }] }
  */
 router.post('/iap/price-preview', authMiddleware, async (req, res) => {
@@ -326,11 +325,11 @@ router.post('/iap/price-preview', authMiddleware, async (req, res) => {
         const assessment = await assessStorePrice({
           amountMajor: Number(item.amountMajor),
           currency: item.currency,
-          creditPence: product.creditPence,
         });
         results.push({
           productId,
           accepted: assessment.accepted,
+          creditPence: assessment.paidPenceEstimate,
           paidPenceEstimate: assessment.paidPenceEstimate,
           currency: assessment.currency,
           amountMajor: assessment.amountMajor,
@@ -408,14 +407,13 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
       environment: verified.environment,
       priceCheckSkip: verified.priceCheckSkip,
       storePrice: verified.storePrice,
-      creditPence: verified.product.creditPence,
-      platform,
     });
 
     const paymentMethod = platform === 'ios' ? 'apple_iap' : 'google_play';
+    const creditPence = priceCheck.creditPence || verified.product.creditPence;
     const result = await creditIapTopUp({
       userId: req.user._id,
-      creditPence: verified.product.creditPence,
+      creditPence,
       paymentMethod,
       storeTransactionId: verified.storeTransactionId,
       storeProductId: productId,
@@ -436,13 +434,16 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
       }
     }
 
+    const creditedPence = result.alreadyProcessed
+      ? result.transaction?.amount || creditPence
+      : creditPence;
     res.json({
       message: result.alreadyProcessed
         ? 'Purchase already credited'
         : 'Purchase verified and wallet credited',
       balance: result.balance,
-      creditPence: verified.product.creditPence,
-      creditPounds: verified.product.creditPounds,
+      creditPence: creditedPence,
+      creditPounds: creditedPence / 100,
       alreadyProcessed: result.alreadyProcessed,
       transactionId: result.transaction?._id,
       storeTransactionId: verified.storeTransactionId,

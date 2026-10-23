@@ -84,7 +84,7 @@ export default function WalletScreen() {
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [storeProducts, setStoreProducts] = useState<Product[]>([]);
-  const [blockedSkus, setBlockedSkus] = useState<Set<string>>(new Set());
+  const [creditPenceBySku, setCreditPenceBySku] = useState<Map<string, number>>(new Map());
   const [iapReady, setIapReady] = useState(false);
   const [iapError, setIapError] = useState<string | null>(null);
   const verifyChain = useRef(Promise.resolve());
@@ -307,8 +307,13 @@ export default function WalletScreen() {
       try {
         const results = await paymentAPI.previewIapPrices(items);
         if (cancelled) return;
-        setBlockedSkus(
-          new Set(results.filter((result) => result.accepted === false).map((result) => result.productId))
+        setCreditPenceBySku(
+          new Map(
+            results.flatMap((result) => {
+              const pence = result.creditPence ?? result.paidPenceEstimate;
+              return pence && pence > 0 ? [[result.productId, pence] as const] : [];
+            })
+          )
         );
       } catch (err) {
         console.warn('IAP price preview failed', err);
@@ -341,13 +346,6 @@ export default function WalletScreen() {
   ]);
 
   const startIapPurchase = async (productId: string) => {
-    if (blockedSkus.has(productId)) {
-      Alert.alert(
-        'Price too low',
-        'This store price is too low for the wallet credit. It needs a higher local price before it can be sold.'
-      );
-      return;
-    }
     const iap = getExpoIap();
     if (!iap || !iapReady) {
       Alert.alert(
@@ -501,22 +499,20 @@ export default function WalletScreen() {
           <View style={styles.quickRow}>
             {WALLET_IAP_PRODUCTS.map((pack) => {
               const displayPrice = storePriceBySku.get(pack.productId);
-              const blocked = blockedSkus.has(pack.productId);
+              const creditPence = creditPenceBySku.get(pack.productId);
               return (
                 <Pressable
                   key={pack.productId}
-                  style={[styles.quickBtn, (loading || !iapReady || blocked) && styles.disabled]}
-                  disabled={loading || !iapReady || blocked}
+                  style={[styles.quickBtn, (loading || !iapReady) && styles.disabled]}
+                  disabled={loading || !iapReady}
                   onPress={() => void startIapPurchase(pack.productId)}>
                   <Text style={styles.quickText}>{displayPrice || pack.label}</Text>
                   <Text style={styles.feeHint}>
-                    {blocked
-                      ? `Too low for ${pack.label} credit`
-                      : displayPrice
-                        ? `${pack.label} credit`
-                        : iapReady
-                          ? 'Price unavailable'
-                          : 'Loading…'}
+                    {creditPence
+                      ? `Adds £${(creditPence / 100).toFixed(2)}`
+                      : iapReady
+                        ? 'Adds the pound value of this price'
+                        : 'Loading…'}
                   </Text>
                 </Pressable>
               );
@@ -524,11 +520,9 @@ export default function WalletScreen() {
           </View>
           <Text style={styles.note}>
             You pay the {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} price
-            in your local currency. The pound amount is added to your wallet.
-            {blockedSkus.size > 0
-              ? ' A pack stays unavailable when that store price is too low for its credit.'
-              : ''}{' '}
-            Custom amounts are available on the website via card.
+            in your local currency. Your wallet is credited the pound value of that
+            price, at the rate on the day you pay. Custom amounts are available on
+            the website via card.
           </Text>
         </>
       ) : (

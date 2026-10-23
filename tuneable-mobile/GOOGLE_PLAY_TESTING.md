@@ -142,10 +142,10 @@ eas build --platform android --profile production
 2. Create products:
 
 ```
-stream.tuneable.app.wallet.5   → £5.00
-stream.tuneable.app.wallet.10  → £10.00
-stream.tuneable.app.wallet.20  → £20.00
-stream.tuneable.app.wallet.50  → £50.00
+stream.tuneable.app.wallet.5   → Top-up 5
+stream.tuneable.app.wallet.10  → Top-up 10
+stream.tuneable.app.wallet.20  → Top-up 20
+stream.tuneable.app.wallet.50  → Top-up 50
 ```
 
 3. Each product:

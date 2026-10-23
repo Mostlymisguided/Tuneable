@@ -1,6 +1,5 @@
 /**
- * IAP store-price floor. Wallet credit stays a fixed GBP amount; a local
- * price that converts far below that credit is refused.
+ * Store top-ups credit the pound value of the price charged, not the pack face.
  * Run: npx jest tests/iapPriceGuard.test.js
  */
 
@@ -37,58 +36,43 @@ describe('assessStorePrice', () => {
   const aud = async () => 0.48;
   const usd = async () => 0.75;
 
-  it('accepts a GBP price at the pack value', async () => {
+  it('credits a GBP price at the amount charged', async () => {
     const result = await assessStorePrice({
       amountMajor: 4.99,
       currency: 'GBP',
-      creditPence: 500,
     });
     expect(result.accepted).toBe(true);
     expect(result.paidPenceEstimate).toBe(499);
   });
 
-  it('rejects a same-digits Australian price for a £5 credit', async () => {
+  it('credits a same-digits Australian price at its pound value', async () => {
     const result = await assessStorePrice({
       amountMajor: 4.99,
       currency: 'AUD',
-      creditPence: 500,
       rateFor: aud,
     });
     expect(result.paidPenceEstimate).toBe(240);
-    expect(result.accepted).toBe(false);
+    expect(result.accepted).toBe(true);
   });
 
-  it('rejects a same-digits US $4.99 tier against a £5 credit', async () => {
+  it('credits a US $4.99 charge at its pound value, not £5', async () => {
     const result = await assessStorePrice({
       amountMajor: 4.99,
       currency: 'USD',
-      creditPence: 500,
       rateFor: usd,
     });
     expect(result.paidPenceEstimate).toBe(374);
-    expect(result.accepted).toBe(false);
+    expect(result.accepted).toBe(true);
   });
 
-  it('accepts a US price near the pre-tax value of a £5 sticker', async () => {
+  it('refuses a zero price', async () => {
     const result = await assessStorePrice({
-      amountMajor: 6.49,
+      amountMajor: 0,
       currency: 'USD',
-      creditPence: 500,
       rateFor: usd,
     });
-    expect(result.paidPenceEstimate).toBe(487);
-    expect(result.accepted).toBe(true);
-  });
-
-  it('accepts an equalised Australian price', async () => {
-    const result = await assessStorePrice({
-      amountMajor: 9.99,
-      currency: 'AUD',
-      creditPence: 500,
-      rateFor: aud,
-    });
-    expect(result.paidPenceEstimate).toBe(480);
-    expect(result.accepted).toBe(true);
+    expect(result.paidPenceEstimate).toBe(0);
+    expect(result.accepted).toBe(false);
   });
 });
 
@@ -107,27 +91,32 @@ describe('resolveIapCreditPrice', () => {
     const result = await resolveIapCreditPrice({
       environment: 'Production',
       storePrice: { amountMajor: 5, currency: 'GBP', source: 'apple' },
-      creditPence: 500,
-      platform: 'ios',
     });
     expect(result.priceCheck).toBe('ok');
+    expect(result.creditPence).toBe(500);
     expect(result.paidPenceEstimate).toBe(500);
     expect(result.fxSource).toBe('identity');
     expect(result.fxAsOf).toBeNull();
   });
 
-  it('refuses a price under the floor without calling FX for GBP', async () => {
+  it('credits the pounds charged when that is below the pack face', async () => {
+    const result = await resolveIapCreditPrice({
+      environment: 'Production',
+      storePrice: { amountMajor: 1, currency: 'GBP', source: 'apple' },
+    });
+    expect(result.priceCheck).toBe('ok');
+    expect(result.creditPence).toBe(100);
+  });
+
+  it('refuses a zero price', async () => {
     await expect(
       resolveIapCreditPrice({
         environment: 'Production',
-        storePrice: { amountMajor: 1, currency: 'GBP', source: 'apple' },
-        creditPence: 500,
-        platform: 'ios',
+        storePrice: { amountMajor: 0, currency: 'GBP', source: 'apple' },
       })
     ).rejects.toMatchObject({
       status: 409,
-      code: 'iap_price_too_low',
-      message: expect.stringContaining('Apple'),
+      code: 'iap_price_missing',
     });
   });
 });

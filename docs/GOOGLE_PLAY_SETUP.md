@@ -316,10 +316,10 @@ Since your app has IAP for wallet top-ups, set these up in Play Console:
 
 | Product ID | Title | Description | Price |
 |------------|-------|-------------|-------|
-| `stream.tuneable.app.wallet.5` | £5 Wallet Top-Up | Add £5 to your Tuneable wallet | £5.00 |
-| `stream.tuneable.app.wallet.10` | £10 Wallet Top-Up | Add £10 to your Tuneable wallet | £10.00 |
-| `stream.tuneable.app.wallet.20` | £20 Wallet Top-Up | Add £20 to your Tuneable wallet | £20.00 |
-| `stream.tuneable.app.wallet.50` | £50 Wallet Top-Up | Add £50 to your Tuneable wallet | £50.00 |
+| `stream.tuneable.app.wallet.5` | Top-up 5 | Adds this price's pound value to your wallet. | Local store price |
+| `stream.tuneable.app.wallet.10` | Top-up 10 | Adds this price's pound value to your wallet. | Local store price |
+| `stream.tuneable.app.wallet.20` | Top-up 20 | Adds this price's pound value to your wallet. | Local store price |
+| `stream.tuneable.app.wallet.50` | Top-up 50 | Adds this price's pound value to your wallet. | Local store price |
 
 3. Activate each product
 4. Test in internal testing with test accounts
