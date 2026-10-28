@@ -1,4 +1,5 @@
 export type CopyAccessStatus = {
+  mode?: 'share' | 'pence' | 'closed';
   sharePercent?: number;
   thresholdPence: number | null;
   unlocked: boolean;
@@ -18,6 +19,20 @@ export function copyShareLabel(percent: number): string {
 }
 
 export function copyAccessSentence(status: CopyAccessStatus): string {
+  if (status.mode === 'closed') {
+    if (status.unlocked) return 'You already have a personal copy. New copies are no longer offered.';
+    return 'The artist has not offered a personal download.';
+  }
+  if (status.mode === 'pence') {
+    const price = status.thresholdPence != null
+      ? `£${(status.thresholdPence / 100).toFixed(2)}`
+      : null;
+    if (status.unlocked && status.grandfathered) return 'You keep a copy from when the line was lower.';
+    if (status.unlocked) return `You can keep a personal copy${price ? `. The unlock is ${price}` : ''}.`;
+    return price
+      ? `A personal copy unlocks at ${price} in tips on this tune.`
+      : 'A personal copy unlocks with a tip on this tune.';
+  }
   const share = normalizeCopySharePercent(status.sharePercent);
   if (status.unlocked && status.grandfathered) {
     return 'You keep a copy from when the line was lower.';

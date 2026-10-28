@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../../utils/toast';
 import { mediaAPI, claimAPI, userAPI } from '../../lib/api';
+import { summariseLicence } from '../LicencePicker';
 
 interface BaseUser {
   _id?: string;
@@ -50,6 +51,15 @@ export interface OwnershipClaim {
   reviewer?: BaseUser | null;
   reviewNotes?: string | null;
   proofText?: string | null;
+  licence?: {
+    chosen?: boolean;
+    publicStreaming?: boolean;
+    publicStreamingFloorPence?: number | null;
+    personalDownload?: boolean;
+    personalDownloadUnlockPence?: number | null;
+    openToRework?: boolean;
+    openToCommercial?: boolean;
+  } | null;
   attachments?: Array<{
     url: string;
     filename?: string;
@@ -858,6 +868,10 @@ const MediaOwnershipTab: React.FC<MediaOwnershipTabProps> = ({
                       {claim.status}
                     </span>
                   </div>
+
+                  {claim.licence?.chosen && (
+                    <p className="mt-3 text-sm text-purple-100">{summariseLicence(claim.licence)}</p>
+                  )}
 
                   {claim.proofText && (
                     <p className="mt-3 text-sm text-gray-300 bg-white/5 rounded-lg p-3">{claim.proofText}</p>

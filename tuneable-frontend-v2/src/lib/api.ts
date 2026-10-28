@@ -614,6 +614,13 @@ export const mediaAPI = {
     formData.append('title', metadata.title);
     formData.append('artistName', metadata.artist);
     formData.append('rightsConfirmed', 'true');
+    formData.append('licence', JSON.stringify({
+      personalStreaming: true,
+      publicStreaming: false,
+      personalDownload: false,
+      openToRework: false,
+      openToCommercial: false,
+    }));
     const response = await api.post('/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -628,7 +635,8 @@ export const mediaAPI = {
   getCopyAccess: async (mediaId: string) => {
     const response = await api.get(`/media/${encodeURIComponent(mediaId)}/copy-access`);
     return response.data as {
-      sharePercent: number;
+      mode?: 'share' | 'pence' | 'closed';
+      sharePercent: number | null;
       thresholdPence: number | null;
       tipperCount: number;
       userTotalPence: number | null;
@@ -779,6 +787,18 @@ export const mediaAPI = {
       failed: number;
       items: Array<{ mediaId: string; title?: string; status: string; error?: string }>;
     };
+  },
+
+  updateMediaLicence: async (mediaId: string, licence: {
+    publicStreaming: boolean;
+    publicStreamingFloorPence: number | null;
+    personalDownload: boolean;
+    personalDownloadUnlockPence: number | null;
+    openToRework: boolean;
+    openToCommercial: boolean;
+  }) => {
+    const response = await api.put(`/media/${mediaId}/licence`, { licence });
+    return response.data as { licence: typeof licence & { chosen: boolean } };
   },
 
   updateMedia: async (mediaId: string, updates: {

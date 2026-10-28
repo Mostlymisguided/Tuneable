@@ -6,10 +6,11 @@ import { claimAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { isCreator } from '../utils/permissionHelpers';
 import type { RightsStatus } from '../utils/rightsStatus';
+import LicencePicker, { DEFAULT_LICENCE_CHOICE, type LicenceChoice } from './LicencePicker';
 
 export type ClaimIntent = 'claim_keep' | 'takedown';
 
-type Step = 'intent' | 'login' | 'creator' | 'proof';
+type Step = 'intent' | 'login' | 'creator' | 'licence' | 'proof';
 
 interface ClaimMediaModalProps {
   mediaId: string;
@@ -40,6 +41,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('intent');
   const [intent, setIntent] = useState<ClaimIntent | null>(null);
+  const [licenceChoice, setLicenceChoice] = useState<LicenceChoice>(DEFAULT_LICENCE_CHOICE);
   const [proofText, setProofText] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +56,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
       setStep('creator');
       return;
     }
-    setStep('proof');
+    setStep(selected === 'claim_keep' && contentLabel === 'Tune' ? 'licence' : 'proof');
   };
 
   const handleSubmit = async () => {
@@ -70,6 +72,9 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
       formData.append('mediaId', mediaId);
       formData.append('proofText', proofText.trim());
       formData.append('intent', intent);
+      if (intent === 'claim_keep' && contentLabel === 'Tune') {
+        formData.append('licence', JSON.stringify(licenceChoice));
+      }
       proofFiles.forEach((file) => {
         formData.append('proofFiles', file);
       });
@@ -95,6 +100,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
     intent: `This is my ${contentLabel.toLowerCase()}`,
     login: 'Sign in to continue',
     creator: 'Enable creator mode',
+    licence: `Choose a licence for "${mediaTitle}"`,
     proof: intent === 'takedown' ? `Take down "${mediaTitle}"` : `Claim "${mediaTitle}"`,
   };
 
@@ -218,6 +224,25 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
           </>
         )}
 
+        {step === 'licence' && (
+          <>
+            <p className="text-gray-300 mb-4 text-sm">
+              Nothing is granted until you pick. Personal streaming is included so the tune can play for a listener. You can change or revoke this after the claim is approved.
+            </p>
+            <div className="mb-4">
+              <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />
+            </div>
+            <div className="flex space-x-3">
+              <button type="button" onClick={() => setStep('proof')} className="btn-primary flex-1">
+                Continue
+              </button>
+              <button type="button" onClick={() => setStep('intent')} className="btn-secondary">
+                Back
+              </button>
+            </div>
+          </>
+        )}
+
         {step === 'proof' && (
           <>
             <p className="text-gray-300 mb-4">
@@ -287,7 +312,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
                     : 'Submit claim'}
               </button>
               <button
-                onClick={() => setStep('intent')}
+                onClick={() => setStep(intent === 'claim_keep' && contentLabel === 'Tune' ? 'licence' : 'intent')}
                 className="btn-secondary"
                 disabled={submitting}
               >

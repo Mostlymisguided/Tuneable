@@ -51,6 +51,7 @@ const {
   isVerifiedOriginalUpload,
   demoteUnclaimedOwners,
 } = require('../utils/mediaRights');
+const { parseLicenceChoice, stampLicence, musicTuneNeedsLicence } = require('../utils/mediaLicence');
 const {
   parsePermittedPermission,
   permittedHistoryEntry,
@@ -826,6 +827,15 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
     const useUploaderSecondaryLocation = !isAdminPermittedUpload
       && user.secondaryLocation && Object.keys(user.secondaryLocation).length > 0;
 
+    let uploadLicence = null;
+    if (!isAdminPermittedUpload) {
+      const parsedLicence = parseLicenceChoice(req.body.licence);
+      if (parsedLicence.error) {
+        return res.status(400).json({ error: parsedLicence.error });
+      }
+      uploadLicence = stampLicence(parsedLicence.licence, userId);
+    }
+
     // Create Media entry with extracted and manual metadata
     const media = new Media({
       // Basic information (user input takes priority)
@@ -909,6 +919,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
             rightsStatus: 'cleared',
             rightsConfirmedBy: userId,
             rightsConfirmedAt: new Date(),
+            licence: uploadLicence,
           }),
       
       // Auto-assign ownership to uploader unless this is an admin permitted upload
@@ -1685,6 +1696,56 @@ router.get('/top-tunes', async (req, res) => {
       error: 'Error fetching Top Tunes', 
       details: err.message 
     });
+  }
+});
+
+// @route   PUT /api/media/:id/licence
+// @desc    Save the artist's licence choice. Personal streaming is always included.
+// @access  Private (admin, owner, or verified creator on the media)
+router.put('/:id/licence', authMiddleware, async (req, res) => {
+  try {
+    const media = await findMediaByParam(req.params.id);
+    if (!media || media.status === 'deleted') {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    if (!canEditMedia(req.user, media)) {
+      return res.status(403).json({ error: 'Not authorized to choose licences for this media' });
+    }
+    if (!musicTuneNeedsLicence(media)) {
+      return res.status(400).json({ error: 'Licences can be chosen for tunes' });
+    }
+
+    const parsed = parseLicenceChoice(req.body.licence || req.body);
+    if (parsed.error) {
+      return res.status(400).json({ error: parsed.error });
+    }
+
+    const previous = media.licence?.chosen ? { ...media.licence.toObject?.() || media.licence } : null;
+    media.licence = stampLicence(parsed.licence, req.user._id);
+    media.editHistory.push({
+      editedBy: req.user._id,
+      editedAt: new Date(),
+      changes: [{
+        field: 'licence',
+        oldValue: previous,
+        newValue: media.licence,
+      }],
+    });
+    await media.save();
+
+    if (media.licence.personalDownload) {
+      try {
+        const copyAccessService = require('../services/copyAccessService');
+        await copyAccessService.grantCurrentHalf(media._id);
+      } catch (copyError) {
+        console.error('Failed to refresh download unlocks after licence save:', copyError);
+      }
+    }
+
+    res.json({ licence: media.licence });
+  } catch (error) {
+    console.error('Error saving media licence:', error);
+    res.status(500).json({ error: 'Failed to save licence' });
   }
 });
 

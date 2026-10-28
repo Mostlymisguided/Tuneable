@@ -55,6 +55,7 @@ export type UploadMediaFields = {
   tags?: string;
   description?: string;
   explicit?: boolean;
+  licence?: Record<string, unknown>;
 };
 
 export type UploadMediaResponse = {
@@ -183,11 +184,25 @@ export const mediaAPI = {
     }
     form.append('explicit', String(Boolean(fields.explicit)));
     form.append('rightsConfirmed', 'true');
+    if (fields.licence) {
+      form.append('licence', JSON.stringify(fields.licence));
+    }
 
     const response = await api.post<UploadMediaResponse>(
       '/media/upload',
       form,
       { timeout: UPLOAD_TIMEOUT_MS, ...request }
+    );
+    return response.data;
+  },
+
+  updateMediaLicence: async (
+    mediaId: string,
+    licence: Record<string, unknown>
+  ): Promise<{ licence?: Record<string, unknown> }> => {
+    const response = await api.put<{ licence?: Record<string, unknown> }>(
+      `/media/${mediaId}/licence`,
+      { licence }
     );
     return response.data;
   },

@@ -44,6 +44,12 @@ import {
 import { canDeleteMedia, canEditMedia, isAdmin } from '@/src/lib/permissions';
 import { prepareProfilePhoto } from '@/src/lib/profileImage';
 import { showToast } from '@/src/stores/toastStore';
+import {
+  DEFAULT_LICENCE_CHOICE,
+  licenceChoiceFromSaved,
+  LicencePicker,
+  type LicenceChoice,
+} from '@/src/components/LicencePicker';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
 
@@ -96,6 +102,8 @@ export default function EditMediaScreen() {
     total: number;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [licenceChoice, setLicenceChoice] = useState<LicenceChoice>(DEFAULT_LICENCE_CHOICE);
+  const [licenceSaving, setLicenceSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -106,6 +114,7 @@ export default function EditMediaScreen() {
       const next = profile.media;
       if (!next) throw new Error('Media not found');
       setMedia(next);
+      setLicenceChoice(licenceChoiceFromSaved(next.licence));
       setForm(formFromMedia(next));
       setCoverUri(next.coverArt || DEFAULT_COVER_ART);
     } catch (err) {
@@ -138,6 +147,21 @@ export default function EditMediaScreen() {
 
   const patch = (partial: Partial<MediaEditForm>) => {
     setForm((prev) => (prev ? { ...prev, ...partial } : prev));
+  };
+
+  const onSaveLicence = async () => {
+    if (!mongoId) return;
+    setLicenceSaving(true);
+    setError(null);
+    try {
+      await mediaAPI.updateMediaLicence(mongoId, licenceChoice);
+      showToast('Licence saved');
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not save the licence'));
+    } finally {
+      setLicenceSaving(false);
+    }
   };
 
   const onSave = async () => {
@@ -838,6 +862,19 @@ export default function EditMediaScreen() {
 
             {kind !== 'book' ? (
               <>
+                <Text style={styles.sectionTitle}>Licences</Text>
+                {!media?.licence?.chosen ? (
+                  <Text style={styles.hint}>
+                    Until you save a choice, parties can still play this tune.
+                  </Text>
+                ) : null}
+                <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />
+                <Pressable
+                  style={[styles.saveBtn, licenceSaving && styles.buttonDisabled]}
+                  disabled={licenceSaving || busy}
+                  onPress={() => void onSaveLicence()}>
+                  <Text style={styles.saveBtnText}>{licenceSaving ? 'Saving licences…' : 'Save licences'}</Text>
+                </Pressable>
                 <Text style={styles.sectionTitle}>Audio</Text>
                 <Text style={styles.hint}>
                   {hasAudio

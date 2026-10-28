@@ -11,6 +11,7 @@ import type { ArtistEntry } from '../components/MultiArtistInput';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import AiToolsEditor from '../components/AiToolsEditor';
 import UploadProgress from '../components/UploadProgress';
+import LicencePicker, { DEFAULT_LICENCE_CHOICE, type LicenceChoice } from '../components/LicencePicker';
 import { useUploadProgress } from '../hooks/useUploadProgress';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
@@ -98,6 +99,7 @@ const CreatorUpload: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const uploadProgress = useUploadProgress();
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [licenceChoice, setLicenceChoice] = useState<LicenceChoice>(DEFAULT_LICENCE_CHOICE);
   const [adminRightsMode, setAdminRightsMode] = useState<'cleared' | 'permitted'>('cleared');
   const [permission, setPermission] = useState({
     fromName: '',
@@ -573,6 +575,9 @@ const CreatorUpload: React.FC = () => {
       uploadData.append('audioFile', file);
       uploadData.append('title', formData.title.trim());
       uploadData.append('rightsConfirmed', 'true');
+      if (!isPermittedUpload) {
+        uploadData.append('licence', JSON.stringify(licenceChoice));
+      }
 
       const cleanedArtists = artistEntries
         .map((artist, idx) => ({
@@ -1702,6 +1707,11 @@ const CreatorUpload: React.FC = () => {
                 )}
               </fieldset>
             )}
+            {!isPermittedUpload && (
+              <div className="mb-4">
+                <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />
+              </div>
+            )}
             <div className="flex items-start space-x-3">
               <input
                 type="checkbox"
@@ -1712,12 +1722,12 @@ const CreatorUpload: React.FC = () => {
                 required
               />
               <label htmlFor="rights-confirmation" className="text-sm text-gray-300">
-                <strong className="text-white">Rights Confirmation:</strong> I confirm that I own or have authorization 
-                to distribute the rights (composition and master) in this uploaded work, and I grant Tuneable CIC a 
-                non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.
-                <br /><br />
-                <strong className="text-white">✨Your Rights✨ You retain full rights over your works. You may 
-                revoke any rights granted to Tuneable at any time by removing your works from the platform.</strong>
+                <strong className="text-white">Rights confirmation:</strong> I own or control the recording and
+                composition
+                {isPermittedUpload
+                  ? ', and the rights holder gave permission for Tuneable to host it until they claim it and choose a licence.'
+                  : ', and I grant only the licences selected above.'}
+                {' '}I keep my rights and can change or revoke a licence later.
                 <Link to="/terms-of-service#copyright" className="text-purple-400 underline ml-1 hover:text-purple-300">
                   Copyright and takedown terms
                 </Link>

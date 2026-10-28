@@ -459,6 +459,23 @@ const mediaSchema = new mongoose.Schema({
   },
   rightsConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   rightsConfirmedAt: { type: Date },
+  // Artist-chosen uses. chosen:false (or absent) means no choice yet — party play
+  // and copy access stay on the previous rules until the artist saves one.
+  licence: {
+    type: new mongoose.Schema({
+      chosen: { type: Boolean, default: false },
+      personalStreaming: { type: Boolean, default: true },
+      publicStreaming: { type: Boolean, default: false },
+      publicStreamingFloorPence: { type: Number, default: null },
+      personalDownload: { type: Boolean, default: false },
+      personalDownloadUnlockPence: { type: Number, default: null },
+      openToRework: { type: Boolean, default: false },
+      openToCommercial: { type: Boolean, default: false },
+      chosenAt: { type: Date, default: null },
+      chosenBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    }, { _id: false }),
+    default: undefined,
+  },
   importSource: { type: String, default: null }, // e.g. rekordbox, itunes_library
   importedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   

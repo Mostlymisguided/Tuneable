@@ -68,7 +68,7 @@ import BidConfirmationModal from '../components/BidConfirmationModal';
 import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { computeChampionTipContext } from '../utils/tipStats';
-import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent } from '../utils/copyShare';
+import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent, type CopyAccessStatus } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import MultiArtistInput from '../components/MultiArtistInput';
 import type { ArtistEntry } from '../components/MultiArtistInput';
@@ -307,12 +307,7 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   // Global bidding state
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
-  const [copyAccess, setCopyAccess] = useState<{
-    sharePercent?: number;
-    thresholdPence: number | null;
-    unlocked: boolean;
-    grandfathered: boolean;
-  } | null>(null);
+  const [copyAccess, setCopyAccess] = useState<CopyAccessStatus | null>(null);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);

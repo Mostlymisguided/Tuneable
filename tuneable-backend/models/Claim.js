@@ -23,6 +23,21 @@ const claimSchema = new mongoose.Schema({
     default: 'claim_keep'
   },
 
+  // Licences the claimant chose. Applied to the media when a keep-claim is approved.
+  licence: {
+    type: new mongoose.Schema({
+      chosen: { type: Boolean, default: false },
+      personalStreaming: { type: Boolean, default: true },
+      publicStreaming: { type: Boolean, default: false },
+      publicStreamingFloorPence: { type: Number, default: null },
+      personalDownload: { type: Boolean, default: false },
+      personalDownloadUnlockPence: { type: Number, default: null },
+      openToRework: { type: Boolean, default: false },
+      openToCommercial: { type: Boolean, default: false },
+    }, { _id: false }),
+    default: undefined,
+  },
+
   // Proof of ownership
   proofText: {
     type: String,

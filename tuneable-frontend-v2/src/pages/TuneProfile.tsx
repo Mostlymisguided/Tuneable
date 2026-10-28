@@ -94,7 +94,7 @@ import {
 } from '../utils/listenElsewhere';
 import { requireAuthToPlay } from '../utils/playAuth';
 import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
-import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent } from '../utils/copyShare';
+import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent, type CopyAccessStatus } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import ProductionStackEditor from '../components/ProductionStackEditor';
 import ProductionStackDisplay from '../components/ProductionStackDisplay';
@@ -113,6 +113,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
 import { type RightsStatus } from '../utils/rightsStatus';
+import { MediaLicenceCard, type SavedLicence } from '../components/LicencePicker';
 
 interface Media {
   _id: string;
@@ -157,6 +158,7 @@ interface Media {
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
+  licence?: SavedLicence | null;
   hasHostedAudio?: boolean;
   tipCount?: number;
   bids?: Bid[];
@@ -381,12 +383,7 @@ const TuneProfile: React.FC = () => {
 
   // Global bidding state
   const [minimumBid, setMinimumBid] = useState<number>(0.01);
-  const [copyAccess, setCopyAccess] = useState<{
-    sharePercent?: number;
-    thresholdPence: number | null;
-    unlocked: boolean;
-    grandfathered: boolean;
-  } | null>(null);
+  const [copyAccess, setCopyAccess] = useState<CopyAccessStatus | null>(null);
   const [globalBidInput, setGlobalBidInput] = useState<string>('');
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -1593,7 +1590,7 @@ const TuneProfile: React.FC = () => {
       ? `${window.location.origin}${getMediaProfileUrl(media)}`
       : window.location.href;
     const inviteLink = `${window.location.origin}/creator/register?invite=${inviteCode}`;
-    const message = `Hey ${artistName} — "${title}" is on Tuneable as ${chartPhrase}. Sign up as a creator and claim it so tips can reach you.\n\nIt is currently not playable as rights are not cleared - please reply YES to clear rights if you have the permissions or NO to have the title removed from the charts.\n\n✨Your Rights✨\n\nYou grant Tuneable Community Interest Company a non-exclusive, worldwide license to host, stream, display, distribute, and monetise your content within the Tuneable platform.\n\nYou retain full rights over your works. You may revoke any rights granted to Tuneable at any time as per our terms.\n\nCheck it out: ${mediaLink}\n\n${inviteLink}`;
+    const message = `Hey ${artistName} — "${title}" is on Tuneable as ${chartPhrase}. It isn't playable yet, and tips are waiting until you claim it.\n\nReply YES and choose a licence for your work, or NO to have it removed from the charts.\n\nYou keep your rights. Nothing is granted until you pick a licence on Tuneable, and you can change or revoke it later.\n\n${mediaLink}\n\n${inviteLink}`;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(message);
@@ -2625,6 +2622,12 @@ const TuneProfile: React.FC = () => {
               <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
                 <ClickableArtistDisplay media={media} />
               </div>
+              <MediaLicenceCard
+                mediaId={media._id}
+                saved={media.licence}
+                canEdit={canEditTune()}
+                onSaved={(licence) => setMedia((current) => current ? { ...current, licence } : current)}
+              />
 
               {heroMetadata.length > 0 && (
                 <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-2">
@@ -4356,7 +4359,7 @@ const TuneProfile: React.FC = () => {
                 />
                 <label htmlFor="attach-audio-rights-confirmation" className="text-sm text-gray-300">
                   <strong className="text-white">Rights confirmation:</strong>{' '}
-                  I confirm that I own or have authorization to distribute the rights in this work, and I grant Tuneable CIC a non-exclusive, worldwide, royalty-free license to host, stream, display, and distribute this content.
+                  I own or control the recording and composition in this audio. Adding the file does not change the licences already chosen for this tune.
                   {' '}
                   <Link to="/terms-of-service#copyright" className="text-purple-400 underline hover:text-purple-300">
                     Copyright and takedown terms

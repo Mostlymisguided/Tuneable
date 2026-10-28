@@ -96,6 +96,16 @@ export interface ChartMediaItem {
   externalIds?: Record<string, string> | null;
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
+  licence?: {
+    chosen?: boolean;
+    personalStreaming?: boolean;
+    publicStreaming?: boolean;
+    publicStreamingFloorPence?: number | null;
+    personalDownload?: boolean;
+    personalDownloadUnlockPence?: number | null;
+    openToRework?: boolean;
+    openToCommercial?: boolean;
+  } | null;
   isPlayable?: boolean;
   hasHostedAudio?: boolean;
   playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;

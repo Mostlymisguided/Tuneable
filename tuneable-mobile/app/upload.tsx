@@ -31,6 +31,7 @@ import { LEGAL_URLS } from '@/src/components/LegalLinks';
 import { CREATOR_REGISTER_URL } from '@/src/components/InviteShareCard';
 import { UploadProgressBar, type UploadPhase } from '@/src/components/UploadProgressBar';
 import { colors } from '@/src/theme/colors';
+import { DEFAULT_LICENCE_CHOICE, LicencePicker, type LicenceChoice } from '@/src/components/LicencePicker';
 
 function formatBytes(size: number | null | undefined): string {
   if (size == null || !Number.isFinite(size) || size <= 0) return '';
@@ -46,6 +47,7 @@ export default function UploadScreen() {
   const [artistName, setArtistName] = useState(user?.username ?? '');
   const [tags, setTags] = useState('');
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [licenceChoice, setLicenceChoice] = useState<LicenceChoice>(DEFAULT_LICENCE_CHOICE);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ phase: UploadPhase; loaded: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +119,7 @@ export default function UploadScreen() {
           title: title.trim(),
           artistName: artistName.trim() || undefined,
           tags: tags.trim() || undefined,
+          licence: licenceChoice,
         },
         {
           signal: controller.signal,
@@ -249,6 +252,8 @@ export default function UploadScreen() {
               autoCapitalize="none"
             />
 
+            <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />
+
             <View style={styles.rightsRow}>
               <Pressable
                 onPress={() => setRightsConfirmed((v) => !v)}
@@ -262,7 +267,7 @@ export default function UploadScreen() {
                 />
               </Pressable>
               <Text style={styles.rightsText}>
-                I confirm I have the rights to upload and distribute this audio.{' '}
+                I own or control this recording and composition, and I grant only the licences selected above.{' '}
                 <Text
                   style={styles.rightsLink}
                   onPress={() => {

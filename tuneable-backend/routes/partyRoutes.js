@@ -1672,6 +1672,31 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
             });
         }
 
+        if (!isVirtualParty) {
+            const alreadyQueued = (party.media || []).some((entry) => {
+                if (!entry || entry.status !== 'active' || !entry.mediaId) return false;
+                const entryId = entry.mediaId._id || entry.mediaId;
+                return entryId.toString() === media._id.toString();
+            });
+            if (!alreadyQueued) {
+                const { assertPartyQueueLicence } = require('../utils/mediaLicence');
+                const gate = await assertPartyQueueLicence({
+                    media,
+                    userId,
+                    bidAmountPence,
+                });
+                if (!gate.ok) {
+                    return res.status(gate.status || 403).json({
+                        error: gate.error,
+                        code: gate.code,
+                        mediaId: media._id,
+                        publicStreamingFloorPence: gate.floorPence ?? null,
+                        yourTipPence: gate.yourTipPence ?? null,
+                    });
+                }
+            }
+        }
+
         // Calculate queue context
         let queueSize;
         let queuePosition;

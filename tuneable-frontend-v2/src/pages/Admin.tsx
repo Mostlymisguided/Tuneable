@@ -47,6 +47,7 @@ import AmbassadorsAdmin from '../components/AmbassadorsAdmin';
 import UserTopUpModal from '../components/UserTopUpModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from '../utils/toast';
+import { summariseLicence } from '../components/LicencePicker';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
@@ -3816,6 +3817,10 @@ const Admin: React.FC = () => {
                             </div>
                           </div>
                         </div>
+
+                        {claim.licence?.chosen && (
+                          <p className="text-sm text-purple-200 mb-4">{summariseLicence(claim.licence)}</p>
+                        )}
 
                         <div className="mb-4">
                           <p className="text-sm text-gray-400 mb-2">Proof:</p>

@@ -13,6 +13,7 @@ const { softDeleteMedia } = require('../services/mediaLifecycleService');
 const artistEscrowService = require('../services/artistEscrowService');
 const { isRightsPendingClaimable: isRightsPendingLimbo } = require('../utils/mediaPlayability');
 const { isClaimApprovedOwner } = require('../utils/mediaRights');
+const { parseLicenceChoice, stampLicence, musicTuneNeedsLicence } = require('../utils/mediaLicence');
 
 // Configure upload using R2 or local fallback
 const upload = createClaimUpload();
@@ -71,6 +72,15 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
       return res.status(400).json({ error: 'You already have a pending claim for this tune' });
     }
 
+    let licence = undefined;
+    if (intent === 'claim_keep' && musicTuneNeedsLicence(media)) {
+      const parsedLicence = parseLicenceChoice(req.body.licence);
+      if (parsedLicence.error) {
+        return res.status(400).json({ error: parsedLicence.error });
+      }
+      licence = parsedLicence.licence;
+    }
+
     const proofFiles = req.files ? req.files.map(file => ({
       filename: file.key || file.filename,
       url: file.key ? getPublicUrl(file.key) : (file.location || getPublicUrl(`claims/${file.filename}`)),
@@ -83,6 +93,7 @@ router.post('/submit', authMiddleware, upload.array('proofFiles', 5), async (req
       intent,
       proofText,
       proofFiles,
+      licence,
       status: 'pending'
     });
 
@@ -164,6 +175,7 @@ router.get('/media/:mediaId', authMiddleware, async (req, res) => {
         _id: claim._id,
         mediaId: claim.mediaId?.toString?.() || claim.mediaId,
         intent: claim.intent || 'claim_keep',
+        licence: claim.licence?.chosen ? claim.licence : null,
         status: claim.status,
         proofText: claim.proofText,
         proofFiles: claim.proofFiles || [],
@@ -292,6 +304,9 @@ router.patch('/:claimId/review', authMiddleware, adminMiddleware, async (req, re
           media.rightsStatus = 'cleared';
           media.rightsConfirmedBy = claim.userId;
           media.rightsConfirmedAt = new Date();
+          if (claim.licence?.chosen) {
+            media.licence = stampLicence(claim.licence.toObject ? claim.licence.toObject() : claim.licence, claim.userId);
+          }
 
           media.editHistory.push({
             editedBy: req.user._id,

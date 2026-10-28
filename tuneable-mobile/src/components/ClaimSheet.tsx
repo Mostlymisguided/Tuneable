@@ -21,8 +21,9 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { claimsAPI, type ClaimIntent } from '@/src/api/claims';
 import { CREATOR_REGISTER_URL } from '@/src/components/InviteShareCard';
 import { colors } from '@/src/theme/colors';
+import { DEFAULT_LICENCE_CHOICE, LicencePicker, type LicenceChoice } from '@/src/components/LicencePicker';
 
-type Step = 'intent' | 'login' | 'creator' | 'proof';
+type Step = 'intent' | 'login' | 'creator' | 'licence' | 'proof';
 
 type MediaKind = 'tune' | 'book';
 
@@ -55,6 +56,7 @@ export function ClaimSheet({
   const [step, setStep] = useState<Step>('intent');
   const [intent, setIntent] = useState<ClaimIntent | null>(null);
   const [proofText, setProofText] = useState('');
+  const [licenceChoice, setLicenceChoice] = useState<LicenceChoice>(DEFAULT_LICENCE_CHOICE);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +65,7 @@ export function ClaimSheet({
       setStep('intent');
       setIntent(null);
       setProofText('');
+      setLicenceChoice(DEFAULT_LICENCE_CHOICE);
       setSubmitting(false);
       setError(null);
     }
@@ -79,7 +82,7 @@ export function ClaimSheet({
       setStep('creator');
       return;
     }
-    setStep('proof');
+    setStep(selected === 'claim_keep' && mediaKind === 'tune' ? 'licence' : 'proof');
   };
 
   const submit = async () => {
@@ -95,6 +98,7 @@ export function ClaimSheet({
         mediaId,
         proofText: proofText.trim(),
         intent,
+        licence: intent === 'claim_keep' && mediaKind === 'tune' ? licenceChoice : undefined,
       });
       onSubmitted?.();
       onClose();
@@ -117,6 +121,7 @@ export function ClaimSheet({
     intent: `This is my ${noun}`,
     login: 'Sign in to continue',
     creator: 'Enable creator mode',
+    licence: `Choose a licence`,
     proof: intent === 'takedown' ? `Take down "${mediaTitle}"` : `Claim "${mediaTitle}"`,
   };
 
@@ -229,6 +234,21 @@ export function ClaimSheet({
               </>
             )}
 
+            {step === 'licence' && (
+              <>
+                <Text style={styles.copy}>
+                  Nothing is granted until you pick. Personal streaming is included. You can change or revoke this after the claim is approved.
+                </Text>
+                <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />
+                <Pressable style={styles.primaryBtn} onPress={() => setStep('proof')}>
+                  <Text style={styles.primaryBtnText}>Continue</Text>
+                </Pressable>
+                <Pressable style={styles.secondaryBtn} onPress={() => setStep('intent')}>
+                  <Text style={styles.secondaryBtnText}>Back</Text>
+                </Pressable>
+              </>
+            )}
+
             {step === 'proof' && (
               <>
                 <Text style={styles.copy}>
@@ -289,7 +309,7 @@ export function ClaimSheet({
                   style={styles.secondaryBtn}
                   onPress={() => {
                     Keyboard.dismiss();
-                    setStep('intent');
+                    setStep(intent === 'claim_keep' && mediaKind === 'tune' ? 'licence' : 'intent');
                   }}
                   disabled={submitting}
                 >
