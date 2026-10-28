@@ -1,6 +1,6 @@
 export type CopyAccessStatus = {
   mode?: 'share' | 'pence' | 'closed';
-  sharePercent?: number;
+  sharePercent?: number | null;
   thresholdPence: number | null;
   unlocked: boolean;
   grandfathered: boolean;
