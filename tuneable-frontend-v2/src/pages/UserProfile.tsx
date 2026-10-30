@@ -103,6 +103,15 @@ const CollapsibleBadgeWrap: React.FC<{
     </div>
   );
 };
+
+/** Profile total, rounded to a whole number like the mobile profile stat. */
+function formatProfileTuneBytes(value: number | undefined | null): string {
+  const n = Math.round(Number(value) || 0);
+  return n.toLocaleString(undefined, {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  });
+}
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
@@ -2173,8 +2182,19 @@ const UserProfile: React.FC = () => {
                 </div>
               )}
               </div>
-              
-              <div className="mb-2"></div>
+
+              <div
+                className="inline-flex items-center gap-2 mb-3 px-3 py-2 bg-black/20 border border-purple-500/30 rounded-lg"
+                aria-label={`${formatProfileTuneBytes(user.tuneBytes)} TuneBytes`}
+              >
+                <Sparkles className="h-4 w-4 text-purple-400" aria-hidden />
+                <div className="leading-tight">
+                  <p className="text-[11px] uppercase tracking-wide text-purple-200/80">TuneBytes</p>
+                  <p className="text-lg font-bold text-white tabular-nums">
+                    {formatProfileTuneBytes(user.tuneBytes)}
+                  </p>
+                </div>
+              </div>
 
               {/* Collective Memberships - Above label affiliations */}
               {collectiveMemberships.length > 0 && (
