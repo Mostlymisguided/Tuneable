@@ -11,7 +11,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, router } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
-import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
+import {
+  ADD_NEW_MEDIA_CTA,
+  ChartFilterToolbar,
+} from '@/src/components/ChartFilterToolbar';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -260,14 +263,6 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
               onClearFilters={clearClientFilters}
               hasActiveFilters={filtersActive}
               searchPlaceholder="Title, series, or tag…"
-              onAddMedia={() => {
-                const q = searchQuery.trim();
-                if (q) {
-                  router.push({ pathname: '/podcast-search', params: { q } });
-                  return;
-                }
-                router.push('/podcast-search');
-              }}
             />
 
             {playableCount > 0 ? (
@@ -291,7 +286,22 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
           </View>
         }
         ListEmptyComponent={
-          !loading ? <Text style={styles.empty}>{emptyMessage}</Text> : null
+          !loading ? (
+            searchQuery.trim() && filteredEpisodes.length === 0 ? (
+              <Pressable
+                onPress={() => {
+                  const q = searchQuery.trim();
+                  router.push({ pathname: '/podcast-search', params: { q } });
+                }}
+                style={styles.addMediaBtn}
+                accessibilityRole="button"
+                accessibilityLabel={ADD_NEW_MEDIA_CTA}>
+                <Text style={styles.addMediaText}>{ADD_NEW_MEDIA_CTA}</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.empty}>{emptyMessage}</Text>
+            )
+          ) : null
         }
         ListFooterComponent={
           hasMore ? (
@@ -364,6 +374,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
+  },
+  addMediaBtn: {
+    alignSelf: 'center',
+    marginTop: 32,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  addMediaText: {
+    color: '#c4b5fd',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   showMoreBtn: {
     alignSelf: 'center',

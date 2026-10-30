@@ -418,7 +418,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
     getTagTermsFromSearchParams(searchParams, partyId === 'global')
   );
-  // Unified search: live-filters queue; "Can't find it? Add New Media" queries Tuneable + MusicBrainz
+  // Unified search: live-filters the queue. Catalog search runs only from the empty-results action.
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [lastLibrarySearchQuery, setLastLibrarySearchQuery] = useState('');
@@ -3152,7 +3152,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                   </div>
                 )}
 
-                {/* Unified search: live-filters queue; Add New Media queries Tuneable + MusicBrainz */}
+                {/* Unified search: live-filters the queue */}
                 {!showVetoed && party && (
                   <div className="mb-4 md:mb-6">
                     <div className="w-full max-w-2xl mx-auto">
@@ -3171,23 +3171,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           aria-label="Filter tunes in this party"
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!searchQuery.trim()) {
-                            searchInputRef.current?.focus();
-                            return;
-                          }
-                          void handleAddMediaSearch();
-                        }}
-                        disabled={isSearchingNewMedia}
-                        className="mt-2 mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
-                      >
-                        {isSearchingNewMedia ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : null}
-                        Can't find it? Add New Media
-                      </button>
                       {searchQuery.trim() && getDisplayMedia().length > 0 && (
                         <p className="text-xs text-purple-300 mt-2 text-center">
                           {getDisplayMedia().length} tune{getDisplayMedia().length !== 1 ? 's' : ''} in party match — scroll down to tip
@@ -3203,11 +3186,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           >
                             Show catalog
                           </button>
-                        </p>
-                      )}
-                      {searchQuery.trim() && displayMedia.length === 0 && !hasSearchedDatabase && getPartyMedia().length > 0 && (
-                        <p className="text-xs text-gray-400 mt-2 text-center">
-                          No matches in this chart — sort by Newest, or add it from MusicBrainz
                         </p>
                       )}
                       {queueSearchTerms.length > 0 && (
@@ -3650,7 +3628,24 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                   </div>
                 )}
 
-                {!showVetoed && getPartyMedia().length === 0 && (
+                {!showVetoed && !showSortedLoader && searchQuery.trim() && displayMedia.length === 0 && (
+                  <div className="text-center py-12">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleAddMediaSearch();
+                      }}
+                      disabled={isSearchingNewMedia}
+                      className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
+                    >
+                      {isSearchingNewMedia ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : null}
+                      Can't find it? Add New Media
+                    </button>
+                  </div>
+                )}
+                {!showVetoed && getPartyMedia().length === 0 && !(searchQuery.trim() && displayMedia.length === 0) && (
                   <div className="text-center py-8">
                     <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-500">
@@ -3662,10 +3657,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                           )
                         : 'No tunes in queue yet'}
                     </p>
-                    <p className="text-gray-600 text-sm mt-2">Can't find it? Add New Media above to search MusicBrainz and tip it in</p>
                   </div>
                 )}
-                {!showVetoed && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
+                {!showVetoed && !(searchQuery.trim() && displayMedia.length === 0) && getDisplayMedia().length === 0 && hiddenPlayableCount > 0 && (
                   <PlayableEmptyState
                     hiddenCount={hiddenPlayableCount}
                     onShowAll={() => requestPlayableOnly(false)}

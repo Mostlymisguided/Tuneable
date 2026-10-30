@@ -47,8 +47,6 @@ type Props = {
   hasActiveFilters: boolean;
   searchPlaceholder?: string;
   searchHint?: string;
-  onAddMedia?: () => void;
-  addMediaLabel?: string;
   playableOnly?: boolean;
   onPlayableOnlyChange?: (next: boolean) => void;
   showPlayable?: boolean;
@@ -82,8 +80,6 @@ export function ChartFilterToolbar({
   hasActiveFilters,
   searchPlaceholder = 'Title, artist, or tag…',
   searchHint,
-  onAddMedia,
-  addMediaLabel = ADD_NEW_MEDIA_CTA,
   playableOnly = false,
   onPlayableOnlyChange,
   showPlayable = false,
@@ -127,17 +123,7 @@ export function ChartFilterToolbar({
             accessibilityLabel={searchPlaceholder}
           />
         </View>
-        {onAddMedia ? (
-          <Pressable
-            onPress={onAddMedia}
-            style={styles.addMediaBtn}
-            accessibilityRole="button"
-            accessibilityLabel={addMediaLabel}>
-            <Text style={styles.addMediaText}>{addMediaLabel}</Text>
-          </Pressable>
-        ) : searchHint ? (
-          <Text style={styles.searchHint}>{searchHint}</Text>
-        ) : null}
+        {searchHint ? <Text style={styles.searchHint}>{searchHint}</Text> : null}
       </View>
 
       <View style={styles.triggers}>
@@ -393,17 +379,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: colors.text,
     fontSize: 15,
-  },
-  addMediaBtn: {
-    alignSelf: 'center',
-    marginTop: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  addMediaText: {
-    color: '#c4b5fd',
-    fontSize: 14,
-    fontWeight: '600',
   },
   triggers: {
     flexDirection: 'row',

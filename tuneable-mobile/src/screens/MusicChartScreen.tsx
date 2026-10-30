@@ -11,7 +11,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
-import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
+import {
+  ADD_NEW_MEDIA_CTA,
+  ChartFilterToolbar,
+} from '@/src/components/ChartFilterToolbar';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -285,14 +288,6 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
               showPlayable
               playableOnly={playableOnly}
               onPlayableOnlyChange={setPlayableOnly}
-              onAddMedia={() => {
-                const q = searchQuery.trim();
-                if (q) {
-                  router.push({ pathname: '/music-search', params: { q } });
-                  return;
-                }
-                router.push('/music-search');
-              }}
             />
 
             {playableCount > 0 ? (
@@ -317,7 +312,18 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         }
         ListEmptyComponent={
           !loading ? (
-            playableOnly && noPlayableWithCatalog ? (
+            searchQuery.trim() && matchingMedia.length === 0 ? (
+              <Pressable
+                onPress={() => {
+                  const q = searchQuery.trim();
+                  router.push({ pathname: '/music-search', params: { q } });
+                }}
+                style={styles.addMediaBtn}
+                accessibilityRole="button"
+                accessibilityLabel={ADD_NEW_MEDIA_CTA}>
+                <Text style={styles.addMediaText}>{ADD_NEW_MEDIA_CTA}</Text>
+              </Pressable>
+            ) : playableOnly && noPlayableWithCatalog ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.empty}>{emptyMessage}</Text>
                 <Pressable
@@ -403,6 +409,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
+  },
+  addMediaBtn: {
+    alignSelf: 'center',
+    marginTop: 32,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  addMediaText: {
+    color: '#c4b5fd',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   emptyWrap: {
     alignItems: 'center',

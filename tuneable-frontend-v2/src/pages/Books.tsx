@@ -642,24 +642,9 @@ const Books: React.FC = () => {
                 aria-label="Filter books in this chart"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                const q = searchQuery.trim();
-                navigate(q ? `/books/search?q=${encodeURIComponent(q)}` : '/books/search');
-              }}
-              className="mt-2 mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white transition-colors"
-            >
-              Can&apos;t find it? Add New Media
-            </button>
             {searchQuery.trim() && filteredBooks.length > 0 && (
               <p className="text-xs text-purple-300 mt-2 text-center">
                 {filteredBooks.length} book{filteredBooks.length !== 1 ? 's' : ''} in chart match
-              </p>
-            )}
-            {searchQuery.trim() && filteredBooks.length === 0 && books.length > 0 && (
-              <p className="text-xs text-gray-400 mt-2 text-center">
-                No matches in this chart — add it from the catalogue
               </p>
             )}
           </div>
@@ -675,6 +660,20 @@ const Books: React.FC = () => {
             detail="Ranking tipped books."
           />
         ) : filteredBooks.length === 0 ? (
+          searchQuery.trim() ? (
+            <div className="text-center py-20">
+              <button
+                type="button"
+                onClick={() => {
+                  const q = searchQuery.trim();
+                  navigate(`/books/search?q=${encodeURIComponent(q)}`);
+                }}
+                className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white transition-colors"
+              >
+                Can&apos;t find it? Add New Media
+              </button>
+            </div>
+          ) : (
           <div className="text-center py-20">
             <BookOpen className="h-16 w-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 text-lg">{emptyMessage}</p>
@@ -693,6 +692,7 @@ const Books: React.FC = () => {
               </button>
             )}
           </div>
+          )
         ) : (
           <div className="space-y-3">
             {visibleBooks.map((book, index) => (

@@ -1767,21 +1767,6 @@ const Podcasts: React.FC = () => {
             <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (!searchQuery.trim()) {
-                    searchInputRef.current?.focus();
-                    return;
-                  }
-                  void handleSearch();
-                }}
-                disabled={isSearching}
-                className="text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors flex items-center gap-2"
-              >
-                {isSearching ? <Loader className="h-4 w-4 animate-spin" /> : null}
-                Can't find it? Add New Media
-              </button>
-              <button
-                type="button"
                 onClick={() => setShowImportSection(!showImportSection)}
                 className="text-sm font-medium text-gray-300 hover:text-white transition-colors flex items-center gap-1.5"
               >
@@ -1793,11 +1778,6 @@ const Podcasts: React.FC = () => {
             {searchQuery.trim() && !showSearchResults && displayEpisodes.length > 0 && (
               <p className="text-xs text-purple-300 mt-2 text-center">
                 {displayEpisodes.length} episode{displayEpisodes.length !== 1 ? 's' : ''} in chart match
-              </p>
-            )}
-            {searchQuery.trim() && !showSearchResults && displayEpisodes.length === 0 && episodes.length > 0 && (
-              <p className="text-xs text-gray-400 mt-2 text-center">
-                No matches in this chart — add it from the catalog
               </p>
             )}
 
@@ -1985,6 +1965,21 @@ const Podcasts: React.FC = () => {
             }
           />
         ) : displayEpisodes.length === 0 ? (
+          searchQuery.trim() && !showSearchResults ? (
+            <div className="text-center py-20">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSearch();
+                }}
+                disabled={isSearching}
+                className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
+              >
+                {isSearching ? <Loader className="h-4 w-4 animate-spin" /> : null}
+                Can't find it? Add New Media
+              </button>
+            </div>
+          ) : (
           <div className="text-center py-20">
             <Music className="h-16 w-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 text-lg">
@@ -2002,6 +1997,7 @@ const Podcasts: React.FC = () => {
               {showSearchResults ? 'Try a different search term' : 'Try adjusting your filters or search for podcasts'}
             </p>
           </div>
+          )
         ) : (
           <div className="space-y-3">
             {visibleEpisodes.map((episode, index) => {
