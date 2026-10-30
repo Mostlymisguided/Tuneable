@@ -44,8 +44,3 @@ export function buildChartRankMap<T>(
   });
   return ranks;
 }
-
-export function catalogHiddenLabel(count: number): string {
-  if (count <= 0) return '';
-  return `${count} catalog ${count === 1 ? 'tune' : 'tunes'} hidden`;
-}

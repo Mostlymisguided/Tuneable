@@ -22,7 +22,7 @@ import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getCreatorDisplay, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
-import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
+import { buildChartRankMap } from '@/src/lib/playableFilterPref';
 import { collectiveTypeLabel } from '@/src/lib/collectiveTypes';
 import {
   CHART_ADDED_SORT_HINT,
@@ -337,17 +337,6 @@ export default function PlaceProfileScreen() {
           </Pressable>
         </View>
       </View>
-
-      {playableOnly && hiddenPlayableCount > 0 ? (
-        <Pressable onPress={() => setPlayableOnly(false)} style={styles.hiddenHintBtn}>
-          <Text style={styles.hiddenHint}>
-            Showing playable only ·{' '}
-            <Text style={styles.hiddenHintLink}>
-              {catalogHiddenLabel(hiddenPlayableCount)}
-            </Text>
-          </Text>
-        </Pressable>
-      ) : null}
 
       {showTimePanel ? (
         <View style={styles.timePanel}>
@@ -801,19 +790,6 @@ const styles = StyleSheet.create({
   emptyWrap: {
     alignItems: 'center',
     paddingHorizontal: 16,
-  },
-  hiddenHintBtn: {
-    alignSelf: 'center',
-    marginBottom: 8,
-  },
-  hiddenHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  hiddenHintLink: {
-    color: '#d8b4fe',
-    textDecorationLine: 'underline',
   },
   showCatalogBtn: {
     marginTop: 12,

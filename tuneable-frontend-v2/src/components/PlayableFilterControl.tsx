@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Headphones, Loader2 } from 'lucide-react';
-import { catalogHiddenLabel } from '../utils/playableFilterPref';
 
 /** True only after `pending` has lasted long enough to be worth a progress bar. */
 export function useChartLag(pending: boolean, delay = 200) {
@@ -62,32 +61,6 @@ export function PlayableFilterTrigger({
       {playableOnly ? 'Playable' : 'All'}
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-300" /> : null}
     </button>
-  );
-}
-
-type HintProps = {
-  playableOnly: boolean;
-  hiddenCount: number;
-  onShowAll: () => void;
-};
-
-export function PlayableFilterHint({
-  playableOnly,
-  hiddenCount,
-  onShowAll,
-}: HintProps) {
-  if (!playableOnly || hiddenCount <= 0) return null;
-  return (
-    <p className="text-center text-xs text-gray-400 mt-2">
-      Showing playable only ·{' '}
-      <button
-        type="button"
-        onClick={onShowAll}
-        className="text-purple-300 hover:text-white underline-offset-2 hover:underline"
-      >
-        {catalogHiddenLabel(hiddenCount)}
-      </button>
-    </p>
   );
 }
 

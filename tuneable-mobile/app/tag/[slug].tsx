@@ -41,7 +41,7 @@ import {
 } from '@/src/lib/podcast';
 import { getTagProfileHref, tagsMatch } from '@/src/lib/tagNormalizer';
 import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
-import { buildChartRankMap, catalogHiddenLabel } from '@/src/lib/playableFilterPref';
+import { buildChartRankMap } from '@/src/lib/playableFilterPref';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { usePodcastPlayerStore } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
@@ -441,17 +441,6 @@ export default function TagProfileScreen() {
           ) : null}
         </View>
       </View>
-
-      {!isPodcast && playableOnly && hiddenPlayableCount > 0 ? (
-        <Pressable onPress={() => setPlayableOnly(false)} style={styles.hiddenHintBtn}>
-          <Text style={styles.hiddenHint}>
-            Showing playable only ·{' '}
-            <Text style={styles.hiddenHintLink}>
-              {catalogHiddenLabel(hiddenPlayableCount)}
-            </Text>
-          </Text>
-        </Pressable>
-      ) : null}
 
       {showTimePanel ? (
         <View style={styles.timePanel}>
@@ -950,19 +939,6 @@ const styles = StyleSheet.create({
   emptyWrap: {
     alignItems: 'center',
     paddingHorizontal: 16,
-  },
-  hiddenHintBtn: {
-    alignSelf: 'center',
-    marginBottom: 8,
-  },
-  hiddenHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  hiddenHintLink: {
-    color: '#d8b4fe',
-    textDecorationLine: 'underline',
   },
   showCatalogBtn: {
     marginTop: 12,

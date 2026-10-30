@@ -20,7 +20,6 @@ import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
   ChartRefreshBar,
   PlayableEmptyState,
-  PlayableFilterHint,
   PlayableFilterTrigger,
   useChartLag,
 } from './PlayableFilterControl';
@@ -321,11 +320,6 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
           ) : null}
         </div>
       </div>
-      <PlayableFilterHint
-        playableOnly={playableOnly}
-        hiddenCount={hiddenPlayableCount}
-        onShowAll={() => setPlayableOnly(false)}
-      />
 
       {showFilterLag && visibleItems.length > 0 ? (
         <ChartRefreshBar

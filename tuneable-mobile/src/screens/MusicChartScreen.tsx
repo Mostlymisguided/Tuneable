@@ -285,7 +285,6 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
               showPlayable
               playableOnly={playableOnly}
               onPlayableOnlyChange={setPlayableOnly}
-              hiddenPlayableCount={hiddenPlayableCount}
               onAddMedia={() => {
                 const q = searchQuery.trim();
                 if (q) {

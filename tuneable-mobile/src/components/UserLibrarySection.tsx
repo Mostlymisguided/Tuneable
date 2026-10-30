@@ -384,7 +384,6 @@ export function UserLibrarySection({
           showPlayable
           playableOnly={playableOnly}
           onPlayableOnlyChange={setPlayableOnly}
-          hiddenPlayableCount={hiddenPlayableCount}
         />
       ) : null}
 

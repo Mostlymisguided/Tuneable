@@ -24,7 +24,6 @@ import {
 import {
   ChartRefreshBar,
   PlayableEmptyState,
-  PlayableFilterHint,
   PlayableFilterTrigger,
   useChartLag,
 } from './PlayableFilterControl';
@@ -339,11 +338,6 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
             onToggle={togglePlayableOnly}
           />
         </div>
-        <PlayableFilterHint
-          playableOnly={playableOnly}
-          hiddenCount={hiddenPlayableCount}
-          onShowAll={() => setPlayableOnly(false)}
-        />
 
         {displayedItems.length > 0 && (
           <div className="flex justify-center mt-2 sm:mt-3">

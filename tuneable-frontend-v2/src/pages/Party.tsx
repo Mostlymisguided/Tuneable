@@ -55,7 +55,6 @@ import { buildChartRankMap } from '../utils/playableFilterPref';
 import {
   ChartRefreshBar,
   PlayableEmptyState,
-  PlayableFilterHint,
   PlayableFilterTrigger,
   useChartLag,
 } from '../components/PlayableFilterControl';
@@ -2953,11 +2952,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         onToggle={() => requestPlayableOnly(!playableOnly)}
                       />
                     </div>
-                    <PlayableFilterHint
-                      playableOnly={playableOnly}
-                      hiddenCount={hiddenPlayableCount}
-                      onShowAll={() => requestPlayableOnly(false)}
-                    />
                     {getDisplayMedia().length > 0 && (
                       <div className="flex justify-center mt-2 sm:mt-3">
                         <button
