@@ -1,17 +1,18 @@
 /**
  * Pure TuneBytes math. No DB.
  *
- * TuneBytes reward later growth on a track you already tipped, not your own tip.
+ * A tip earns its value in pence immediately. Later tips on the same media
+ * add a growth bonus for everyone who tipped earlier.
  *
  * Formula:
  *   subsequentGrowth = currentTotal − value at (and including) your tip
- *   TuneBytes = subsequentGrowth × ∛(your tip in pence) × discoveryBonus
+ *   TuneBytes = your tip in pence + subsequentGrowth × ∛(your tip in pence) × discoveryBonus
  *
  * Discovery bonus: 1 + e^(−rank / 10)
  */
 
 const TUNEBYTES_FORMULA =
-  '(currentTotal - bidTimeTotal - userBid) * ∛(userBidPence) * discoveryBonus';
+  'userBidPence + (currentTotal - bidTimeTotal - userBid) * ∛(userBidPence) * discoveryBonus';
 
 function getDiscoveryBonus(rank) {
   return 1 + Math.exp(-rank / 10);
@@ -65,10 +66,8 @@ function computeTuneBytesFromBids(bidId, allActiveBidsSorted, { now = new Date()
   const subsequentGrowth = Math.max(0, currentTotalValue - bidTimeTotalValue - userBidPence);
   const discoveryRank = bidIndex + 1;
   const discoveryBonus = getDiscoveryBonus(discoveryRank);
-  const tuneBytesEarned = Math.max(
-    0,
-    subsequentGrowth * Math.cbrt(userBidPence) * discoveryBonus
-  );
+  const growthTuneBytes = subsequentGrowth * Math.cbrt(userBidPence) * discoveryBonus;
+  const tuneBytesEarned = Math.max(0, userBidPence + growthTuneBytes);
 
   const bidTime = bid.createdAt ? new Date(bid.createdAt) : now;
   const timeElapsed = Math.round((now.getTime() - bidTime.getTime()) / (1000 * 60 * 60));

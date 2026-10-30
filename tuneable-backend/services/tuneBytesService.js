@@ -1,14 +1,15 @@
 /**
  * TuneBytes Service
  *
- * Reward currency for discovering media that later attracts more tips.
+ * Reward currency for tipping media, plus extra for discovering media that later attracts more tips.
  *
- * Formula: TuneBytes = subsequentGrowth * ∛(userBidPence) * discoveryBonus
+ * Formula: TuneBytes = userBidPence + subsequentGrowth * ∛(userBidPence) * discoveryBonus
  *   subsequentGrowth = currentTotal − value at (and including) your tip
  * Discovery bonus: 1 + e^(−rank / 10)
  *
- * Awards are recalculated whenever a track's active tips change, so early
- * tippers earn as later people tip, and lose that growth if later tips refund.
+ * A tip credits its value in pence immediately. Awards are recalculated whenever
+ * a track's active tips change, so early tippers also earn as later people tip,
+ * and lose that growth if later tips refund.
  */
 
 const mongoose = require('mongoose');
@@ -51,7 +52,7 @@ class TuneBytesService {
 
   /**
    * Calculate TuneBytes for a specific bid from current active tips.
-   * Own tip is not counted as growth — only tips placed after this one.
+   * The tip itself credits its value in pence. Only later tips count as growth.
    */
   async calculateTuneBytesForBid(bidId) {
     const bid = await Bid.findById(bidId).populate('mediaId');
@@ -416,7 +417,7 @@ class TuneBytesService {
 
   /**
    * Recalculate TuneBytes for every tip on a media item.
-   * Active bids earn from subsequent tips; refunded/vetoed bids are clawed back to 0.
+   * Active bids earn their tip in pence plus later growth; refunded/vetoed bids are clawed back to 0.
    */
   async recalculateTuneBytesForMedia(mediaId, { skipLedgerEntry = false, notify = true, updateRankings = true } = {}) {
     if (!mediaId) {

@@ -59,7 +59,7 @@ const tuneBytesTransactionSchema = new mongoose.Schema({
     totalBidsOnMedia: { type: Number },
     formula: {
       type: String,
-      default: '(currentTotal - bidTimeTotal - userBid) * ∛(userBidPence) * discoveryBonus'
+      default: 'userBidPence + (currentTotal - bidTimeTotal - userBid) * ∛(userBidPence) * discoveryBonus'
     }
   },
   

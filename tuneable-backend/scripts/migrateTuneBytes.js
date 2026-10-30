@@ -3,8 +3,8 @@
 /**
  * Recalculate TuneBytes for every media item that has tips or existing awards.
  *
- * Uses the current formula (later growth only) and applies deltas, so:
- *   - sole tippers are clawed back to 0
+ * Uses the current formula and applies deltas, so:
+ *   - every active tip credits its value in pence
  *   - missing awards for tracks that did grow are filled in
  *   - earlier tippers catch up when later tips already exist
  *

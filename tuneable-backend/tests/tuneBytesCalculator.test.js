@@ -22,12 +22,12 @@ describe('getDiscoveryBonus', () => {
 });
 
 describe('computeTuneBytesFromBids', () => {
-  it('awards nothing to a sole tipper — own tip is not growth', () => {
+  it('awards a sole tipper their tip in pence immediately', () => {
     const only = bid('a', 111);
     const result = computeTuneBytesFromBids('a', [only]);
-    expect(result.tuneBytesEarned).toBe(0);
     expect(result.calculation.subsequentGrowth).toBe(0);
     expect(result.calculation.discoveryRank).toBe(1);
+    expect(result.tuneBytesEarned).toBe(111);
   });
 
   it('does not mint 1016.1 TuneBytes for a sole £1.11 tip', () => {
@@ -35,10 +35,11 @@ describe('computeTuneBytesFromBids', () => {
     const result = computeTuneBytesFromBids('a', [only]);
     const oldFormula = 111 * Math.cbrt(111) * getDiscoveryBonus(1);
     expect(oldFormula).toBeCloseTo(1016.1, 1);
+    expect(result.tuneBytesEarned).toBe(111);
     expect(result.tuneBytesEarned).not.toBeCloseTo(oldFormula, 1);
   });
 
-  it('pays the earlier tipper when someone else tips later', () => {
+  it('pays the earlier tipper growth when someone else tips later', () => {
     const first = bid('a', 111);
     const second = bid('b', 111);
     const bids = [first, second];
@@ -48,13 +49,12 @@ describe('computeTuneBytesFromBids', () => {
 
     expect(forFirst.calculation.subsequentGrowth).toBe(111);
     expect(forFirst.tuneBytesEarned).toBeCloseTo(
-      111 * Math.cbrt(111) * getDiscoveryBonus(1),
+      111 + 111 * Math.cbrt(111) * getDiscoveryBonus(1),
       6
     );
-    expect(forFirst.tuneBytesEarned).toBeCloseTo(1016.14, 1);
 
     expect(forSecond.calculation.subsequentGrowth).toBe(0);
-    expect(forSecond.tuneBytesEarned).toBe(0);
+    expect(forSecond.tuneBytesEarned).toBe(111);
     expect(forSecond.calculation.discoveryRank).toBe(2);
   });
 
@@ -62,11 +62,13 @@ describe('computeTuneBytesFromBids', () => {
     const bids = [bid('a', 100), bid('b', 100), bid('c', 200)];
     const first = computeTuneBytesFromBids('a', bids);
     const second = computeTuneBytesFromBids('b', bids);
+    const third = computeTuneBytesFromBids('c', bids);
 
     expect(first.calculation.subsequentGrowth).toBe(300);
     expect(second.calculation.subsequentGrowth).toBe(200);
+    expect(third.calculation.subsequentGrowth).toBe(0);
     expect(first.tuneBytesEarned).toBeGreaterThan(second.tuneBytesEarned);
-    expect(computeTuneBytesFromBids('c', bids).tuneBytesEarned).toBe(0);
+    expect(third.tuneBytesEarned).toBe(200);
   });
 
   it('returns zero for a bid that is no longer in the active set', () => {
