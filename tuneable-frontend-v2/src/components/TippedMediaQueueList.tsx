@@ -66,6 +66,7 @@ export interface TippedQueueItem {
     };
   }>;
   globalMediaAggregate?: number;
+  tuneBytesEarned?: number;
   globalMediaAggregateAvg?: number;
   globalMediaAggregateTop?: number;
   globalMediaAggregateTopUser?: string | {
@@ -194,6 +195,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     tags: item.tags || [],
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,
+    tuneBytesEarned: item.tuneBytesEarned,
     sources: item.sources || {},
   });
 

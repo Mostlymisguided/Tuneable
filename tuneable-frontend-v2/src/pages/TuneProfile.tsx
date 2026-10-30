@@ -244,6 +244,7 @@ interface RecommendedMediaItem {
     }>;
   } | null;
   globalMediaAggregate?: number;
+  tuneBytesEarned?: number;
   tags?: string[];
   sharedTags?: string[];
   reasons?: string[];
@@ -1804,6 +1805,7 @@ const TuneProfile: React.FC = () => {
     tags: item.tags?.length ? item.tags : item.sharedTags || [],
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,
+    tuneBytesEarned: item.tuneBytesEarned,
     sources: item.sources || {},
   });
 

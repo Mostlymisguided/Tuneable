@@ -26,6 +26,7 @@ const {
   locationScopeIncludesTips,
   locationScopeRanksByLocalTips,
 } = require('../utils/locationScope');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 const router = express.Router();
 
@@ -286,20 +287,22 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
       }
     }
 
-    const supportersByMedia = await loadTopSupportersByMedia(
-      books.map((book) => book._id).filter(Boolean),
-      {
+    const bookIds = books.map((book) => book._id).filter(Boolean);
+    const [supportersByMedia, tuneBytesByMedia] = await Promise.all([
+      loadTopSupportersByMedia(bookIds, {
         supportersLimit: DEFAULT_SUPPORTERS_LIMIT,
         userId: req.user?._id || null,
         startDate: startDate || null,
         locationPlaceId: rankByLocalTips ? locationPlaceId : null,
-      }
-    );
+      }),
+      sumConfirmedTuneBytesByMediaId(bookIds),
+    ]);
 
     res.json({
       books: books.map((book) => serializeBook({
         ...book,
         bids: supportersByMedia.get(book._id.toString()) || [],
+        tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, book._id),
       })),
       count: books.length,
       timePeriod,

@@ -13,6 +13,7 @@ const { loadBidsByMediaId } = require('./relatedMediaService');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
 const WRITTEN_FORMS = ['book', 'article'];
@@ -741,11 +742,16 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const tipTotal = ordered.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
   // Attach active bids (with tipper user info) for supporters display on the page slice only
-  const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
+  const pageIds = pageSlice.map((m) => m._id);
+  const [bidsByMediaId, tuneBytesByMedia] = await Promise.all([
+    loadBidsByMediaId(pageIds),
+    sumConfirmedTuneBytesByMediaId(pageIds),
+  ]);
   const media = pageSlice.map((m) => ({
     ...m,
     ...enrichMediaWithPlayability(m, { authenticated }),
     bids: bidsByMediaId.get(m._id.toString()) || [],
+    tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, m._id),
   }));
 
   let relatedParty = null;

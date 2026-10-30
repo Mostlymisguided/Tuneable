@@ -13,6 +13,8 @@ import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../util
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { roundBpm } from '../utils/bpm';
+import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
+import { TuneBytesMark } from './TuneBytesMark';
 
 function QueueCover({ media }: { media: { coverArt?: string | null; title?: string; contentForm?: string | string[]; contentType?: string | string[] } }) {
   const alt = media.title || 'Unknown Media';
@@ -208,6 +210,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   );
 
   const rank = rankProp ?? index + 1;
+  const tuneBytesLabel = formatMediaTuneBytes(mediaData.tuneBytesEarned);
 
   return (
     <div className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">
@@ -288,9 +291,12 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
               )}
             </div>
           </div>
-          <p className="text-gray-400 text-xs truncate">
-            <ClickableArtistDisplay media={mediaData} />
-          </p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-gray-400 text-xs truncate min-w-0 flex-1">
+              <ClickableArtistDisplay media={mediaData} />
+            </p>
+            {tuneBytesLabel ? <TuneBytesMark label={tuneBytesLabel} className="text-xs" /> : null}
+          </div>
           {tags.length > 0 && (
             <div className="hidden md:block mt-1">
               <TagList

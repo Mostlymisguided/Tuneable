@@ -12,6 +12,7 @@ const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 const Collective = require('../models/Collective');
 const { venuesAtPlaceQuery, serializeVenueForPlace } = require('../utils/collectiveVenue');
 
@@ -365,11 +366,16 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
   const pageSlice = ordered.slice(skip, skip + limitNum);
   const tipTotal = ordered.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
-  const bidsByMediaId = await loadBidsByMediaId(pageSlice.map((m) => m._id));
+  const pageIds = pageSlice.map((m) => m._id);
+  const [bidsByMediaId, tuneBytesByMedia] = await Promise.all([
+    loadBidsByMediaId(pageIds),
+    sumConfirmedTuneBytesByMediaId(pageIds),
+  ]);
   const media = pageSlice.map((m) => ({
     ...m,
     ...enrichMediaWithPlayability(m, { authenticated }),
     bids: bidsByMediaId.get(m._id.toString()) || [],
+    tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, m._id),
   }));
 
   return {

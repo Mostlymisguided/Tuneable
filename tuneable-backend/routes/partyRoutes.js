@@ -33,6 +33,7 @@ const {
     MEDIA_CHART_SELECT,
     DEFAULT_SUPPORTERS_LIMIT,
 } = require('../utils/globalPartyChart');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 const VIRTUAL_PARTY_MEDIA_LIMIT = 250;
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
@@ -1100,6 +1101,13 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
                 ...playability,
             };
         }).filter(Boolean); // ✅ Remove null entries (but keep vetoed media for frontend to display)
+
+        const partyTuneBytes = await sumConfirmedTuneBytesByMediaId(
+            processedMedia.map((item) => item._id)
+        );
+        for (const item of processedMedia) {
+            item.tuneBytesEarned = tuneBytesFor(partyTuneBytes, item._id);
+        }
 
         // ✅ Sort media by bid value (active media first, then vetoed)
         processedMedia.sort((a, b) => {
@@ -3908,6 +3916,13 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 })
                 .filter(media => media !== null)
                 .filter(media => media.status !== 'vetoed');
+
+        const partyTuneBytes = await sumConfirmedTuneBytesByMediaId(
+            processedMedia.map((item) => item._id)
+        );
+        for (const item of processedMedia) {
+            item.tuneBytesEarned = tuneBytesFor(partyTuneBytes, item._id);
+        }
 
         const sortedMedia = sortChartItems(processedMedia, chartSort, {
             getDate: (item) => item.queuedAt || item.createdAt || item.uploadedAt,

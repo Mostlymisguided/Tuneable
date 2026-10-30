@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { getCanonicalTag, normalizeTagForStorage, tagsMatch } = require('../utils/tagNormalizer');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { roundBpm } = require('../utils/bpm');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 const DEFAULT_OPTIONS = {
   candidatePoolSize: 120,
@@ -249,14 +250,19 @@ const attachBidsToEntries = async (entries) => {
 };
 
 const attachBidsToPlaylistEntries = async (relatedMedia, fansAlsoTip) => {
-  const bidsByMediaId = await loadBidsByMediaId([
+  const mediaIds = [
     ...relatedMedia.map((entry) => entry._id),
     ...fansAlsoTip.map((entry) => entry._id),
+  ];
+  const [bidsByMediaId, tuneBytesByMedia] = await Promise.all([
+    loadBidsByMediaId(mediaIds),
+    sumConfirmedTuneBytesByMediaId(mediaIds),
   ]);
 
   const withBids = (entry) => ({
     ...entry,
     bids: bidsByMediaId.get(entry._id) || [],
+    tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, entry._id),
   });
 
   return {

@@ -9,6 +9,8 @@ import {
   getCountryPlaceProfilePath,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
+import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
+import { TuneBytesMark } from './TuneBytesMark';
 
 const META_LINK_CLASS =
   'truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
@@ -23,6 +25,7 @@ export interface BookChartCardData {
   author?: Array<{ name?: string }>;
   tags?: string[];
   globalMediaAggregate?: number;
+  tuneBytesEarned?: number;
   timePeriodBidValue?: number;
   periodTotal?: number;
   createdAt?: string;
@@ -92,6 +95,7 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
   const country = getCountryLabelFromLocation(book.primaryLocation);
   const countryPath = getCountryPlaceProfilePath(book.primaryLocation);
   const rank = index + 1;
+  const tuneBytesLabel = formatMediaTuneBytes(book.tuneBytesEarned);
 
   const metaParts: React.ReactNode[] = [];
   if (year != null) {
@@ -185,7 +189,10 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
               </div>
             )}
           </div>
-          <p className="text-gray-400 text-xs truncate">{author}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-gray-400 text-xs truncate min-w-0 flex-1">{author}</p>
+            {tuneBytesLabel ? <TuneBytesMark label={tuneBytesLabel} className="text-xs" /> : null}
+          </div>
           {tags.length > 0 && (
             <div className="hidden md:block mt-1">
               <TagList tags={tags} mediaId={mediaId} limit={5} />

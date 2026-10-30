@@ -9,6 +9,7 @@ import EntertainingLoader from '../components/EntertainingLoader';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import TagList from '../components/TagList';
+import { TuneBytesMark } from '../components/TuneBytesMark';
 import {
   getCountryPickFromLocation,
   getPlaceProfilePath,
@@ -309,9 +310,7 @@ const Places: React.FC = () => {
                     <div className="font-semibold truncate">{place.name}</div>
                     <div className="text-xs text-purple-200/70 capitalize truncate">{subtitle}</div>
                   </div>
-                  <div className="text-purple-200 font-semibold text-sm tabular-nums">
-                    {formatTuneBytes(tuneBytesValue)} TB
-                  </div>
+                  <TuneBytesMark label={formatTuneBytes(tuneBytesValue)} className="text-sm" />
                   <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />
                 </Link>
               </li>

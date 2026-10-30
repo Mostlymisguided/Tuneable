@@ -188,7 +188,10 @@ function PlaceChartRow({
         </Text>
       </View>
       <View style={styles.right}>
-        <Text style={styles.tuneBytes}>{formatTuneBytes(tuneBytesValue)} TB</Text>
+        <View style={styles.tuneBytesRow}>
+          <Ionicons name="sparkles-outline" size={13} color={colors.accentLight} />
+          <Text style={styles.tuneBytes}>{formatTuneBytes(tuneBytesValue)}</Text>
+        </View>
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </View>
     </Pressable>
@@ -261,6 +264,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  tuneBytesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   tuneBytes: {
     color: colors.accentLight,

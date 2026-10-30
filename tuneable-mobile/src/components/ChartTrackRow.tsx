@@ -25,6 +25,18 @@ import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
 
+function TuneBytesAmount({ value }: { value: number }) {
+  const label = formatTuneBytesDecimal(value);
+  return (
+    <View
+      style={styles.tuneBytesRow}
+      accessibilityLabel={`${label} TuneBytes`}>
+      <Ionicons name="sparkles-outline" size={12} color={colors.accentLight} />
+      <Text style={styles.tuneBytes}>{label}</Text>
+    </View>
+  );
+}
+
 function getReleaseYear(item: ChartMediaItem): number | null {
   const year = item.releaseYear;
   if (typeof year === 'number' && Number.isFinite(year) && year >= 1900 && year <= 2100) {
@@ -158,6 +170,9 @@ export function ChartTrackRow({
           ) : null}
         </Pressable>
         <View style={styles.right}>
+          {typeof item.tuneBytesEarned === 'number' ? (
+            <TuneBytesAmount value={item.tuneBytesEarned} />
+          ) : null}
           <Text style={styles.tips}>{formatPoundsFromPence(displayTip)}</Text>
           <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn} accessibilityLabel="Send a tip">
             <Ionicons name="heart" size={16} color={colors.tipHeart} />
@@ -261,11 +276,7 @@ export function ChartTrackRow({
               ) : null}
             </Pressable>
             {typeof item.tuneBytesEarned === 'number' ? (
-              <Text
-                style={styles.tuneBytes}
-                accessibilityLabel={`${formatTuneBytesDecimal(item.tuneBytesEarned)} TuneBytes earned`}>
-                {formatTuneBytesDecimal(item.tuneBytesEarned)} TB
-              </Text>
+              <TuneBytesAmount value={item.tuneBytesEarned} />
             ) : null}
             <Pressable
               onPress={onTip}
@@ -481,8 +492,14 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  tuneBytesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    flexShrink: 0,
+  },
   tuneBytes: {
-    color: '#facc15',
+    color: colors.accentLight,
     fontSize: 12,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],

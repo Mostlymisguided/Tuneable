@@ -31,7 +31,8 @@ import {
   Crown,
   Camera,
   Trash2,
-  Ban
+  Ban,
+  Sparkles,
 } from 'lucide-react';
 import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
 
@@ -2344,8 +2345,11 @@ const UserProfile: React.FC = () => {
                             <span className="text-white font-medium text-sm truncate">{ranking.tag}</span>
                           </div>
                           <div className="text-right flex-shrink-0 ml-2">
-                            <div className="text-sm font-bold text-purple-300">
-                              {ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })} TB
+                            <div className="flex items-center justify-end gap-1 text-sm font-bold text-purple-200">
+                              <Sparkles className="h-3.5 w-3.5 text-purple-400" aria-hidden />
+                              <span>
+                                {ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </span>
                             </div>
                             <div className="text-xs text-gray-400">
                               #{ranking.rank} of {ranking.totalUsers} · Top {ranking.percentile}%

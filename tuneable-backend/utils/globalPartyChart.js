@@ -14,6 +14,7 @@ const {
   normalizeSources,
 } = require('./mediaPlayability');
 const { normalizeChartSort, mediaChartMongoSort, sortChartItems } = require('./chartSort');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('./mediaTuneBytes');
 const {
   normalizeLocationScope,
   locationScopeIncludesOrigin,
@@ -719,6 +720,10 @@ async function fetchAllTimeGlobalChart({
   if (viewerRecent.length) {
     mediaList.push(...viewerRecent);
   }
+  const tuneBytesByMedia = await sumConfirmedTuneBytesByMediaId(mediaList.map((media) => media._id));
+  for (const media of mediaList) {
+    media.tuneBytesEarned = tuneBytesFor(tuneBytesByMedia, media._id);
+  }
   const rankedMedia = sortAssembledChartRows(mediaList, chartSort);
 
   const mediaIds = rankedMedia.map((m) => m._id);
@@ -770,6 +775,7 @@ async function fetchAllTimeGlobalChart({
       globalMediaBidTopUser: media.globalMediaBidTopUser,
       globalMediaAggregateTop: media.globalMediaAggregateTop || 0,
       globalMediaAggregateTopUser: media.globalMediaAggregateTopUser,
+      tuneBytesEarned: media.tuneBytesEarned || 0,
       status: 'active',
       ...chartMediaDateFields(media),
       queuedAt: media.createdAt || new Date(),
@@ -1057,6 +1063,13 @@ async function fetchPeriodGlobalChart({
     }
   }
 
+  const periodTuneBytes = await sumConfirmedTuneBytesByMediaId(
+    mediaList.map((row) => row.media._id)
+  );
+  mediaList = mediaList.map((row) => ({
+    ...row,
+    tuneBytesEarned: tuneBytesFor(periodTuneBytes, row.media._id),
+  }));
   mediaList = sortAssembledChartRows(mediaList, chartSort);
 
   const pageMediaIds = mediaList.map((row) => row.media._id);
@@ -1068,7 +1081,7 @@ async function fetchPeriodGlobalChart({
     startDate,
   });
 
-  const chartMedia = mediaList.map(({ media, timePeriodBidValue }) => {
+  const chartMedia = mediaList.map(({ media, timePeriodBidValue, tuneBytesEarned }) => {
     const activeBids = supportersByMedia.get(media._id.toString()) || [];
     const playability = withPublicPlayability(
       media,
@@ -1111,6 +1124,7 @@ async function fetchPeriodGlobalChart({
       globalMediaBidTopUser: media.globalMediaBidTopUser,
       globalMediaAggregateTop: media.globalMediaAggregateTop || 0,
       globalMediaAggregateTopUser: media.globalMediaAggregateTopUser,
+      tuneBytesEarned: tuneBytesEarned || 0,
       status: 'active',
       ...chartMediaDateFields(media),
       queuedAt: media.createdAt || new Date(),

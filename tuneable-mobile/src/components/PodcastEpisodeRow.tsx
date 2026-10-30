@@ -8,7 +8,7 @@ import {
 import { TagChip } from '@/src/components/TagChip';
 import { colors } from '@/src/theme/colors';
 import type { PodcastEpisode } from '@/src/types/podcast';
-import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence, formatTuneBytesDecimal } from '@/src/lib/format';
 import {
   episodeCoverArt,
   getEpisodeDisplayTags,
@@ -117,6 +117,16 @@ export function PodcastEpisodeRow({
           {!playable ? <Text style={styles.hint}>No audio URL</Text> : null}
         </Pressable>
 
+        {typeof episode.tuneBytesEarned === 'number' ? (
+          <View
+            style={styles.tuneBytesRow}
+            accessibilityLabel={`${formatTuneBytesDecimal(episode.tuneBytesEarned)} TuneBytes`}>
+            <Ionicons name="sparkles-outline" size={12} color={colors.accentLight} />
+            <Text style={styles.tuneBytes}>
+              {formatTuneBytesDecimal(episode.tuneBytesEarned)}
+            </Text>
+          </View>
+        ) : null}
         <Pressable
           onPress={onTip}
           hitSlop={8}
@@ -260,6 +270,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: colors.textMuted,
     fontSize: 11,
+  },
+  tuneBytesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    flexShrink: 0,
+  },
+  tuneBytes: {
+    color: colors.accentLight,
+    fontSize: 12,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   tipBtn: {
     alignItems: 'center',

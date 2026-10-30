@@ -39,6 +39,7 @@ const {
   locationScopeIncludesTips,
   locationScopeRanksByLocalTips,
 } = require('../utils/locationScope');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 const router = express.Router();
 
@@ -1948,6 +1949,12 @@ router.get('/chart', async (req, res) => {
       }
     });
 
+    const tuneBytesByMedia = await sumConfirmedTuneBytesByMediaId(episodes.map((episode) => episode._id));
+    episodes = episodes.map((episode) => ({
+      ...episode,
+      tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, episode._id),
+    }));
+
     const [categories, genres, tags] = await Promise.all([
       Media.distinct('category', { 
         contentType: { $in: ['spoken'] },
@@ -2540,9 +2547,11 @@ async function computeSeriesEpisodeStats(seriesId) {
   };
 }
 
-function serializeSeriesEpisodes(episodes, seriesCoverArt) {
+async function serializeSeriesEpisodes(episodes, seriesCoverArt) {
+  const tuneBytesByMedia = await sumConfirmedTuneBytesByMediaId(episodes.map((ep) => ep._id));
   return episodes.map((ep) => {
     const episode = withSeriesCoverArt({ ...ep }, seriesCoverArt);
+    episode.tuneBytesEarned = tuneBytesFor(tuneBytesByMedia, episode._id);
     if (episode.sources instanceof Map) {
       episode.sources = Object.fromEntries(episode.sources);
     }
@@ -3625,7 +3634,7 @@ router.get('/series/:seriesId', async (req, res) => {
       applyLimit && searching ? Media.countDocuments(episodeMatch) : Promise.resolve(null),
     ]);
 
-    const serializedEpisodes = serializeSeriesEpisodes(episodes, seriesCoverArt);
+    const serializedEpisodes = await serializeSeriesEpisodes(episodes, seriesCoverArt);
     const resultCount = searching
       ? (matchedCount ?? serializedEpisodes.length)
       : stats.totalEpisodes;
