@@ -129,7 +129,8 @@ describe('buildOutreachContent', () => {
     });
     expect(content.subject).toMatch(/tipped on Tuneable/i);
     expect(content.text).toContain('has been tipped on Tuneable');
-    expect(content.text).toContain('Reply YES to this email');
+    expect(content.text).toContain('Reply YES to this email, or click the link, to choose a licence.');
+    expect(content.text).toContain('Or reply NO to have "Around the World" removed from the charts.');
     expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
     expect(content.text).toContain('Become a founding creator here:');
@@ -151,9 +152,9 @@ describe('buildOutreachContent', () => {
     expect(content.format).toBe('instagram');
     expect(content.subject).toBe('');
     expect(content.text).toContain('has been tipped on Tuneable');
-    expect(content.text).toContain('Reply YES');
+    expect(content.text).toContain('Reply YES, or click the link, to choose a licence.');
     expect(content.text).toContain('Become a founding creator here:');
-    expect(content.text).toContain('reply NO');
+    expect(content.text).toContain('Or reply NO to have "Around the World" removed from the charts.');
     expect(content.text).toContain('✨Your Rights✨');
     expect(content.text).toContain('✌️🎶🖤');
     expect(content.text).toContain('https://tuneable.stream/creator/register?from=rights&tune=abc');
@@ -195,9 +196,9 @@ describe('buildOutreachContent', () => {
     });
     expect(content.format).toBe('link');
     expect(content.text).toContain('Your tune "Around the World" has been tipped on Tuneable.');
-    expect(content.text).toContain('Reply YES');
+    expect(content.text).toContain('Reply YES, or click the link, to choose a licence.');
     expect(content.text).toContain('Become a founding creator here: https://tuneable.stream/creator/register?from=rights&tune=abc');
-    expect(content.text).toContain('reply NO');
+    expect(content.text).toContain('Or reply NO to have "Around the World" removed from the charts.');
     expect(content.text).toContain('✨Your Rights✨');
     expect(content.text).toContain('✌️🎶🖤');
     expect(content.text).toContain('https://tuneable.stream/tune/abc');
@@ -211,6 +212,28 @@ describe('buildOutreachContent', () => {
       customMessage: 'Tried IG last week.',
     });
     expect(content.text).toContain('Tried IG last week.');
+    expect(content.text).toContain('Reply YES to this email, or click the link, to choose a licence.');
+    expect(content.text).toContain('Or reply NO to have "Around the World" removed from the charts.');
+  });
+
+  it('uses the short licence and charts lines on Instagram and link follow-ups', () => {
+    const instagram = buildOutreachContent({
+      template: 'follow_up',
+      media,
+      party,
+      format: 'instagram',
+    });
+    const link = buildOutreachContent({
+      template: 'follow_up',
+      media,
+      party,
+      format: 'link',
+    });
+    for (const content of [instagram, link]) {
+      expect(content.text).toContain('Reply YES, or click the link, to choose a licence.');
+      expect(content.text).toContain('Or reply NO to have "Around the World" removed from the charts.');
+      expect(content.text).not.toContain('to this email');
+    }
   });
 });
 
