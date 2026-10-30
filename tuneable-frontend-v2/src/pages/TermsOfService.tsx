@@ -221,7 +221,11 @@ const TermsOfService: React.FC = () => {
                   <li>Process the request within 7 business days (or sooner if technically feasible)</li>
                 </ul>
                 <p className="mb-2">
-                  <strong>How to Request Opt-Out:</strong> Send an email to <strong>hi@tuneable.stream</strong> with:
+                  <strong>How to Request Opt-Out:</strong> Send an email to{' '}
+                  <a href="mailto:copyright@tuneable.stream" className="text-primary-600 hover:text-primary-500 font-medium">
+                    copyright@tuneable.stream
+                  </a>{' '}
+                  with:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Your name and contact information</li>
@@ -239,7 +243,11 @@ const TermsOfService: React.FC = () => {
                 <h3 id="copyright" className="text-xl font-medium text-gray-900 scroll-mt-24">5.4.3 Copyright Takedown (DMCA-Style)</h3>
                 <p className="mb-2">
                   Tuneable respects intellectual property rights and will process valid copyright takedown requests. 
-                  To submit a copyright takedown request, send an email to <strong>hi@tuneable.stream</strong> with:
+                  To submit a copyright takedown request, send an email to{' '}
+                  <a href="mailto:copyright@tuneable.stream" className="text-primary-600 hover:text-primary-500 font-medium">
+                    copyright@tuneable.stream
+                  </a>{' '}
+                  with:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Your name, address, telephone number, and email address</li>
