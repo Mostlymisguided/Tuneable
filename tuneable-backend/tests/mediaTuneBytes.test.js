@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { mediaIdKey, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 describe('mediaTuneBytes', () => {
@@ -12,6 +13,9 @@ describe('mediaTuneBytes', () => {
   it('stringifies object ids and ignores empty values', () => {
     expect(mediaIdKey('507f1f77bcf86cd799439011')).toBe('507f1f77bcf86cd799439011');
     expect(mediaIdKey({ _id: '507f1f77bcf86cd799439011' })).toBe('507f1f77bcf86cd799439011');
+    const objectId = new mongoose.Types.ObjectId('507f1f77bcf86cd799439011');
+    expect(mediaIdKey(objectId)).toBe('507f1f77bcf86cd799439011');
+    expect(mediaIdKey({ _id: objectId })).toBe('507f1f77bcf86cd799439011');
     expect(mediaIdKey(null)).toBeNull();
     expect(mediaIdKey('')).toBeNull();
   });

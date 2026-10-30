@@ -4,7 +4,9 @@ const TuneBytesTransaction = require('../models/TuneBytesTransaction');
 function mediaIdKey(id) {
   if (id == null || id === '') return null;
   if (typeof id === 'object') {
-    if (id._id) return mediaIdKey(id._id);
+    // Mongoose ObjectId's `_id` getter returns the id itself. Recursing on it
+    // overflows the stack while building the Global Party chart.
+    if (id._id && id._id !== id) return mediaIdKey(id._id);
     if (typeof id.toString === 'function') {
       const key = id.toString();
       if (key && key !== '[object Object]') return key;
