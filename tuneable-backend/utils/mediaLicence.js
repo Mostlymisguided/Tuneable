@@ -1,15 +1,14 @@
 /**
  * Artist-chosen use of a tune, separate from rightsStatus (whether it may play at all).
  *
- * personalStreaming is always included once a choice is saved.
- * Public streaming, personal download, rework requests, and commercial requests
- * stay off until the artist turns them on.
+ * Streaming is one included licence: a listener's library, parties, and public charts.
+ * Personal download, rework requests, and commercial requests stay off until the artist
+ * turns them on.
  *
- * licence.chosen !== true means no choice has been saved. Those tunes keep the
- * previous behaviour: they may join a party, and copy access follows copySharePercent.
+ * licence.chosen !== true means no choice has been saved. Copy access then follows
+ * copySharePercent. Streaming is not gated on that flag.
  */
 
-const mongoose = require('mongoose');
 const { isPodcastLike } = require('./mediaPlayability');
 const { isWrittenMedia } = require('./mediaKinds');
 
@@ -47,14 +46,7 @@ function parseLicenceChoice(raw) {
     return { error: 'Choose a licence for this tune' };
   }
 
-  const publicStreaming = input.publicStreaming === true;
   const personalDownload = input.personalDownload === true;
-  const floor = parsePence(input.publicStreamingFloorPence, 'Public streaming minimum tip');
-  if (floor.error) return { error: floor.error };
-  if (publicStreaming && floor.pence == null && input.publicStreamingFloorPence != null && input.publicStreamingFloorPence !== '') {
-    return { error: 'Public streaming minimum tip must be a whole number of pence' };
-  }
-
   const unlockInput = personalDownload && (input.personalDownloadUnlockPence == null || input.personalDownloadUnlockPence === '')
     ? 1
     : input.personalDownloadUnlockPence;
@@ -68,8 +60,8 @@ function parseLicenceChoice(raw) {
     licence: {
       chosen: true,
       personalStreaming: true,
-      publicStreaming,
-      publicStreamingFloorPence: publicStreaming ? floor.pence : null,
+      publicStreaming: true,
+      publicStreamingFloorPence: null,
       personalDownload,
       personalDownloadUnlockPence: personalDownload ? unlock.pence : null,
       openToRework: input.openToRework === true,
@@ -83,63 +75,11 @@ function stampLicence(licence, userId) {
     ...licence,
     chosen: true,
     personalStreaming: true,
+    publicStreaming: true,
+    publicStreamingFloorPence: null,
     chosenBy: userId || null,
     chosenAt: new Date(),
   };
-}
-
-function formatPounds(pence) {
-  return `£${(Number(pence) / 100).toFixed(2)}`;
-}
-
-function partyQueueBlock({ media, priorTipPence = 0, bidAmountPence = 0 }) {
-  if (!media?.licence?.chosen) return { ok: true };
-  const title = media.title || 'This tune';
-  if (media.licence.publicStreaming !== true) {
-    return {
-      ok: false,
-      status: 403,
-      code: 'personal_only',
-      error: `${title} is licensed for personal listening. It can't be added to a party.`,
-    };
-  }
-  const floor = media.licence.publicStreamingFloorPence;
-  if (!floor) return { ok: true };
-  const yourTipPence = Math.max(0, Number(priorTipPence) || 0) + Math.max(0, Number(bidAmountPence) || 0);
-  if (yourTipPence < floor) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'public_floor',
-      error: `${title} needs ${formatPounds(floor)} in tips from you before it can join a party. This tip brings you to ${formatPounds(yourTipPence)}.`,
-      floorPence: floor,
-      yourTipPence,
-    };
-  }
-  return { ok: true };
-}
-
-async function userActiveTipPence(userId, mediaId) {
-  const Bid = require('../models/Bid');
-  const rows = await Bid.aggregate([
-    {
-      $match: {
-        userId: new mongoose.Types.ObjectId(String(userId)),
-        mediaId: new mongoose.Types.ObjectId(String(mediaId)),
-        status: 'active',
-      },
-    },
-    { $group: { _id: null, total: { $sum: '$amount' } } },
-  ]);
-  return rows[0]?.total || 0;
-}
-
-async function assertPartyQueueLicence({ media, userId, bidAmountPence }) {
-  if (!media?.licence?.chosen || media.licence.publicStreaming !== true || !media.licence.publicStreamingFloorPence) {
-    return partyQueueBlock({ media, priorTipPence: 0, bidAmountPence });
-  }
-  const priorTipPence = await userActiveTipPence(userId, media._id);
-  return partyQueueBlock({ media, priorTipPence, bidAmountPence });
 }
 
 /**
@@ -216,10 +156,6 @@ module.exports = {
   musicTuneNeedsLicence,
   parseLicenceChoice,
   stampLicence,
-  formatPounds,
-  partyQueueBlock,
-  userActiveTipPence,
-  assertPartyQueueLicence,
   replayFixedFloor,
   downloadDecision,
 };

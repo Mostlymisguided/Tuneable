@@ -5,8 +5,6 @@ import { colors } from '@/src/theme/colors';
 
 export type LicenceChoice = {
   personalStreaming: true;
-  publicStreaming: boolean;
-  publicStreamingFloorPence: number | null;
   personalDownload: boolean;
   personalDownloadUnlockPence: number | null;
   openToRework: boolean;
@@ -17,8 +15,6 @@ export type SavedLicence = Partial<LicenceChoice> & { chosen?: boolean };
 
 export const DEFAULT_LICENCE_CHOICE: LicenceChoice = {
   personalStreaming: true,
-  publicStreaming: false,
-  publicStreamingFloorPence: null,
   personalDownload: false,
   personalDownloadUnlockPence: null,
   openToRework: false,
@@ -27,7 +23,7 @@ export const DEFAULT_LICENCE_CHOICE: LicenceChoice = {
 
 const PDF_BASE = 'https://tuneable.stream/licences';
 
-type LicenceId = 'personal' | 'public' | 'download' | 'rework' | 'commercial';
+type LicenceId = 'streaming' | 'download' | 'rework' | 'commercial';
 
 const LICENCES: Array<{
   id: LicenceId;
@@ -38,22 +34,13 @@ const LICENCES: Array<{
   pdf: string;
 }> = [
   {
-    id: 'personal',
-    name: 'Personal streaming',
+    id: 'streaming',
+    name: 'Streaming',
     icon: 'musical-notes-outline',
-    visual: 'Listener → their library → play on Tuneable',
+    visual: 'Listener → library, party, or chart → play on Tuneable',
     description:
-      'Included. People can add it to their library and play it on Tuneable. It stays off parties and public charts, and the file is not handed over. You keep the copyright.',
-    pdf: `${PDF_BASE}/personal-streaming.pdf`,
-  },
-  {
-    id: 'public',
-    name: 'Public streaming',
-    icon: 'people-outline',
-    visual: 'Supporter tips → meets your minimum → a party can play it',
-    description:
-      'Parties and public charts can play this tune. Set a minimum tip from the person who adds it to a party, or leave it blank if any tip is enough. This is not a sync or advert clearance.',
-    pdf: `${PDF_BASE}/public-streaming.pdf`,
+      'Included. People can keep it in a library and play it on Tuneable, including in a party and on the public charts. The file is not handed over. You keep the copyright.',
+    pdf: `${PDF_BASE}/streaming.pdf`,
   },
   {
     id: 'download',
@@ -85,22 +72,14 @@ const LICENCES: Array<{
 ];
 
 function isOn(value: LicenceChoice, id: LicenceId): boolean {
-  if (id === 'personal') return true;
-  if (id === 'public') return value.publicStreaming;
+  if (id === 'streaming') return true;
   if (id === 'download') return value.personalDownload;
   if (id === 'rework') return value.openToRework;
   return value.openToCommercial;
 }
 
 function toggle(value: LicenceChoice, id: LicenceId): LicenceChoice {
-  if (id === 'public') {
-    const publicStreaming = !value.publicStreaming;
-    return {
-      ...value,
-      publicStreaming,
-      publicStreamingFloorPence: publicStreaming ? value.publicStreamingFloorPence : null,
-    };
-  }
+  if (id === 'streaming') return value;
   if (id === 'download') {
     const personalDownload = !value.personalDownload;
     return {
@@ -118,8 +97,6 @@ export function licenceChoiceFromSaved(saved?: SavedLicence | null): LicenceChoi
   if (!saved?.chosen) return { ...DEFAULT_LICENCE_CHOICE };
   return {
     personalStreaming: true,
-    publicStreaming: saved.publicStreaming === true,
-    publicStreamingFloorPence: saved.publicStreaming ? (saved.publicStreamingFloorPence ?? null) : null,
     personalDownload: saved.personalDownload === true,
     personalDownloadUnlockPence: saved.personalDownload ? (saved.personalDownloadUnlockPence ?? 1) : null,
     openToRework: saved.openToRework === true,
@@ -164,13 +141,13 @@ export function LicencePicker({
   value: LicenceChoice;
   onChange: (next: LicenceChoice) => void;
 }) {
-  const [openId, setOpenId] = useState<LicenceId | null>('personal');
+  const [openId, setOpenId] = useState<LicenceId | null>('streaming');
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Choose a licence</Text>
       <Text style={styles.intro}>
-        Personal streaming is included. The others stay off until you open them. You can change this later.
+        Streaming is included. The others stay off until you open them. You can change this later.
         Example contracts are blanks, not legal advice.
       </Text>
       {LICENCES.map((licence) => {
@@ -186,7 +163,7 @@ export function LicencePicker({
               <Ionicons name={licence.icon} size={18} color={colors.accentLight} />
               <Text style={styles.name}>{licence.name}</Text>
               <Text style={[styles.badge, selected && styles.badgeOn]}>
-                {licence.id === 'personal' ? 'Included' : selected ? 'On' : 'Off'}
+                {licence.id === 'streaming' ? 'Included' : selected ? 'On' : 'Off'}
               </Text>
             </Pressable>
             {open ? (
@@ -196,21 +173,13 @@ export function LicencePicker({
                 <Pressable onPress={() => void Linking.openURL(licence.pdf)}>
                   <Text style={styles.link}>Example contract (PDF)</Text>
                 </Pressable>
-                {licence.id !== 'personal' ? (
+                {licence.id !== 'streaming' ? (
                   <Pressable
                     style={[styles.offerBtn, selected && styles.offerBtnOff]}
                     onPress={() => onChange(toggle(value, licence.id))}
                   >
                     <Text style={styles.offerText}>{selected ? 'Turn off' : 'Offer this'}</Text>
                   </Pressable>
-                ) : null}
-                {licence.id === 'public' && value.publicStreaming ? (
-                  <PenceField
-                    label="Minimum tip before a party can play this (pence)"
-                    hint="Optional. 100 pence is £1. Leave blank if any tip is enough."
-                    amount={value.publicStreamingFloorPence}
-                    onAmount={(pence) => onChange({ ...value, publicStreamingFloorPence: pence })}
-                  />
                 ) : null}
                 {licence.id === 'download' && value.personalDownload ? (
                   <PenceField

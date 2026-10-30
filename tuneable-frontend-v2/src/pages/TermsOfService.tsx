@@ -296,11 +296,11 @@ const TermsOfService: React.FC = () => {
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>You are the owner or authorized representative of all rights (composition and master) in the uploaded work</li>
-                  <li>You choose which licences to grant. Personal streaming — play on Tuneable, in a listener&apos;s own library — is included. Public streaming, personal download, rework requests, and commercial requests stay off unless you turn them on</li>
+                  <li>You choose which licences to grant. Streaming on Tuneable — a listener&apos;s library, parties, and public charts — is included. Personal download, rework requests, and commercial requests stay off unless you turn them on</li>
                   <li>You grant Tuneable CIC a non-exclusive licence, limited to the options you select, to host and use the work inside Tuneable. You keep your copyright</li>
                   <li>Rework and commercial options do not clear a use. They let someone send a request. Each approval covers that one use</li>
                   <li>You indemnify Tuneable CIC against any third-party claims arising from your uploaded content</li>
-                  <li>You may change or revoke a licence at any time. Revoking stops new streams, party plays, and downloads. A personal copy already unlocked stays with that listener. Removing the work takes it off Tuneable within 30 days</li>
+                  <li>You may change or revoke a licence at any time. Revoking a download stops new downloads. A personal copy already unlocked stays with that listener. Removing the work takes it off Tuneable within 30 days</li>
                 </ul>
                 <p className="text-sm text-gray-600">
                   If you do not have the necessary rights to upload content, or if a third party claims infringement, Tuneable reserves the right to immediately remove such content without notice. 

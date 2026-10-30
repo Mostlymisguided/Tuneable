@@ -616,7 +616,6 @@ export const mediaAPI = {
     formData.append('rightsConfirmed', 'true');
     formData.append('licence', JSON.stringify({
       personalStreaming: true,
-      publicStreaming: false,
       personalDownload: false,
       openToRework: false,
       openToCommercial: false,
@@ -790,8 +789,6 @@ export const mediaAPI = {
   },
 
   updateMediaLicence: async (mediaId: string, licence: {
-    publicStreaming: boolean;
-    publicStreamingFloorPence: number | null;
     personalDownload: boolean;
     personalDownloadUnlockPence: number | null;
     openToRework: boolean;

@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { Download, Headphones, Megaphone, RefreshCw, Users } from 'lucide-react';
+import { Download, Headphones, Megaphone, RefreshCw } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
 import { toast } from '../utils/toast';
 
 export type LicenceChoice = {
   personalStreaming: true;
-  publicStreaming: boolean;
-  publicStreamingFloorPence: number | null;
   personalDownload: boolean;
   personalDownloadUnlockPence: number | null;
   openToRework: boolean;
@@ -19,8 +17,6 @@ export type SavedLicence = Partial<LicenceChoice> & {
 
 export const DEFAULT_LICENCE_CHOICE: LicenceChoice = {
   personalStreaming: true,
-  publicStreaming: false,
-  publicStreamingFloorPence: null,
   personalDownload: false,
   personalDownloadUnlockPence: null,
   openToRework: false,
@@ -31,8 +27,6 @@ export function licenceChoiceFromSaved(saved?: SavedLicence | null): LicenceChoi
   if (!saved?.chosen) return { ...DEFAULT_LICENCE_CHOICE };
   return {
     personalStreaming: true,
-    publicStreaming: saved.publicStreaming === true,
-    publicStreamingFloorPence: saved.publicStreaming ? (saved.publicStreamingFloorPence ?? null) : null,
     personalDownload: saved.personalDownload === true,
     personalDownloadUnlockPence: saved.personalDownload
       ? (saved.personalDownloadUnlockPence ?? 1)
@@ -44,14 +38,7 @@ export function licenceChoiceFromSaved(saved?: SavedLicence | null): LicenceChoi
 
 export function summariseLicence(saved?: SavedLicence | null): string {
   if (!saved?.chosen) return 'No licence chosen yet';
-  const parts = ['Personal streaming'];
-  if (saved.publicStreaming) {
-    parts.push(
-      saved.publicStreamingFloorPence
-        ? `Public streaming from £${(saved.publicStreamingFloorPence / 100).toFixed(2)}`
-        : 'Public streaming'
-    );
-  }
+  const parts = ['Streaming'];
   if (saved.personalDownload) {
     const pence = saved.personalDownloadUnlockPence || 1;
     parts.push(`Personal download from £${(pence / 100).toFixed(2)}`);
@@ -61,7 +48,7 @@ export function summariseLicence(saved?: SavedLicence | null): string {
   return parts.join(' · ');
 }
 
-type LicenceId = 'personal' | 'public' | 'download' | 'rework' | 'commercial';
+type LicenceId = 'streaming' | 'download' | 'rework' | 'commercial';
 
 const LICENCES: Array<{
   id: LicenceId;
@@ -71,20 +58,12 @@ const LICENCES: Array<{
   pdf: string;
 }> = [
   {
-    id: 'personal',
-    name: 'Personal streaming',
-    visual: ['Listener', 'Their library', 'Play on Tuneable'],
+    id: 'streaming',
+    name: 'Streaming',
+    visual: ['Listener', 'Library, party, or chart', 'Play on Tuneable'],
     description:
-      'Included with every tune. People can add it to their library and play it on Tuneable. It stays off parties and public charts, and the file is not handed over. You keep the copyright. This does not allow samples, sync, adverts, redistribution, or use for training AI models.',
-    pdf: '/licences/personal-streaming.pdf',
-  },
-  {
-    id: 'public',
-    name: 'Public streaming',
-    visual: ['Supporter tips', 'Meets your minimum', 'Party can play it'],
-    description:
-      'Parties and public charts can play this tune. You can set a minimum tip from the person who adds it to a party. Leave the minimum blank if any tip is enough. Personal listening stays available either way. This is not a sync or advert clearance.',
-    pdf: '/licences/public-streaming.pdf',
+      'Included with every tune. People can keep it in a library and play it on Tuneable, including in a party and on the public charts. The file is not handed over. You keep the copyright. This does not allow download, samples, sync, adverts, redistribution, or use for training AI models.',
+    pdf: '/licences/streaming.pdf',
   },
   {
     id: 'download',
@@ -113,23 +92,14 @@ const LICENCES: Array<{
 ];
 
 function isOn(value: LicenceChoice, id: LicenceId): boolean {
-  if (id === 'personal') return true;
-  if (id === 'public') return value.publicStreaming;
+  if (id === 'streaming') return true;
   if (id === 'download') return value.personalDownload;
   if (id === 'rework') return value.openToRework;
   return value.openToCommercial;
 }
 
 function toggle(value: LicenceChoice, id: LicenceId): LicenceChoice {
-  if (id === 'personal') return value;
-  if (id === 'public') {
-    const publicStreaming = !value.publicStreaming;
-    return {
-      ...value,
-      publicStreaming,
-      publicStreamingFloorPence: publicStreaming ? value.publicStreamingFloorPence : null,
-    };
-  }
+  if (id === 'streaming') return value;
   if (id === 'download') {
     const personalDownload = !value.personalDownload;
     return {
@@ -162,8 +132,7 @@ function penceField(label: string, hint: string, amount: number | null, onAmount
 }
 
 const ICONS = {
-  personal: Headphones,
-  public: Users,
+  streaming: Headphones,
   download: Download,
   rework: RefreshCw,
   commercial: Megaphone,
@@ -209,8 +178,8 @@ export function MediaLicenceCard({ mediaId, saved, canEdit, onSaved }: EditorPro
           <p className="text-sm font-semibold text-white">Licences</p>
           <p className="text-sm text-gray-300 mt-1">{summariseLicence(saved)}</p>
           {!saved?.chosen && canEdit && (
-            <p className="text-xs text-amber-200 mt-1">
-              Until you save a choice, parties can still play this tune.
+            <p className="text-xs text-gray-400 mt-1">
+              Streaming is included. Download, rework, and commercial stay off until you turn them on.
             </p>
           )}
         </div>
@@ -243,14 +212,14 @@ type Props = {
 };
 
 export default function LicencePicker({ value, onChange }: Props) {
-  const [openId, setOpenId] = useState<LicenceId | null>('personal');
+  const [openId, setOpenId] = useState<LicenceId | null>('streaming');
 
   return (
     <div className="space-y-2">
       <div>
         <h3 className="text-white font-semibold">Choose a licence</h3>
         <p className="text-sm text-gray-300 mt-1">
-          Personal streaming is included. The others stay off until you open them. You can change this later.
+          Streaming is included. The others stay off until you open them. You can change this later.
           Example contracts are blanks, not legal advice.
         </p>
       </div>
@@ -274,7 +243,7 @@ export default function LicencePicker({ value, onChange }: Props) {
               </span>
               <span className="flex-1 text-white font-medium">{licence.name}</span>
               <span className={`text-xs font-semibold px-2 py-1 rounded-full ${selected ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/10 text-gray-300'}`}>
-                {licence.id === 'personal' ? 'Included' : selected ? 'On' : 'Off'}
+                {licence.id === 'streaming' ? 'Included' : selected ? 'On' : 'Off'}
               </span>
             </button>
             {open && (
@@ -296,7 +265,7 @@ export default function LicencePicker({ value, onChange }: Props) {
                 >
                   Example contract (PDF)
                 </a>
-                {licence.id !== 'personal' && (
+                {licence.id !== 'streaming' && (
                   <div className="mt-3">
                     <button
                       type="button"
@@ -306,12 +275,6 @@ export default function LicencePicker({ value, onChange }: Props) {
                       {selected ? 'Turn off' : 'Offer this'}
                     </button>
                   </div>
-                )}
-                {licence.id === 'public' && value.publicStreaming && penceField(
-                  'Minimum tip before a party can play this (pence)',
-                  'Optional. 100 pence is £1. Leave blank if any tip is enough.',
-                  value.publicStreamingFloorPence,
-                  (pence) => onChange({ ...value, publicStreamingFloorPence: pence })
                 )}
                 {licence.id === 'download' && value.personalDownload && penceField(
                   'Tip that unlocks a personal copy (pence)',

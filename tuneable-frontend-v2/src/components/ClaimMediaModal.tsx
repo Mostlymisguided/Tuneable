@@ -227,7 +227,7 @@ const ClaimMediaModal: React.FC<ClaimMediaModalProps> = ({
         {step === 'licence' && (
           <>
             <p className="text-gray-300 mb-4 text-sm">
-              Nothing is granted until you pick. Personal streaming is included so the tune can play for a listener. You can change or revoke this after the claim is approved.
+              Nothing is granted until you pick. Streaming on Tuneable is included, in a library, a party, or on the charts. You can change or revoke the other licences after the claim is approved.
             </p>
             <div className="mb-4">
               <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />

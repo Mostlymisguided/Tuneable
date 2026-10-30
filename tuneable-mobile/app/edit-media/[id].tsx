@@ -865,7 +865,7 @@ export default function EditMediaScreen() {
                 <Text style={styles.sectionTitle}>Licences</Text>
                 {!media?.licence?.chosen ? (
                   <Text style={styles.hint}>
-                    Until you save a choice, parties can still play this tune.
+                    Streaming is included. Download, rework, and commercial stay off until you turn them on.
                   </Text>
                 ) : null}
                 <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />

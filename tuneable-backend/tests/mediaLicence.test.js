@@ -4,20 +4,19 @@
 
 const {
   parseLicenceChoice,
-  partyQueueBlock,
   replayFixedFloor,
   downloadDecision,
   musicTuneNeedsLicence,
 } = require('../utils/mediaLicence');
 
 describe('parseLicenceChoice', () => {
-  it('includes personal streaming and leaves the other grants off', () => {
+  it('includes streaming and leaves the other grants off', () => {
     const parsed = parseLicenceChoice({});
     expect(parsed.error).toBeUndefined();
     expect(parsed.licence).toMatchObject({
       chosen: true,
       personalStreaming: true,
-      publicStreaming: false,
+      publicStreaming: true,
       publicStreamingFloorPence: null,
       personalDownload: false,
       personalDownloadUnlockPence: null,
@@ -26,9 +25,9 @@ describe('parseLicenceChoice', () => {
     });
   });
 
-  it('keeps a public-streaming floor and a download unlock', () => {
+  it('keeps a download unlock and ignores an old public-streaming floor', () => {
     const parsed = parseLicenceChoice({
-      publicStreaming: true,
+      publicStreaming: false,
       publicStreamingFloorPence: 50,
       personalDownload: true,
       personalDownloadUnlockPence: 1,
@@ -37,7 +36,7 @@ describe('parseLicenceChoice', () => {
     });
     expect(parsed.licence).toMatchObject({
       publicStreaming: true,
-      publicStreamingFloorPence: 50,
+      publicStreamingFloorPence: null,
       personalDownload: true,
       personalDownloadUnlockPence: 1,
       openToRework: true,
@@ -50,68 +49,18 @@ describe('parseLicenceChoice', () => {
     expect(parsed.licence.personalDownloadUnlockPence).toBe(1);
   });
 
-  it('drops a public floor when public streaming is off', () => {
+  it('rejects a fractional download price', () => {
     const parsed = parseLicenceChoice({
-      publicStreaming: false,
-      publicStreamingFloorPence: 50,
-    });
-    expect(parsed.licence.publicStreamingFloorPence).toBeNull();
-  });
-
-  it('rejects a fractional tip', () => {
-    const parsed = parseLicenceChoice({
-      publicStreaming: true,
-      publicStreamingFloorPence: 1.5,
+      personalDownload: true,
+      personalDownloadUnlockPence: 1.5,
     });
     expect(parsed.error).toMatch(/whole number of pence/);
   });
 
   it('accepts a JSON string from a multipart form', () => {
-    const parsed = parseLicenceChoice('{"publicStreaming":true,"openToRework":true}');
+    const parsed = parseLicenceChoice('{"openToRework":true}');
     expect(parsed.licence.publicStreaming).toBe(true);
     expect(parsed.licence.openToRework).toBe(true);
-  });
-});
-
-describe('partyQueueBlock', () => {
-  it('allows a tune with no saved choice', () => {
-    expect(partyQueueBlock({ media: { title: 'Old', licence: { chosen: false } } }).ok).toBe(true);
-    expect(partyQueueBlock({ media: { title: 'Older' } }).ok).toBe(true);
-  });
-
-  it('blocks party play when only personal streaming is on', () => {
-    const result = partyQueueBlock({
-      media: { title: 'Quiet', licence: { chosen: true, publicStreaming: false } },
-    });
-    expect(result.ok).toBe(false);
-    expect(result.status).toBe(403);
-    expect(result.error).toMatch(/personal listening/);
-  });
-
-  it('blocks a party add that does not meet the tip floor', () => {
-    const result = partyQueueBlock({
-      media: {
-        title: 'Floor',
-        licence: { chosen: true, publicStreaming: true, publicStreamingFloorPence: 100 },
-      },
-      priorTipPence: 20,
-      bidAmountPence: 30,
-    });
-    expect(result.ok).toBe(false);
-    expect(result.code).toBe('public_floor');
-    expect(result.yourTipPence).toBe(50);
-  });
-
-  it('allows a party add once the tip floor is met', () => {
-    const result = partyQueueBlock({
-      media: {
-        title: 'Floor',
-        licence: { chosen: true, publicStreaming: true, publicStreamingFloorPence: 100 },
-      },
-      priorTipPence: 80,
-      bidAmountPence: 20,
-    });
-    expect(result.ok).toBe(true);
   });
 });
 

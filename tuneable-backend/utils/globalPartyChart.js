@@ -28,12 +28,6 @@ const GLOBAL_PARTY_TUNES_FILTER = {
   // Deleted duplicates keep their old rights + upload. Without this they still
   // match the playable chart after the live recording is set to rights pending.
   status: { $ne: 'deleted' },
-  // A saved licence with public streaming off stays in libraries, off public charts.
-  // No saved choice keeps the previous chart behaviour.
-  $or: [
-    { 'licence.chosen': { $ne: true } },
-    { 'licence.publicStreaming': true },
-  ],
 };
 
 const MEDIA_CHART_SELECT = [

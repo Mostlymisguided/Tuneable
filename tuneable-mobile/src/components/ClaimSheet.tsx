@@ -237,7 +237,7 @@ export function ClaimSheet({
             {step === 'licence' && (
               <>
                 <Text style={styles.copy}>
-                  Nothing is granted until you pick. Personal streaming is included. You can change or revoke this after the claim is approved.
+                  Nothing is granted until you pick. Streaming on Tuneable is included, in a library, a party, or on the charts. You can change or revoke the other licences after the claim is approved.
                 </Text>
                 <LicencePicker value={licenceChoice} onChange={setLicenceChoice} />
                 <Pressable style={styles.primaryBtn} onPress={() => setStep('proof')}>

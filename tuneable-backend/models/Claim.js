@@ -28,7 +28,7 @@ const claimSchema = new mongoose.Schema({
     type: new mongoose.Schema({
       chosen: { type: Boolean, default: false },
       personalStreaming: { type: Boolean, default: true },
-      publicStreaming: { type: Boolean, default: false },
+      publicStreaming: { type: Boolean, default: true },
       publicStreamingFloorPence: { type: Number, default: null },
       personalDownload: { type: Boolean, default: false },
       personalDownloadUnlockPence: { type: Number, default: null },
