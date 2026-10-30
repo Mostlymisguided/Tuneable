@@ -59,9 +59,10 @@ const TermsOfService: React.FC = () => {
               <div className="space-y-4 text-gray-700">
                 <h3 className="text-xl font-medium text-gray-900">2.1.1 Tuneable is Not a Streaming Service</h3>
                 <p className="mb-2">
-                  <strong>Tuneable CIC is a community-funded artist support platform, not a music streaming service. </strong> 
+                  <strong>Tuneable CIC is a community-funded artist support platform, not a subscription streaming service. </strong> 
                   Tuneable facilitates fan tipping, social queueing, and artist support. Playback on Tuneable is limited to 
-                  media hosted on the Service.
+                  media hosted on the Service. A Streaming licence, described in section 6.3.2, is permission to play a hosted 
+                  tune on Tuneable. It is not a subscription, and it is not a right to copy the file.
                 </p>
                 <p className="mb-4">
                   Tuneable does <strong>not</strong>:
@@ -83,9 +84,11 @@ const TermsOfService: React.FC = () => {
                   <li>Facilitate community support for musicians and creators</li>
                 </ul>
                 <p className="mb-2">
-                  <strong>Revenue Model:</strong> Money exchanged on Tuneable is for social influence, ranking, tipping artists, 
-                  and party participation—not for streaming or content access. This model is similar to Twitch Bits, TikTok Gifts, 
-                  or Patreon support, where users pay to support creators and influence community features, not to access content.
+                  <strong>Revenue Model:</strong> Money exchanged on Tuneable is a tip: support for artists, and a way to influence 
+                  rankings and party queues. Pressing play on a hosted tune does not require a payment. If the artist turns on 
+                  personal download, a listener who has tipped at least the price the artist set on that tune can keep one private 
+                  copy, as described in section 6.3.3. This model is similar to Twitch Bits, TikTok Gifts, or Patreon support, 
+                  where users pay to support creators and influence community features.
                 </p>
                 <p className="mb-2">
                   <strong>Community Interest Company Status:</strong> As a UK Community Interest Company (CIC), Tuneable exists 
@@ -293,23 +296,53 @@ const TermsOfService: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">6.3 User Content</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>You retain ownership of any content you submit to the Service (comments, profile information, etc.)</li>
-                  <li>By submitting content, you grant Tuneable a non-exclusive license to use, display, and distribute your content on the platform</li>
+                  <li>You retain ownership of comments, profile information, and other material you submit that is not a hosted tune</li>
+                  <li>For that material, you grant Tuneable a non-exclusive licence to host and display it on the Service</li>
+                  <li>A tune you upload or claim is covered by sections 6.3.1 to 6.3.5. The grant is only the licences that apply there. Tuneable does not receive a general right to distribute or monetise the work</li>
                   <li>You represent that you have the necessary rights to share any content you submit</li>
                 </ul>
 
-                <h3 className="text-xl font-medium text-gray-900">6.3.1 Upload License Agreement</h3>
+                <h3 className="text-xl font-medium text-gray-900">6.3.1 Tune licences</h3>
                 <p className="mb-2">
-                  <strong>By uploading original music or media content to Tuneable, you represent and warrant that:</strong>
+                  These licences apply when you upload a tune, or when a claim to keep a tune is approved. Saying you want to claim a tune does not grant anything. You choose the licences on Tuneable. Podcasts and written works are hosted under your rights declaration and do not use this tune licence choice.
+                </p>
+                <p className="mb-2">
+                  <strong>By uploading or claiming a tune, you represent and warrant that:</strong>
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>You are the owner or authorized representative of all rights (composition and master) in the uploaded work</li>
-                  <li>You choose which licences to grant. Streaming on Tuneable — a listener&apos;s library, parties, and public charts — is included. Personal download, rework requests, and commercial requests stay off unless you turn them on</li>
-                  <li>You grant Tuneable CIC a non-exclusive licence, limited to the options you select, to host and use the work inside Tuneable. You keep your copyright</li>
-                  <li>Rework and commercial options do not clear a use. They let someone send a request. Each approval covers that one use</li>
-                  <li>You indemnify Tuneable CIC against any third-party claims arising from your uploaded content</li>
-                  <li>You may change or revoke a licence at any time. Revoking a download stops new downloads. A personal copy already unlocked stays with that listener. Removing the work takes it off Tuneable within 30 days</li>
+                  <li>You own or control the composition and the recording, or you are authorised to license them</li>
+                  <li>You keep your copyright</li>
+                  <li>You grant Tuneable CIC a non-exclusive licence only for the uses in sections 6.3.2 to 6.3.5 that apply to your choice</li>
+                  <li>Streaming is included when you save a choice. Personal download, rework requests, and commercial requests stay off until you turn them on</li>
+                  <li>You may change or revoke a choice at any time. Removing the work takes it off Tuneable within 30 days</li>
+                  <li>You indemnify Tuneable CIC against any third-party claims arising from the tune</li>
                 </ul>
+
+                <h3 className="text-xl font-medium text-gray-900">6.3.2 Streaming</h3>
+                <p className="mb-2">
+                  Streaming is included with every tune once you save a licence. A listener may keep the tune in a library and play it on Tuneable, including in a party and on the public charts. Tuneable may store the file and send it to a device so that playback can happen. The listener does not receive a copy they can keep.
+                </p>
+                <p className="mb-2">
+                  Streaming does not allow download, samples, remixes, covers, synchronisation, adverts, redistribution, or use to train AI models. Pressing play does not require a separate payment. Tips remain support for the artist and a way to influence queues and charts.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">6.3.3 Personal download</h3>
+                <p className="mb-2">
+                  Personal download stays off until you turn it on. You set the unlock price in pence. One penny is the suggested price if you want the copy essentially open. A listener whose tips on that tune reach the price may keep one personal copy for private listening.
+                </p>
+                <p className="mb-2">
+                  Turning personal download off stops new downloads. A copy a listener has already unlocked stays with them. A personal copy does not allow samples, remixes, covers, synchronisation, adverts, redistribution, or use to train AI models.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">6.3.4 Rework requests</h3>
+                <p className="mb-2">
+                  Rework requests stay off until you turn them on. Turning them on records that you are open to being asked about one sample, remix, or cover. It does not clear that use. A use is cleared only if you later approve that one use, including the credit, any share of tips on the new work, and whether the new work may also be released off Tuneable.
+                </p>
+
+                <h3 className="text-xl font-medium text-gray-900">6.3.5 Commercial requests</h3>
+                <p className="mb-2">
+                  Commercial requests stay off until you turn them on. Turning them on records that you are open to being asked about one film, advert, game, or brand use. It does not clear that use, and it does not include a rework. A use is cleared only if you later approve that one use, including the media, territory, term, and a fee or tip share.
+                </p>
                 <p className="text-sm text-gray-600">
                   If you do not have the necessary rights to upload content, or if a third party claims infringement, Tuneable reserves the right to immediately remove such content without notice. 
                   You bear sole responsibility for ensuring you have all necessary permissions before uploading.

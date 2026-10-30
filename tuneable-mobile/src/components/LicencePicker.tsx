@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 
@@ -21,8 +21,6 @@ export const DEFAULT_LICENCE_CHOICE: LicenceChoice = {
   openToCommercial: false,
 };
 
-const PDF_BASE = 'https://tuneable.stream/licences';
-
 type LicenceId = 'streaming' | 'download' | 'rework' | 'commercial';
 
 const LICENCES: Array<{
@@ -31,7 +29,6 @@ const LICENCES: Array<{
   icon: keyof typeof Ionicons.glyphMap;
   visual: string;
   description: string;
-  pdf: string;
 }> = [
   {
     id: 'streaming',
@@ -40,7 +37,6 @@ const LICENCES: Array<{
     visual: 'Listener → library, party, or chart → play on Tuneable',
     description:
       'Included. People can keep it in a library and play it on Tuneable, including in a party and on the public charts. The file is not handed over. You keep the copyright.',
-    pdf: `${PDF_BASE}/streaming.pdf`,
   },
   {
     id: 'download',
@@ -49,7 +45,6 @@ const LICENCES: Array<{
     visual: 'Tip on this tune → reaches your price → one private copy',
     description:
       'A listener who has tipped at least this amount can keep one personal copy. 1p is the suggested price. Turning this off stops new downloads. A copy already unlocked stays with that listener.',
-    pdf: `${PDF_BASE}/personal-download.pdf`,
   },
   {
     id: 'rework',
@@ -58,7 +53,6 @@ const LICENCES: Array<{
     visual: 'Someone asks → you approve one use → credit and a tip share',
     description:
       'Records that you are open to a request for one sample, remix, or cover. Turning this on does not clear anything.',
-    pdf: `${PDF_BASE}/rework.pdf`,
   },
   {
     id: 'commercial',
@@ -67,7 +61,6 @@ const LICENCES: Array<{
     visual: 'A sync or advert ask → fee, term, territory → you approve one use',
     description:
       'Records that you are open to a request for one film, advert, or brand use. Turning this on does not clear a use, and it does not include a rework.',
-    pdf: `${PDF_BASE}/commercial.pdf`,
   },
 ];
 
@@ -148,31 +141,40 @@ export function LicencePicker({
       <Text style={styles.title}>Choose a licence</Text>
       <Text style={styles.intro}>
         Streaming is included. The others stay off until you open them. You can change this later.
-        Example contracts are blanks, not legal advice.
       </Text>
       {LICENCES.map((licence) => {
         const open = openId === licence.id;
         const selected = isOn(value, licence.id);
         return (
           <View key={licence.id} style={[styles.card, selected && styles.cardOn]}>
-            <Pressable
-              onPress={() => setOpenId(open ? null : licence.id)}
-              style={styles.header}
-              accessibilityRole="button"
-            >
-              <Ionicons name={licence.icon} size={18} color={colors.accentLight} />
-              <Text style={styles.name}>{licence.name}</Text>
-              <Text style={[styles.badge, selected && styles.badgeOn]}>
-                {licence.id === 'streaming' ? 'Included' : selected ? 'On' : 'Off'}
-              </Text>
-            </Pressable>
+            <View style={styles.header}>
+              <Pressable
+                onPress={() => setOpenId(open ? null : licence.id)}
+                style={styles.headerMain}
+                accessibilityRole="button"
+              >
+                <Ionicons name={licence.icon} size={18} color={colors.accentLight} />
+                <Text style={styles.name}>{licence.name}</Text>
+              </Pressable>
+              {licence.id === 'streaming' ? (
+                <Text style={[styles.badge, styles.badgeOn]}>Included</Text>
+              ) : (
+                <Pressable
+                  onPress={() => onChange(toggle(value, licence.id))}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={selected ? `Turn off ${licence.name}` : `Offer ${licence.name}`}
+                >
+                  <Text style={[styles.badge, selected && styles.badgeOn]}>
+                    {selected ? 'On' : 'Off'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
             {open ? (
               <View style={styles.body}>
                 <Text style={styles.visual}>{licence.visual}</Text>
                 <Text style={styles.description}>{licence.description}</Text>
-                <Pressable onPress={() => void Linking.openURL(licence.pdf)}>
-                  <Text style={styles.link}>Example contract (PDF)</Text>
-                </Pressable>
                 {licence.id !== 'streaming' ? (
                   <Pressable
                     style={[styles.offerBtn, selected && styles.offerBtnOff]}
@@ -210,6 +212,7 @@ const styles = StyleSheet.create({
   },
   cardOn: { borderColor: 'rgba(168, 85, 247, 0.7)' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
+  headerMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
   badge: {
     color: colors.textMuted,
@@ -225,7 +228,6 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 12, paddingBottom: 12 },
   visual: { color: '#e9d5ff', fontSize: 12, marginBottom: 6 },
   description: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  link: { color: colors.accentLight, textDecorationLine: 'underline', marginTop: 8, fontSize: 13 },
   offerBtn: {
     alignSelf: 'flex-start',
     marginTop: 10,

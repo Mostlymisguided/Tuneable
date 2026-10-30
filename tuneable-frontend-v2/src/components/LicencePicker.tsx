@@ -55,7 +55,6 @@ const LICENCES: Array<{
   name: string;
   visual: string[];
   description: string;
-  pdf: string;
 }> = [
   {
     id: 'streaming',
@@ -63,7 +62,6 @@ const LICENCES: Array<{
     visual: ['Listener', 'Library, party, or chart', 'Play on Tuneable'],
     description:
       'Included with every tune. People can keep it in a library and play it on Tuneable, including in a party and on the public charts. The file is not handed over. You keep the copyright. This does not allow download, samples, sync, adverts, redistribution, or use for training AI models.',
-    pdf: '/licences/streaming.pdf',
   },
   {
     id: 'download',
@@ -71,7 +69,6 @@ const LICENCES: Array<{
     visual: ['Tip on this tune', 'Reaches your price', 'One private copy'],
     description:
       'A listener who has tipped at least this amount on this tune can keep one personal copy. 1p is the suggested price if you want it essentially open. The copy is for private listening. Turning this off stops new downloads. A copy someone already unlocked stays with them.',
-    pdf: '/licences/personal-download.pdf',
   },
   {
     id: 'rework',
@@ -79,7 +76,6 @@ const LICENCES: Array<{
     visual: ['Someone asks', 'You approve one use', 'Credit and a tip share'],
     description:
       'Records that you are open to a request for one sample, remix, or cover. A request names the use, the credit, the share of tips on the new work, and whether that new work can also be released off Tuneable. Turning this on does not clear anything.',
-    pdf: '/licences/rework.pdf',
   },
   {
     id: 'commercial',
@@ -87,7 +83,6 @@ const LICENCES: Array<{
     visual: ['A sync or advert ask', 'Fee, term, territory', 'You approve one use'],
     description:
       'Records that you are open to a request for one film, advert, game, or brand use. A request names the media, territory, term, and a fee or tip share. Turning this on does not clear a use, and it does not include a rework.',
-    pdf: '/licences/commercial.pdf',
   },
 ];
 
@@ -220,7 +215,6 @@ export default function LicencePicker({ value, onChange }: Props) {
         <h3 className="text-white font-semibold">Choose a licence</h3>
         <p className="text-sm text-gray-300 mt-1">
           Streaming is included. The others stay off until you open them. You can change this later.
-          Example contracts are blanks, not legal advice.
         </p>
       </div>
       {LICENCES.map((licence) => {
@@ -232,20 +226,34 @@ export default function LicencePicker({ value, onChange }: Props) {
             key={licence.id}
             className={`rounded-lg border ${selected ? 'border-purple-400/70 bg-purple-900/30' : 'border-white/15 bg-black/20'}`}
           >
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 px-3 py-3 text-left"
-              aria-expanded={open}
-              onClick={() => setOpenId(open ? null : licence.id)}
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-600/40 text-purple-100">
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="flex-1 text-white font-medium">{licence.name}</span>
-              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${selected ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/10 text-gray-300'}`}>
-                {licence.id === 'streaming' ? 'Included' : selected ? 'On' : 'Off'}
-              </span>
-            </button>
+            <div className="w-full flex items-center gap-3 px-3 py-3">
+              <button
+                type="button"
+                className="flex flex-1 items-center gap-3 text-left min-w-0"
+                aria-expanded={open}
+                onClick={() => setOpenId(open ? null : licence.id)}
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-600/40 text-purple-100">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="flex-1 text-white font-medium">{licence.name}</span>
+              </button>
+              {licence.id === 'streaming' ? (
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-200">
+                  Included
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  aria-label={selected ? `Turn off ${licence.name}` : `Offer ${licence.name}`}
+                  onClick={() => onChange(toggle(value, licence.id))}
+                  className={`text-xs font-semibold px-2 py-1 rounded-full ${selected ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/10 text-gray-300'}`}
+                >
+                  {selected ? 'On' : 'Off'}
+                </button>
+              )}
+            </div>
             {open && (
               <div className="px-3 pb-3">
                 <div className="flex flex-wrap items-center gap-1 text-xs text-purple-100 mb-2">
@@ -257,14 +265,6 @@ export default function LicencePicker({ value, onChange }: Props) {
                   ))}
                 </div>
                 <p className="text-sm text-gray-300">{licence.description}</p>
-                <a
-                  href={licence.pdf}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block mt-2 text-sm text-purple-300 underline hover:text-purple-200"
-                >
-                  Example contract (PDF)
-                </a>
                 {licence.id !== 'streaming' && (
                   <div className="mt-3">
                     <button
