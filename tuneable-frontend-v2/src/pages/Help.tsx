@@ -393,7 +393,11 @@ const Help: React.FC = () => {
               Help & Support
             </h1>
             <p className="text-gray-300 text-lg">
-              Everything you need to know about using Tuneable
+              Everything you need to know about using Tuneable. Short answers are on the{' '}
+              <Link to="/faq" className="text-purple-300 underline">
+                FAQ
+              </Link>
+              .
             </p>
           </div>
 

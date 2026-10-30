@@ -1,3 +1,4 @@
+import { FAQ_DESCRIPTION, FAQ_PATH, faqJsonLd } from '../content/faq';
 import {
   DEFAULT_DESCRIPTION,
   DEFAULT_TITLE,
@@ -40,6 +41,12 @@ const EXACT: Record<string, PageMeta> = {
     description:
       'How Tuneable works: tipping, charts, TuneBytes, parties, and where your money goes.',
     path: '/help',
+  },
+  [FAQ_PATH]: {
+    title: 'FAQ',
+    description: FAQ_DESCRIPTION,
+    path: FAQ_PATH,
+    jsonLd: faqJsonLd(),
   },
   '/join-us': {
     title: 'Join Tuneable',

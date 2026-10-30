@@ -11,6 +11,7 @@ const productLinks = [
   { to: '/about', label: 'About' },
   { to: '/help#support', label: 'Contact' },
   { to: '/help', label: 'Help' },
+  { to: '/faq', label: 'FAQ' },
   { to: '/join-us', label: 'Join Us' },
   { to: '/party/global?period=all-time', label: 'Charts' },
   { to: '/places', label: 'Places' },

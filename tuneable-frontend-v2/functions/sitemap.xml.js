@@ -22,6 +22,7 @@ export async function onRequest(context) {
   <url><loc>https://tuneable.stream/podcasts</loc></url>
   <url><loc>https://tuneable.stream/books</loc></url>
   <url><loc>https://tuneable.stream/help</loc></url>
+  <url><loc>https://tuneable.stream/faq</loc></url>
 </urlset>
 `;
   }

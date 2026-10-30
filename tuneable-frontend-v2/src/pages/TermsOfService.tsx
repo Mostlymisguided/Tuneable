@@ -302,7 +302,7 @@ const TermsOfService: React.FC = () => {
                   <li>You represent that you have the necessary rights to share any content you submit</li>
                 </ul>
 
-                <h3 className="text-xl font-medium text-gray-900">6.3.1 Tune licences</h3>
+                <h3 id="tune-licences" className="text-xl font-medium text-gray-900 scroll-mt-24">6.3.1 Tune licences</h3>
                 <p className="mb-2">
                   These licences apply when you upload a tune, or when a claim to keep a tune is approved. Saying you want to claim a tune does not grant anything. You choose the licences on Tuneable. Podcasts and written works are hosted under your rights declaration and do not use this tune licence choice.
                 </p>

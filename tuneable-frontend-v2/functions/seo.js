@@ -32,6 +32,12 @@ const STATIC_PAGES = {
     'How Tuneable works: tipping, charts, TuneBytes, parties, and where your money goes.',
     '/help'
   ),
+  '/faq': page(
+    'FAQ',
+    'Short answers on tipping, rights, licences, welcome credit, TuneBytes, and how creators get paid.',
+    '/faq',
+    '<h1>FAQ</h1><p>Short answers for listeners and creators. The longer how-to is on <a href="/help">Help</a>.</p>'
+  ),
   '/join-us': page(
     'Join Tuneable',
     'Buy shares in Tuneable and help steer a chart that pays artists.',
@@ -116,6 +122,7 @@ export const SITEMAP_PATHS = [
   '/places',
   '/parties',
   '/help',
+  '/faq',
   '/join-us',
   '/creator/register',
   '/privacy-policy',
@@ -484,6 +491,7 @@ const SITE_NAV = `
     <a href="/places">Places</a>
     <a href="/parties">Parties</a>
     <a href="/help">Help</a>
+    <a href="/faq">FAQ</a>
   </nav>
 `;
 

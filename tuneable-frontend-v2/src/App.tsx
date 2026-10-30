@@ -24,6 +24,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import DataDeletion from './pages/DataDeletion';
 import Help from './pages/Help';
+import Faq from './pages/Faq';
 import Dashboard from './pages/Dashboard';
 import Parties from './pages/Parties';
 import Party from './pages/Party';
@@ -198,6 +199,7 @@ const OnboardingRedirect = () => {
     '/data-deletion',
     '/about',
     '/help',
+    '/faq',
     '/join-us',
     '/request-invite',
     '/creator/register',
@@ -252,6 +254,7 @@ const AppContent = () => {
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/faq" element={<Faq />} />
             <Route path="/join-us" element={<JoinUs />} />
             <Route path="/explore" element={<Navigate to="/party/global?period=all-time" replace />} />
             <Route 
