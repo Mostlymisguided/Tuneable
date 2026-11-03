@@ -71,6 +71,17 @@ describe('chartSort', () => {
     expect(mediaChartMongoSort('most-tunebytes')).toEqual({
       tuneBytesEarned: -1,
       createdAt: -1,
+      _id: 1,
+    });
+    expect(mediaChartMongoSort('most-tipped')).toEqual({
+      globalMediaAggregate: -1,
+      createdAt: -1,
+      _id: 1,
+    });
+    expect(mediaChartMongoSort(undefined)).toEqual({
+      globalMediaAggregate: -1,
+      createdAt: -1,
+      _id: 1,
     });
   });
 });

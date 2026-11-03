@@ -682,7 +682,8 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
         if (isRequestingGlobalParty) {
             console.log('🌍 Fetching Global Party chart (slim supporters)...');
             const playableOnly = parsePlayableOnlyQuery(req.query.playableOnly);
-            const chart = await fetchAllTimeGlobalChart({ userId, playableOnly });
+            const search = typeof req.query.q === 'string' ? req.query.q : '';
+            const chart = await fetchAllTimeGlobalChart({ userId, playableOnly, search });
             console.log(`🌍 Global Party Performance Metrics:`);
             console.log(`   - Processing time: ${chart.meta.processingTimeMs}ms`);
             console.log(`   - Media count: ${chart.meta.count}`);
@@ -3732,6 +3733,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
                 userId: req.user?._id,
                 sortBy: chartSort,
                 playableOnly: parsePlayableOnlyQuery(req.query.playableOnly),
+                search: typeof req.query.q === 'string' ? req.query.q : '',
             });
             console.log(`🌍 Global Party time sorting: ${chart.meta.count} media in ${chart.meta.processingTimeMs}ms${locationPlaceId ? ` (location: ${locationPlaceId}, scope: ${locationScope})` : ''}`);
 

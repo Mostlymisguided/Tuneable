@@ -28,7 +28,7 @@ export const partyAPI = {
   getMediaSortedByTime: async (
     partyId: string,
     timePeriod: string,
-    options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string; playableOnly?: boolean }
+    options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string; playableOnly?: boolean; q?: string }
   ): Promise<SortedMediaResponse> => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
@@ -42,6 +42,9 @@ export const partyAPI = {
     }
     if (typeof options?.playableOnly === 'boolean') {
       params.playableOnly = String(options.playableOnly);
+    }
+    if (options?.q && options.q.trim().length >= 2) {
+      params.q = options.q.trim();
     }
     const response = await api.get<SortedMediaResponse>(
       `/parties/${partyId}/media/sorted/${timePeriod}`,

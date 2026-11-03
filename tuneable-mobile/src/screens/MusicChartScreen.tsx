@@ -74,6 +74,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
@@ -100,6 +101,11 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
     setVisibleCount(CHART_PAGE_SIZE);
   }, [period, locationPlaceId, selectedTagTerms, searchQuery, bpmFilterRange, chartSort, locationScope, playableOnly]);
 
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearchQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
+
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -110,6 +116,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         locationScope: locationPlaceId ? locationScope : undefined,
         sortBy: chartSort,
         playableOnly,
+        q: debouncedSearchQuery,
       });
       setMedia(res.media ?? []);
       setServerHiddenCount(
@@ -123,7 +130,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, locationPlaceId, chartSort, locationScope, playableOnly]);
+  }, [period, locationPlaceId, chartSort, locationScope, playableOnly, debouncedSearchQuery]);
 
   useFocusEffect(
     useCallback(() => {

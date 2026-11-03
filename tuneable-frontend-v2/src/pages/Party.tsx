@@ -225,6 +225,7 @@ function sortedChartCacheKey(parts: {
   locationScope: string;
   chartSort: string;
   playableOnly: boolean;
+  search?: string;
 }) {
   return [
     'sorted',
@@ -233,6 +234,7 @@ function sortedChartCacheKey(parts: {
     parts.locationPlaceId || '',
     parts.locationScope,
     parts.chartSort,
+    parts.search || '',
     parts.playableOnly ? '1' : '0',
   ].join('|');
 }
@@ -308,9 +310,15 @@ function chartItemMatchesSearch(item: any, allTerms: string[]): boolean {
     regularTerms.some((term) => {
       const lowerTerm = term.toLowerCase();
       const title = (mediaItem.title || '').toLowerCase();
-      const artist = Array.isArray(mediaItem.artist)
-        ? mediaItem.artist.map((a: any) => (a && typeof a === 'object' ? a.name : a) || '').join(' ').toLowerCase()
-        : (mediaItem.artist || '').toLowerCase();
+      const nameList = (value: any) => Array.isArray(value)
+        ? value.map((a: any) => (a && typeof a === 'object' ? a.name : a) || '').join(' ')
+        : (value || '');
+      const artist = [
+        nameList(mediaItem.artist),
+        nameList(mediaItem.artists),
+        nameList(mediaItem.featuring),
+        mediaItem.creatorDisplay || '',
+      ].join(' ').toLowerCase();
       const category = (mediaItem.category || '').toLowerCase();
       const tagHaystack = tags.join(' ').toLowerCase();
 
@@ -409,17 +417,19 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const [locationScope, setLocationScope] = useState<LocationScope>(() =>
     normalizeLocationScope(searchParams.get('scope'))
   );
-  const useSortedQueue =
-    selectedTimePeriod !== 'all-time' ||
-    !!selectedLocation?.placeId ||
-    (isGlobalParty && chartSort !== 'most-tipped');
-  
   // Search state (initial tag terms from URL for global party: ?tag= or ?tags=)
   const [queueSearchTerms, setQueueSearchTerms] = useState<string[]>(() =>
     getTagTermsFromSearchParams(searchParams, partyId === 'global')
   );
-  // Unified search: live-filters the queue. Catalog search runs only from the empty-results action.
+  // Live filter of the loaded page, plus a debounced server search so tipped
+  // tunes outside the top-250 chart cap can still be found.
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const useSortedQueue =
+    selectedTimePeriod !== 'all-time' ||
+    !!selectedLocation?.placeId ||
+    (isGlobalParty && chartSort !== 'most-tipped') ||
+    (isGlobalParty && debouncedSearchQuery.trim().length >= 2);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [lastLibrarySearchQuery, setLastLibrarySearchQuery] = useState('');
   const [addMediaResults, setAddMediaResults] = useState<{
@@ -635,6 +645,11 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   });
 
   useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearchQuery(searchQuery.trim()), 300);
+    return () => window.clearTimeout(handle);
+  }, [searchQuery]);
+
+  useEffect(() => {
     partyLoadedRef.current = false;
     setLoadedPartyPlayableOnly(null);
     setLoadedSortedKey(null);
@@ -652,6 +667,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   useEffect(() => {
     if (!partyId) return;
     if (!useSortedQueue) {
+      sortedFetchGen.current += 1;
       setSortedMedia([]);
       setSortedHiddenCount(null);
       setLoadedSortedKey(null);
@@ -664,6 +680,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       locationScope,
       chartSort,
       playableOnly,
+      search: debouncedSearchQuery,
     });
     const cached = chartCacheRef.current.get(key);
     if (cached) {
@@ -672,7 +689,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       setLoadedSortedKey(key);
     }
     void fetchSortedMedia(selectedTimePeriod, selectedLocation?.placeId, { preserveOtherModes: true });
-  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope, playableOnly]);
+  }, [partyId, selectedTimePeriod, selectedLocation?.placeId, useSortedQueue, chartSort, locationScope, playableOnly, debouncedSearchQuery]);
 
   // Sync period from URL when it changes (e.g. /explore redirect, back/forward)
   useEffect(() => {
@@ -910,6 +927,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       locationScope,
       chartSort,
       playableOnly: requestedPlayable,
+      search: debouncedSearchQuery,
     });
     const gen = ++sortedFetchGen.current;
     setIsLoadingSortedMedia(true);
@@ -921,6 +939,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           ...(locationPlaceId ? { locationPlaceId, locationScope } : {}),
           sortBy: chartSort,
           playableOnly: requestedPlayable,
+          q: debouncedSearchQuery,
         }
       );
       if (gen !== sortedFetchGen.current) return;
@@ -1781,6 +1800,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         locationScope,
         chartSort,
         playableOnly,
+        search: debouncedSearchQuery,
       })
     : '';
   const sortedCacheEntry = sortedRequestKey ? chartCacheRef.current.get(sortedRequestKey) : undefined;
@@ -1799,7 +1819,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     ? isLoadingSortedMedia && sameSortedChart && loadedSortedKey !== sortedRequestKey && !usingSortedCache
     : isRefreshingPartyMedia && loadedPartyPlayableOnly !== null && loadedPartyPlayableOnly !== playableOnly && !usingPartyCache;
   const showSortedLoader =
-    isLoadingSortedMedia && !sameSortedChart && selectedTimePeriod !== 'all-time';
+    isLoadingSortedMedia && !sameSortedChart && (
+      selectedTimePeriod !== 'all-time' || debouncedSearchQuery.trim().length >= 2
+    );
   const showPlayableBar = useChartLag(playableTogglePending);
 
   const requestPlayableOnly = (next: boolean) => {
@@ -1812,6 +1834,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           locationScope,
           chartSort,
           playableOnly: next,
+          search: debouncedSearchQuery,
         })
       : '';
     const hasSortedCache = Boolean(nextSortedKey && chartCacheRef.current.has(nextSortedKey));

@@ -121,6 +121,32 @@ function chartTunesFilter({ playableOnly = true, extra = {} } = {}) {
   );
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Match a chart search against title, creators, tags, and category.
+ * Null until there are at least two characters — one letter matches too much
+ * of a capped chart to be useful.
+ */
+function chartTextSearchClause(raw) {
+  const q = String(raw || '').trim();
+  if (q.length < 2) return null;
+  const rx = new RegExp(escapeRegExp(q), 'i');
+  return {
+    $or: [
+      { title: rx },
+      { 'artist.name': rx },
+      { 'featuring.name': rx },
+      { creatorDisplay: rx },
+      { creatorNames: rx },
+      { tags: rx },
+      { category: rx },
+    ],
+  };
+}
+
 const ALL_TIME_CHART_EXTRA = {
   bids: { $exists: true, $ne: [] },
   status: { $ne: 'vetoed' },
@@ -661,23 +687,33 @@ async function fetchAllTimeGlobalChart({
   offset = 0,
   sortBy = 'most-tipped',
   playableOnly = true,
+  search = '',
 } = {}) {
   const startTime = Date.now();
   const chartSort = normalizeChartSort(sortBy);
   const chartLimit = effectiveChartLimit(limit);
   const startOffset = typeof offset === 'number' && offset > 0 ? offset : 0;
+  const textClause = chartTextSearchClause(search);
   const baseFilter = chartTunesFilter({
     playableOnly,
-    extra: ALL_TIME_CHART_EXTRA,
+    extra: {
+      ...ALL_TIME_CHART_EXTRA,
+      ...(textClause || {}),
+    },
   });
   const hiddenCountPromise = countHiddenCatalogTunes({
-    extra: ALL_TIME_CHART_EXTRA,
+    extra: {
+      ...ALL_TIME_CHART_EXTRA,
+      ...(textClause || {}),
+    },
     playableOnly,
   });
 
   // Keep newest tipped tracks in the all-time payload so a just-tipped upload
   // is searchable / show-more-reachable instead of falling off the top-250 cut.
-  const reserveRecent = chartSort === 'most-tipped' && startOffset === 0;
+  // A text search already queries the full tipped catalog, so don't pad it
+  // with unrelated recent tunes.
+  const reserveRecent = !textClause && chartSort === 'most-tipped' && startOffset === 0;
   const recentLimit = reserveRecent ? Math.min(RECENT_TIPPED_RESERVE, chartLimit) : 0;
   const primaryLimit = chartLimit - recentLimit;
 
@@ -706,13 +742,15 @@ async function fetchAllTimeGlobalChart({
     mediaList.push(...recent);
   }
 
-  const viewerRecent = await fetchViewerRecentTippedMedia({
-    userId,
-    existingIds: mediaList.map((m) => m._id),
-    playableOnly,
-  });
-  if (viewerRecent.length) {
-    mediaList.push(...viewerRecent);
+  if (!textClause) {
+    const viewerRecent = await fetchViewerRecentTippedMedia({
+      userId,
+      existingIds: mediaList.map((m) => m._id),
+      playableOnly,
+    });
+    if (viewerRecent.length) {
+      mediaList.push(...viewerRecent);
+    }
   }
   const tuneBytesByMedia = await sumConfirmedTuneBytesByMediaId(mediaList.map((media) => media._id));
   for (const media of mediaList) {
@@ -839,9 +877,11 @@ async function fetchPeriodGlobalChart({
   offset = 0,
   sortBy = 'most-tipped',
   playableOnly = true,
+  search = '',
 } = {}) {
   const startTime = Date.now();
   const chartSort = normalizeChartSort(sortBy);
+  const textClause = chartTextSearchClause(search);
   const scope = normalizeLocationScope(locationScope);
   const startDate = getPeriodStartDate(timePeriod);
   const placeId = typeof locationPlaceId === 'string' && locationPlaceId.trim()
@@ -858,6 +898,7 @@ async function fetchPeriodGlobalChart({
       offset,
       sortBy: chartSort,
       playableOnly,
+      search,
     });
   }
 
@@ -908,11 +949,29 @@ async function fetchPeriodGlobalChart({
     extra: {
       _id: { $in: matchingMediaIds },
       status: { $ne: 'vetoed' },
+      ...(textClause || {}),
     },
     playableOnly,
   });
 
   matchingMediaIds = await filterPlayableMediaIds(matchingMediaIds, playableOnly);
+
+  // Search the full tipped set for this period, not the top-N page. Otherwise
+  // a tune with tips that missed the chart cap cannot be found from the box.
+  if (textClause && matchingMediaIds.length > 0) {
+    const matched = await Media.find(chartTunesFilter({
+      playableOnly,
+      extra: {
+        _id: { $in: matchingMediaIds },
+        status: { $ne: 'vetoed' },
+        ...textClause,
+      },
+    }))
+      .select('_id')
+      .lean();
+    const matchedIds = new Set(matched.map((doc) => doc._id.toString()));
+    matchingMediaIds = matchingMediaIds.filter((id) => matchedIds.has(id.toString()));
+  }
 
   if (matchingMediaIds.length === 0) {
     return {
@@ -1019,7 +1078,12 @@ async function fetchPeriodGlobalChart({
     const recentIdSet = new Set(reservedRecentIds);
     const topByTips = candidateIds
       .filter((id) => !recentIdSet.has(id))
-      .sort((a, b) => (mediaBidValues[b] || 0) - (mediaBidValues[a] || 0))
+      .sort((a, b) => {
+        const byTips = (mediaBidValues[b] || 0) - (mediaBidValues[a] || 0);
+        if (byTips !== 0) return byTips;
+        // ObjectIds encode creation time, so equal tips keep the newer tune.
+        return String(b).localeCompare(String(a));
+      })
       .slice(startOffset, startOffset + Math.max(chartLimit - reservedRecentIds.length, 0));
     const rankedIds = [...topByTips, ...reservedRecentIds];
 
@@ -1160,6 +1224,7 @@ module.exports = {
   computeTopLocations,
   loadTopSupportersByMedia,
   chartTunesFilter,
+  chartTextSearchClause,
   andChartFilters,
   toObjectIds,
   hiddenCatalogCount,

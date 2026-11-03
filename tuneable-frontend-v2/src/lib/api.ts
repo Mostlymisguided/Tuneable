@@ -532,7 +532,7 @@ export const partyAPI = {
     return response.data;
   },
   
-  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string; playableOnly?: boolean }) => {
+  getMediaSortedByTime: async (partyId: string, timePeriod: string, options?: { locationPlaceId?: string; locationScope?: string; sortBy?: string; playableOnly?: boolean; q?: string }) => {
     const params: Record<string, string> = {};
     if (options?.locationPlaceId) {
       params.locationPlaceId = options.locationPlaceId;
@@ -545,6 +545,9 @@ export const partyAPI = {
     }
     if (typeof options?.playableOnly === 'boolean') {
       params.playableOnly = String(options.playableOnly);
+    }
+    if (options?.q && options.q.trim().length >= 2) {
+      params.q = options.q.trim();
     }
     const response = await api.get(`/parties/${partyId}/media/sorted/${timePeriod}`, { params });
     return response.data;
