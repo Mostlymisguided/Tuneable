@@ -55,7 +55,17 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   className,
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
   const blockedIds = useBlockedUsersStore((s) => s.ids);
+
+  const toggleRevealed = (id: string) => {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const rawSupporters = useMemo(() => {
     if (champions && champions.length > 0) {
@@ -143,52 +153,78 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
         {visible.map((s) => {
           const id = s.id;
           const rank = podiumRankById.get(id);
-          const content = (
-            <>
-              <img
-                src={s.anonymous ? DEFAULT_PROFILE_PIC : s.user.profilePic || DEFAULT_PROFILE_PIC}
-                alt={s.anonymous ? ANONYMOUS_LABEL : s.user.username}
-                className="h-4 w-4 md:h-6 md:w-6 rounded-full object-cover flex-shrink-0"
-                onError={(e) => {
-                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                }}
-              />
-              {rank && (
-                <span
-                  className={`inline-flex items-center justify-center h-4 w-4 md:h-5 md:w-5 rounded-full border ${podiumBadgeStyles(rank)} flex-shrink-0`}
-                  title={`#${rank} tip champion`}
-                >
-                  <Crown
-                    className={`h-2.5 w-2.5 ${
-                      rank === 1 ? 'text-amber-200' : rank === 2 ? 'text-slate-200' : 'text-orange-200'
-                    }`}
-                  />
-                </span>
-              )}
-              <span
-                className={`text-[10px] md:text-sm whitespace-nowrap ${s.anonymous ? 'text-gray-400 italic' : 'text-white'}`}
-              >
-                {s.anonymous ? ANONYMOUS_LABEL : s.user.username}
-              </span>
-              <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">{penceToPounds(s.total)}</span>
-            </>
+          const revealed = revealedIds.has(id);
+          const avatar = (
+            <img
+              src={s.anonymous ? DEFAULT_PROFILE_PIC : s.user.profilePic || DEFAULT_PROFILE_PIC}
+              alt=""
+              className="h-4 w-4 md:h-6 md:w-6 rounded-full object-cover flex-shrink-0"
+              onError={(e) => {
+                e.currentTarget.src = DEFAULT_PROFILE_PIC;
+              }}
+            />
           );
+          const crown = rank ? (
+            <span
+              className={`inline-flex items-center justify-center h-4 w-4 md:h-5 md:w-5 rounded-full border ${podiumBadgeStyles(rank)} flex-shrink-0`}
+              title={`#${rank} tip champion`}
+            >
+              <Crown
+                className={`h-2.5 w-2.5 ${
+                  rank === 1 ? 'text-amber-200' : rank === 2 ? 'text-slate-200' : 'text-orange-200'
+                }`}
+              />
+            </span>
+          ) : null;
           const chipClass =
             'flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 transition-colors flex-shrink-0';
           const title = `${penceToPounds(s.total)} (${s.count} tips)`;
-          return s.anonymous ? (
-            <span key={id} className={chipClass} title={title}>
-              {content}
-            </span>
-          ) : (
-            <Link
+          return (
+            <span
               key={id}
-              to={getUserProfileUrl(s.user)}
-              className={`${chipClass} hover:bg-purple-400`}
+              className={s.anonymous ? chipClass : `${chipClass} hover:bg-purple-400`}
               title={title}
             >
-              {content}
-            </Link>
+              {s.anonymous ? (
+                <>
+                  {avatar}
+                  {crown}
+                  <span className="text-[10px] md:text-sm whitespace-nowrap text-gray-400 italic">
+                    {ANONYMOUS_LABEL}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleRevealed(id);
+                    }}
+                    className="inline-flex items-center gap-1.5 md:gap-2 flex-shrink-0 rounded-full cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-purple-300"
+                    aria-pressed={revealed}
+                    aria-label={
+                      revealed ? 'Hide name' : rank ? `Show #${rank} champion` : 'Show supporter'
+                    }
+                  >
+                    {avatar}
+                    {crown}
+                  </button>
+                  {revealed && (
+                    <Link
+                      to={getUserProfileUrl(s.user)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[10px] md:text-sm whitespace-nowrap text-white hover:underline"
+                    >
+                      {s.user.username}
+                    </Link>
+                  )}
+                </>
+              )}
+              <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">
+                {penceToPounds(s.total)}
+              </span>
+            </span>
           );
         })}
 

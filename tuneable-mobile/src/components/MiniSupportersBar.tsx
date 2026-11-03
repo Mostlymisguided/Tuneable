@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -93,6 +93,16 @@ export function MiniSupportersBar({
   onStackPress,
 }: Props) {
   const blockedIds = useBlockedUsersStore((s) => s.ids);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
+
+  const toggleRevealed = (id: string) => {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const supporters = useMemo((): Supporter[] => {
     const blocked = new Set(blockedIds);
@@ -185,32 +195,60 @@ export function MiniSupportersBar({
       contentContainerStyle={styles.row}>
       {visible.map((s) => {
         const rank = podiumRankById.get(s.id);
+        const revealed = revealedIds.has(s.id);
+        const avatar = (
+          <Image
+            source={{ uri: s.profilePic || DEFAULT_PROFILE_PIC }}
+            style={styles.avatar}
+          />
+        );
+        const crown = rank ? (
+          <View
+            style={[
+              styles.crownBadge,
+              { borderColor: `${podiumColor(rank)}55` },
+            ]}>
+            <Ionicons name="trophy" size={9} color={podiumColor(rank)} />
+          </View>
+        ) : null;
         return (
-          <Pressable
-            key={s.id}
-            style={styles.chip}
-            disabled={s.anonymous}
-            onPress={() => router.push(`/user/${s.id}`)}>
-            <Image
-              source={{ uri: s.profilePic || DEFAULT_PROFILE_PIC }}
-              style={styles.avatar}
-            />
-            {rank ? (
-              <View
-                style={[
-                  styles.crownBadge,
-                  { borderColor: `${podiumColor(rank)}55` },
-                ]}>
-                <Ionicons name="trophy" size={9} color={podiumColor(rank)} />
-              </View>
-            ) : null}
-            <Text
-              style={[styles.username, s.anonymous && styles.anonymousName]}
-              numberOfLines={1}>
-              {s.username}
-            </Text>
+          <View key={s.id} style={styles.chip}>
+            {s.anonymous ? (
+              <>
+                {avatar}
+                {crown}
+                <Text style={[styles.username, styles.anonymousName]} numberOfLines={1}>
+                  {s.username}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  style={styles.identity}
+                  onPress={() => toggleRevealed(s.id)}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: revealed }}
+                  accessibilityLabel={
+                    revealed ? 'Hide name' : rank ? `Show number ${rank} champion` : 'Show supporter'
+                  }>
+                  {avatar}
+                  {crown}
+                </Pressable>
+                {revealed ? (
+                  <Pressable
+                    onPress={() => router.push(`/user/${s.id}`)}
+                    accessibilityRole="link"
+                    accessibilityLabel={s.username}>
+                    <Text style={styles.username} numberOfLines={1}>
+                      {s.username}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
+            )}
             <Text style={styles.amount}>{formatPoundsFromPence(s.total)}</Text>
-          </Pressable>
+          </View>
         );
       })}
     </ScrollView>
@@ -232,6 +270,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'rgba(0,0,0,0.25)',
     maxWidth: 160,
+  },
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   avatar: {
     width: 16,

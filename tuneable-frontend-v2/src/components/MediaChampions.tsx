@@ -132,7 +132,17 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   const [data, setData] = useState<MediaChampionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
   const isStrip = variant === 'strip';
+
+  const toggleRevealed = (id: string) => {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const homeScopePicks = useMemo(
     () => getChampionScopePicksFromLocation(user?.homeLocation || null),
@@ -260,7 +270,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
                   className={`relative rounded-full overflow-hidden bg-gray-800 border-2 ${styles.border} ${
                     ranking.rank === 1 ? 'w-8 h-8 z-10' : 'w-7 h-7'
                   }`}
-                  title={`#${ranking.rank} ${ranking.user.username}`}
+                  title={`#${ranking.rank}`}
                 >
                   <img
                     src={ranking.user.profilePic || DEFAULT_PROFILE_PIC}
@@ -428,37 +438,65 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
               const styles = medal ? MEDAL_STYLES[medal] : null;
               const path = profilePath(ranking);
               const tipLabel = `${ranking.bidCount} ${ranking.bidCount === 1 ? 'tip' : 'tips'}`;
+              const key = String(ranking.user._id || ranking.user.uuid || ranking.rank);
+              const revealed = revealedIds.has(key);
               const chipClassName = `flex items-center gap-1.5 md:gap-2 w-full px-1.5 py-1.5 md:px-2 md:py-2 rounded-lg bg-black/25 hover:bg-purple-500/40 border transition-colors ${
                 styles ? styles.border : 'border-white/5'
               }`;
-              const chipContent = (
-                <>
-                  <img
-                    src={ranking.user.profilePic || DEFAULT_PROFILE_PIC}
-                    alt=""
-                    className="h-6 w-6 md:h-7 md:w-7 rounded-full object-cover flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
+              const nameClass = 'flex-1 min-w-0 text-xs md:text-sm text-white truncate hover:underline';
+              return (
+                <div key={key} className={chipClassName} title={tipLabel}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleRevealed(key);
                     }}
-                  />
-                  {styles ? (
-                    <span
-                      className={`inline-flex items-center justify-center h-5 w-5 rounded-full border flex-shrink-0 ${styles.crownWrap}`}
-                      title={`#${ranking.rank} Champion`}
-                    >
-                      <Crown className={`h-2.5 w-2.5 ${styles.crown}`} />
+                    className="inline-flex items-center gap-1.5 md:gap-2 flex-shrink-0 rounded-full cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-purple-300"
+                    aria-pressed={revealed}
+                    aria-label={
+                      revealed
+                        ? 'Hide name'
+                        : styles
+                          ? `Show #${ranking.rank} champion`
+                          : `Show #${ranking.rank}`
+                    }
+                  >
+                    <img
+                      src={ranking.user.profilePic || DEFAULT_PROFILE_PIC}
+                      alt=""
+                      className="h-6 w-6 md:h-7 md:w-7 rounded-full object-cover flex-shrink-0"
+                      onError={(e) => {
+                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                      }}
+                    />
+                    {styles ? (
+                      <span
+                        className={`inline-flex items-center justify-center h-5 w-5 rounded-full border flex-shrink-0 ${styles.crownWrap}`}
+                        title={`#${ranking.rank} Champion`}
+                      >
+                        <Crown className={`h-2.5 w-2.5 ${styles.crown}`} />
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-black/30 border border-white/10 text-[10px] font-semibold text-gray-300 tabular-nums flex-shrink-0"
+                        title={`#${ranking.rank}`}
+                      >
+                        #{ranking.rank}
+                      </span>
+                    )}
+                  </button>
+                  {revealed && path ? (
+                    <Link to={path} className={nameClass} onClick={(e) => e.stopPropagation()}>
+                      {ranking.user.username}
+                    </Link>
+                  ) : revealed ? (
+                    <span className="flex-1 min-w-0 text-xs md:text-sm text-white truncate">
+                      {ranking.user.username}
                     </span>
                   ) : (
-                    <span
-                      className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-black/30 border border-white/10 text-[10px] font-semibold text-gray-300 tabular-nums flex-shrink-0"
-                      title={`#${ranking.rank}`}
-                    >
-                      #{ranking.rank}
-                    </span>
+                    <span className="flex-1" />
                   )}
-                  <span className="flex-1 min-w-0 text-xs md:text-sm text-white truncate">
-                    {ranking.user.username}
-                  </span>
                   <span
                     className={`text-xs md:text-sm font-medium flex-shrink-0 tabular-nums ${
                       styles ? styles.amount : 'text-green-300'
@@ -467,16 +505,6 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
                   >
                     {penceToPounds(ranking.totalAmount)}
                   </span>
-                </>
-              );
-              const key = ranking.user._id || ranking.user.uuid || ranking.rank;
-              return path ? (
-                <Link key={key} to={path} className={chipClassName} title={tipLabel}>
-                  {chipContent}
-                </Link>
-              ) : (
-                <div key={key} className={chipClassName} title={tipLabel}>
-                  {chipContent}
                 </div>
               );
             })}
