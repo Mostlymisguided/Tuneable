@@ -6,6 +6,8 @@ export type EditableMedia = {
   id?: string;
   mediaOwners?: Array<{
     userId?: string | { _id?: string; id?: string; uuid?: string } | null;
+    percentage?: number;
+    ownershipPercentage?: number;
   }>;
   artists?: unknown;
   artist?: unknown;
@@ -42,23 +44,39 @@ export function canUploadMedia(user: User | null | undefined): boolean {
 }
 
 function refId(value: unknown): string | null {
-  if (!value) return null;
-  if (typeof value === 'string') return value;
+  if (value == null || value === '') return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '[object Object]') return null;
+    return trimmed;
+  }
   if (typeof value === 'object') {
-    const record = value as { _id?: string; id?: string };
-    if (record._id) return String(record._id);
-    if (record.id) return String(record.id);
+    const record = value as { _id?: unknown; id?: unknown; uuid?: unknown };
+    if (record._id && record._id !== value) {
+      const nested = refId(record._id);
+      if (nested) return nested;
+    }
+    if (record.id && record.id !== value) {
+      const nested = refId(record.id);
+      if (nested) return nested;
+    }
+    if (typeof record.uuid === 'string' && record.uuid.trim()) return record.uuid.trim();
   }
   return null;
 }
 
 function userIds(user: User): Set<string> {
   return new Set(
-    [user._id, user.id, user.uuid].filter((value): value is string => Boolean(value)).map(String)
+    [user._id, user.id, user.uuid].map((value) => refId(value)).filter((value): value is string => Boolean(value))
   );
 }
 
-/** Owner of this media item (revenue / edit rights), not merely a credited name. */
+function hasOwnershipStake(owner: { percentage?: number; ownershipPercentage?: number } | null | undefined): boolean {
+  const percentage = Number(owner?.percentage ?? owner?.ownershipPercentage ?? 0);
+  return Number.isFinite(percentage) && percentage > 0;
+}
+
+/** Owner with a real stake. A 0% row is a library-import curator, not an editor. */
 export function isMediaOwner(
   user: User | null | undefined,
   media: EditableMedia
@@ -66,6 +84,7 @@ export function isMediaOwner(
   if (!user || !media?.mediaOwners?.length) return false;
   const ids = userIds(user);
   return media.mediaOwners.some((owner) => {
+    if (!hasOwnershipStake(owner)) return false;
     const ownerId = refId(owner?.userId);
     if (ownerId && ids.has(ownerId)) return true;
     const ownerUser = owner?.userId;
@@ -86,6 +105,9 @@ const VERIFIED_CREDIT_FIELDS = [
   'host',
   'guest',
   'narrator',
+  'director',
+  'cinematographer',
+  'editor',
   'author',
   'label',
 ] as const;

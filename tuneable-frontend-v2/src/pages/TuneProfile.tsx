@@ -309,7 +309,7 @@ const TuneProfile: React.FC = () => {
   const [savingRightsStatus, setSavingRightsStatus] = useState(false);
 
   // Edit mode - controlled by query params (similar to UserProfile settings mode)
-  const isEditMode = searchParams.get('edit') === 'true';
+  const isEditMode = searchParams.get('edit') === 'true' && canEditMedia(user, media);
   const editTab = (searchParams.get('tab') as 'info' | 'edit' | 'ownership') || 'info';
   const [tagInput, setTagInput] = useState(''); // Separate state for tag input
   const [elementsInput, setElementsInput] = useState(''); // Separate state for elements input
@@ -1137,7 +1137,7 @@ const TuneProfile: React.FC = () => {
 
   // Save media updates
   const handleSaveTune = async () => {
-    if (!mediaId) return;
+    if (!mediaId || !canEditMedia(user, media)) return;
     
     try {
       // Convert input strings to arrays before saving

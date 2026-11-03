@@ -1702,7 +1702,7 @@ router.get('/top-tunes', async (req, res) => {
 
 // @route   PUT /api/media/:id/licence
 // @desc    Save the artist's licence choice. Streaming is always included.
-// @access  Private (admin, owner, or verified creator on the media)
+// @access  Private (admin, owner with a stake, or verified creator credited on this media)
 router.put('/:id/licence', authMiddleware, async (req, res) => {
   try {
     const media = await findMediaByParam(req.params.id);

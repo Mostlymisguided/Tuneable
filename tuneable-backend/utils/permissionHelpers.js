@@ -14,13 +14,112 @@
  * are checked separately and should not use these helpers.
  */
 
+const CREDIT_FIELDS = [
+  'artists',
+  'artist',
+  'producer',
+  'featuring',
+  'songwriter',
+  'composer',
+  'host',
+  'guest',
+  'narrator',
+  'director',
+  'cinematographer',
+  'editor',
+  'author',
+  'label',
+];
+
+function roleList(user) {
+  const role = user?.role;
+  if (Array.isArray(role)) {
+    return role.map((entry) => String(entry).toLowerCase());
+  }
+  if (typeof role === 'string') {
+    return role.toLowerCase().split(/[\s,]+/).filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * A real user id. Rejects missing values and plain objects, whose default
+ * toString is "[object Object]" and would otherwise match every other object.
+ */
+function refId(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '[object Object]') return null;
+    return trimmed;
+  }
+  if (typeof value !== 'object') return null;
+
+  if (value._id && value._id !== value) {
+    const nested = refId(value._id);
+    if (nested) return nested;
+  }
+  if (typeof value.toHexString === 'function') {
+    const hex = value.toHexString();
+    if (typeof hex === 'string' && /^[a-f0-9]{24}$/i.test(hex)) return hex;
+  }
+  if (typeof value.id === 'string') {
+    const trimmed = value.id.trim();
+    if (trimmed && trimmed !== '[object Object]') return trimmed;
+  } else if (value.id && value.id !== value) {
+    const nested = refId(value.id);
+    if (nested) return nested;
+  }
+  if (typeof value.uuid === 'string' && value.uuid.trim()) return value.uuid.trim();
+  if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
+    const text = value.toString();
+    if (typeof text === 'string' && text && text !== '[object Object]') return text;
+  }
+  return null;
+}
+
+function userIdSet(user) {
+  const ids = new Set();
+  if (!user) return ids;
+  for (const value of [user._id, user.id, user.uuid]) {
+    const id = refId(value);
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+function ownerIdSet(userId) {
+  const ids = new Set();
+  const id = refId(userId);
+  if (id) ids.add(id);
+  if (userId && typeof userId === 'object' && typeof userId.uuid === 'string' && userId.uuid.trim()) {
+    ids.add(userId.uuid.trim());
+  }
+  return ids;
+}
+
+function idsOverlap(left, right) {
+  for (const id of left) {
+    if (right.has(id)) return true;
+  }
+  return false;
+}
+
+/**
+ * A 0% mediaOwners row is a library-import curator placeholder, not a stake.
+ */
+function hasOwnershipStake(owner) {
+  const percentage = Number(owner?.percentage ?? owner?.ownershipPercentage ?? 0);
+  return Number.isFinite(percentage) && percentage > 0;
+}
+
 /**
  * Check if user is a platform administrator
  * @param {Object} user - User object
  * @returns {boolean}
  */
 function isAdmin(user) {
-  return user?.role?.includes('admin') || false;
+  return roleList(user).includes('admin');
 }
 
 /**
@@ -29,7 +128,7 @@ function isAdmin(user) {
  * @returns {boolean}
  */
 function isCreator(user) {
-  return user?.role?.includes('creator') || false;
+  return roleList(user).includes('creator');
 }
 
 /**
@@ -57,20 +156,14 @@ function canUploadMedia(user) {
  * @returns {boolean}
  */
 function isMediaOwner(user, media) {
-  if (!user || !media || !media.mediaOwners) return false;
-  
-  const userId = user._id?.toString() || user.id?.toString();
-  if (!userId) return false;
-  
-  return media.mediaOwners.some(owner => {
-    if (!owner.userId) return false;
-    
-    // Handle both ObjectId and populated User object cases
-    const ownerUserId = owner.userId._id 
-      ? owner.userId._id.toString() 
-      : owner.userId.toString();
-    
-    return ownerUserId === userId;
+  if (!user || !media || !Array.isArray(media.mediaOwners)) return false;
+
+  const ids = userIdSet(user);
+  if (ids.size === 0) return false;
+
+  return media.mediaOwners.some((owner) => {
+    if (!owner || !hasOwnershipStake(owner)) return false;
+    return idsOverlap(ids, ownerIdSet(owner.userId));
   });
 }
 
@@ -80,36 +173,41 @@ function isMediaOwner(user, media) {
  * @param {Object} media - Media object (must have getVerifiedCreators method)
  * @returns {boolean}
  */
+function creditMatchesUser(entry, ids) {
+  if (!entry || typeof entry !== 'object' || entry.verified !== true) return false;
+  return idsOverlap(ids, ownerIdSet(entry.userId));
+}
+
 function isVerifiedCreatorOnMedia(user, media) {
-  if (!user || !media || typeof media.getVerifiedCreators !== 'function') return false;
-  
-  const userId = user._id?.toString() || user.id?.toString();
-  if (!userId) return false;
-  
-  const verifiedCreators = media.getVerifiedCreators();
-  return verifiedCreators.some(
-    creator => creator.userId?.toString() === userId
-  );
+  if (!user || !media) return false;
+
+  const ids = userIdSet(user);
+  if (ids.size === 0) return false;
+
+  if (typeof media.getVerifiedCreators === 'function') {
+    const verifiedCreators = media.getVerifiedCreators() || [];
+    const matched = verifiedCreators.some((creator) => idsOverlap(ids, ownerIdSet(creator?.userId)));
+    if (matched) return true;
+  }
+
+  return CREDIT_FIELDS.some((field) => {
+    const list = media[field];
+    if (!Array.isArray(list)) return false;
+    return list.some((entry) => creditMatchesUser(entry, ids));
+  });
 }
 
 /**
- * Check if user can edit a media item
- * @param {Object} user - User object
- * @param {Object} media - Media object
- * @returns {boolean}
+ * Who can edit a media item, including its licence.
+ * Platform admins, owners with a stake, and verified creators credited on
+ * this item. A platform creator role, the uploader, and a 0% curator row
+ * do not qualify.
  */
 function canEditMedia(user, media) {
   if (!user || !media) return false;
-  
-  // Admin can always edit
   if (isAdmin(user)) return true;
-  
-  // Media owners can edit
   if (isMediaOwner(user, media)) return true;
-  
-  // Verified creators on the media can edit
   if (isVerifiedCreatorOnMedia(user, media)) return true;
-  
   return false;
 }
 
