@@ -29,7 +29,7 @@ import { EditMediaButton } from '@/src/components/EditMediaButton';
 import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
-import { formatDuration, formatPoundsFromPence, formatBpmLabel, roundBpm } from '@/src/lib/format';
+import { formatDuration, formatPoundsFromPence, formatBpmLabel, formatTuneBytesDecimal, roundBpm } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { getListenElsewhereTarget } from '@/src/lib/listenElsewhere';
@@ -528,6 +528,14 @@ export default function TuneProfileScreen() {
                 <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
                 <Text style={styles.statChipText}>
                   {formatPoundsFromPence(tipTotal)}
+                </Text>
+              </View>
+              <View
+                style={styles.statChip}
+                accessibilityLabel={`${formatTuneBytesDecimal(media.tuneBytesEarned)} TuneBytes`}>
+                <Ionicons name="sparkles-outline" size={14} color={colors.accentLight} />
+                <Text style={styles.statChipText}>
+                  {formatTuneBytesDecimal(media.tuneBytesEarned)}
                 </Text>
               </View>
               <View style={styles.statChip}>

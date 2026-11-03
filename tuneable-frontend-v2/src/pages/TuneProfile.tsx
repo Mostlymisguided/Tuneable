@@ -47,6 +47,7 @@ import {
   Info,
   MapPin,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { mediaAPI, labelAPI, collectiveAPI, partyAPI, userAPI } from '../lib/api';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection } from '../lib/audioUpload';
@@ -114,6 +115,7 @@ import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHel
 import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
 import { type RightsStatus } from '../utils/rightsStatus';
 import { MediaLicenceCard, type SavedLicence } from '../components/LicencePicker';
+import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
 
 interface Media {
   _id: string;
@@ -158,6 +160,7 @@ interface Media {
   externalIds?: { [key: string]: string };
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
+  tuneBytesEarned?: number;
   licence?: SavedLicence | null;
   hasHostedAudio?: boolean;
   tipCount?: number;
@@ -2684,6 +2687,16 @@ const TuneProfile: React.FC = () => {
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm">
                   <Coins className="h-3.5 w-3.5 text-gray-400" />
                   <span className="font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
+                </span>
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm"
+                  title="TuneBytes"
+                  aria-label={`${formatMediaTuneBytes(media.tuneBytesEarned) ?? '0.0'} TuneBytes`}
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-purple-400" aria-hidden />
+                  <span className="font-semibold tabular-nums">
+                    {formatMediaTuneBytes(media.tuneBytesEarned) ?? '0.0'}
+                  </span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm">
                   <Globe className="h-3.5 w-3.5 text-gray-400" />

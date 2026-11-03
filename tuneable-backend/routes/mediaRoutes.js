@@ -41,6 +41,7 @@ const {
 } = require('../utils/elementNormalizer');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 const { roundBpm } = require('../utils/bpm');
+const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 const {
   shouldClearRightsOnAttach,
   pendingRightsFields,
@@ -1966,6 +1967,15 @@ router.get('/:mediaId/profile', async (req, res) => {
     } catch (rankedError) {
       console.error('Failed to load ranked tags for media profile:', rankedError);
     }
+
+    let tuneBytesEarned = 0;
+    try {
+      const tuneBytesByMedia = await sumConfirmedTuneBytesByMediaId([media._id]);
+      tuneBytesEarned = tuneBytesFor(tuneBytesByMedia, media._id);
+    } catch (tuneBytesError) {
+      console.error('Failed to load TuneBytes for media profile:', tuneBytesError);
+    }
+    transformedMedia.tuneBytesEarned = tuneBytesEarned;
 
     console.log('📤 Sending media profile response:', {
       message: 'Media profile fetched successfully',
