@@ -25,6 +25,8 @@ interface Media {
   uuid?: string;
   mediaOwners?: Array<{
     userId?: string | { _id?: string; id?: string; toString(): string } | any;
+    percentage?: number;
+    ownershipPercentage?: number;
   }>;
   verifiedCreators?: Array<string | { _id?: string; id?: string; toString(): string } | any>;
   getVerifiedCreators?: () => Array<{
