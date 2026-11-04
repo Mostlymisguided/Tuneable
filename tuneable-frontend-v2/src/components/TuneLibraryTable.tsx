@@ -5,6 +5,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import MiniSupportersBar from './MiniSupportersBar';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { formatLibraryTuneBytes } from '../utils/formatTuneBytes';
 
 export interface LibraryBid {
   userId?: {
@@ -257,7 +258,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                 </td>
                 <td className="px-2 md:px-4 py-3 whitespace-nowrap">
                   <div className="text-sm font-semibold text-yellow-400">
-                    {item.tuneBytesEarned.toFixed(1)}
+                    {formatLibraryTuneBytes(item.tuneBytesEarned)}
                   </div>
                 </td>
                 <td className="px-2 md:px-4 py-3 whitespace-nowrap">

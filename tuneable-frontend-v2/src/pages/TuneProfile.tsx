@@ -2691,11 +2691,11 @@ const TuneProfile: React.FC = () => {
                 <span
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm"
                   title="TuneBytes"
-                  aria-label={`${formatMediaTuneBytes(media.tuneBytesEarned) ?? '0.0'} TuneBytes`}
+                  aria-label={`${formatMediaTuneBytes(media.tuneBytesEarned) ?? '0'} TuneBytes`}
                 >
                   <Sparkles className="h-3.5 w-3.5 text-purple-400" aria-hidden />
                   <span className="font-semibold tabular-nums">
-                    {formatMediaTuneBytes(media.tuneBytesEarned) ?? '0.0'}
+                    {formatMediaTuneBytes(media.tuneBytesEarned) ?? '0'}
                   </span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm">

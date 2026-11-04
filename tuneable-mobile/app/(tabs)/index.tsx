@@ -449,6 +449,7 @@ export default function HomeScreen() {
           <UserLibrarySection
             items={library}
             user={user}
+            referenceTuneBytes
             loading={libraryLoading}
             onBalanceUpdate={updateBalance}
             title="Recently tipped"

@@ -135,6 +135,8 @@ type Props = {
   searchHint?: string;
   compactHeader?: boolean;
   loading?: boolean;
+  /** Show each tune's TuneBytes to one decimal. Own library only. */
+  referenceTuneBytes?: boolean;
 };
 
 export function UserLibrarySection({
@@ -158,6 +160,7 @@ export function UserLibrarySection({
   searchHint = 'Filters your tipped tunes.',
   compactHeader = false,
   loading = false,
+  referenceTuneBytes = false,
 }: Props) {
   const [period, setPeriod] = useState<TimePeriodKey>('all-time');
   const [chartSort, setChartSort] = useState<ChartSortKey>(
@@ -427,6 +430,7 @@ export function UserLibrarySection({
           <ChartTrackRow
             rank={chartRanks.get(mediaId(item)) ?? 0}
             item={item}
+            referenceTuneBytes={referenceTuneBytes}
             variant="rich"
             hideCatalogHint
             tipPence={item.partyMediaAggregate ?? 0}

@@ -15,6 +15,7 @@ import {
 import type { AmbassadorSummary, FoundingCreatorsStatus } from '../types';
 import AmbassadorDashboard from '../components/AmbassadorDashboard';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
 import LabelCreateModal from '../components/LabelCreateModal';
@@ -2695,7 +2696,7 @@ Join here: ${inviteLink}`.trim();
             <div className="ml-4">
               <p className="text-sm font-medium text-white">TuneBytes</p>
                 <p className="text-base md:text-2xl font-semibold text-white">
-                {(user as any)?.tuneBytes?.toFixed(0) || '0'}
+                {formatTuneBytes((user as any)?.tuneBytes)}
               </p>
             </div>
           </div>

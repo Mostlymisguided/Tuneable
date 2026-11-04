@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ledgerAPI } from '../lib/api';
 import { toast } from '../utils/toast';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { 
   Database, 
   Search, 
@@ -753,8 +754,8 @@ const LedgerAdmin: React.FC = () => {
                     <div>
                       <label className="text-xs text-gray-400">User TuneBytes</label>
                       <div className="text-sm text-white">
-                        <div>Pre: {selectedEntry.userTuneBytesPre.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-                        <div>Post: {selectedEntry.userTuneBytesPost !== null && selectedEntry.userTuneBytesPost !== undefined ? selectedEntry.userTuneBytesPost.toLocaleString(undefined, { maximumFractionDigits: 2 }) : 'N/A'}</div>
+                        <div>Pre: {formatTuneBytes(selectedEntry.userTuneBytesPre)}</div>
+                        <div>Post: {selectedEntry.userTuneBytesPost !== null && selectedEntry.userTuneBytesPost !== undefined ? formatTuneBytes(selectedEntry.userTuneBytesPost) : 'N/A'}</div>
                       </div>
                     </div>
                   )}

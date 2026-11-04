@@ -4,17 +4,23 @@ export function formatPoundsFromPence(pence: number | undefined | null): string 
   return `£${value.toFixed(2)}`;
 }
 
-/** Format TuneBytes as a whole number (0 decimal places). */
+/** TuneBytes rounded to the nearest whole number. */
 export function formatTuneBytes(value: number | undefined | null): string {
-  const n = Math.round(Number(value) || 0);
-  return n.toLocaleString(undefined, {
-    maximumFractionDigits: 0,
+  const n = Number(value);
+  const safe = Number.isFinite(n) ? n : 0;
+  return safe.toLocaleString(undefined, {
     minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 }
 
-/** TuneBytes earned on one tune, rounded to one decimal place. */
+/** Same whole-number rounding, kept for existing tune and chart call sites. */
 export function formatTuneBytesDecimal(value: number | undefined | null): string {
+  return formatTuneBytes(value);
+}
+
+/** Owner's own library: keeps the tenth behind the public whole number. */
+export function formatLibraryTuneBytes(value: number | undefined | null): string {
   const n = Number(value);
   const safe = Number.isFinite(n) ? n : 0;
   return safe.toLocaleString(undefined, {

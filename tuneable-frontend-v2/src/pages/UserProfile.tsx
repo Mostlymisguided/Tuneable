@@ -104,14 +104,6 @@ const CollapsibleBadgeWrap: React.FC<{
   );
 };
 
-/** Profile total, rounded to a whole number like the mobile profile stat. */
-function formatProfileTuneBytes(value: number | undefined | null): string {
-  const n = Math.round(Number(value) || 0);
-  return n.toLocaleString(undefined, {
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
-  });
-}
 import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
@@ -124,6 +116,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import { requireAuthToPlay } from '../utils/playAuth';
@@ -2186,13 +2179,13 @@ const UserProfile: React.FC = () => {
 
               <div
                 className="inline-flex items-center gap-2 mb-3 px-3 py-2 bg-black/20 border border-purple-500/30 rounded-lg"
-                aria-label={`${formatProfileTuneBytes(user.tuneBytes)} TuneBytes`}
+                aria-label={`${formatTuneBytes(user.tuneBytes)} TuneBytes`}
               >
                 <Sparkles className="h-4 w-4 text-purple-400" aria-hidden />
                 <div className="leading-tight">
                   <p className="text-[11px] uppercase tracking-wide text-purple-200/80">TuneBytes</p>
                   <p className="text-lg font-bold text-white tabular-nums">
-                    {formatProfileTuneBytes(user.tuneBytes)}
+                    {formatTuneBytes(user.tuneBytes)}
                   </p>
                 </div>
               </div>
@@ -2336,7 +2329,7 @@ const UserProfile: React.FC = () => {
                         key={ranking.tag}
                         to={getTagProfilePath(ranking.tag)}
                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r border text-xs sm:text-sm font-semibold shadow-md hover:brightness-110 transition-all ${championBadgeStyles(ranking.rank)}`}
-                        title={`#${ranking.rank} of ${ranking.totalUsers} · Top ${ranking.percentile}% · ${ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })} TuneBytes`}
+                        title={`#${ranking.rank} of ${ranking.totalUsers} · Top ${ranking.percentile}% · ${formatTuneBytes(ranking.tuneBytesEarned)} TuneBytes`}
                       >
                         <Award className="h-3.5 w-3.5 flex-shrink-0" />
                         <span>#{ranking.rank}</span>
@@ -2369,7 +2362,7 @@ const UserProfile: React.FC = () => {
                             <div className="flex items-center justify-end gap-1 text-sm font-bold text-purple-200">
                               <Sparkles className="h-3.5 w-3.5 text-purple-400" aria-hidden />
                               <span>
-                                {ranking.tuneBytesEarned.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                {formatTuneBytes(ranking.tuneBytesEarned)}
                               </span>
                             </div>
                             <div className="text-xs text-gray-400">

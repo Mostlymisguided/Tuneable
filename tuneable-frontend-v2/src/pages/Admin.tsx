@@ -50,6 +50,7 @@ import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, 
 import { toast } from '../utils/toast';
 import { summariseLicence } from '../components/LicencePicker';
 import { penceToPounds } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import TagList from '../components/TagList';
@@ -1942,7 +1943,7 @@ const Admin: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-300">
-                            {(user.tuneBytes ?? 0).toLocaleString()}
+                            {formatTuneBytes(user.tuneBytes)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

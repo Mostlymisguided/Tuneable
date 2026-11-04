@@ -164,6 +164,7 @@ export default function ProfileScreen() {
           <UserLibrarySection
             items={library}
             user={user}
+            referenceTuneBytes
             loading={libraryLoading}
             onBalanceUpdate={updateBalance}
             contentPaddingBottom={12}

@@ -3,6 +3,7 @@ import { X, DollarSign, Gift, Loader2 } from 'lucide-react';
 import { userAPI } from '../lib/api';
 import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 
 interface UserTopUpModalProps {
   isOpen: boolean;
@@ -243,7 +244,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
             <div>
               <span className="text-gray-400">TuneBytes: </span>
               <span className="text-white font-semibold">
-                {currentTunebytes !== undefined ? currentTunebytes.toLocaleString() : 'N/A'}
+                {currentTunebytes !== undefined ? formatTuneBytes(currentTunebytes) : 'N/A'}
               </span>
             </div>
             <div>
@@ -438,7 +439,7 @@ const UserTopUpModal: React.FC<UserTopUpModalProps> = ({
                 />
                 {tunebytesAmount && !isNaN(parseFloat(tunebytesAmount)) && parseFloat(tunebytesAmount) > 0 && (
                   <p className="mt-1 text-xs text-gray-400">
-                    New TuneBytes: {((currentTunebytes || 0) + parseInt(tunebytesAmount)).toLocaleString()}
+                    New TuneBytes: {formatTuneBytes((currentTunebytes || 0) + parseInt(tunebytesAmount, 10))}
                   </p>
                 )}
               </div>

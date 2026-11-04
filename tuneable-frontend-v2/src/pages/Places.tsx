@@ -10,6 +10,7 @@ import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import TagList from '../components/TagList';
 import { TuneBytesMark } from '../components/TuneBytesMark';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import {
   getCountryPickFromLocation,
   getPlaceProfilePath,
@@ -48,12 +49,6 @@ type CollectiveChartItem = {
     tuneBytesAggregate?: number;
   };
 };
-
-function formatTuneBytes(value: number | null | undefined): string {
-  const n = Number(value);
-  const safe = Number.isFinite(n) ? n : 0;
-  return safe.toLocaleString(undefined, { maximumFractionDigits: 1 });
-}
 
 const COLLECTIVES_CHART_LIMIT = 20;
 

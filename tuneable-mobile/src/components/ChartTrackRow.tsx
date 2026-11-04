@@ -13,6 +13,7 @@ import { bookCoverSource, isBlankCoverSize } from '@/src/lib/bookCover';
 import {
   formatDuration,
   formatPoundsFromPence,
+  formatLibraryTuneBytes,
   formatTuneBytesDecimal,
   roundBpm,
 } from '@/src/lib/format';
@@ -25,8 +26,8 @@ import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 
 const COLLAPSED_TAG_COUNT = 2;
 
-function TuneBytesAmount({ value }: { value: number }) {
-  const label = formatTuneBytesDecimal(value);
+function TuneBytesAmount({ value, reference }: { value: number; reference?: boolean }) {
+  const label = reference ? formatLibraryTuneBytes(value) : formatTuneBytesDecimal(value);
   return (
     <View
       style={styles.tuneBytesRow}
@@ -64,6 +65,8 @@ type Props = {
   onOpen: () => void;
   onPlay: () => void;
   onTip: () => void;
+  /** Own library: show TuneBytes to one decimal. */
+  referenceTuneBytes?: boolean;
 };
 
 export function ChartTrackRow({
@@ -75,6 +78,7 @@ export function ChartTrackRow({
   onOpen,
   onPlay,
   onTip,
+  referenceTuneBytes = false,
 }: Props) {
   const [footerExpanded, setFooterExpanded] = useState(false);
   const playable = isUploadPlayable(item);
@@ -171,7 +175,7 @@ export function ChartTrackRow({
         </Pressable>
         <View style={styles.right}>
           {typeof item.tuneBytesEarned === 'number' ? (
-            <TuneBytesAmount value={item.tuneBytesEarned} />
+            <TuneBytesAmount value={item.tuneBytesEarned} reference={referenceTuneBytes} />
           ) : null}
           <Text style={styles.tips}>{formatPoundsFromPence(displayTip)}</Text>
           <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn} accessibilityLabel="Send a tip">
@@ -276,7 +280,7 @@ export function ChartTrackRow({
               ) : null}
             </Pressable>
             {typeof item.tuneBytesEarned === 'number' ? (
-              <TuneBytesAmount value={item.tuneBytesEarned} />
+              <TuneBytesAmount value={item.tuneBytesEarned} reference={referenceTuneBytes} />
             ) : null}
             <Pressable
               onPress={onTip}

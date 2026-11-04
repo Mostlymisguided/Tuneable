@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin, TrendingUp } from 'lucide-react';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { getUserProfileUrl } from '../utils/profileNavigation';
 
 interface Bid {
@@ -66,6 +67,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
     <div className="space-y-2 md:space-y-3">
       {topSupporters.map((supporter: any, index: number) => {
         const userId = supporter.user.username || supporter.user._id || supporter.user.uuid;
+        const supporterTuneBytes = userStatsMap?.[supporter.user.uuid || supporter.user._id]?.tuneBytes;
         const rowClassName = "flex flex-row md:items-center md:justify-between p-1.5 md:p-4 bg-purple-900/20 rounded-lg hover:bg-purple-500/40 transition-all cursor-pointer";
         const rowContent = (
           <>
@@ -125,7 +127,7 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
             </div>
             {userStatsMap && (supporter.user.uuid || supporter.user._id) && (
               <div className="text-xs text-purple-300 mt-1 hidden md:block">
-                TuneBytes: {userStatsMap[supporter.user.uuid || supporter.user._id]?.tuneBytes ?? '—'}
+                TuneBytes: {typeof supporterTuneBytes === 'number' ? formatTuneBytes(supporterTuneBytes) : '—'}
               </div>
             )}
           </div>

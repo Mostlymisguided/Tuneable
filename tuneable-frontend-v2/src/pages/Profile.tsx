@@ -3,6 +3,7 @@ import { authAPI } from '../lib/api';
 import { toast } from '../utils/toast';
 import { prepareProfileImage } from '../utils/profileImage';
 import { penceToPounds } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
@@ -287,7 +288,7 @@ const Profile: React.FC = () => {
               <Gift className="w-6 h-6" />
               <div>
                 <p className="text-purple-100 text-sm">TuneBytes Earned</p>
-                <p className="text-2xl font-bold">{(profile as any).tuneBytes?.toFixed(2) || '0.00'}</p>
+                <p className="text-2xl font-bold">{formatTuneBytes((profile as any).tuneBytes)}</p>
                 <p className="text-purple-100 text-xs mt-1">
                   Earned by discovering popular music
                 </p>
