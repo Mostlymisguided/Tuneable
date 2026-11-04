@@ -1915,6 +1915,18 @@ const PodcastEpisodeProfile: React.FC = () => {
     return languageMap[lang.toLowerCase()] || lang.toUpperCase();
   };
 
+  const labelEntries = (Array.isArray(media.label) ? media.label : []).flatMap((labelItem) => {
+    const record = labelItem?.labelId && typeof labelItem.labelId === 'object'
+      ? labelItem.labelId
+      : labelItem;
+    const name = typeof record === 'string' ? record : record?.name;
+    const trimmed = String(name || '').trim();
+    if (!trimmed) return [];
+    const slug = typeof record === 'object' ? record.slug : undefined;
+    const catalog = typeof labelItem?.catalogNumber === 'string' ? labelItem.catalogNumber.trim() : '';
+    return [{ name: trimmed, slug: slug || null, catalog: catalog || null }];
+  });
+
   const mediaFields = [
     { label: 'Title', value: media.title, icon: Music },
     { label: 'Podcast Series', value: typeof media.podcastSeries === 'object' ? media.podcastSeries?.title : null, icon: Mic },
@@ -1922,6 +1934,7 @@ const PodcastEpisodeProfile: React.FC = () => {
     { label: 'Season Number', value: media.seasonNumber ?? null, icon: Calendar },
     { label: 'Host', value: Array.isArray(media.host) ? media.host.map((h: any) => h.name).join(', ') : null, icon: Mic },
     { label: 'Guest', value: Array.isArray(media.guest) ? media.guest.map((g: any) => g.name).join(', ') : null, icon: User },
+    { label: 'Label', value: labelEntries.length > 0 ? labelEntries : null, icon: Building },
     { label: 'Duration', value: media.duration ? formatDuration(media.duration) : null, icon: Clock },
     { label: 'File Size', value: formatFileSize(media.fileSize), icon: Disc },
     { label: 'Language', value: formatLanguage(media.language), icon: Globe },
@@ -2551,13 +2564,33 @@ const PodcastEpisodeProfile: React.FC = () => {
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 ${media.description ? 'pt-6 border-t border-gray-700' : ''}`}>
                   {detailFields.map((field, index) => {
                     const IconComponent = field.icon;
+                    const isLabelField = field.label === 'Label';
                     return (
                       <div key={index} className="flex items-start space-x-3">
                         <IconComponent className="w-5 h-5 text-purple-400 mt-1 flex-shrink-0" />
                         <div>
                           <div className="text-sm text-gray-300">{field.label}</div>
                           <div className="text-white font-medium">
-                            {getFieldValue(field.value, (field as any).fieldName)}
+                            {isLabelField ? (
+                              labelEntries.map((entry, entryIndex) => (
+                                <React.Fragment key={`${entry.name}-${entryIndex}`}>
+                                  {entryIndex > 0 ? ', ' : null}
+                                  {entry.slug ? (
+                                    <Link
+                                      to={`/label/${entry.slug}`}
+                                      className="hover:text-purple-300 transition-colors"
+                                    >
+                                      {entry.name}
+                                    </Link>
+                                  ) : (
+                                    entry.name
+                                  )}
+                                  {entry.catalog ? ` (${entry.catalog})` : ''}
+                                </React.Fragment>
+                              ))
+                            ) : (
+                              getFieldValue(field.value, (field as any).fieldName)
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2745,74 +2778,6 @@ const PodcastEpisodeProfile: React.FC = () => {
             </div>
           ) : null;
         })()}
-
-        {/* Label Section - Above external links, below metrics */}
-        {media.label && Array.isArray(media.label) && media.label.length > 0 && (
-          <div className="mb-8 px-2 md:px-0">
-            <h2 className="text-xl md:text-2xl font-bold text-white mb-3 md:mb-4 flex items-center">
-              <Building className="h-5 w-5 md:h-6 md:w-6 mr-2 text-purple-400" />
-              Label
-            </h2>
-            <div className="card bg-black/20 rounded-lg p-4 md:p-6">
-              <div className="space-y-3">
-                {media.label.map((labelItem: any, index: number) => {
-                  const label = labelItem.labelId || labelItem;
-                  if (!label || (typeof label === 'object' && !label.name)) return null;
-                  
-                  const labelName = typeof label === 'string' ? label : label.name;
-                  const labelSlug = typeof label === 'object' ? label.slug : null;
-                  const labelProfilePicture = typeof label === 'object' ? label.profilePicture : null;
-                  const isVerified = typeof label === 'object' ? label.verificationStatus === 'verified' : false;
-                  const catalogNumber = labelItem.catalogNumber;
-                  const releaseDate = labelItem.releaseDate;
-                  
-                  return (
-                    <div key={index} className="flex items-center space-x-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all">
-                      <img
-                        src={labelProfilePicture || DEFAULT_PROFILE_PIC}
-                        alt={labelName}
-                        className="h-12 w-12 rounded-full object-cover flex-shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        {labelSlug ? (
-                          <a
-                            href={`/label/${labelSlug}`}
-                            className="text-lg font-semibold text-white hover:text-purple-400 transition-colors block truncate"
-                          >
-                            {labelName}
-                          </a>
-                        ) : (
-                          <div className="text-lg font-semibold text-white truncate">{labelName}</div>
-                        )}
-                        <div className="flex items-center space-x-3 mt-1">
-                          {catalogNumber && (
-                            <span className="text-sm text-gray-400">Catalog: {catalogNumber}</span>
-                          )}
-                          {releaseDate && (
-                            <span className="text-sm text-gray-400">
-                              Released: {new Date(releaseDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isVerified && (
-                        <div className="flex-shrink-0">
-                          <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-medium flex items-center space-x-1">
-                            <CheckCircle className="h-3 w-3" />
-                            <span>Verified</span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Links Section */}
         {externalLinks.length > 0 && (
