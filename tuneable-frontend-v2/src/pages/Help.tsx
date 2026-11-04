@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Music, Users, CreditCard, PartyPopper, Settings, MessageCircle, Mail, Flag, Library, Wallet, MessagesSquare } from 'lucide-react';
+import { HelpCircle, Music, Users, CreditCard, Settings, MessageCircle, Mail, Flag, Library, Wallet } from 'lucide-react';
 import {
   SUPPORT_EMAIL,
   HOW_MONEY_WORKS_PATH,
@@ -76,64 +76,6 @@ const Help: React.FC = () => {
             <p className="text-gray-300">
               You earn TuneByte Tokens when other users tip on tunes you've tipped on. The more your tunes get tipped on, 
               the more you earn. TuneBytes can't be spent yet but they will be tradeable for all sorts of artist swag in the future.
-            </p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'conversations',
-      icon: <MessagesSquare className="h-6 w-6" />,
-      title: 'Conversations',
-      content: (
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">What are Tuneable Conversations?</h3>
-            <p className="text-gray-300">
-              Propose a talk between two or more people (or podcasts), set a funding goal, and let the community
-              pledge from their wallet. When the goal is met (and linked participants accept), the conversation
-              can be scheduled and livestreamed.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Pledges</h3>
-            <p className="text-gray-300">
-              Pledges are held until the conversation is cancelled (full refund) or completed (released to
-              accepted creators&apos; escrow). While a conversation is still open, you can withdraw your own pledges.
-              Browse and propose from the{' '}
-              <Link to="/conversations" className="text-purple-300 underline">Talks</Link> page.
-            </p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'parties',
-      icon: <PartyPopper className="h-6 w-6" />,
-      title: 'Parties',
-      content: (
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Joining a Party</h3>
-            <p className="text-gray-300">
-              Browse available parties from the Parties page. Click on any party to view the queue and 
-              start tipping on tunes. You can tip tunes already in the queue or search for new tracks 
-              to add.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Adding Tunes</h3>
-            <p className="text-gray-300">
-              Use the search feature in any party to find tunes from our library. When adding 
-              a new track, you'll be prompted to add tags to help others discover it. Set your tip amount 
-              and add the tune to the queue.
-            </p>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Creating Parties</h3>
-            <p className="text-gray-300">
-              Party creation is currently limited to platform administrators. If you're interested in 
-              hosting events, contact us through the admin panel or support channels.
             </p>
           </div>
         </div>
