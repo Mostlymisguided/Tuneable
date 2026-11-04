@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Play, X, Clock, Heart } from 'lucide-react';
+import { Play, Heart } from 'lucide-react';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
@@ -12,7 +12,6 @@ import { DEFAULT_POST_AUTH_PATH } from '../utils/authHelpers';
 import { getCountryLabelFromLocation, getCountryPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
-import { roundBpm } from '../utils/bpm';
 import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
 import { TuneBytesMark } from './TuneBytesMark';
 
@@ -32,9 +31,10 @@ function QueueCover({ media }: { media: { coverArt?: string | null; title?: stri
   );
 }
 
-const META_LINK_CLASS =
-  'truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
-const META_LOCATION_CLASS = 'truncate max-w-[9rem] md:max-w-[12rem]';
+const QUIET_LINK_CLASS =
+  'shrink-0 text-xs tabular-nums text-gray-400 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
+const PLACE_CLASS =
+  'shrink-0 truncate max-w-[9rem] text-xs text-gray-400 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
 export function normalizeQueueMediaData(rawMediaData: any) {
@@ -61,10 +61,6 @@ function formatDuration(duration: number | string | undefined) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function getBpm(mediaData: { bpm?: number | null }): number | null {
-  return roundBpm(mediaData?.bpm);
-}
-
 function getReleaseYear(mediaData: {
   releaseYear?: number | null;
   releaseDate?: string | Date | null;
@@ -85,8 +81,10 @@ export interface QueueMediaCardProps {
   item: any;
   index: number;
   mediaData: ReturnType<typeof normalizeQueueMediaData>;
+  /** Accepted from existing callers. The dismiss control is no longer drawn on the card. */
   showActions: boolean;
   isBidding: boolean;
+  /** Accepted from existing callers. The dismiss control is no longer drawn on the card. */
   onActionClick: (item: any) => void;
   onPlay: (item: any, index: number) => void;
   onTip: (item: any) => void;
@@ -100,9 +98,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   item,
   index,
   mediaData,
-  showActions,
   isBidding,
-  onActionClick,
   onPlay,
   onTip,
   mediaHref,
@@ -110,7 +106,6 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
 }) => {
   const routeLocation = useLocation();
   const tags = mediaData.tags ?? [];
-  const bpm = getBpm(mediaData);
   const releaseYear = getReleaseYear(mediaData);
   const country = getCountryLabelFromLocation(mediaData.primaryLocation);
   const countryPath = getCountryPlaceProfilePath(mediaData.primaryLocation);
@@ -120,80 +115,37 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   const href =
     mediaHref ||
     (mediaData.slug || mediaData.uuid || mediaData._id ? getMediaProfileUrl(mediaData) : undefined);
+  const mediaId = mediaData.uuid || mediaData._id || mediaData.id;
+  const rank = rankProp ?? index + 1;
+  const tuneBytesLabel = formatMediaTuneBytes(mediaData.tuneBytesEarned);
+  const bids = mediaData.bids || [];
 
-  const metaParts: React.ReactNode[] = [];
-  metaParts.push(
-    <span key="duration" className="flex items-center gap-1">
-      <Clock className="h-3 w-3 text-gray-500" />
-      <span>{formatDuration(mediaData.duration)}</span>
-    </span>
-  );
-  if (bpm != null) {
-    metaParts.push(
-      <Link
-        key="bpm"
-        to={getTagProfilePath(String(bpm))}
-        title={`${bpm} BPM`}
-        onClick={(e) => e.stopPropagation()}
-        className={`${META_LINK_CLASS} tabular-nums`}
-      >
-        <span className="md:hidden">{bpm}</span>
-        <span className="hidden md:inline">{bpm} BPM</span>
+  const place = country ? (
+    countryPath ? (
+      <Link to={countryPath} title={country} onClick={(e) => e.stopPropagation()} className={PLACE_CLASS}>
+        {country}
       </Link>
-    );
-  }
-  if (releaseYear != null) {
-    metaParts.push(
-      <Link
-        key="year"
-        to={getTagProfilePath(String(releaseYear))}
-        title={`Released ${releaseYear}`}
-        onClick={(e) => e.stopPropagation()}
-        className={`${META_LINK_CLASS} tabular-nums`}
-      >
-        {releaseYear}
-      </Link>
-    );
-  }
-  if (country) {
-    metaParts.push(
-      countryPath ? (
-        <Link
-          key="country"
-          to={countryPath}
-          title={country}
-          onClick={(e) => e.stopPropagation()}
-          className={META_LINK_CLASS}
-        >
-          {country}
-        </Link>
-      ) : (
-        <span key="country" title={country} className={META_LOCATION_CLASS}>
-          {country}
-        </span>
-      )
-    );
-  } else if (isOnGlobalEarth) {
-    metaParts.push(
-      <span key="earth" title="Origin unknown" className={META_LOCATION_CLASS}>
-        Earth
+    ) : (
+      <span title={country} className={PLACE_CLASS}>
+        {country}
       </span>
-    );
-  } else {
-    metaParts.push(
-      <Link
-        key="earth"
-        to={DEFAULT_POST_AUTH_PATH}
-        title="Origin unknown — view Global Party"
-        onClick={(e) => e.stopPropagation()}
-        className={META_LINK_CLASS}
-      >
-        Earth
-      </Link>
-    );
-  }
+    )
+  ) : isOnGlobalEarth ? (
+    <span title="Origin unknown" className={PLACE_CLASS}>
+      Earth
+    </span>
+  ) : (
+    <Link
+      to={DEFAULT_POST_AUTH_PATH}
+      title="Origin unknown — view Global Party"
+      onClick={(e) => e.stopPropagation()}
+      className={PLACE_CLASS}
+    >
+      Earth
+    </Link>
+  );
 
-  const tipButton = (
+  const tipButton = (size: 'sm' | 'md') => (
     <button
       type="button"
       onClick={(e) => {
@@ -203,34 +155,29 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
       disabled={isBidding}
       title="Send a tip"
       aria-label="Send a tip"
-      className="group flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className={`group flex items-center justify-center rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+        size === 'sm' ? 'w-10 h-10' : 'w-11 h-11'
+      }`}
     >
-      <Heart className="h-5 w-5 md:h-6 md:w-6 transition-transform group-hover:scale-110" />
+      <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
     </button>
   );
 
-  const rank = rankProp ?? index + 1;
-  const tuneBytesLabel = formatMediaTuneBytes(mediaData.tuneBytesEarned);
+  const scoreStack = (
+    <>
+      {tuneBytesLabel ? (
+        <TuneBytesMark label={tuneBytesLabel} className="text-[15px] md:text-lg" />
+      ) : null}
+      <MiniSupportersBar bids={bids} maxVisible={5} limit={5} scrollable={false} className="" />
+    </>
+  );
 
   return (
-    <div className="rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl flex flex-col md:flex-row md:items-center hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow relative p-1.5 md:p-4">
-      {showActions && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onActionClick(item);
-          }}
-          className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white transition-colors"
-          title="Actions"
-        >
-          <X className="h-3 w-3 md:h-4 md:w-4" />
-        </button>
-      )}
-
-      <div className="flex flex-row items-start gap-2 md:contents">
-        <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0">
+    <div className="relative flex flex-col gap-1.5 rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl p-2 hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow md:flex-row md:items-stretch md:gap-4 md:px-4 md:pt-2.5 md:pb-3">
+      <div className="flex min-w-0 flex-1 items-start gap-2 md:gap-4">
+        <div className="relative h-12 w-12 flex-shrink-0 cursor-pointer overflow-hidden rounded group md:h-20 md:w-20">
           {href ? (
-            <Link to={href} className="block w-full h-full" tabIndex={-1}>
+            <Link to={href} className="block h-full w-full" tabIndex={-1}>
               <QueueCover media={mediaData} />
             </Link>
           ) : (
@@ -238,7 +185,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
           )}
           <button
             type="button"
-            className="absolute inset-0 flex items-center justify-center bg-black/35 rounded cursor-pointer"
+            className="absolute inset-0 flex cursor-pointer items-center justify-center rounded bg-black/35"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -247,86 +194,85 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
             aria-label={`Play chart position ${rank}`}
           >
             <span
-              className={`pointer-events-none text-white font-bold tabular-nums leading-none transition-all duration-150 group-hover:opacity-0 group-hover:scale-90 ${
+              className={`pointer-events-none font-bold tabular-nums leading-none text-white transition-all duration-150 group-hover:scale-90 group-hover:opacity-0 ${
                 rank >= 100 ? 'text-xs md:text-sm' : 'text-sm md:text-lg'
               }`}
             >
               {rank}
             </span>
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              <div className="w-7 h-7 md:w-12 md:h-12 rounded-full flex items-center justify-center border border-white bg-transparent md:border-0 md:bg-purple-600">
-                <Play className="h-3.5 w-3.5 md:h-6 md:w-6 text-white" />
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-white bg-transparent md:h-12 md:w-12 md:border-0 md:bg-purple-600">
+                <Play className="h-3.5 w-3.5 text-white md:h-6 md:w-6" />
               </div>
             </div>
           </button>
         </div>
 
-        <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex-1 min-w-0 flex items-center gap-1.5">
-              <h4 className="min-w-0 flex-1 font-medium text-white text-sm truncate">
-                {href ? (
-                  <Link
-                    to={href}
-                    className="cursor-pointer hover:text-purple-300 transition-colors"
-                  >
-                    {mediaData.title || 'Unknown Media'}
-                  </Link>
-                ) : (
-                  mediaData.title || 'Unknown Media'
-                )}
-              </h4>
-              <AiAssistedBadge aiUsage={mediaData.aiUsage} size="sm" />
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0 text-xs text-gray-400">
-              {metaParts.flatMap((part, i) =>
-                i === 0
-                  ? [part]
-                  : [
-                      <span key={`sep-${i}`} className="text-gray-600" aria-hidden>
-                        ·
-                      </span>,
-                      part,
-                    ]
+        <div className="min-w-0 flex-1 pr-12 md:pr-0 md:pt-0.5">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h4 className="min-w-0 shrink text-sm font-medium text-white">
+              {href ? (
+                <Link to={href} className="block truncate cursor-pointer transition-colors hover:text-purple-300">
+                  {mediaData.title || 'Unknown Media'}
+                </Link>
+              ) : (
+                <span className="block truncate">{mediaData.title || 'Unknown Media'}</span>
               )}
-            </div>
+            </h4>
+            <AiAssistedBadge aiUsage={mediaData.aiUsage} size="sm" />
+            <span className="shrink-0 text-xs tabular-nums text-gray-400">
+              {formatDuration(mediaData.duration)}
+            </span>
+            <span className="ml-auto md:hidden">{place}</span>
           </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="text-gray-400 text-xs truncate min-w-0 flex-1">
+          <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
+            <p className="min-w-0 shrink truncate text-xs text-gray-400">
               <ClickableArtistDisplay media={mediaData} />
             </p>
-            {tuneBytesLabel ? <TuneBytesMark label={tuneBytesLabel} className="text-xs" /> : null}
+            {releaseYear != null && (
+              <>
+                <span className="shrink-0 text-xs text-gray-600" aria-hidden>
+                  ·
+                </span>
+                <Link
+                  to={getTagProfilePath(String(releaseYear))}
+                  title={`Released ${releaseYear}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className={QUIET_LINK_CLASS}
+                >
+                  {releaseYear}
+                </Link>
+              </>
+            )}
           </div>
           {tags.length > 0 && (
-            <div className="hidden md:block mt-1">
-              <TagList
-                tags={tags}
-                mediaId={mediaData.uuid || mediaData._id || mediaData.id}
-                limit={5}
-              />
+            <div className="mt-1.5">
+              <div className="md:hidden">
+                <TagList tags={tags} mediaId={mediaId} limit={3} />
+              </div>
+              <div className="hidden md:block">
+                <TagList tags={tags} mediaId={mediaId} limit={5} />
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Tags — own line on mobile, aligned with supporters bar */}
-      {tags.length > 0 && (
-        <div className="md:hidden mt-1">
-          <TagList
-            tags={tags}
-            mediaId={mediaData.uuid || mediaData._id || mediaData.id}
-            limit={3}
-          />
-        </div>
+      {(tuneBytesLabel || bids.length > 0) && (
+        <div className="flex flex-wrap items-center gap-2 pr-12 md:hidden">{scoreStack}</div>
       )}
 
-      <div className="flex items-center md:ml-2 md:mr-4 flex-shrink-0">
-        <MiniSupportersBar bids={mediaData.bids || []} maxVisible={5} limit={5} scrollable={false} />
+      <div className="ml-auto hidden self-stretch grid-cols-[max-content_2.75rem] grid-rows-[auto_1fr] justify-items-end gap-x-3.5 md:grid">
+        <div className="col-span-2 justify-self-end leading-none">{place}</div>
+        <div className="col-start-1 row-start-2 flex flex-col items-end gap-1.5 self-center">
+          {scoreStack}
+        </div>
+        <div className="col-start-2 row-start-2 flex items-center justify-center">
+          {tipButton('md')}
+        </div>
       </div>
 
-      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
-        {tipButton}
-      </div>
+      <div className="absolute right-2 top-1/2 z-10 -translate-y-1/2 md:hidden">{tipButton('sm')}</div>
     </div>
   );
 };
