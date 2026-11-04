@@ -588,7 +588,39 @@ export const mediaAPI = {
   // Admin: Get media statistics
   getStats: async () => {
     const response = await api.get('/media/admin/stats');
-    return response.data;
+    return response.data as {
+      totalMedia: number;
+      playsToday: number;
+      playsThisWeek: number;
+      uniqueListenersThisWeek: number;
+    };
+  },
+
+  getMediaPlays: async (mediaId: string, params?: { page?: number; limit?: number; counted?: boolean }) => {
+    const response = await api.get(`/media/admin/${encodeURIComponent(mediaId)}/plays`, {
+      params: {
+        ...params,
+        counted: params?.counted === false ? 'false' : 'true',
+      },
+    });
+    return response.data as {
+      media: { _id: string; title: string; playCount: number; creatorDisplay: string };
+      summary: { qualifiedPlays: number; uniqueListeners: number };
+      sessions: Array<{
+        _id: string;
+        sourceType: string;
+        client: string;
+        status: string;
+        startedAt?: string;
+        lastPlayedAt?: string;
+        qualifiedAt?: string | null;
+        listenDurationSeconds: number;
+        completionPercent: number;
+        countedAsPlay: boolean;
+        user: { _id: string; username: string; uuid?: string | null; profilePic?: string } | null;
+      }>;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    };
   },
 
   // Admin: Get all media with filtering

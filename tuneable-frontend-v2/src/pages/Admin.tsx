@@ -38,6 +38,7 @@ import LedgerAdmin from '../components/LedgerAdmin';
 import LibraryXmlEnrich from '../components/LibraryXmlEnrich';
 import RekordboxPlaylistIngest from '../components/RekordboxPlaylistIngest';
 import MediaMergePanel from '../components/MediaMergePanel';
+import MediaPlaysModal from '../components/MediaPlaysModal';
 import MetadataEnrichmentAdmin from '../components/MetadataEnrichmentAdmin';
 import IssueWarningModal from '../components/IssueWarningModal';
 import CreateTestUserModal from '../components/CreateTestUserModal';
@@ -120,6 +121,8 @@ const Admin: React.FC = () => {
   const [sortField, setSortField] = useState<string>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [mediaCount, setMediaCount] = useState<number>(0);
+  const [playStats, setPlayStats] = useState({ playsToday: 0, playsThisWeek: 0, uniqueListenersThisWeek: 0 });
+  const [playsMedia, setPlaysMedia] = useState<{ _id: string; title?: string; playCount?: number } | null>(null);
   const [activeParties, setActiveParties] = useState<number>(0);
   const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<any>(null);
@@ -480,6 +483,11 @@ const Admin: React.FC = () => {
         partyAPI.getStats()
       ]);
       setMediaCount(mediaStats.totalMedia || 0);
+      setPlayStats({
+        playsToday: mediaStats.playsToday || 0,
+        playsThisWeek: mediaStats.playsThisWeek || 0,
+        uniqueListenersThisWeek: mediaStats.uniqueListenersThisWeek || 0,
+      });
       setActiveParties(partyStats.activeParties || 0);
     } catch (error) {
       console.error('Error loading overview stats:', error);
@@ -1416,6 +1424,30 @@ const Admin: React.FC = () => {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-gray-800 rounded-lg p-6">
+                <p className="text-sm font-medium text-gray-400">Plays today</p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {isLoadingOverview ? 'Loading...' : playStats.playsToday.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Qualified plays since 00:00 UTC</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-6">
+                <p className="text-sm font-medium text-gray-400">Plays this week</p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {isLoadingOverview ? 'Loading...' : playStats.playsThisWeek.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Last 7 days</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-6">
+                <p className="text-sm font-medium text-gray-400">Listeners this week</p>
+                <p className="text-2xl font-bold text-white mt-1">
+                  {isLoadingOverview ? 'Loading...' : playStats.uniqueListenersThisWeek.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">People with a counted play</p>
               </div>
             </div>
 
@@ -3198,9 +3230,18 @@ const Admin: React.FC = () => {
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-300">
-                                  {item.playCount || 0}
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPlaysMedia({
+                                    _id: item._id,
+                                    title: item.title,
+                                    playCount: item.playCount || 0,
+                                  })}
+                                  className="text-sm text-purple-300 hover:text-purple-100 underline decoration-dotted"
+                                  title="View listening sessions"
+                                >
+                                  {(item.playCount || 0).toLocaleString()}
+                                </button>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-300">
@@ -4685,6 +4726,15 @@ const Admin: React.FC = () => {
               // Refresh users list to show updated balances
               loadUsers();
             }}
+          />
+        )}
+
+        {playsMedia && (
+          <MediaPlaysModal
+            mediaId={playsMedia._id}
+            title={playsMedia.title}
+            playCount={playsMedia.playCount}
+            onClose={() => setPlaysMedia(null)}
           />
         )}
       </div>

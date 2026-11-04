@@ -3989,13 +3989,52 @@ router.get('/admin/stats', authMiddleware, async (req, res) => {
     }
 
     const totalMedia = await Media.countDocuments({ contentType: { $in: ['music'] } });
-    
+    let playStats = { playsToday: 0, playsThisWeek: 0, uniqueListenersThisWeek: 0 };
+    try {
+      const { getPlayOverview } = require('../services/listeningHistoryService');
+      playStats = await getPlayOverview();
+    } catch (playError) {
+      console.error('Error fetching play overview:', playError);
+    }
+
     res.json({
-      totalMedia
+      totalMedia,
+      ...playStats,
     });
   } catch (error) {
     console.error('Error fetching media stats:', error);
     res.status(500).json({ error: 'Failed to fetch media stats' });
+  }
+});
+
+// @route   GET /api/media/admin/:mediaId/plays
+// @desc    Listening sessions for one tune (admin only)
+// @access  Private (Admin)
+router.get('/admin/:mediaId/plays', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { listMediaPlaySessions } = require('../services/listeningHistoryService');
+    const countedParam = req.query.counted;
+    const countedOnly = countedParam === undefined
+      ? true
+      : !['false', '0', 'all'].includes(String(countedParam).toLowerCase());
+
+    const data = await listMediaPlaySessions(req.params.mediaId, {
+      page: req.query.page,
+      limit: req.query.limit,
+      countedOnly,
+    });
+    res.json(data);
+  } catch (error) {
+    const { ListeningHistoryError } = require('../services/listeningHistoryService');
+    if (error instanceof ListeningHistoryError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    console.error('Error fetching media plays:', error);
+    res.status(500).json({ error: 'Failed to fetch media plays' });
   }
 });
 

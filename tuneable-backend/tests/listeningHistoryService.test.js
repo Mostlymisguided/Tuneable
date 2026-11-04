@@ -92,7 +92,16 @@ describe('trackListeningSession', () => {
   });
 
   it('increments playCount once when the session first qualifies', async () => {
-    const saved = historyDoc({ listenDurationSeconds: 30 });
+    const existing = historyDoc({
+      listenDurationSeconds: 10,
+      lastPositionSeconds: 10,
+      lastPlayedAt: new Date(Date.now() - 25_000),
+    });
+    ListeningHistory.findOne.mockImplementation((query) => {
+      if (query && query.countedAsPlay === true) return Promise.resolve(null);
+      return Promise.resolve(existing);
+    });
+    const saved = historyDoc({ listenDurationSeconds: 35 });
     ListeningHistory.findOneAndUpdate
       .mockResolvedValueOnce(saved)
       .mockResolvedValueOnce({ ...saved, countedAsPlay: true });
@@ -101,7 +110,7 @@ describe('trackListeningSession', () => {
       userId,
       mediaId: mediaId.toString(),
       sessionId: 'session-1',
-      currentTime: 30,
+      currentTime: 35,
       duration: 200,
       client: 'mobile',
     });
@@ -111,6 +120,55 @@ describe('trackListeningSession', () => {
       { _id: mediaId },
       { $inc: { playCount: 1 } }
     );
+  });
+
+  it('does not count a forward seek or a completed flag without listen time', async () => {
+    const existing = historyDoc({
+      listenDurationSeconds: 2,
+      lastPositionSeconds: 2,
+      lastPlayedAt: new Date(),
+    });
+    ListeningHistory.findOne.mockResolvedValue(existing);
+    ListeningHistory.findOneAndUpdate.mockResolvedValue(existing);
+
+    const result = await trackListeningSession({
+      userId,
+      mediaId: mediaId.toString(),
+      sessionId: 'session-1',
+      currentTime: 180,
+      duration: 200,
+      completed: true,
+    });
+
+    expect(result.playCounted).toBe(false);
+    expect(Media.updateOne).not.toHaveBeenCalled();
+  });
+
+  it('does not increment when this listener already counted a play today', async () => {
+    const existing = historyDoc({
+      listenDurationSeconds: 15,
+      lastPositionSeconds: 15,
+      lastPlayedAt: new Date(Date.now() - 20_000),
+    });
+    ListeningHistory.findOne.mockImplementation((query) => {
+      if (query && query.countedAsPlay === true) {
+        return Promise.resolve({ _id: new mongoose.Types.ObjectId() });
+      }
+      return Promise.resolve(existing);
+    });
+    ListeningHistory.findOneAndUpdate.mockResolvedValue(existing);
+
+    const result = await trackListeningSession({
+      userId,
+      mediaId: mediaId.toString(),
+      sessionId: 'session-1',
+      currentTime: 35,
+      duration: 200,
+    });
+
+    expect(result.playCounted).toBe(false);
+    expect(Media.updateOne).not.toHaveBeenCalled();
+    expect(ListeningHistory.findOneAndUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('does not increment again on a later heartbeat of the same session', async () => {
@@ -135,7 +193,16 @@ describe('trackListeningSession', () => {
   });
 
   it('does not double-count when a concurrent request already claimed the play', async () => {
-    const saved = historyDoc({ listenDurationSeconds: 40 });
+    const existing = historyDoc({
+      listenDurationSeconds: 20,
+      lastPositionSeconds: 20,
+      lastPlayedAt: new Date(Date.now() - 25_000),
+    });
+    ListeningHistory.findOne.mockImplementation((query) => {
+      if (query && query.countedAsPlay === true) return Promise.resolve(null);
+      return Promise.resolve(existing);
+    });
+    const saved = historyDoc({ listenDurationSeconds: 45 });
     ListeningHistory.findOneAndUpdate
       .mockResolvedValueOnce(saved)
       .mockResolvedValueOnce(null);
@@ -144,7 +211,7 @@ describe('trackListeningSession', () => {
       userId,
       mediaId: mediaId.toString(),
       sessionId: 'session-1',
-      currentTime: 40,
+      currentTime: 45,
       duration: 200,
     });
 

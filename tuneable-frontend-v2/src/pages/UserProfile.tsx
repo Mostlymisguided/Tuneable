@@ -358,6 +358,7 @@ const UserProfile: React.FC = () => {
   const [isLoadingListeningHistory, setIsLoadingListeningHistory] = useState(false);
   const [listeningHistoryPagination, setListeningHistoryPagination] = useState<any>(null);
   const [listeningHistoryStatus, setListeningHistoryStatus] = useState<'' | 'in_progress' | 'partial' | 'completed'>('');
+  const [listeningHistoryPage, setListeningHistoryPage] = useState(1);
   
   // Wallet history state
   const [walletHistory, setWalletHistory] = useState<any[]>([]);
@@ -720,8 +721,8 @@ const UserProfile: React.FC = () => {
       setIsLoadingListeningHistory(true);
       const response = await userAPI.getListeningHistory({
         status: listeningHistoryStatus || undefined,
-        page: 1,
-        limit: 50,
+        page: listeningHistoryPage,
+        limit: 25,
       });
       setListeningHistory(response.history || []);
       setListeningHistoryPagination(response.pagination || null);
@@ -993,7 +994,7 @@ const UserProfile: React.FC = () => {
     if (viewTab === 'listening-history' && isOwnProfile && !isSettingsMode) {
       loadListeningHistory();
     }
-  }, [viewTab, isOwnProfile, isSettingsMode, listeningHistoryStatus]);
+  }, [viewTab, isOwnProfile, isSettingsMode, listeningHistoryStatus, listeningHistoryPage]);
 
   const loadWalletHistory = async () => {
     if (!isOwnProfile) return;
@@ -3045,7 +3046,10 @@ const UserProfile: React.FC = () => {
                   <label className="block text-xs text-gray-400 mb-1">Status</label>
                   <select
                     value={listeningHistoryStatus}
-                    onChange={(e) => setListeningHistoryStatus(e.target.value as any)}
+                    onChange={(e) => {
+                      setListeningHistoryStatus(e.target.value as any);
+                      setListeningHistoryPage(1);
+                    }}
                     className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
                   >
                     <option value="">All</option>
@@ -3102,6 +3106,11 @@ const UserProfile: React.FC = () => {
                             <span className="px-2 py-0.5 rounded text-xs bg-gray-700/60 text-gray-200">
                               {entry.sourceType.replace('_', ' ')}
                             </span>
+                            {entry.countedAsPlay && (
+                              <span className="px-2 py-0.5 rounded text-xs bg-green-600/30 text-green-200">
+                                Counted
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-gray-400 truncate">{entry.media.artist}</p>
                           <div className="mt-3 h-2 w-full rounded-full bg-gray-800 overflow-hidden">
@@ -3125,9 +3134,23 @@ const UserProfile: React.FC = () => {
 
             {listeningHistoryPagination && listeningHistoryPagination.totalPages > 1 && (
               <div className="flex justify-center items-center space-x-4 mt-6">
+                <button
+                  onClick={() => setListeningHistoryPage((current) => Math.max(1, current - 1))}
+                  disabled={listeningHistoryPage <= 1}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
                 <span className="text-gray-400 text-sm">
-                  Showing {listeningHistoryPagination.total} sessions
+                  Page {listeningHistoryPagination.page} of {listeningHistoryPagination.totalPages}
                 </span>
+                <button
+                  onClick={() => setListeningHistoryPage((current) => current + 1)}
+                  disabled={listeningHistoryPage >= listeningHistoryPagination.totalPages}
+                  className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>

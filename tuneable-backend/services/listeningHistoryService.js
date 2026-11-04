@@ -3,7 +3,9 @@ const { uuidv7 } = require('uuidv7');
 const Media = require('../models/Media');
 const ListeningHistory = require('../models/ListeningHistory');
 const {
+  PLAY_REPEAT_WINDOW_MS,
   computeCompletionPercent,
+  credibleListenDelta,
   isCompletedPlay,
   isQualifiedPlay,
   normalizeClient,
@@ -57,9 +59,43 @@ async function resolveMediaByIdentifier(identifier) {
   }
 }
 
+function elapsedSince(date, now) {
+  if (!date) return null;
+  const then = new Date(date).getTime();
+  if (!Number.isFinite(then)) return null;
+  return Math.max(0, (now.getTime() - then) / 1000);
+}
+
+function formatPlaySession(entry) {
+  const user = entry.userId && typeof entry.userId === 'object' ? entry.userId : null;
+  return {
+    _id: entry._id,
+    uuid: entry.uuid,
+    sessionId: entry.sessionId,
+    sourceType: entry.sourceType,
+    client: entry.client || 'web',
+    status: entry.status,
+    startedAt: entry.startedAt,
+    lastPlayedAt: entry.lastPlayedAt,
+    qualifiedAt: entry.qualifiedAt || null,
+    listenDurationSeconds: entry.listenDurationSeconds || 0,
+    completionPercent: entry.completionPercent || 0,
+    countedAsPlay: Boolean(entry.countedAsPlay),
+    mediaTitle: entry.mediaTitle || '',
+    user: user ? {
+      _id: user._id,
+      uuid: user.uuid || null,
+      username: user.username || 'Unknown',
+      profilePic: user.profilePic || '',
+    } : null,
+  };
+}
+
 /**
  * Upsert a listening session. The first time a session crosses the
- * qualified-play threshold, increment Media.playCount exactly once.
+ * qualified-play threshold, increment Media.playCount exactly once,
+ * and at most once per listener per tune per day.
+ * Listen time follows playback, so a seek ahead does not count.
  */
 async function trackListeningSession({
   userId,
@@ -96,19 +132,20 @@ async function trackListeningSession({
     durationSeconds: numericDuration,
     completed,
   });
-  const qualified = isQualifiedPlay({
-    positionSeconds: numericPosition,
-    durationSeconds: numericDuration,
-    completed: derivedCompleted,
-  });
   const normalizedSourceType = normalizeSourceType(sourceType);
   const normalizedClient = normalizeClient(client);
 
   const existing = await ListeningHistory.findOne({ userId, sessionId });
-  const listenDurationSeconds = Math.max(
-    numericPosition,
-    existing?.listenDurationSeconds || 0
-  );
+  const listenDelta = credibleListenDelta({
+    previousPosition: existing?.lastPositionSeconds || 0,
+    nextPosition: numericPosition,
+    elapsedSeconds: elapsedSince(existing?.lastPlayedAt, now),
+  });
+  const listenDurationSeconds = toNonNegativeNumber(existing?.listenDurationSeconds) + listenDelta;
+  const qualified = isQualifiedPlay({
+    positionSeconds: listenDurationSeconds,
+    durationSeconds: numericDuration,
+  });
 
   const setFields = {
     mediaId: media._id,
@@ -165,6 +202,19 @@ async function trackListeningSession({
 
   let playCounted = false;
   if (qualified && !history.countedAsPlay) {
+    const windowStart = new Date(now.getTime() - PLAY_REPEAT_WINDOW_MS);
+    const alreadyCountedToday = await ListeningHistory.findOne({
+      userId,
+      mediaId: media._id,
+      countedAsPlay: true,
+      qualifiedAt: { $gte: windowStart },
+      _id: { $ne: history._id },
+    });
+
+    if (alreadyCountedToday) {
+      return { history, playCounted: false };
+    }
+
     const claimed = await ListeningHistory.findOneAndUpdate(
       { _id: history._id, countedAsPlay: { $ne: true } },
       {
@@ -187,9 +237,78 @@ async function trackListeningSession({
   return { history, playCounted };
 }
 
+async function getPlayOverview(now = new Date()) {
+  const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const countedSince = (since) => ({ countedAsPlay: true, qualifiedAt: { $gte: since } });
+
+  const [playsToday, playsThisWeek, listenerIds] = await Promise.all([
+    ListeningHistory.countDocuments(countedSince(startOfToday)),
+    ListeningHistory.countDocuments(countedSince(weekAgo)),
+    ListeningHistory.distinct('userId', countedSince(weekAgo)),
+  ]);
+
+  return {
+    playsToday,
+    playsThisWeek,
+    uniqueListenersThisWeek: listenerIds.length,
+  };
+}
+
+async function listMediaPlaySessions(mediaIdentifier, {
+  page = 1,
+  limit = 25,
+  countedOnly = true,
+} = {}) {
+  const media = await resolveMediaByIdentifier(mediaIdentifier);
+  if (!media) {
+    throw new ListeningHistoryError(404, 'Media not found');
+  }
+
+  const pageNumber = Math.max(1, parseInt(page, 10) || 1);
+  const limitNumber = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+  const skip = (pageNumber - 1) * limitNumber;
+  const query = { mediaId: media._id };
+  if (countedOnly) query.countedAsPlay = true;
+
+  const [total, items, qualifiedPlays, listenerIds] = await Promise.all([
+    ListeningHistory.countDocuments(query),
+    ListeningHistory.find(query)
+      .sort({ lastPlayedAt: -1 })
+      .skip(skip)
+      .limit(limitNumber)
+      .populate('userId', 'username profilePic uuid')
+      .lean(),
+    ListeningHistory.countDocuments({ mediaId: media._id, countedAsPlay: true }),
+    ListeningHistory.distinct('userId', { mediaId: media._id, countedAsPlay: true }),
+  ]);
+
+  return {
+    media: {
+      _id: media._id,
+      title: media.title || '',
+      playCount: media.playCount || 0,
+      creatorDisplay: formatMediaArtist(media),
+    },
+    summary: {
+      qualifiedPlays,
+      uniqueListeners: listenerIds.length,
+    },
+    sessions: items.map(formatPlaySession),
+    pagination: {
+      page: pageNumber,
+      limit: limitNumber,
+      total,
+      totalPages: Math.ceil(total / limitNumber),
+    },
+  };
+}
+
 module.exports = {
   ListeningHistoryError,
   formatMediaArtist,
   resolveMediaByIdentifier,
   trackListeningSession,
+  getPlayOverview,
+  listMediaPlaySessions,
 };

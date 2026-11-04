@@ -552,6 +552,12 @@ export default function TuneProfileScreen() {
                   {tipCount} tip{tipCount === 1 ? '' : 's'}
                 </Text>
               </View>
+              <View style={styles.statChip}>
+                <Ionicons name="headset-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.statChipText}>
+                  {(media.playCount || 0).toLocaleString()} {(media.playCount || 0) === 1 ? 'play' : 'plays'}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.supportersWrap}>

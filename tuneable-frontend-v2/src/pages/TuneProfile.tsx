@@ -2706,6 +2706,13 @@ const TuneProfile: React.FC = () => {
                   <Heart className="h-3.5 w-3.5 text-gray-400" />
                   <span>{media.tipCount ?? media.bids?.length ?? 0} tips</span>
                 </span>
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm"
+                  title="Qualified plays. One per listener per day."
+                >
+                  <Headphones className="h-3.5 w-3.5 text-gray-400" />
+                  <span>{(media.playCount || 0).toLocaleString()} {(media.playCount || 0) === 1 ? 'play' : 'plays'}</span>
+                </span>
               </div>
 
               {media.bids && media.bids.length > 0 && (

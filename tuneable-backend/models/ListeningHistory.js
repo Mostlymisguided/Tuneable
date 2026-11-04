@@ -41,5 +41,8 @@ const listeningHistorySchema = new mongoose.Schema({
 listeningHistorySchema.index({ userId: 1, lastPlayedAt: -1 });
 listeningHistorySchema.index({ userId: 1, sessionId: 1 }, { unique: true });
 listeningHistorySchema.index({ userId: 1, mediaId: 1, lastPlayedAt: -1 });
+listeningHistorySchema.index({ userId: 1, mediaId: 1, countedAsPlay: 1, qualifiedAt: -1 });
+listeningHistorySchema.index({ mediaId: 1, countedAsPlay: 1, qualifiedAt: -1 });
+listeningHistorySchema.index({ countedAsPlay: 1, qualifiedAt: -1 });
 
 module.exports = mongoose.models.ListeningHistory || mongoose.model('ListeningHistory', listeningHistorySchema);
