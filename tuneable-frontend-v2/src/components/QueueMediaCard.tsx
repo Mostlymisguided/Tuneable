@@ -34,7 +34,7 @@ function QueueCover({ media }: { media: { coverArt?: string | null; title?: stri
 const QUIET_LINK_CLASS =
   'shrink-0 text-xs tabular-nums text-gray-400 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
 const PLACE_CLASS =
-  'shrink-0 truncate max-w-[9rem] text-xs text-gray-400 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
+  'inline-block max-w-[6.5rem] truncate text-xs text-gray-400 hover:text-white hover:underline underline-offset-2 transition-colors no-underline md:max-w-[9rem]';
 
 /** Normalize raw party-media payload for display (artists array, featuring, etc.) */
 export function normalizeQueueMediaData(rawMediaData: any) {
@@ -145,7 +145,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
     </Link>
   );
 
-  const tipButton = (size: 'sm' | 'md') => (
+  const tipButton = (
     <button
       type="button"
       onClick={(e) => {
@@ -155,9 +155,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
       disabled={isBidding}
       title="Send a tip"
       aria-label="Send a tip"
-      className={`group flex items-center justify-center rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-        size === 'sm' ? 'w-10 h-10' : 'w-11 h-11'
-      }`}
+      className="group flex h-10 w-10 items-center justify-center rounded-full border border-purple-500/40 bg-purple-900/40 text-purple-300 transition-colors hover:border-purple-500 hover:bg-purple-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 md:h-11 md:w-11"
     >
       <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
     </button>
@@ -166,14 +164,22 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   const scoreStack = (
     <>
       {tuneBytesLabel ? (
-        <TuneBytesMark label={tuneBytesLabel} className="text-[15px] md:text-lg" />
+        <TuneBytesMark label={tuneBytesLabel} className="text-xs md:text-lg" />
       ) : null}
-      <MiniSupportersBar bids={bids} maxVisible={5} limit={5} scrollable={false} className="" />
+      <MiniSupportersBar
+        bids={bids}
+        maxVisible={5}
+        limit={5}
+        scrollable={false}
+        alignEnd
+        collapseAmountBelowMd
+        className=""
+      />
     </>
   );
 
   return (
-    <div className="relative flex flex-col gap-1.5 rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl p-2 hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow md:flex-row md:items-stretch md:gap-4 md:px-4 md:pt-2.5 md:pb-3">
+    <div className="relative flex items-stretch gap-2 rounded-2xl overflow-hidden backdrop-blur-md bg-gray-900/50 border border-white/10 shadow-2xl p-2 hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-shadow md:gap-4 md:px-4 md:pt-2.5 md:pb-3">
       <div className="flex min-w-0 flex-1 items-start gap-2 md:gap-4">
         <div className="relative h-12 w-12 flex-shrink-0 cursor-pointer overflow-hidden rounded group md:h-20 md:w-20">
           {href ? (
@@ -208,8 +214,8 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
           </button>
         </div>
 
-        <div className="min-w-0 flex-1 pr-12 md:pr-0 md:pt-0.5">
-          <div className="flex min-w-0 items-baseline gap-2">
+        <div className="min-w-0 flex-1 md:pt-0.5">
+          <div className="flex min-w-0 items-baseline gap-1.5">
             <h4 className="min-w-0 shrink text-sm font-medium text-white">
               {href ? (
                 <Link to={href} className="block truncate cursor-pointer transition-colors hover:text-purple-300">
@@ -223,7 +229,6 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
             <span className="shrink-0 text-xs tabular-nums text-gray-400">
               {formatDuration(mediaData.duration)}
             </span>
-            <span className="ml-auto md:hidden">{place}</span>
           </div>
           <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5">
             <p className="min-w-0 shrink truncate text-xs text-gray-400">
@@ -258,21 +263,15 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         </div>
       </div>
 
-      {(tuneBytesLabel || bids.length > 0) && (
-        <div className="flex flex-wrap items-center gap-2 pr-12 md:hidden">{scoreStack}</div>
-      )}
-
-      <div className="ml-auto hidden self-stretch grid-cols-[max-content_2.75rem] grid-rows-[auto_1fr] justify-items-end gap-x-3.5 md:grid">
-        <div className="col-span-2 justify-self-end leading-none">{place}</div>
-        <div className="col-start-1 row-start-2 flex flex-col items-end gap-1.5 self-center">
+      <div className="ml-auto grid shrink-0 grid-cols-[max-content_2.5rem] grid-rows-[auto_1fr] items-stretch gap-x-2 self-stretch md:grid-cols-[max-content_2.75rem] md:gap-x-3.5">
+        <div className="col-span-2 row-start-1 justify-self-end leading-none">{place}</div>
+        <div className="col-start-1 row-start-2 flex flex-col items-end gap-1 self-center md:gap-1.5">
           {scoreStack}
         </div>
-        <div className="col-start-2 row-start-2 flex items-center justify-center">
-          {tipButton('md')}
+        <div className="col-start-2 row-start-2 flex items-center justify-center self-center">
+          {tipButton}
         </div>
       </div>
-
-      <div className="absolute right-2 top-1/2 z-10 -translate-y-1/2 md:hidden">{tipButton('sm')}</div>
     </div>
   );
 };

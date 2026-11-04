@@ -44,6 +44,10 @@ interface MiniSupportersBarProps {
   /** When set, only show the top N tippers (no expand / scroll-all). */
   limit?: number;
   className?: string;
+  /** Pack chips toward the trailing edge when they wrap. */
+  alignEnd?: boolean;
+  /** Below md, keep the tip amount off the chip until that supporter is revealed. */
+  collapseAmountBelowMd?: boolean;
 }
 
 const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
@@ -53,6 +57,8 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   scrollable = true,
   limit,
   className,
+  alignEnd = false,
+  collapseAmountBelowMd = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
@@ -147,9 +153,15 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
     return 'bg-orange-400/15 border-orange-400/30 text-orange-200';
   };
 
+  const rowClass = scrollable && typeof limit !== 'number'
+    ? `flex gap-2 overflow-x-auto py-1 ${alignEnd ? 'justify-end' : ''}`
+    : collapseAmountBelowMd
+      ? 'flex flex-col items-end gap-1 md:flex-row md:flex-wrap md:justify-end md:gap-2'
+      : `flex flex-wrap gap-2 ${alignEnd ? 'justify-end' : ''}`;
+
   return (
     <div className={className ?? 'md:mt-2'}>
-      <div className={scrollable && typeof limit !== 'number' ? 'flex gap-2 overflow-x-auto py-1' : 'flex flex-wrap gap-2'}>
+      <div className={rowClass}>
         {visible.map((s) => {
           const id = s.id;
           const rank = podiumRankById.get(id);
@@ -176,8 +188,12 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
               />
             </span>
           ) : null;
-          const chipClass =
-            'flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 transition-colors flex-shrink-0';
+          const chipClass = collapseAmountBelowMd
+            ? 'flex min-w-0 max-w-full items-center gap-1 overflow-hidden px-1 py-0.5 md:gap-2 md:px-2 md:py-1.5 rounded-lg bg-black/25 transition-colors flex-shrink-0'
+            : 'flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 transition-colors flex-shrink-0';
+          const amountClass = `text-[10px] md:text-sm text-green-300 flex-shrink-0 ${
+            collapseAmountBelowMd && !revealed ? 'max-md:sr-only' : ''
+          }`;
           const title = `${penceToPounds(s.total)} (${s.count} tips)`;
           return (
             <span
@@ -189,7 +205,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
                 <>
                   {avatar}
                   {crown}
-                  <span className="text-[10px] md:text-sm whitespace-nowrap text-gray-400 italic">
+                  <span className={`text-[10px] md:text-sm whitespace-nowrap text-gray-400 italic ${collapseAmountBelowMd ? 'max-md:truncate' : ''}`}>
                     {ANONYMOUS_LABEL}
                   </span>
                 </>
@@ -214,14 +230,14 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
                     <Link
                       to={getUserProfileUrl(s.user)}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[10px] md:text-sm whitespace-nowrap text-white hover:underline"
+                      className={`text-[10px] md:text-sm whitespace-nowrap text-white hover:underline ${collapseAmountBelowMd ? 'max-md:max-w-[4.5rem] max-md:truncate' : ''}`}
                     >
                       {s.user.username}
                     </Link>
                   )}
                 </>
               )}
-              <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">
+              <span className={amountClass}>
                 {penceToPounds(s.total)}
               </span>
             </span>
