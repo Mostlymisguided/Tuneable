@@ -133,36 +133,59 @@ router.get('/status', authMiddleware, async (req, res) => {
   }
 });
 
+async function applyCreatorProfileUpdate(user, updates) {
+  if (!user.creatorProfile) {
+    return { status: 400, body: { error: 'No creator profile found. Please create one first.' } };
+  }
+
+  const allowedFields = ['artistName', 'bio', 'genres', 'roles', 'website', 'socialMedia', 'label', 'management', 'distributor'];
+
+  allowedFields.forEach(field => {
+    if (updates[field] !== undefined) {
+      user.creatorProfile[field] = updates[field];
+    }
+  });
+
+  await user.save();
+
+  return {
+    status: 200,
+    body: {
+      message: 'Creator profile updated successfully',
+      creatorProfile: user.creatorProfile
+    }
+  };
+}
+
 // Update creator profile
 router.patch('/profile', authMiddleware, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const updates = req.body;
-
-    const user = await User.findById(userId);
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!user.creatorProfile) {
-      return res.status(400).json({ error: 'No creator profile found. Please create one first.' });
+    const result = await applyCreatorProfileUpdate(user, req.body);
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('Error updating creator profile:', error);
+    res.status(500).json({ error: 'Failed to update creator profile' });
+  }
+});
+
+// Admin: update another user's creator profile
+router.patch('/admin/users/:userId/profile', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const user = await User.findByIdentifier(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // Update allowed fields
-    const allowedFields = ['artistName', 'bio', 'genres', 'roles', 'website', 'socialMedia', 'label', 'management', 'distributor'];
-    
-    allowedFields.forEach(field => {
-      if (updates[field] !== undefined) {
-        user.creatorProfile[field] = updates[field];
-      }
-    });
-
-    await user.save();
-
-    res.json({
-      message: 'Creator profile updated successfully',
-      creatorProfile: user.creatorProfile
-    });
+    const result = await applyCreatorProfileUpdate(user, req.body);
+    if (result.status === 200 && String(user._id) !== String(req.user._id)) {
+      console.log(`Admin ${req.user.username || req.user._id} updated creator profile for ${user.username} (${user._id})`);
+    }
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('Error updating creator profile:', error);
     res.status(500).json({ error: 'Failed to update creator profile' });

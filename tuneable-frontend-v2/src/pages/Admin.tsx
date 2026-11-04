@@ -1999,6 +1999,13 @@ const Admin: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-2 flex-wrap gap-1">
+                            <Link
+                              to={`/user/${user._id}?settings=true&tab=profile`}
+                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                              title="Edit this user's profile"
+                            >
+                              Edit
+                            </Link>
                             {!user.role.includes('admin') && (
                               <>
                                 <button

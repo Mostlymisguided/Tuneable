@@ -387,12 +387,21 @@ const UserProfile: React.FC = () => {
   const [isAddingTune, setIsAddingTune] = useState(false);
   const [showAddTunePanel, setShowAddTunePanel] = useState(false);
   
-  // Settings mode - controlled by query params
-  const isSettingsMode = searchParams.get('settings') === 'true';
+  // Settings mode - controlled by query params.
+  // Admins can edit another user's profile, but not their preferences or security settings.
+  const isOwnProfile = Boolean(
+    currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid)
+  );
+  const isAdminViewer = Boolean(currentUser?.role?.includes('admin'));
+  const canEditProfile = isOwnProfile || isAdminViewer;
+  const isSettingsMode = searchParams.get('settings') === 'true' && canEditProfile;
   const settingsTab = (searchParams.get('tab') as 'profile' | 'notifications' | 'creator' | 'security') || 'profile';
   const creatorVerificationStatus = (user as any)?.creatorProfile?.verificationStatus as string | undefined;
   const hasCreatorSettingsTab = ['verified', 'pending', 'rejected'].includes(creatorVerificationStatus || '');
-  const activeSettingsTab = settingsTab === 'creator' && !hasCreatorSettingsTab ? 'profile' : settingsTab;
+  const requestedSettingsTab = settingsTab === 'creator' && !hasCreatorSettingsTab ? 'profile' : settingsTab;
+  const activeSettingsTab = !isOwnProfile && requestedSettingsTab !== 'profile' && requestedSettingsTab !== 'creator'
+    ? 'profile'
+    : requestedSettingsTab;
   
   // View mode tabs - controlled by query params
   // Note: the former 'podcast-library' tab has been merged into 'tune-library'.
@@ -486,9 +495,6 @@ const UserProfile: React.FC = () => {
   
   // Collective memberships state
   const [collectiveMemberships, setCollectiveMemberships] = useState<any[]>([]);
-
-  // Check if viewing own profile
-  const isOwnProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid);
 
   // Helper functions for loading additional data
   const loadLabelAffiliations = async () => {
@@ -753,17 +759,17 @@ const UserProfile: React.FC = () => {
 
   // Populate edit form when user data loads
   useEffect(() => {
-    // Check if this is the user's own profile
     const ownProfile = currentUser && user && (currentUser._id === user._id || currentUser.uuid === user.uuid || currentUser.uuid === user.id || currentUser._id === user.id);
-    
-    if (user && ownProfile) {
+    const adminViewer = Boolean(currentUser?.role?.includes('admin'));
+
+    if (user && (ownProfile || adminViewer)) {
       console.log('📝 Populating edit form with user data:', {
         givenName: user.givenName,
         familyName: user.familyName,
         cellPhone: user.cellPhone,
         homeLocation: user.homeLocation,
         userId: user._id || user.id,
-        currentUserId: currentUser._id || currentUser.uuid
+        currentUserId: currentUser?._id || currentUser?.uuid
       });
       setEditForm({
         username: user.username || '',
@@ -1829,7 +1835,8 @@ const UserProfile: React.FC = () => {
     if (isSettingsMode) {
       // Save and exit settings mode
       try {
-        await handleSaveProfileInternal();
+        const saved = await handleSaveProfileInternal();
+        if (saved === false) return;
         exitSettings();
       } catch (error) {
         // Error already handled in handleSaveProfileInternal
@@ -1837,15 +1844,21 @@ const UserProfile: React.FC = () => {
       return;
     }
     // Legacy modal behavior (keep for potential revert)
-    await handleSaveProfileInternal();
-    setIsEditingProfile(false);
+    const saved = await handleSaveProfileInternal();
+    if (saved !== false) setIsEditingProfile(false);
   };
 
   // Save creator profile
   const handleSaveCreatorProfile = async () => {
     try {
       setIsSavingCreatorProfile(true);
-      await creatorAPI.updateProfile(creatorProfileForm);
+      if (isOwnProfile) {
+        await creatorAPI.updateProfile(creatorProfileForm);
+      } else if (user?._id) {
+        await creatorAPI.adminUpdateProfile(user._id, creatorProfileForm);
+      } else {
+        throw new Error('User not loaded');
+      }
       toast.success('Creator profile updated successfully!');
       
       // Refresh user data
@@ -1892,7 +1905,7 @@ const UserProfile: React.FC = () => {
         if (usernameValidationError) {
           setUsernameError(usernameValidationError);
           toast.error(usernameValidationError);
-          return;
+          return false;
         }
         setUsernameError(null);
       }
@@ -1908,8 +1921,14 @@ const UserProfile: React.FC = () => {
         socialMedia: socialMedia
       };
       
-      await authAPI.updateProfile(formattedData as Partial<import('../types').User>);
-      toast.success('Profile updated successfully!');
+      if (isOwnProfile) {
+        await authAPI.updateProfile(formattedData as Partial<import('../types').User>);
+      } else if (user?._id) {
+        await userAPI.adminUpdateProfile(user._id, formattedData as Partial<import('../types').User>);
+      } else {
+        throw new Error('User not loaded');
+      }
+      toast.success(isOwnProfile ? 'Profile updated successfully!' : `Updated @${user?.username}'s profile`);
       setUsernameError(null); // Clear any errors on success
       // Only update modal state if NOT in settings mode
       if (!isSettingsMode) {
@@ -1917,6 +1936,7 @@ const UserProfile: React.FC = () => {
       }
       // Refresh user data
       await fetchUserProfile();
+      return true;
     } catch (err: any) {
       console.error('Error updating profile:', err);
       const errorMessage = err.response?.data?.error || 'Failed to update profile';
@@ -1932,7 +1952,7 @@ const UserProfile: React.FC = () => {
   };
 
   const handleProfilePicClick = () => {
-    if (isOwnProfile && fileInputRef.current) {
+    if (canEditProfile && fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
@@ -1952,12 +1972,19 @@ const UserProfile: React.FC = () => {
 
     try {
       setIsUploading(true);
-      const response = await authAPI.uploadProfilePic(prepared);
+      const targetUserId = user?._id || user?.id;
+      if (!isOwnProfile && !targetUserId) {
+        toast.error('User not loaded');
+        return;
+      }
+      const response = isOwnProfile
+        ? await authAPI.uploadProfilePic(prepared)
+        : await userAPI.adminUploadProfilePic(targetUserId as string, prepared);
       toast.success('Profile picture updated!');
       setUser((prev) =>
         prev ? { ...prev, profilePic: response.user.profilePic || prev.profilePic } : prev
       );
-      await refreshUser();
+      if (isOwnProfile) await refreshUser();
     } catch (err: any) {
       console.error('Error uploading profile pic:', err);
       toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to upload profile picture');
@@ -1973,18 +2000,28 @@ const UserProfile: React.FC = () => {
   const handleRemoveProfilePic = async () => {
     if (!hasCustomProfilePic(user?.profilePic)) return;
 
-    if (!window.confirm('Remove your profile picture and use the default avatar? This cannot be undone.')) {
+    const confirmMessage = isOwnProfile
+      ? 'Remove your profile picture and use the default avatar? This cannot be undone.'
+      : `Remove @${user?.username}'s profile picture and use the default avatar? This cannot be undone.`;
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
     try {
+      const targetUserId = user?._id || user?.id;
+      if (!isOwnProfile && !targetUserId) {
+        toast.error('User not loaded');
+        return;
+      }
       setIsRemovingPic(true);
-      const response = await authAPI.removeProfilePic();
+      const response = isOwnProfile
+        ? await authAPI.removeProfilePic()
+        : await userAPI.adminRemoveProfilePic(targetUserId as string);
       toast.success('Profile picture removed');
       setUser((prev) =>
         prev ? { ...prev, profilePic: response.user.profilePic || DEFAULT_PROFILE_PIC } : prev
       );
-      await refreshUser();
+      if (isOwnProfile) await refreshUser();
     } catch (err: any) {
       console.error('Error removing profile pic:', err);
       toast.error(err.response?.data?.error || err.response?.data?.details || 'Failed to remove profile picture');
@@ -2090,19 +2127,18 @@ const UserProfile: React.FC = () => {
               </button>
             )}
             
-            {/* Settings Button - Only show when viewing own profile and not in settings mode */}
-            {isOwnProfile && !isSettingsMode && (
+            {canEditProfile && !isSettingsMode && (
               <button
                 onClick={handleSettingsClick}
                 className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
               >
                 <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Settings</span>
+                <span className="hidden sm:inline">{isOwnProfile ? 'Settings' : 'Edit'}</span>
               </button>
             )}
             
             {/* Exit Settings Button - Only show in settings mode */}
-            {isOwnProfile && isSettingsMode && (
+            {canEditProfile && isSettingsMode && (
               <button
                 onClick={exitSettings}
                 className="px-3 md:px-4 py-2 bg-gray-600/40 hover:bg-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
@@ -2128,10 +2164,10 @@ const UserProfile: React.FC = () => {
               <img
                 src={user.profilePic || DEFAULT_PROFILE_PIC}
                 alt={`${user.username} profile`}
-                className={`rounded-full shadow-xl object-cover ${isOwnProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                className={`rounded-full shadow-xl object-cover ${canEditProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                 style={{ width: '200px', height: '200px' }}
                 onClick={handleProfilePicClick}
-                title={isOwnProfile ? 'Click to change profile picture' : ''}
+                title={canEditProfile ? 'Click to change profile picture' : ''}
                 onError={(e) => {
                   e.currentTarget.src = DEFAULT_PROFILE_PIC;
                 }}
@@ -2456,7 +2492,7 @@ const UserProfile: React.FC = () => {
         </div>
 
         {/* Conditional Rendering: Settings Mode vs Normal Mode */}
-        {blockedByMe && !isOwnProfile ? (
+        {blockedByMe && !isOwnProfile && !isSettingsMode ? (
           <div className="card p-6 text-center">
             <p className="text-white font-semibold mb-1">You blocked this user</p>
             <p className="text-gray-400 text-sm mb-4">Their library and activity are hidden while they are blocked.</p>
@@ -3576,6 +3612,7 @@ const UserProfile: React.FC = () => {
                       : 'Creator Application (Rejected)'}
                   </button>
                 )}
+                {isOwnProfile && (
                 <button
                   onClick={() => handleSettingsTabChange('notifications')}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -3586,6 +3623,8 @@ const UserProfile: React.FC = () => {
                 >
                   Preferences
                 </button>
+                )}
+                {isOwnProfile && (
                 <button
                   onClick={() => handleSettingsTabChange('security')}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -3596,13 +3635,21 @@ const UserProfile: React.FC = () => {
                 >
                   Security & Privacy
                 </button>
+                )}
               </nav>
             </div>
 
             {/* Tab Content */}
             {activeSettingsTab === 'profile' && (
               <div className="card p-6">
-                <h2 className="text-2xl font-bold text-white mb-6">Edit Profile</h2>
+                <h2 className="text-2xl font-bold text-white mb-6">
+                  {isOwnProfile ? 'Edit Profile' : `Edit @${user.username}`}
+                </h2>
+                {!isOwnProfile && (
+                  <p className="mb-6 text-sm text-amber-100 bg-amber-900/30 border border-amber-500/30 rounded-lg px-3 py-2">
+                    You are editing this profile as an admin. Notification preferences and security settings stay with the account owner.
+                  </p>
+                )}
 
                 {/* Profile Picture */}
                 <div className="mb-6">
@@ -3779,6 +3826,50 @@ const UserProfile: React.FC = () => {
                 {/* Social Media Section */}
                 <div className="mb-6">
                   <label className="block text-white font-medium mb-3">Social Media</label>
+                  {!isOwnProfile ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-gray-300 text-sm mb-1">SoundCloud</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.soundcloud}
+                          onChange={(e) => setEditForm({
+                            ...editForm,
+                            socialMedia: { ...editForm.socialMedia, soundcloud: e.target.value }
+                          })}
+                          className="input"
+                          placeholder="https://soundcloud.com/username"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 text-sm mb-1">Facebook</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.facebook}
+                          onChange={(e) => setEditForm({
+                            ...editForm,
+                            socialMedia: { ...editForm.socialMedia, facebook: e.target.value }
+                          })}
+                          className="input"
+                          placeholder="https://facebook.com/username"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 text-sm mb-1">Instagram</label>
+                        <input
+                          type="url"
+                          value={editForm.socialMedia.instagram}
+                          onChange={(e) => setEditForm({
+                            ...editForm,
+                            socialMedia: { ...editForm.socialMedia, instagram: e.target.value }
+                          })}
+                          className="input"
+                          placeholder="https://instagram.com/username"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   <div className="space-y-3">
                     {getSocialMediaLinks()
                       .filter((social) => social.platform) // Only show platforms that can be edited via modal
@@ -3811,7 +3902,7 @@ const UserProfile: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  {!hasCreatorSettingsTab && (
+                  {isOwnProfile && !hasCreatorSettingsTab && (
                     <Link
                       to="/creator/register"
                       className="mt-4 inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg font-medium transition-colors"
@@ -3819,6 +3910,8 @@ const UserProfile: React.FC = () => {
                       <Award className="w-4 h-4" />
                       <span>Become a Creator</span>
                     </Link>
+                  )}
+                  </>
                   )}
                 </div>
 

@@ -1441,6 +1441,24 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: update another user's profile fields
+  adminUpdateProfile: async (userId: string, userData: Partial<User>) => {
+    const response = await api.put(`/users/admin/${encodeURIComponent(userId)}/profile`, userData);
+    return response.data;
+  },
+
+  adminUploadProfilePic: async (userId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('profilePic', file);
+    const response = await api.put(`/users/admin/${encodeURIComponent(userId)}/profile-pic`, formData);
+    return response.data;
+  },
+
+  adminRemoveProfilePic: async (userId: string) => {
+    const response = await api.delete(`/users/admin/${encodeURIComponent(userId)}/profile-pic`);
+    return response.data;
+  },
+
   // Admin: Get all users (admin only)
   getAllUsers: async (limit?: number, skip?: number, search?: string) => {
     const params: any = {};
@@ -2820,6 +2838,12 @@ export const creatorAPI = {
   // Update creator profile
   updateProfile: async (profileData: any) => {
     const response = await api.patch('/creator/profile', profileData);
+    return response.data;
+  },
+
+  // Admin: update another user's creator profile
+  adminUpdateProfile: async (userId: string, profileData: any) => {
+    const response = await api.patch(`/creator/admin/users/${encodeURIComponent(userId)}/profile`, profileData);
     return response.data;
   },
   

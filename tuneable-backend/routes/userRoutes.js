@@ -3708,8 +3708,16 @@ function assignSocialMedia(user, socialMedia) {
   return null;
 }
 
-// Update user profile (excluding profile picture)
-router.put('/profile', authMiddleware, async (req, res) => {
+async function findProfileSubject(req) {
+  if (req.params.userId) {
+    return User.findByIdentifier(req.params.userId);
+  }
+  return User.findById(req.user._id);
+}
+
+// Update user profile (excluding profile picture).
+// Admins update another account with PUT /admin/:userId/profile.
+async function handleProfileUpdate(req, res) {
   try {
     const {
       homeLocation,
@@ -3724,7 +3732,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
       socialMedia,
     } = req.body;
 
-    const user = await User.findById(req.user._id);
+    const user = await findProfileSubject(req);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // Handle username update with validation
@@ -3984,6 +3992,10 @@ router.put('/profile', authMiddleware, async (req, res) => {
       });
     }
 
+    if (req.params.userId && String(user._id) !== String(req.user._id)) {
+      console.log(`Admin ${req.user.username || req.user._id} updated profile for ${user.username} (${user._id})`);
+    }
+
     const updatedUser = await User.findById(user._id).select('-password');
     const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
     res.json({ message: 'Profile updated successfully', user: withWelcomeCreditOffer(updatedUser) });
@@ -3991,7 +4003,10 @@ router.put('/profile', authMiddleware, async (req, res) => {
     console.error('Error updating profile:', error);
     res.status(500).json({ error: 'Error updating profile', details: error.message });
   }
-});
+}
+
+router.put('/profile', authMiddleware, handleProfileUpdate);
+router.put('/admin/:userId/profile', authMiddleware, adminMiddleware, handleProfileUpdate);
 
 // Update social media URL
 router.put('/profile/social-media', authMiddleware, async (req, res) => {
@@ -4114,11 +4129,17 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
   }
 });
 
-router.put('/profile-pic', authMiddleware, upload.single('profilePic'), processAndUploadImage, async (req, res) => {
+async function handleProfilePicUpload(req, res) {
   try {
       if (!req.file) {
           console.log("❌ No file uploaded");
           return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const subject = await findProfileSubject(req);
+      if (!subject) {
+          console.log("❌ User not found");
+          return res.status(404).json({ error: 'User not found' });
       }
 
       // Use custom domain URL via getPublicUrl (uses R2_PUBLIC_URL env var)
@@ -4126,10 +4147,10 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), processA
       // req.file.location is the default R2 URL, but we want the custom domain
       const profilePicPath = req.file.key ? getPublicUrl(req.file.key) : (req.file.location || getPublicUrl(`profile-pictures/${req.file.filename}`));
 
-      console.log(`📸 Saving profile pic: ${profilePicPath} for user ${req.user.userId}`);
+      console.log(`📸 Saving profile pic: ${profilePicPath} for user ${subject._id}`);
 
       const user = await User.findByIdAndUpdate(
-          req.user._id,
+          subject._id,
           { $set: { profilePic: profilePicPath } },
           { new: true, projection: { profilePic: 1, _id: 1 } }
       );
@@ -4145,7 +4166,10 @@ router.put('/profile-pic', authMiddleware, upload.single('profilePic'), processA
       console.error('Error updating profile picture:', error.message);
       res.status(500).json({ error: 'Error updating profile picture', details: error.message });
   }
-});
+}
+
+router.put('/profile-pic', authMiddleware, upload.single('profilePic'), processAndUploadImage, handleProfilePicUpload);
+router.put('/admin/:userId/profile-pic', authMiddleware, adminMiddleware, upload.single('profilePic'), processAndUploadImage, handleProfilePicUpload);
 
 const DEFAULT_PROFILE_PIC =
   'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
@@ -4153,9 +4177,9 @@ const DEFAULT_PROFILE_PIC =
 // @route   DELETE /api/users/profile-pic
 // @desc    Remove profile picture and reset to the default avatar
 // @access  Private
-router.delete('/profile-pic', authMiddleware, async (req, res) => {
+async function handleProfilePicRemoval(req, res) {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await findProfileSubject(req);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -4170,7 +4194,7 @@ router.delete('/profile-pic', authMiddleware, async (req, res) => {
     user.profilePic = DEFAULT_PROFILE_PIC;
     await user.save();
 
-    console.log(`✅ Profile picture removed for user ${req.user.userId || req.user._id}`);
+    console.log(`✅ Profile picture removed for user ${user._id}`);
     res.json({
       message: 'Profile picture removed successfully',
       user: { _id: user._id, profilePic: user.profilePic }
@@ -4179,7 +4203,10 @@ router.delete('/profile-pic', authMiddleware, async (req, res) => {
     console.error('Error removing profile picture:', error.message);
     res.status(500).json({ error: 'Error removing profile picture', details: error.message });
   }
-});
+}
+
+router.delete('/profile-pic', authMiddleware, handleProfilePicRemoval);
+router.delete('/admin/:userId/profile-pic', authMiddleware, adminMiddleware, handleProfilePicRemoval);
 
 // @route   POST /api/users/make-admin/:userId
 // @desc    Grant the admin role. Requires an existing admin.
@@ -4299,10 +4326,11 @@ router.get('/:userId/profile', async (req, res) => {
     const { blockedByMe, blockedMe } = req.user
       ? await getBlockState(req.user._id, user._id)
       : { blockedByMe: false, blockedMe: false };
-    if (blockedMe) {
+    const isAdminViewer = Array.isArray(req.user?.role) && req.user.role.includes('admin');
+    if (blockedMe && !isAdminViewer) {
       return res.status(404).json({ error: 'User not found' });
     }
-    if (blockedByMe) {
+    if (blockedByMe && !isAdminViewer) {
       // Enough to render the header and an Unblock action, nothing more.
       return res.json({
         message: 'User profile fetched successfully',
@@ -4426,6 +4454,7 @@ router.get('/:userId/profile', async (req, res) => {
       req.user._id?.toString() === userObj._id.toString() ||
       req.user.uuid === userObj.uuid
     );
+    const canSeePrivateProfile = Boolean(isOwnProfile || isAdminViewer);
 
     // Explicitly access socialMedia - ensure it's included
     // Access from both the original user document and converted object
@@ -4466,10 +4495,13 @@ router.get('/:userId/profile', async (req, res) => {
       userResponse.cellPhone = userObj.cellPhone || '';
       userResponse.isActive = userObj.isActive;
       userResponse.preferences = userObj.preferences;
+    } else if (isAdminViewer) {
+      userResponse.email = userObj.email;
+      userResponse.cellPhone = userObj.cellPhone || '';
     }
 
-    // Anonymous mode hides names and social links from everyone except the signed-in owner.
-    if (userObj.preferences?.anonymousMode && !isOwnProfile) {
+    // Anonymous mode hides names and social links from everyone except the owner and admins.
+    if (userObj.preferences?.anonymousMode && !canSeePrivateProfile) {
       // Remove givenName and familyName from response
       // They're not explicitly included above, but we'll ensure they're not
       delete userResponse.givenName;
