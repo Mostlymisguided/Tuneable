@@ -2203,7 +2203,7 @@ const TuneProfile: React.FC = () => {
     const name = typeof record === 'string' ? record : record?.name;
     const trimmed = String(name || '').trim();
     if (!trimmed) return [];
-    const slug = typeof record === 'object' ? record.slug : undefined;
+    const slug = record && typeof record === 'object' && 'slug' in record ? record.slug : undefined;
     const catalog = typeof labelItem?.catalogNumber === 'string' ? labelItem.catalogNumber.trim() : '';
     return [{ name: trimmed, slug: slug || null, catalog: catalog || null }];
   });
