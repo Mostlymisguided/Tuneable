@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Download, Headphones, Megaphone, RefreshCw } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
 import { toast } from '../utils/toast';
@@ -133,6 +133,129 @@ const ICONS = {
   commercial: Megaphone,
 };
 
+function poundsFromPence(pence: number | null | undefined): string {
+  return ((pence || 1) / 100).toFixed(2);
+}
+
+/** Licences that are actually on. Off grants stay out of the public row. */
+export function activeLicenceMarks(saved?: SavedLicence | null): Array<{
+  id: LicenceId;
+  name: string;
+  hint: string;
+}> {
+  if (!saved?.chosen) return [];
+  const marks: Array<{ id: LicenceId; name: string; hint: string }> = [
+    {
+      id: 'streaming',
+      name: 'Streaming',
+      hint: 'People can keep this in a library and play it on Tuneable, including in a party and on the charts. The file is not handed over.',
+    },
+  ];
+  if (saved.personalDownload) {
+    marks.push({
+      id: 'download',
+      name: 'Personal download',
+      hint: `A listener who has tipped at least £${poundsFromPence(saved.personalDownloadUnlockPence)} on this tune can keep one personal copy.`,
+    });
+  }
+  if (saved.openToRework) {
+    marks.push({
+      id: 'rework',
+      name: 'Rework requests',
+      hint: 'Open to a request for one sample, remix, or cover. A request still needs approval.',
+    });
+  }
+  if (saved.openToCommercial) {
+    marks.push({
+      id: 'commercial',
+      name: 'Commercial requests',
+      hint: 'Open to a request for one film, advert, game, or brand use. A request still needs approval.',
+    });
+  }
+  return marks;
+}
+
+function LicenceMarkRow({
+  saved,
+  trailing,
+}: {
+  saved?: SavedLicence | null;
+  trailing?: ReactNode;
+}) {
+  const marks = activeLicenceMarks(saved);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [hoverId, setHoverId] = useState<LicenceId | null>(null);
+  const [pinnedId, setPinnedId] = useState<LicenceId | null>(null);
+  const openId = pinnedId || hoverId;
+  const openMark = marks.find((mark) => mark.id === openId) || null;
+
+  useEffect(() => {
+    if (!pinnedId) return;
+    const close = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && rowRef.current?.contains(target)) return;
+      setPinnedId(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPinnedId(null);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [pinnedId]);
+
+  if (marks.length === 0 && !trailing) return null;
+
+  return (
+    <div ref={rowRef} className="flex flex-col items-center md:items-start gap-2">
+      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+        {marks.map((mark) => {
+          const Icon = ICONS[mark.id];
+          const open = openId === mark.id;
+          return (
+            <button
+              key={mark.id}
+              type="button"
+              aria-label={mark.name}
+              aria-expanded={open}
+              aria-describedby={open ? `licence-tip-${mark.id}` : undefined}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border text-purple-100 ${open ? 'border-purple-400/70 bg-purple-900/40' : 'border-white/15 bg-black/30'}`}
+              onPointerEnter={(event) => {
+                if (event.pointerType === 'mouse') setHoverId(mark.id);
+              }}
+              onPointerLeave={(event) => {
+                if (event.pointerType === 'mouse') setHoverId((current) => (current === mark.id ? null : current));
+              }}
+              onFocus={() => setHoverId(mark.id)}
+              onBlur={() => setHoverId((current) => (current === mark.id ? null : current))}
+              onPointerUp={(event) => {
+                if (event.pointerType !== 'touch') return;
+                setPinnedId((current) => (current === mark.id ? null : mark.id));
+              }}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          );
+        })}
+        {trailing}
+      </div>
+      {openMark && (
+        <div
+          id={`licence-tip-${openMark.id}`}
+          role="tooltip"
+          className="max-w-sm rounded-lg border border-white/15 bg-gray-950 px-3 py-2 text-center md:text-left"
+        >
+          <p className="text-xs font-semibold text-white">{openMark.name}</p>
+          <p className="text-xs text-gray-300 mt-1">{openMark.hint}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type EditorProps = {
   mediaId: string;
   saved?: SavedLicence | null;
@@ -167,23 +290,20 @@ export function MediaLicenceCard({ mediaId, saved, canEdit, onSaved }: EditorPro
   if (!saved?.chosen && !canEdit) return null;
 
   return (
-    <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-white">Licences</p>
-          <p className="text-sm text-gray-300 mt-1">{summariseLicence(saved)}</p>
-          {!saved?.chosen && canEdit && (
-            <p className="text-xs text-gray-400 mt-1">
-              Streaming is included. Download, rework, and commercial stay off until you turn them on.
-            </p>
-          )}
-        </div>
-        {canEdit && !editing && (
+    <div className="mt-3 px-2">
+      <LicenceMarkRow
+        saved={saved}
+        trailing={canEdit && !editing ? (
           <button type="button" onClick={startEditing} className="text-sm text-purple-300 underline shrink-0">
             {saved?.chosen ? 'Change' : 'Choose'}
           </button>
-        )}
-      </div>
+        ) : null}
+      />
+      {!saved?.chosen && canEdit && (
+        <p className="text-xs text-gray-400 mt-1 text-center md:text-left">
+          Streaming is included. Download, rework, and commercial stay off until you turn them on.
+        </p>
+      )}
       {editing && (
         <div className="mt-3">
           <LicencePicker value={choice} onChange={setChoice} />

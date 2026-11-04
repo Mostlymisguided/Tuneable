@@ -26,6 +26,7 @@ import { TipSheet } from '@/src/components/TipSheet';
 import { TagClaimSheet } from '@/src/components/TagClaimSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { EditMediaButton } from '@/src/components/EditMediaButton';
+import { LicenceMarks } from '@/src/components/LicencePicker';
 import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -450,6 +451,7 @@ export default function TuneProfileScreen() {
 
             <Text style={styles.title}>{media.title || 'Untitled'}</Text>
             <Text style={styles.artist}>{artist}</Text>
+            <LicenceMarks licence={media.licence} />
 
             {heroMetadata.length > 0 ? (
               <Text style={styles.metaLine}>{heroMetadata.join(' · ')}</Text>

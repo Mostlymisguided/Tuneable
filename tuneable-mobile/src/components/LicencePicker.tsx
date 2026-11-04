@@ -64,6 +64,128 @@ const LICENCES: Array<{
   },
 ];
 
+function poundsFromPence(pence: number | null | undefined): string {
+  return ((pence || 1) / 100).toFixed(2);
+}
+
+/** Icon per licence that is on. Tap a box to read what it allows. */
+export function LicenceMarks({ licence }: { licence?: SavedLicence | null }) {
+  const [openId, setOpenId] = useState<LicenceId | null>(null);
+  if (!licence?.chosen) return null;
+
+  const marks: Array<{ id: LicenceId; name: string; hint: string; icon: keyof typeof Ionicons.glyphMap }> = [
+    {
+      id: 'streaming',
+      name: 'Streaming',
+      icon: 'musical-notes-outline',
+      hint: 'People can keep this in a library and play it on Tuneable, including in a party and on the charts. The file is not handed over.',
+    },
+  ];
+  if (licence.personalDownload) {
+    marks.push({
+      id: 'download',
+      name: 'Personal download',
+      icon: 'download-outline',
+      hint: `A listener who has tipped at least £${poundsFromPence(licence.personalDownloadUnlockPence)} on this tune can keep one personal copy.`,
+    });
+  }
+  if (licence.openToRework) {
+    marks.push({
+      id: 'rework',
+      name: 'Rework requests',
+      icon: 'refresh-outline',
+      hint: 'Open to a request for one sample, remix, or cover. A request still needs approval.',
+    });
+  }
+  if (licence.openToCommercial) {
+    marks.push({
+      id: 'commercial',
+      name: 'Commercial requests',
+      icon: 'megaphone-outline',
+      hint: 'Open to a request for one film, advert, game, or brand use. A request still needs approval.',
+    });
+  }
+
+  const open = marks.find((mark) => mark.id === openId);
+
+  return (
+    <View style={markStyles.wrap}>
+      <View style={markStyles.row}>
+        {marks.map((mark) => {
+          const selected = openId === mark.id;
+          return (
+            <Pressable
+              key={mark.id}
+              accessibilityRole="button"
+              accessibilityLabel={mark.name}
+              accessibilityHint={mark.hint}
+              accessibilityState={{ expanded: selected }}
+              onPress={() => setOpenId((current) => (current === mark.id ? null : mark.id))}
+              style={[markStyles.box, selected && markStyles.boxOn]}
+            >
+              <Ionicons name={mark.icon} size={18} color="#e9d5ff" />
+            </Pressable>
+          );
+        })}
+      </View>
+      {open ? (
+        <View style={markStyles.tip}>
+          <Text style={markStyles.tipTitle}>{open.name}</Text>
+          <Text style={markStyles.tipBody}>{open.hint}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const markStyles = StyleSheet.create({
+  wrap: {
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  box: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  boxOn: {
+    borderColor: 'rgba(192,132,252,0.7)',
+    backgroundColor: 'rgba(88,28,135,0.4)',
+  },
+  tip: {
+    maxWidth: 280,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(3,7,18,0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  tipTitle: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tipBody: {
+    marginTop: 4,
+    color: '#d1d5db',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+});
+
 function isOn(value: LicenceChoice, id: LicenceId): boolean {
   if (id === 'streaming') return true;
   if (id === 'download') return value.personalDownload;
