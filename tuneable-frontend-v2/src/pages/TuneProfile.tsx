@@ -2198,15 +2198,14 @@ const TuneProfile: React.FC = () => {
   }
 
   const labelEntries = (Array.isArray(media.label) ? media.label : []).flatMap((labelItem) => {
-    const record = labelItem?.labelId && typeof labelItem.labelId === 'object'
+    const linkedLabel = labelItem?.labelId && typeof labelItem.labelId === 'object'
       ? labelItem.labelId
-      : labelItem;
-    const name = typeof record === 'string' ? record : record?.name;
+      : null;
+    const name = linkedLabel?.name || labelItem?.name;
     const trimmed = String(name || '').trim();
     if (!trimmed) return [];
-    const slug = typeof record === 'object' ? record.slug : undefined;
     const catalog = typeof labelItem?.catalogNumber === 'string' ? labelItem.catalogNumber.trim() : '';
-    return [{ name: trimmed, slug: slug || null, catalog: catalog || null }];
+    return [{ name: trimmed, slug: linkedLabel?.slug || null, catalog: catalog || null }];
   });
 
   const mediaFields = [
