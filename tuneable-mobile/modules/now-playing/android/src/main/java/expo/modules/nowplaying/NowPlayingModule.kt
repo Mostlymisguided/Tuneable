@@ -22,10 +22,34 @@ class NowPlayingModule : Module() {
     Name("NowPlaying")
     Events("onCommand")
 
-    // Lock-screen Now Playing is implemented natively on iOS. Android keeps
-    // these as no-ops so adding the module cannot affect app startup.
-    Function("setNowPlaying") { _: NowPlayingParams -> }
-    Function("updateElapsed") { _: Double, _: Double, _: Double -> }
-    Function("clear") { }
+    OnCreate {
+      NowPlayingController.setEmitter { command, positionMs, intervalMs ->
+        val payload = mutableMapOf<String, Any>("command" to command)
+        if (positionMs != null) payload["positionMs"] = positionMs
+        if (intervalMs != null) payload["intervalMs"] = intervalMs
+        try {
+          sendEvent("onCommand", payload)
+        } catch (_: Throwable) {
+        }
+      }
+    }
+
+    OnDestroy {
+      NowPlayingController.setEmitter(null)
+      NowPlayingController.clear()
+    }
+
+    Function("setNowPlaying") { params: NowPlayingParams ->
+      val context = appContext.reactContext ?: return@Function
+      NowPlayingController.setNowPlaying(context, params)
+    }
+
+    Function("updateElapsed") { elapsed: Double, duration: Double, playbackRate: Double ->
+      NowPlayingController.updateElapsed(elapsed, duration, playbackRate)
+    }
+
+    Function("clear") {
+      NowPlayingController.clear()
+    }
   }
 }
