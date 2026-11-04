@@ -6342,7 +6342,11 @@ router.get('/admin/bids', authMiddleware, async (req, res) => {
         _id: bid.vetoedBy._id,
         username: bid.vetoedBy.username,
         uuid: bid.vetoedBy.uuid
-      } : null
+      } : null,
+      adjustmentCount: Array.isArray(bid.amountAdjustments) ? bid.amountAdjustments.length : 0,
+      lastAdjustment: Array.isArray(bid.amountAdjustments) && bid.amountAdjustments.length
+        ? bid.amountAdjustments[bid.amountAdjustments.length - 1]
+        : null
     };
     });
 
@@ -6356,6 +6360,52 @@ router.get('/admin/bids', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error fetching bids:', error);
     res.status(500).json({ error: 'Failed to fetch bids', details: error.message });
+  }
+});
+
+// Admin: Change the amount of an active tip without deleting it.
+// Location, tipper, and the original TIP ledger row stay as they are.
+router.post('/admin/bids/:bidId/amount', authMiddleware, async (req, res) => {
+  try {
+    if (!req.user.role || !req.user.role.includes('admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { adjustBidAmount } = require('../services/bidAmountAdjustmentService');
+    const { amountPence, reason } = req.body || {};
+    const result = await adjustBidAmount({
+      bidId: req.params.bidId,
+      newAmountPence: amountPence,
+      reason,
+      adminUser: req.user,
+    });
+
+    const direction = result.deltaPence > 0 ? 'increased' : 'reduced';
+    res.json({
+      message: `Tip ${direction} from £${(result.previousAmountPence / 100).toFixed(2)} to £${(result.amountPence / 100).toFixed(2)}.`,
+      bid: {
+        _id: result.bid._id,
+        uuid: result.bid.uuid,
+        amount: result.bid.amount,
+        previousAmount: result.previousAmountPence,
+        status: result.bid.status,
+      },
+      deltaPence: result.deltaPence,
+      walletDeltaPence: result.walletDeltaPence,
+      ledgerId: result.ledgerId,
+      escrowTouched: result.escrowTouched,
+      tipper: result.tipper,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    if (status >= 500) {
+      console.error('Error adjusting bid amount:', error);
+    }
+    res.status(status).json({
+      error: error.message || 'Failed to adjust tip amount',
+      code: error.code,
+      ...(error.details || {}),
+    });
   }
 });
 

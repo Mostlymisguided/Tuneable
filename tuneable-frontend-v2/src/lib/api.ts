@@ -2383,6 +2383,12 @@ export const userAPI = {
     return response.data;
   },
 
+  // Admin: Change an active tip amount. Keeps the bid, place, and original ledger tip.
+  adjustBidAmount: async (bidId: string, amountPence: number, reason: string) => {
+    const response = await api.post(`/users/admin/bids/${bidId}/amount`, { amountPence, reason });
+    return response.data;
+  },
+
   // Admin: List tip refund requests
   getRefundRequests: async (params?: {
     status?: 'pending' | 'approved' | 'rejected' | '';
@@ -3082,7 +3088,7 @@ export const ledgerAPI = {
 
   // Get ledger entries with filtering and pagination
   getEntries: async (params?: {
-    transactionType?: 'TIP' | 'REFUND' | 'TOP_UP' | 'PAY_OUT';
+    transactionType?: 'TIP' | 'REFUND' | 'TOP_UP' | 'PAY_OUT' | 'ADJUSTMENT';
     userId?: string;
     mediaId?: string;
     startDate?: string;

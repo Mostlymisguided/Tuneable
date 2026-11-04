@@ -62,7 +62,7 @@ const tuneableLedgerSchema = new mongoose.Schema({
   // ========================================
   transactionType: {
     type: String,
-    enum: ['TIP', 'REFUND', 'TOP_UP', 'PAY_OUT'],
+    enum: ['TIP', 'REFUND', 'TOP_UP', 'PAY_OUT', 'ADJUSTMENT'],
     required: true,
     index: true
   },

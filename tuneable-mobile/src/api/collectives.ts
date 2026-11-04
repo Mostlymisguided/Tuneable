@@ -1,6 +1,7 @@
 import { api } from './client';
 import type { CollectiveType } from '../lib/collectiveTypes';
 import type { ResolvedLocation } from '../types/user';
+import type { ChartMediaItem } from '../types/media';
 
 export interface CollectiveStats {
   memberCount?: number;
@@ -11,6 +12,7 @@ export interface CollectiveStats {
   globalCollectiveBidAvg?: number;
   globalCollectiveBidTop?: number;
   globalCollectiveBidCount?: number;
+  tuneBytesAggregate?: number;
 }
 
 export interface CollectiveMember {
@@ -68,6 +70,7 @@ export interface CollectiveProfileResponse {
   collective: Collective;
   recentReleases: CollectiveMedia[];
   topMedia: CollectiveMedia[];
+  tuneBytesMedia?: ChartMediaItem[];
   members: CollectiveMember[];
 }
 

@@ -1,6 +1,7 @@
 const { createMediaUpload, getPublicUrl } = require('./r2Upload');
 const { normalizeIsrc } = require('./mediaMatchUtils');
 const { roundBpm } = require('./bpm');
+const { bitrateToKbps } = require('./bitrate');
 const crypto = require('crypto');
 
 let musicMetadataPromise;
@@ -246,7 +247,7 @@ class MetadataExtractor {
       
       // Technical metadata
       duration: extractedData.duration || null,
-      bitrate: extractedData.bitrate || null,
+      bitrate: bitrateToKbps(extractedData.bitrate),
       sampleRate: extractedData.sampleRate || null,
       explicit: extractedData.explicit || false,
       

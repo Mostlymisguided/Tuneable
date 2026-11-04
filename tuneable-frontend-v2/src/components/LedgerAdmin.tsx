@@ -40,7 +40,7 @@ interface LedgerEntry {
     _id: string;
     name: string;
   };
-  transactionType: 'TIP' | 'REFUND' | 'TOP_UP' | 'PAY_OUT';
+  transactionType: 'TIP' | 'REFUND' | 'TOP_UP' | 'PAY_OUT' | 'ADJUSTMENT';
   amount: number;
   timestamp: string;
   userBalancePre: number;
@@ -66,6 +66,7 @@ interface LedgerStats {
     refunds: number;
     topUps: number;
     payouts: number;
+    adjustments?: number;
   };
   totalVolume: number;
   totalVolumePounds: string;
@@ -208,6 +209,7 @@ const LedgerAdmin: React.FC = () => {
       case 'REFUND': return 'bg-yellow-600';
       case 'TOP_UP': return 'bg-blue-600';
       case 'PAY_OUT': return 'bg-purple-600';
+      case 'ADJUSTMENT': return 'bg-amber-600';
       default: return 'bg-gray-600';
     }
   };
@@ -300,7 +302,7 @@ const LedgerAdmin: React.FC = () => {
       {!loadingStats && stats && (
         <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Transactions by Type</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-400">{stats.byType.tips}</div>
               <div className="text-sm text-gray-400 mt-1">Tips</div>
@@ -316,6 +318,10 @@ const LedgerAdmin: React.FC = () => {
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-400">{stats.byType.payouts}</div>
               <div className="text-sm text-gray-400 mt-1">Payouts</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-amber-400">{stats.byType.adjustments || 0}</div>
+              <div className="text-sm text-gray-400 mt-1">Adjustments</div>
             </div>
           </div>
         </div>
@@ -408,6 +414,7 @@ const LedgerAdmin: React.FC = () => {
               <option value="REFUND">Refunds</option>
               <option value="TOP_UP">Top-ups</option>
               <option value="PAY_OUT">Payouts</option>
+              <option value="ADJUSTMENT">Adjustments</option>
             </select>
           </div>
 

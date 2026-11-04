@@ -2,6 +2,7 @@ const {
   founderTipWindows,
   founderTipTotal,
   founderTuneByteAwards,
+  attributeCollectiveTuneBytes,
   sumFounderTipsForCollectives,
   collectiveRankingAggregate,
   freezeFounderTipScope,
@@ -43,6 +44,36 @@ describe('collective founder tips', () => {
     ]);
     expect(awards.map((award) => award.bidId)).toEqual(['b1', 'b2']);
     expect(awards.reduce((sum, award) => sum + award.earned, 0)).toBe(16.5);
+  });
+
+  it('keeps the media id on each founder TuneBytes award', () => {
+    const windows = founderTipWindows(collective([{
+      userId: founderId,
+      role: 'founder',
+      joinedAt: new Date('2024-01-01T00:00:20.000Z'),
+    }]));
+    const awards = founderTuneByteAwards(windows, [
+      { _id: 'b1', mediaId: 'm1', userId: founderId, tuneBytesEarned: 3, createdAt: new Date('2024-02-01T00:00:00.000Z'), status: 'active' },
+    ]);
+    expect(awards).toEqual([{ bidId: 'b1', mediaId: 'm1', earned: 3 }]);
+  });
+
+  it('attributes TuneBytes per media and counts a bid only once', () => {
+    const { total, byMedia } = attributeCollectiveTuneBytes(
+      [
+        { bidId: 'b1', mediaId: 'm1', earned: 10 },
+        { bidId: 'b2', mediaId: 'm2', earned: 4 },
+      ],
+      [
+        { bidId: 'b1', mediaId: 'm1', tuneBytesEarned: 10 },
+        { bidId: 'b3', mediaId: 'm1', tuneBytesEarned: 6 },
+        { bidId: '', mediaId: 'm9', tuneBytesEarned: 100 },
+      ]
+    );
+    expect(total).toBe(20);
+    expect(byMedia.get('m1')).toBe(16);
+    expect(byMedia.get('m2')).toBe(4);
+    expect(byMedia.has('m9')).toBe(false);
   });
 
   it('does not import history for a founder recorded long after the collective was created', () => {

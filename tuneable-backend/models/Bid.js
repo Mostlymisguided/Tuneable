@@ -180,6 +180,18 @@ const bidSchema = new mongoose.Schema({
     refundReason: { type: String }, // Reason for refund (user-provided or admin note)
     refundRequestedAt: { type: Date }, // Timestamp when refund was requested (if after time window)
     refundRequestReason: { type: String }, // User's reason for requesting refund
+
+    // Admin amount edits. The original TIP ledger row is not rewritten;
+    // each edit also appends an ADJUSTMENT ledger entry.
+    amountAdjustments: [{
+        at: { type: Date, default: Date.now },
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        fromPence: { type: Number, required: true },
+        toPence: { type: Number, required: true },
+        reason: { type: String },
+        ledgerId: { type: mongoose.Schema.Types.ObjectId, ref: 'TuneableLedger' },
+        _id: false
+    }],
     
     // ========================================
     // DYNAMIC METRICS (computed via BidMetricsEngine)

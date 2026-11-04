@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { prepareProfileImage } from '../utils/profileImage';
-import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2, UserPlus, Search, Mail } from 'lucide-react';
+import { Users, Music, TrendingUp, Calendar, MapPin, Globe, Instagram, Facebook, Youtube, Twitter, ArrowLeft, Flag, X, Save, Loader2, UserPlus, Search, Mail, Sparkles } from 'lucide-react';
 import { collectiveAPI, userAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
@@ -12,7 +12,6 @@ import { DEFAULT_PROFILE_PIC } from '../constants';
 import ReportModal from '../components/ReportModal';
 import DeleteCollectiveSection from '../components/DeleteCollectiveSection';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
-import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import {
@@ -24,6 +23,8 @@ import {
 } from '../utils/collectiveTypes';
 import { usePageMeta } from '../seo/usePageMeta';
 import { clipText } from '../seo/pageMeta';
+import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 
 interface Collective {
   _id: string;
@@ -57,6 +58,7 @@ interface Collective {
     globalCollectiveBidAvg?: number;
     globalCollectiveBidTop?: number;
     globalCollectiveBidCount?: number;
+    tuneBytesAggregate?: number;
   };
   verificationStatus?: string;
   createdAt?: string;
@@ -140,7 +142,7 @@ const CollectiveProfile: React.FC = () => {
     imageAlt: collective.name,
   } : null);
   const [recentReleases, setRecentReleases] = useState<Media[]>([]);
-  const [topMedia, setTopMedia] = useState<Media[]>([]);
+  const [tuneBytesMedia, setTuneBytesMedia] = useState<TippedQueueItem[]>([]);
   const [members, setMembers] = useState<Collective['members']>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'media'>('overview');
@@ -368,7 +370,7 @@ useEffect(() => {
       
       setCollective(data.collective);
       setRecentReleases(data.recentReleases || []);
-      setTopMedia(data.topMedia || []);
+      setTuneBytesMedia(data.tuneBytesMedia || []);
       
       // Fetch members separately
       if (data.collective) {
@@ -552,6 +554,20 @@ useEffect(() => {
   const collectiveStats = collective?.stats;
   const activeMembersCount = Array.isArray(members) ? members.length : 0;
   const memberDisplayCount = activeMembersCount > 0 ? activeMembersCount : (collectiveStats?.memberCount || 0);
+  const tuneBytesQueue = tuneBytesMedia.length > 0 ? (
+    <TippedMediaQueueList
+      items={tuneBytesMedia}
+      header={<h3 className="text-2xl font-bold text-white">Tunes</h3>}
+      onTipPlaced={() => { void fetchCollectiveData(); }}
+    />
+  ) : (
+    <div>
+      <h3 className="text-2xl font-bold text-white mb-4">Tunes</h3>
+      <p className="text-gray-400">
+        Founder tips, credited tunes, and tunes owned by current members show up here.
+      </p>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
@@ -773,6 +789,11 @@ useEffect(() => {
               {isVenueCollective(collective.type) ? 'Venue Statistics' : 'Collective Statistics'}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+              <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
+                <Sparkles className="w-8 h-8 text-purple-300 mx-auto mb-2" />
+                <div className="text-lg md:text-2xl font-bold text-white">{formatTuneBytes(collectiveStats?.tuneBytesAggregate)}</div>
+                <div className="text-xs md:text-sm text-gray-300">TuneBytes</div>
+              </div>
               {(collectiveStats?.memberCount !== undefined || memberDisplayCount > 0) && (
                 <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                   <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
@@ -812,7 +833,7 @@ useEffect(() => {
               {[
                 { id: 'overview', label: 'Overview' },
                 { id: 'members', label: isVenueCollective(collective.type) ? 'Membership' : 'Members' },
-                { id: 'media', label: isVenueCollective(collective.type) ? 'Library' : 'Releases' }
+                { id: 'media', label: 'Tunes' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -875,6 +896,8 @@ useEffect(() => {
                 </div>
               </div>
 
+              {tuneBytesQueue}
+
               {/* Recent Releases */}
               {recentReleases.length > 0 && (
                 <div>
@@ -896,44 +919,6 @@ useEffect(() => {
                           </Link>
                           <p className="text-gray-400 text-sm truncate">{release.artist}</p>
                           <p className="text-purple-400 text-sm">{penceToPounds(release.stats.totalBidAmount)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Top Performing Media */}
-              {topMedia.length > 0 && (
-                <div>
-                  <h3 className="text-2xl font-bold text-white mb-4">Top Performing Releases</h3>
-                  <div className="space-y-2">
-                    {topMedia.map((media, index) => (
-                      <div key={media._id} className="card flex items-center space-x-4 p-4 bg-black/10 rounded-lg hover:bg-black/20 transition-colors">
-                        <div className="flex-shrink-0">
-                          <div className="flex items-center justify-center w-12 h-12 bg-purple-600/50 rounded-full">
-                            <span className="text-white font-bold text-lg">{index + 1}</span>
-                          </div>
-                        </div>
-                        <img
-                          src={media.coverArt}
-                          alt={media.title}
-                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Link 
-                            to={getMediaProfileUrl(media)}
-                            className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block"
-                          >
-                            {media.title}
-                          </Link>
-                          <p className="text-gray-400 text-sm truncate">
-                            <ClickableArtistDisplay media={media} />
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-purple-400 font-medium">{penceToPounds(media.stats.totalBidAmount)}</p>
-                          <p className="text-gray-400 text-sm">{media.stats.bidCount} Tips Received</p>
                         </div>
                       </div>
                     ))}
@@ -1011,43 +996,7 @@ useEffect(() => {
 
           {activeTab === 'media' && (
             <div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                {isVenueCollective(collective.type) ? 'Library' : 'All Releases'}
-              </h3>
-              {recentReleases.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {recentReleases.map((release) => (
-                    <div key={release._id} className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors">
-                      <img
-                        src={release.coverArt}
-                        alt={release.title}
-                        className="w-full h-48 rounded-lg object-cover mb-4"
-                      />
-                      <Link 
-                        to={getMediaProfileUrl(release)}
-                        className="text-white font-medium truncate hover:text-purple-300 transition-colors cursor-pointer block mb-1"
-                      >
-                        {release.title}
-                      </Link>
-                      <p className="text-gray-400 text-sm mb-2 truncate">{release.artist}</p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-purple-400 font-medium">
-                          {penceToPounds(release.stats.totalBidAmount)}
-                        </span>
-                        <span className="text-gray-400 text-sm">
-                          {release.stats.bidCount} Tips
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-400">
-                  {isVenueCollective(collective.type)
-                    ? 'House library and hosted-party charts will live here. Claimed venues can already have a public profile and place on the city page.'
-                    : 'No releases found.'}
-                </p>
-              )}
+              {tuneBytesQueue}
             </div>
           )}
         </div>
@@ -1065,6 +1014,11 @@ useEffect(() => {
               {isVenueCollective(collective.type) ? 'Venue Statistics' : 'Collective Statistics'}
             </h2>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+                      <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
+                        <Sparkles className="w-8 h-8 text-purple-300 mx-auto mb-2" />
+                        <div className="text-lg md:text-2xl font-bold text-white">{formatTuneBytes(collectiveStats?.tuneBytesAggregate)}</div>
+                        <div className="text-xs md:text-sm text-gray-300">TuneBytes</div>
+                      </div>
                       {(collectiveStats?.memberCount !== undefined || memberDisplayCount > 0) && (
                         <div className="card bg-black/20 rounded-lg p-2 md:p-4 text-center">
                           <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />

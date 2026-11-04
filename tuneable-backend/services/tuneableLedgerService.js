@@ -486,6 +486,91 @@ class TuneableLedgerService {
   }
   
   /**
+   * Append an admin tip-amount adjustment.
+   * Does not modify the original TIP row. Amount stored is the absolute delta;
+   * the signed delta, old amount, new amount, and reason live in metadata.
+   */
+  async createAdjustmentEntry({
+    userId,
+    mediaId,
+    partyId = null,
+    bidId,
+    oldAmountPence,
+    newAmountPence,
+    userBalancePre,
+    userAggregatePre,
+    mediaAggregatePre,
+    reason,
+    adjustedBy,
+    metadata = {}
+  }) {
+    const user = await User.findById(userId).lean();
+    const media = await Media.findById(mediaId).lean();
+
+    if (!user) {
+      throw new Error(`User ${userId} not found`);
+    }
+    if (!media) {
+      throw new Error(`Media ${mediaId} not found`);
+    }
+
+    const deltaPence = Math.round(newAmountPence) - Math.round(oldAmountPence);
+    const absoluteDelta = Math.abs(deltaPence);
+    const userBalancePost = userBalancePre - deltaPence;
+    const userAggregatePost = Math.max(0, userAggregatePre + deltaPence);
+    const mediaAggregatePost = Math.max(0, (mediaAggregatePre || 0) + deltaPence);
+    const globalAggregatePre = await this._calculateGlobalAggregate();
+    const globalAggregatePost = Math.max(0, globalAggregatePre + deltaPence);
+
+    const mediaTitle = media.title;
+    const direction = deltaPence > 0 ? 'increased' : 'decreased';
+    const ledgerEntry = new TuneableLedger({
+      userId,
+      mediaId,
+      partyId,
+      bidId,
+      user_uuid: user.uuid,
+      media_uuid: media.uuid,
+      transactionType: 'ADJUSTMENT',
+      amount: absoluteDelta,
+      userBalancePre,
+      userBalancePost,
+      userAggregatePre,
+      userAggregatePost,
+      mediaAggregatePre,
+      mediaAggregatePost,
+      globalAggregatePre,
+      globalAggregatePost,
+      referenceTransactionId: bidId,
+      referenceTransactionType: 'Bid',
+      username: user.username,
+      mediaTitle,
+      partyName: partyId ? await this._getPartyName(partyId) : null,
+      description: `Admin ${direction} tip on "${mediaTitle}" from £${(oldAmountPence / 100).toFixed(2)} to £${(newAmountPence / 100).toFixed(2)}`,
+      metadata: {
+        ...metadata,
+        adjustment: true,
+        oldAmountPence,
+        newAmountPence,
+        deltaPence,
+        reason,
+        adjustedBy: adjustedBy ? String(adjustedBy) : null,
+      }
+    });
+
+    await ledgerEntry.save();
+
+    try {
+      const verificationService = require('./transactionVerificationService');
+      await verificationService.storeVerificationHash(ledgerEntry, 'TuneableLedger');
+    } catch (verifyError) {
+      console.error('Failed to store verification hash for adjustment ledger entry:', verifyError);
+    }
+
+    return ledgerEntry;
+  }
+
+  /**
    * Calculate global aggregate (sum of all active bids across platform)
    * @private
    * @returns {Promise<number>} Total amount in pence

@@ -10,22 +10,33 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { collectiveAPI, type Collective } from '@/src/api/collectives';
+import { mediaAPI } from '@/src/api/media';
+import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { Screen } from '@/src/components/Screen';
+import { TipSheet } from '@/src/components/TipSheet';
+import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
-import { formatPoundsFromPence } from '@/src/lib/format';
+import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import { collectiveTypeLabel } from '@/src/lib/collectiveTypes';
 import { getPlaceProfileHref } from '@/src/lib/location';
+import { getCreatorDisplay, isUploadPlayable, mediaId } from '@/src/lib/media';
+import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
+import type { ChartMediaItem } from '@/src/types/media';
 
 export default function CollectiveProfileScreen() {
   const { slug: slugParam } = useLocalSearchParams<{ slug: string }>();
   const slug = typeof slugParam === 'string' ? decodeURIComponent(slugParam) : '';
   const { contentPaddingBottom } = usePlayerDockState();
+  const { user, updateBalance } = useAuth();
+  const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
 
   const [collective, setCollective] = useState<Collective | null>(null);
+  const [tuneBytesMedia, setTuneBytesMedia] = useState<ChartMediaItem[]>([]);
+  const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +47,7 @@ export default function CollectiveProfileScreen() {
     try {
       const data = await collectiveAPI.getProfile(slug);
       setCollective(data.collective);
+      setTuneBytesMedia(data.tuneBytesMedia || []);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Collective not found or failed to load.'
@@ -58,6 +70,29 @@ export default function CollectiveProfileScreen() {
   };
 
   const displayType = collective ? collectiveTypeLabel(collective.type) : '';
+
+  const onPlayItem = (item: ChartMediaItem) => {
+    const playable = tuneBytesMedia.filter(isUploadPlayable);
+    const index = playable.findIndex((entry) => mediaId(entry) === mediaId(item));
+    if (index < 0) {
+      const fallback = tuneBytesMedia.findIndex((entry) => mediaId(entry) === mediaId(item));
+      void setQueueAndPlay(tuneBytesMedia, Math.max(0, fallback));
+      return;
+    }
+    void setQueueAndPlay(playable, index);
+  };
+
+  const onConfirmTip = async (amountPounds: number, tags: string[]) => {
+    if (!tipTarget) return;
+    const id = mediaId(tipTarget);
+    if (!id) throw new Error('Missing media id');
+    const res = await mediaAPI.placeGlobalBid(id, amountPounds, { tags });
+    if (typeof res.updatedBalance === 'number') {
+      updateBalance(res.updatedBalance);
+    }
+    void load();
+    return res;
+  };
 
   return (
     <Screen padForPlayer={false}>
@@ -112,8 +147,16 @@ export default function CollectiveProfileScreen() {
               <Text style={styles.description}>{collective.description}</Text>
             ) : null}
 
-            {(collective.stats?.rankingAggregate ?? collective.stats?.globalCollectiveAggregate) ? (
+            {(collective.stats?.rankingAggregate ?? collective.stats?.globalCollectiveAggregate) ||
+            collective.stats?.tuneBytesAggregate ? (
               <View style={styles.statChips}>
+                <View style={styles.statChip}>
+                  <Ionicons name="sparkles-outline" size={14} color={colors.accentLight} />
+                  <Text style={styles.statChipText}>
+                    {formatTuneBytes(collective.stats?.tuneBytesAggregate)}{' '}
+                    <Text style={styles.statChipMuted}>TuneBytes</Text>
+                  </Text>
+                </View>
                 <View style={styles.statChip}>
                   <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
                   <Text style={styles.statChipText}>
@@ -231,8 +274,43 @@ export default function CollectiveProfileScreen() {
               </View>
             ) : null}
           </View>
+
+          <View style={styles.tunesSection}>
+            <Text style={styles.tunesTitle}>Tunes</Text>
+            {tuneBytesMedia.length > 0 ? (
+              tuneBytesMedia.map((item, index) => (
+                <ChartTrackRow
+                  key={mediaId(item) || `tune-${index}`}
+                  rank={index + 1}
+                  item={item}
+                  variant="rich"
+                  onOpen={() => {
+                    const id = mediaId(item);
+                    if (id) router.push(`/tune/${id}` as Href);
+                  }}
+                  onPlay={() => onPlayItem(item)}
+                  onTip={() => setTipTarget(item)}
+                />
+              ))
+            ) : (
+              <Text style={styles.emptyTunes}>
+                Founder tips, credited tunes, and tunes owned by current members show up here.
+              </Text>
+            )}
+          </View>
         </ScrollView>
       ) : null}
+
+      <TipSheet
+        visible={Boolean(tipTarget)}
+        title={tipTarget?.title || 'Untitled'}
+        subtitle={tipTarget ? getCreatorDisplay(tipTarget) : undefined}
+        balancePence={user?.balance ?? 0}
+        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
+        tipMedia={tipTarget}
+        onClose={() => setTipTarget(null)}
+        onConfirm={onConfirmTip}
+      />
     </Screen>
   );
 }
@@ -386,6 +464,21 @@ const styles = StyleSheet.create({
     color: '#e9d5ff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  tunesSection: {
+    width: '100%',
+    marginTop: 8,
+  },
+  tunesTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  emptyTunes: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
   },
   centered: {
     alignItems: 'center',

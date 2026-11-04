@@ -46,6 +46,7 @@ import DeleteUserModal from '../components/DeleteUserModal';
 import InviteReferrals from '../components/InviteReferrals';
 import AmbassadorsAdmin from '../components/AmbassadorsAdmin';
 import UserTopUpModal from '../components/UserTopUpModal';
+import EditBidAmountModal from '../components/EditBidAmountModal';
 import { authAPI, creatorAPI, claimAPI, userAPI, mediaAPI, partyAPI, searchAPI, labelAPI, collectiveAPI, reportAPI, artistEscrowAPI } from '../lib/api';
 import { toast } from '../utils/toast';
 import { summariseLicence } from '../components/LicencePicker';
@@ -161,6 +162,7 @@ const Admin: React.FC = () => {
   const [bidsStatusFilter, setBidsStatusFilter] = useState<string>('');
   const [bidsSearchQuery, setBidsSearchQuery] = useState<string>('');
   const [bidsScopeFilter, setBidsScopeFilter] = useState<string>('');
+  const [amountEditBid, setAmountEditBid] = useState<any | null>(null);
   const [mediaList, setMediaList] = useState<any[]>([]);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   const [mediaSortField, setMediaSortField] = useState<string>('uploadedAt');
@@ -2803,6 +2805,11 @@ const Admin: React.FC = () => {
                                 <div className="text-sm font-medium text-green-400">
                                   {penceToPounds(bid.amount)}
                                 </div>
+                                {bid.adjustmentCount > 0 && (
+                                  <div className="text-xs text-purple-300">
+                                    Adjusted {bid.adjustmentCount === 1 ? 'once' : `${bid.adjustmentCount} times`}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 {bid.status === 'active' ? (
@@ -2846,6 +2853,15 @@ const Admin: React.FC = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center space-x-2">
+                                  {bid.status === 'active' && (
+                                    <button
+                                      onClick={() => setAmountEditBid(bid)}
+                                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                                      title="Edit tip amount"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
                                   {bid.status === 'active' && (
                                     <button
                                       onClick={async () => {
@@ -4734,6 +4750,14 @@ const Admin: React.FC = () => {
               // Refresh users list to show updated balances
               loadUsers();
             }}
+          />
+        )}
+
+        {amountEditBid && (
+          <EditBidAmountModal
+            bid={amountEditBid}
+            onClose={() => setAmountEditBid(null)}
+            onSaved={() => loadBids()}
           />
         )}
 

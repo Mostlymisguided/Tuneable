@@ -19,6 +19,7 @@ router.get('/stats', authMiddleware, adminMiddleware, async (req, res) => {
       refundCount,
       topUpCount,
       payoutCount,
+      adjustmentCount,
       totalVolume,
       recentEntries,
       sequenceRange
@@ -28,7 +29,9 @@ router.get('/stats', authMiddleware, adminMiddleware, async (req, res) => {
       TuneableLedger.countDocuments({ transactionType: 'REFUND' }),
       TuneableLedger.countDocuments({ transactionType: 'TOP_UP' }),
       TuneableLedger.countDocuments({ transactionType: 'PAY_OUT' }),
+      TuneableLedger.countDocuments({ transactionType: 'ADJUSTMENT' }),
       TuneableLedger.aggregate([
+        { $match: { transactionType: { $ne: 'ADJUSTMENT' } } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
       ]),
       TuneableLedger.find()
@@ -58,7 +61,8 @@ router.get('/stats', authMiddleware, adminMiddleware, async (req, res) => {
           tips: tipCount,
           refunds: refundCount,
           topUps: topUpCount,
-          payouts: payoutCount
+          payouts: payoutCount,
+          adjustments: adjustmentCount
         },
         totalVolume: totalVolumePence,
         totalVolumePounds: (totalVolumePence / 100).toFixed(2),

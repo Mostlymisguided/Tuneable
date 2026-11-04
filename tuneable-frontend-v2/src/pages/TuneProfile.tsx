@@ -62,6 +62,7 @@ import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { canEditMedia, canDeleteMedia, isAdmin } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { formatBpmLabel, roundBpm } from '../utils/bpm';
+import { bitrateToKbps, formatBitrateKbps } from '../utils/bitrate';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import {
   formatLinkedProfileLabel,
@@ -965,7 +966,7 @@ const TuneProfile: React.FC = () => {
         mediawriter: (media as any).mediawriter?.[0]?.name || (media as any).mediawriter || '',
         label: (media as any).label?.[0]?.name || (media as any).label || '',
         language: (media as any).language || '',
-        bitrate: media.bitrate || 0,
+        bitrate: bitrateToKbps(media.bitrate) || 0,
         sampleRate: media.sampleRate || 0,
         pitch: media.pitch || 440,
         timeSignature: media.timeSignature || '',
@@ -2203,7 +2204,7 @@ const TuneProfile: React.FC = () => {
     const name = typeof record === 'string' ? record : record?.name;
     const trimmed = String(name || '').trim();
     if (!trimmed) return [];
-    const slug = record && typeof record === 'object' && 'slug' in record ? record.slug : undefined;
+    const slug = typeof record === 'object' ? record.slug : undefined;
     const catalog = typeof labelItem?.catalogNumber === 'string' ? labelItem.catalogNumber.trim() : '';
     return [{ name: trimmed, slug: slug || null, catalog: catalog || null }];
   });
@@ -2232,7 +2233,7 @@ const TuneProfile: React.FC = () => {
     { label: 'Tags', value: media.tags, icon: Tag },
     { label: 'Explicit', value: media.explicit ? 'Yes' : 'No', icon: Globe },
     { label: 'Time Signature', value: media.timeSignature, icon: Music },
-    { label: 'Bitrate', value: media.bitrate ? `${media.bitrate} kbps` : null, icon: Headphones },
+    { label: 'Bitrate', value: formatBitrateKbps(media.bitrate), icon: Headphones },
     { label: 'ISRC', value: media.isrc, icon: Music },
     { label: 'UPC', value: media.upc, icon: Disc },
     { label: 'Encoded By', value: media.encodedBy, icon: SlidersHorizontal },

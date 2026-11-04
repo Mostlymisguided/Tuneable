@@ -3,6 +3,7 @@ const Bid = require('../models/Bid');
 const TuneBytesTransaction = require('../models/TuneBytesTransaction');
 const ArtistEscrowAllocation = require('../models/ArtistEscrowAllocation');
 const PayoutRequest = require('../models/PayoutRequest');
+const TuneableLedger = require('../models/TuneableLedger');
 const VerificationHash = require('../models/VerificationHash');
 
 /**
@@ -169,7 +170,8 @@ class TransactionVerificationService {
       'Bid',
       'TuneBytesTransaction',
       'ArtistEscrowAllocation',
-      'PayoutRequest'
+      'PayoutRequest',
+      'TuneableLedger'
     ];
 
     const overallResults = {
@@ -208,7 +210,8 @@ class TransactionVerificationService {
       'Bid': Bid,
       'TuneBytesTransaction': TuneBytesTransaction,
       'ArtistEscrowAllocation': ArtistEscrowAllocation,
-      'PayoutRequest': PayoutRequest
+      'PayoutRequest': PayoutRequest,
+      'TuneableLedger': TuneableLedger
     };
 
     return models[transactionType];

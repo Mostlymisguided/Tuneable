@@ -103,17 +103,56 @@ function founderTipTotal(windows, tips) {
   return total;
 }
 
+function refId(value) {
+  if (value == null || value === '') return '';
+  if (typeof value === 'object' && value._id && value._id !== value) return refId(value._id);
+  const asString = typeof value.toString === 'function' ? value.toString() : String(value);
+  return asString && asString !== '[object Object]' ? asString : '';
+}
+
 function founderTuneByteAwards(windows, tips) {
   const byUser = new Map((windows || []).map((window) => [window.userId, window]));
   const awards = [];
   for (const tip of tips || []) {
     if (!tipFallsInWindow(tip, byUser.get(tipUserId(tip)))) continue;
     awards.push({
-      bidId: tip && tip._id ? String(tip._id) : '',
+      bidId: tip && tip._id ? refId(tip._id) : '',
+      mediaId: refId(tip && tip.mediaId),
       earned: Number(tip.tuneBytesEarned) || 0,
     });
   }
   return awards;
+}
+
+/**
+ * Same bid rules as the places-page collective TuneBytes total.
+ * Founder awards are applied first, then credited-media rows whose bid was not already counted.
+ * mediaRows must already be limited to media this collective is credited on.
+ */
+function attributeCollectiveTuneBytes(founderAwards, mediaRows) {
+  const seenBids = new Set();
+  const byMedia = new Map();
+  let total = 0;
+
+  const add = (bidId, mediaId, earned) => {
+    const id = bidId ? String(bidId) : '';
+    if (!id || seenBids.has(id)) return;
+    seenBids.add(id);
+    const amount = Number(earned) || 0;
+    total += amount;
+    const mediaKey = mediaId ? String(mediaId) : '';
+    if (!mediaKey) return;
+    byMedia.set(mediaKey, (byMedia.get(mediaKey) || 0) + amount);
+  };
+
+  for (const award of founderAwards || []) {
+    add(award.bidId, award.mediaId, award.earned);
+  }
+  for (const row of mediaRows || []) {
+    add(row.bidId, row.mediaId, row.tuneBytesEarned);
+  }
+
+  return { total, byMedia };
 }
 
 function sumFounderTipsForCollectives(collectives, tips) {
@@ -134,6 +173,7 @@ module.exports = {
   founderTipWindows,
   founderTipTotal,
   founderTuneByteAwards,
+  attributeCollectiveTuneBytes,
   sumFounderTipsForCollectives,
   collectiveRankingAggregate,
 };

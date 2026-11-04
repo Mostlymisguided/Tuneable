@@ -41,6 +41,7 @@ const {
 } = require('../utils/elementNormalizer');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
 const { roundBpm } = require('../utils/bpm');
+const { bitrateToKbps } = require('../utils/bitrate');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 const {
   shouldClearRightsOnAttach,
@@ -2202,7 +2203,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     const allowedUpdates = [
       'title', 'producer', 'album', 'genre',
       'releaseDate', 'releaseYear', 'duration', 'explicit', 'isrc', 'upc', 'isbn', 'bpm',
-      'pitch', 'key', 'elements', 'tags', 'category', 'timeSignature',
+      'pitch', 'key', 'bitrate', 'elements', 'tags', 'category', 'timeSignature',
       'lyrics', 'description', 'language', 'minimumBid', 'copySharePercent'
       // Note: 'featuring' is handled separately below (needs subdocument conversion)
     ];
@@ -2313,6 +2314,10 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
         if (field === 'bpm') {
           value = roundBpm(value);
+        }
+
+        if (field === 'bitrate') {
+          value = bitrateToKbps(value);
         }
         
         // Check if value actually changed

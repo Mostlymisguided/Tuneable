@@ -30,7 +30,8 @@ const verificationHashSchema = new mongoose.Schema({
       'Bid',
       'TuneBytesTransaction',
       'ArtistEscrowAllocation',
-      'PayoutRequest'
+      'PayoutRequest',
+      'TuneableLedger'
     ],
     required: true,
     index: true

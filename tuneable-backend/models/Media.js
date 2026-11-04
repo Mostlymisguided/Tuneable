@@ -4,6 +4,7 @@ const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeLanguageInput } = require('../utils/language');
 const { normalizeIsbn } = require('../utils/isbn');
 const { roundBpm } = require('../utils/bpm');
+const { bitrateToKbps } = require('../utils/bitrate');
 const { normalizeKey } = require('../utils/keyNormalizer');
 const { mapboxLocationFields } = require('./mapboxLocationFields');
 
@@ -255,7 +256,13 @@ const mediaSchema = new mongoose.Schema({
   },
   pitch: { type: Number, default: 440 },
   timeSignature: { type: String, default: '4/4' },
-  bitrate: { type: Number },
+  bitrate: {
+    type: Number, // kbps
+    set(value) {
+      if (value === undefined) return undefined;
+      return bitrateToKbps(value);
+    },
+  },
   sampleRate: { type: Number },
   elements: { type: [String], default: [] }, // Musical content (instruments/sonic ingredients). Tip chips classified via elementNormalizer.
   encodedBy: { type: String, default: null }, // Encoder/DAW string from ID3 (e.g. "Logic Pro", "LAME")
