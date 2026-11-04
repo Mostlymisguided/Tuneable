@@ -224,7 +224,7 @@ const LedgerAdmin: React.FC = () => {
       new Date(entry.timestamp).toISOString(),
       entry.transactionType,
       entry.username || entry.userId?.username || 'Unknown',
-      entry.mediaTitle || entry.mediaId?.title || 'N/A',
+      entry.mediaId?.title || entry.mediaTitle || 'N/A',
       penceToPounds(entry.amount),
       penceToPounds(entry.userBalancePre),
       penceToPounds(entry.userBalancePost),
@@ -618,12 +618,12 @@ const LedgerAdmin: React.FC = () => {
                         </Link>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {entry.mediaTitle || entry.mediaId?.title ? (
+                        {entry.mediaId?.title || entry.mediaTitle ? (
                           <Link
                             to={`/tune/${entry.mediaId?._id || entry.mediaId}`}
                             className="text-sm text-purple-400 hover:text-purple-300 hover:underline"
                           >
-                            {entry.mediaTitle || entry.mediaId?.title}
+                            {entry.mediaId?.title || entry.mediaTitle}
                           </Link>
                         ) : (
                           <span className="text-sm text-gray-500">N/A</span>

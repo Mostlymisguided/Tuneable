@@ -482,6 +482,14 @@ async function applySuggestionToMedia(media, suggestion, {
 
   media.creatorDisplay = formatCreatorDisplay(media.artist || [], media.featuring || []);
   await media.save();
+  if (applyIdentity) {
+    try {
+      const { syncDenormalizedMediaLabels } = require('./mediaLabelSync');
+      await syncDenormalizedMediaLabels(media);
+    } catch (labelError) {
+      console.error('Error syncing media labels onto tips:', labelError);
+    }
+  }
   return media;
 }
 

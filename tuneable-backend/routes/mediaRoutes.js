@@ -2913,6 +2913,18 @@ router.put('/:id', authMiddleware, async (req, res) => {
     }
     
     await media.save();
+    if (
+      req.body.title !== undefined
+      || req.body.artist !== undefined
+      || req.body.artists !== undefined
+    ) {
+      try {
+        const { syncDenormalizedMediaLabels } = require('../services/mediaLabelSync');
+        await syncDenormalizedMediaLabels(media);
+      } catch (labelError) {
+        console.error('Error syncing media labels onto tips:', labelError);
+      }
+    }
     if (previousLinkedArtists) {
       await notificationService.notifyNewlyLinkedMediaUsers({
         media,
@@ -4772,6 +4784,14 @@ router.put('/admin/:mediaId', authMiddleware, async (req, res) => {
     }
 
     await media.save();
+    if (title !== undefined || artist !== undefined || artists !== undefined) {
+      try {
+        const { syncDenormalizedMediaLabels } = require('../services/mediaLabelSync');
+        await syncDenormalizedMediaLabels(media);
+      } catch (labelError) {
+        console.error('Error syncing media labels onto tips:', labelError);
+      }
+    }
     if (previousLinkedArtists) {
       await notificationService.notifyNewlyLinkedMediaUsers({
         media,

@@ -5911,9 +5911,12 @@ router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
       .skip((parseInt(page) - 1) * parseInt(limit));
 
     const total = await Bid.countDocuments(query);
+    const { mediaLabelFromBid } = require('../utils/mediaDisplayLabel');
 
     // Format response
-    const formattedBids = bids.map(bid => ({
+    const formattedBids = bids.map(bid => {
+      const label = mediaLabelFromBid(bid);
+      return {
       _id: bid._id,
       uuid: bid.uuid,
       amount: bid.amount, // In pence
@@ -5927,10 +5930,11 @@ router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
         uuid: bid.userId?.uuid || bid.user_uuid
       },
       media: {
-        _id: bid.mediaId?._id || bid.mediaId,
-        title: bid.mediaTitle || bid.mediaId?.title || 'Unknown',
-        artist: bid.mediaArtist || (Array.isArray(bid.mediaId?.artist) ? bid.mediaId.artist[0]?.name : bid.mediaId?.artist) || 'Unknown',
-        coverArt: bid.mediaCoverArt || bid.mediaId?.coverArt
+        _id: label._id,
+        title: label.title,
+        artist: label.artist,
+        artists: label.artists,
+        coverArt: label.coverArt
       },
       party: {
         _id: bid.partyId?._id || bid.partyId,
@@ -5943,7 +5947,8 @@ router.get('/admin/bids/vetoed', authMiddleware, async (req, res) => {
         uuid: bid.vetoedBy.uuid
       } : null,
       bidScope: bid.bidScope || 'party'
-    }));
+    };
+    });
 
     res.json({
       bids: formattedBids,
@@ -6087,16 +6092,20 @@ router.get('/admin/vetoes', authMiddleware, async (req, res) => {
         .skip((parseInt(page) - 1) * parseInt(limit))
         .lean();
 
-      results.bidVetoes = vetoedBids.map(bid => ({
+      const { mediaLabelFromBid } = require('../utils/mediaDisplayLabel');
+      results.bidVetoes = vetoedBids.map(bid => {
+        const label = mediaLabelFromBid(bid);
+        return {
         _id: bid._id,
         uuid: bid.uuid,
         type: 'bid',
         media: {
-          _id: bid.mediaId?._id || bid.mediaId,
-          uuid: bid.mediaId?.uuid || bid.media_uuid,
-          title: bid.mediaTitle || bid.mediaId?.title || 'Unknown',
-          artist: bid.mediaArtist || (Array.isArray(bid.mediaId?.artist) ? bid.mediaId.artist[0]?.name : bid.mediaId?.artist) || 'Unknown',
-          coverArt: bid.mediaCoverArt || bid.mediaId?.coverArt
+          _id: label._id,
+          uuid: label.uuid,
+          title: label.title,
+          artist: label.artist,
+          artists: label.artists,
+          coverArt: label.coverArt
         },
         party: {
           _id: bid.partyId?._id || bid.partyId,
@@ -6118,7 +6127,8 @@ router.get('/admin/vetoes', authMiddleware, async (req, res) => {
         } : null,
         vetoedReason: bid.vetoedReason,
         bidScope: bid.bidScope || 'party'
-      }));
+      };
+      });
     }
 
     // Combine all vetoes and sort
@@ -6259,9 +6269,12 @@ router.get('/admin/bids', authMiddleware, async (req, res) => {
       .skip((parseInt(page) - 1) * parseInt(limit));
 
     const total = await Bid.countDocuments(query);
+    const { mediaLabelFromBid } = require('../utils/mediaDisplayLabel');
 
     // Format response
-    const formattedBids = bids.map(bid => ({
+    const formattedBids = bids.map(bid => {
+      const label = mediaLabelFromBid(bid);
+      return {
       _id: bid._id,
       uuid: bid.uuid,
       amount: bid.amount, // In pence
@@ -6282,10 +6295,11 @@ router.get('/admin/bids', authMiddleware, async (req, res) => {
         uuid: bid.userId?.uuid || bid.user_uuid
       },
       media: {
-        _id: bid.mediaId?._id || bid.mediaId,
-        title: bid.mediaTitle || bid.mediaId?.title || 'Unknown',
-        artist: bid.mediaArtist || (Array.isArray(bid.mediaId?.artist) ? bid.mediaId.artist[0]?.name : bid.mediaId?.artist) || 'Unknown',
-        coverArt: bid.mediaCoverArt || bid.mediaId?.coverArt
+        _id: label._id,
+        title: label.title,
+        artist: label.artist,
+        artists: label.artists,
+        coverArt: label.coverArt
       },
       party: {
         _id: bid.partyId?._id || bid.partyId,
@@ -6297,7 +6311,8 @@ router.get('/admin/bids', authMiddleware, async (req, res) => {
         username: bid.vetoedBy.username,
         uuid: bid.vetoedBy.uuid
       } : null
-    }));
+    };
+    });
 
     res.json({
       bids: formattedBids,
