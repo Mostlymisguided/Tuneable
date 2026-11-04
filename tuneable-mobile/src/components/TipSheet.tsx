@@ -67,6 +67,19 @@ export type TipMediaLike = {
 } | null;
 
 const TIP_KEYBOARD_ACCESSORY_ID = 'tip-sheet-keyboard-done';
+/** Slide-out of the native modal. Android does not fire Modal onDismiss. */
+const TIP_SHEET_DISMISS_MS = 420;
+
+function tipSuccessMessage(amount: number, mediaTitle: string, tagCount: number): string {
+  const label = `£${amount.toFixed(2)}`;
+  const name = mediaTitle.trim();
+  const placed = name
+    ? `Placed ${label} tip on "${name}"`
+    : `Placed ${label} tip`;
+  if (tagCount <= 0) return placed;
+  const tagsLabel = tagCount === 1 ? '1 tag' : `${tagCount} tags`;
+  return `${placed} and backed ${tagsLabel}`;
+}
 
 type Props = {
   visible: boolean;
@@ -138,10 +151,32 @@ export function TipSheet({
   const [enablingLocation, setEnablingLocation] = useState(false);
   const pendingWalletNav = useRef(false);
   const walletNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSuccessMessage = useRef<string | null>(null);
+  const successToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushSuccessToast = () => {
+    const message = pendingSuccessMessage.current;
+    if (!message) return;
+    pendingSuccessMessage.current = null;
+    if (successToastTimer.current) {
+      clearTimeout(successToastTimer.current);
+      successToastTimer.current = null;
+    }
+    showToast(message);
+  };
 
   useEffect(() => {
     return () => {
       if (walletNavTimer.current) clearTimeout(walletNavTimer.current);
+      if (successToastTimer.current) {
+        clearTimeout(successToastTimer.current);
+        successToastTimer.current = null;
+      }
+      const message = pendingSuccessMessage.current;
+      if (message) {
+        pendingSuccessMessage.current = null;
+        showToast(message);
+      }
     };
   }, []);
 
@@ -153,6 +188,14 @@ export function TipSheet({
       walletNavTimer.current = null;
     }
     router.push('/wallet');
+  };
+
+  const queueSuccessToast = (message: string) => {
+    pendingSuccessMessage.current = message;
+    if (successToastTimer.current) clearTimeout(successToastTimer.current);
+    // Toast sits under the native modal, so it stays invisible until the sheet
+    // is gone. onDismiss covers iOS; the timer covers Android.
+    successToastTimer.current = setTimeout(flushSuccessToast, TIP_SHEET_DISMISS_MS);
   };
 
   const sendToWalletTopUp = () => {
@@ -257,7 +300,10 @@ export function TipSheet({
     initialTagsKey,
   ]);
 
-  const finishAndClose = () => {
+  const finishAndClose = (success?: { tagCount: number }) => {
+    if (success) {
+      queueSuccessToast(tipSuccessMessage(amount, title, success.tagCount));
+    }
     setPhase('tip');
     setAgreeTags([]);
     setSelectedAgree([]);
@@ -356,7 +402,7 @@ export function TipSheet({
         setPhase('agree');
         setError(null);
       } else {
-        finishAndClose();
+        finishAndClose({ tagCount: tags.length });
       }
     } catch (err) {
       if (isInsufficientBalanceError(err)) {
@@ -379,11 +425,11 @@ export function TipSheet({
 
   const submitAgree = async () => {
     if (!claimMediaId) {
-      finishAndClose();
+      finishAndClose({ tagCount: 0 });
       return;
     }
     if (selectedAgree.length === 0) {
-      finishAndClose();
+      finishAndClose({ tagCount: 0 });
       return;
     }
     setSubmitting(true);
@@ -391,7 +437,7 @@ export function TipSheet({
     try {
       await mediaAPI.claimTags(claimMediaId, { tags: selectedAgree });
       onTagClaimed?.();
-      finishAndClose();
+      finishAndClose({ tagCount: selectedAgree.length });
     } catch (err) {
       if (axios.isAxiosError(err)) {
         const msg =
@@ -427,6 +473,11 @@ export function TipSheet({
 
   const handleClose = () => {
     if (submitting) return;
+    // Closing the tag step still means the tip already went through.
+    if (phase === 'agree') {
+      finishAndClose({ tagCount: 0 });
+      return;
+    }
     finishAndClose();
   };
 
@@ -445,7 +496,10 @@ export function TipSheet({
       visible={visible}
       animationType="slide"
       transparent
-      onDismiss={flushWalletNav}
+      onDismiss={() => {
+        flushWalletNav();
+        flushSuccessToast();
+      }}
       onRequestClose={handleClose}>
       <KeyboardAvoidingView
         style={styles.flex}
@@ -512,7 +566,7 @@ export function TipSheet({
                 </Pressable>
                 <Pressable
                   style={styles.cancel}
-                  onPress={finishAndClose}
+                  onPress={() => finishAndClose({ tagCount: 0 })}
                   disabled={submitting}>
                   <Text style={styles.cancelText}>Skip for now</Text>
                 </Pressable>
