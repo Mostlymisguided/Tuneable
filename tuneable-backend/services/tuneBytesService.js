@@ -3,13 +3,13 @@
  *
  * Reward currency for tipping media, plus extra for discovering media that later attracts more tips.
  *
- * Formula: TuneBytes = userBidPence + subsequentGrowth * ∛(userBidPence) * discoveryBonus
- *   subsequentGrowth = currentTotal − value at (and including) your tip
- * Discovery bonus: 1 + e^(−rank / 10)
+ * One seat per tipper. TuneBytes = tips in pence + growth.
+ *   growth += opposing tip × ∛(stake already committed) × discoveryBonus(seat rank)
+ * Discovery bonus: 1 + e^(−rank / 10). Rank is first-tipper order.
  *
- * A tip credits its value in pence immediately. Awards are recalculated whenever
- * a track's active tips change, so early tippers also earn as later people tip,
- * and lose that growth if later tips refund.
+ * A tip credits its value in pence immediately. A later top-up raises the stake
+ * that faces the next opposing tip and does not resize growth already earned.
+ * Awards are recalculated whenever a track's active tips change.
  */
 
 const mongoose = require('mongoose');
@@ -52,7 +52,7 @@ class TuneBytesService {
 
   /**
    * Calculate TuneBytes for a specific bid from current active tips.
-   * The tip itself credits its value in pence. Only later tips count as growth.
+   * The tip itself credits its value in pence. Opposing tips grow the seat once, at the stake committed before that tip.
    */
   async calculateTuneBytesForBid(bidId) {
     const bid = await Bid.findById(bidId).populate('mediaId');
@@ -88,6 +88,8 @@ class TuneBytesService {
       currentTotalValue: snap.currentTotalValue || 0,
       bidTimeTotalValue: snap.bidTimeTotalValue || 0,
       subsequentGrowth: snap.subsequentGrowth || 0,
+      growthTuneBytes: snap.growthTuneBytes || 0,
+      committedStake: snap.committedStake || 0,
       userBidAmount: snap.userBidAmount || 0,
       userBidPence: snap.userBidPence || 0,
       discoveryRank: snap.discoveryRank || 0,
@@ -417,7 +419,7 @@ class TuneBytesService {
 
   /**
    * Recalculate TuneBytes for every tip on a media item.
-   * Active bids earn their tip in pence plus later growth; refunded/vetoed bids are clawed back to 0.
+   * Active bids earn their tip in pence. The seat bid also keeps growth from opposing tips. Refunded/vetoed bids are clawed back to 0.
    */
   async recalculateTuneBytesForMedia(mediaId, { skipLedgerEntry = false, notify = true, updateRankings = true } = {}) {
     if (!mediaId) {

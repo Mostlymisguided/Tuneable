@@ -51,6 +51,8 @@ const tuneBytesTransactionSchema = new mongoose.Schema({
     currentTotalValue: { type: Number, required: true },
     bidTimeTotalValue: { type: Number, required: true },
     subsequentGrowth: { type: Number, default: 0 },
+    growthTuneBytes: { type: Number, default: 0 },
+    committedStake: { type: Number, default: 0 },
     userBidAmount: { type: Number, required: true },
     userBidPence: { type: Number, required: true },
     discoveryRank: { type: Number, required: true },
@@ -59,7 +61,7 @@ const tuneBytesTransactionSchema = new mongoose.Schema({
     totalBidsOnMedia: { type: Number },
     formula: {
       type: String,
-      default: 'userBidPence + (currentTotal - bidTimeTotal - userBid) * ∛(userBidPence) * discoveryBonus'
+      default: 'pence + Σ opposingTip × ∛(stakeBeforeThatTip) × discoveryBonus(seatRank)'
     }
   },
   
