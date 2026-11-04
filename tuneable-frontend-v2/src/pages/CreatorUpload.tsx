@@ -17,7 +17,8 @@ import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from
 import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection, titleFromAudioFileName } from '../lib/audioUpload';
 import { roundBpm } from '../utils/bpm';
-import { FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
+import { formatLinkedProfileLabel } from '../utils/linkedArtist';
+import { DEFAULT_PROFILE_PIC, FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -141,6 +142,19 @@ const CreatorUpload: React.FC = () => {
   const [productionStack, setProductionStack] = useState<ProductionStack>(EMPTY_PRODUCTION_STACK);
   const [aiUsage, setAiUsage] = useState<AiUsage>({ ...EMPTY_AI_USAGE });
   const [useMultipleArtists, setUseMultipleArtists] = useState(false);
+  const [artistSearchResults, setArtistSearchResults] = useState<any[]>([]);
+  const [showArtistDropdown, setShowArtistDropdown] = useState(false);
+  const [isSearchingArtists, setIsSearchingArtists] = useState(false);
+  const [selectedArtist, setSelectedArtist] = useState<{
+    _id: string;
+    artistName: string;
+    username: string;
+    uuid: string;
+    profilePic?: string;
+  } | null>(null);
+  const artistSearchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const artistSearchRequestRef = useRef(0);
+  const artistFieldRef = useRef<HTMLDivElement>(null);
   const [artistEntries, setArtistEntries] = useState<ArtistEntry[]>(() => [
     createArtistEntry(
       ((user as any)?.creatorProfile?.artistName || user?.username || '') as string,
@@ -361,6 +375,13 @@ const CreatorUpload: React.FC = () => {
   // Auto-populate form when metadata is extracted
   useEffect(() => {
     if (extractedMetadata) {
+      const extractedArtist = extractedMetadata.artist?.trim() || '';
+      setSelectedArtist((current) => {
+        if (!current || !extractedArtist) return current;
+        const linkedName = (current.artistName || current.username || '').trim();
+        if (extractedArtist.toLowerCase() !== linkedName.toLowerCase()) return null;
+        return current;
+      });
       setFormData(prev => ({
         ...prev,
         title: extractedMetadata.title || prev.title,
@@ -487,6 +508,12 @@ const CreatorUpload: React.FC = () => {
       ) {
         setShowLabelSuggestions(false);
       }
+      if (
+        artistFieldRef.current &&
+        !artistFieldRef.current.contains(event.target as Node)
+      ) {
+        setShowArtistDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -501,6 +528,9 @@ const CreatorUpload: React.FC = () => {
       if (labelSearchDebounce) {
         clearTimeout(labelSearchDebounce);
       }
+      if (artistSearchDebounceRef.current) {
+        clearTimeout(artistSearchDebounceRef.current);
+      }
     };
   }, [labelSearchDebounce]);
 
@@ -514,34 +544,104 @@ const CreatorUpload: React.FC = () => {
     }));
   };
 
+  const searchArtists = (query: string) => {
+    if (artistSearchDebounceRef.current) {
+      clearTimeout(artistSearchDebounceRef.current);
+    }
+
+    const requestId = ++artistSearchRequestRef.current;
+
+    if (!query || query.trim().length < 2) {
+      setArtistSearchResults([]);
+      setShowArtistDropdown(false);
+      setIsSearchingArtists(false);
+      return;
+    }
+
+    artistSearchDebounceRef.current = setTimeout(async () => {
+      setIsSearchingArtists(true);
+      try {
+        const response = await userAPI.searchUsers({ search: query.trim(), limit: 10 });
+        if (requestId !== artistSearchRequestRef.current) return;
+        const creators = (response.users || []).filter((found: any) => found.artistName);
+        setArtistSearchResults(creators);
+        setShowArtistDropdown(creators.length > 0);
+      } catch (error) {
+        if (requestId !== artistSearchRequestRef.current) return;
+        console.error('Error searching artists:', error);
+        setArtistSearchResults([]);
+        setShowArtistDropdown(false);
+      } finally {
+        if (requestId === artistSearchRequestRef.current) {
+          setIsSearchingArtists(false);
+        }
+      }
+    }, 300);
+  };
+
+  const handleArtistNameChange = (value: string) => {
+    setFormData(prev => ({ ...prev, artistName: value }));
+    setSelectedArtist(null);
+    searchArtists(value);
+  };
+
+  const handleSelectArtist = (creator: any) => {
+    if (artistSearchDebounceRef.current) {
+      clearTimeout(artistSearchDebounceRef.current);
+    }
+    artistSearchRequestRef.current += 1;
+    setIsSearchingArtists(false);
+    const name = creator.artistName || creator.username;
+    setSelectedArtist({
+      _id: creator._id,
+      artistName: creator.artistName || '',
+      username: creator.username,
+      uuid: creator.uuid || '',
+      profilePic: creator.profilePic,
+    });
+    setFormData(prev => ({ ...prev, artistName: name }));
+    setShowArtistDropdown(false);
+    setArtistSearchResults([]);
+  };
+
   const handleMultipleArtistsToggle = (checked: boolean) => {
     setUseMultipleArtists(checked);
     if (checked) {
       setArtistEntries(prev => {
-        // If we have 0 or 1 entries, ensure we have at least 2 for multiple artists mode
-        if (prev.length === 0) {
-          return [
-            createArtistEntry(
-              formData.artistName ||
-                (user as any)?.creatorProfile?.artistName ||
-                user?.username ||
-                '',
-              {
-                userId: user?._id || null,
-                userUuid: (user as any)?.uuid || null
+        const typedName = formData.artistName.trim();
+        const defaultName =
+          (user as any)?.creatorProfile?.artistName || user?.username || '';
+        const first = typedName
+          ? createArtistEntry(typedName, selectedArtist
+            ? {
+                userId: selectedArtist._id,
+                userUuid: selectedArtist.uuid || null,
+                profilePic: selectedArtist.profilePic || null,
               }
-            ),
-            createArtistEntry('') // Add second empty entry
-          ];
-        } else if (prev.length === 1) {
-          // Add a second empty entry if we only have one
-          return [...prev, createArtistEntry('')];
-        }
-        return prev; // Already has 2+ entries
+            : { userId: null, userUuid: null, profilePic: null })
+          : (prev[0]?.name
+            ? prev[0]
+            : createArtistEntry(defaultName, {
+                userId: user?._id || null,
+                userUuid: (user as any)?.uuid || null,
+              }));
+        const rest = prev.slice(1);
+        const second = rest[0] ?? createArtistEntry('');
+        return [first, second, ...rest.slice(1)];
       });
-    } else {
-      if (artistEntries.length > 0) {
-        setFormData(prev => ({ ...prev, artistName: artistEntries[0].name || '' }));
+    } else if (artistEntries.length > 0) {
+      const first = artistEntries[0];
+      setFormData(prev => ({ ...prev, artistName: first.name || '' }));
+      if (first.userId && first.name) {
+        setSelectedArtist({
+          _id: first.userId,
+          artistName: first.name,
+          username: '',
+          uuid: first.userUuid || '',
+          profilePic: first.profilePic || undefined,
+        });
+      } else {
+        setSelectedArtist(null);
       }
     }
   };
@@ -590,6 +690,13 @@ const CreatorUpload: React.FC = () => {
       if (useMultipleArtists && cleanedArtists.length > 0) {
         uploadData.append('artists', JSON.stringify(cleanedArtists));
         uploadData.append('artistName', cleanedArtists.map(a => a.name).join(' & '));
+      } else if (selectedArtist && formData.artistName.trim()) {
+        uploadData.append('artists', JSON.stringify([{
+          name: formData.artistName.trim(),
+          userId: selectedArtist._id,
+          relationToNext: null,
+        }]));
+        uploadData.append('artistName', formData.artistName.trim());
       } else if (formData.artistName) {
         uploadData.append('artistName', formData.artistName.trim());
       }
@@ -1035,20 +1142,66 @@ const CreatorUpload: React.FC = () => {
                 />
               ) : (
                 <>
-                  <input
-                    type="text"
-                    name="artistName"
-                    value={formData.artistName}
-                    onChange={handleChange}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
-                    placeholder={
-                      (user as any).creatorProfile?.artistName || 
-                      user?.username || 
-                      'Artist name (defaults to your username)'
-                    }
-                  />
+                  <div className="relative" ref={artistFieldRef}>
+                    <input
+                      type="text"
+                      name="artistName"
+                      value={formData.artistName}
+                      onChange={(e) => handleArtistNameChange(e.target.value)}
+                      onFocus={() => {
+                        if (artistSearchResults.length > 0) {
+                          setShowArtistDropdown(true);
+                        }
+                      }}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                      placeholder={
+                        (user as any).creatorProfile?.artistName || 
+                        user?.username || 
+                        'Search a signed-up artist, or type a name'
+                      }
+                      autoComplete="off"
+                    />
+                    {isSearchingArtists && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      </div>
+                    )}
+                    {showArtistDropdown && artistSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {artistSearchResults.map((creator) => (
+                          <button
+                            key={creator._id}
+                            type="button"
+                            onClick={() => handleSelectArtist(creator)}
+                            className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
+                          >
+                            <img
+                              src={creator.profilePic || DEFAULT_PROFILE_PIC}
+                              alt={creator.username}
+                              className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{creator.artistName || creator.username}</div>
+                              {creator.artistName && creator.username !== creator.artistName && (
+                                <div className="text-sm text-gray-400 truncate">@{creator.username}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedArtist && (
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <span>{formatLinkedProfileLabel(selectedArtist)}</span>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-400">
-                    Leave blank to use {(user as any).creatorProfile?.artistName ? 'your artist name' : 'your username'}
+                    Search to link a signed-up artist. Leave blank to use {(user as any).creatorProfile?.artistName ? 'your artist name' : 'your username'}.
                   </p>
                   <button
                     type="button"
