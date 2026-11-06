@@ -46,8 +46,8 @@ interface MiniSupportersBarProps {
   className?: string;
   /** Pack chips toward the trailing edge when they wrap. */
   alignEnd?: boolean;
-  /** Below md, keep the tip amount off the chip until that supporter is revealed. */
-  collapseAmountBelowMd?: boolean;
+  /** Below md, stack chips in a column. Used on queue cards. */
+  stackBelowMd?: boolean;
 }
 
 const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
@@ -58,7 +58,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
   limit,
   className,
   alignEnd = false,
-  collapseAmountBelowMd = false,
+  stackBelowMd = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
@@ -155,7 +155,7 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
 
   const rowClass = scrollable && typeof limit !== 'number'
     ? `flex gap-2 overflow-x-auto py-1 ${alignEnd ? 'justify-end' : ''}`
-    : collapseAmountBelowMd
+    : stackBelowMd
       ? 'flex flex-col items-end gap-1 md:flex-row md:flex-wrap md:justify-end md:gap-2'
       : `flex flex-wrap gap-2 ${alignEnd ? 'justify-end' : ''}`;
 
@@ -188,58 +188,54 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
               />
             </span>
           ) : null;
-          const chipClass = collapseAmountBelowMd
+          const chipClass = stackBelowMd
             ? 'flex min-w-0 max-w-full items-center gap-1 overflow-hidden px-1 py-0.5 md:gap-2 md:px-2 md:py-1.5 rounded-lg bg-black/25 transition-colors flex-shrink-0'
             : 'flex items-center gap-1.5 md:gap-2 px-1.5 py-1 md:py-1.5 md:px-2 rounded-lg bg-black/25 transition-colors flex-shrink-0';
-          const amountClass = `text-[10px] md:text-sm text-green-300 flex-shrink-0 ${
-            collapseAmountBelowMd && !revealed ? 'max-md:sr-only' : ''
-          }`;
-          const title = `${penceToPounds(s.total)} (${s.count} tips)`;
+          const title = revealed ? `${penceToPounds(s.total)} (${s.count} tips)` : undefined;
           return (
             <span
               key={id}
               className={s.anonymous ? chipClass : `${chipClass} hover:bg-purple-400`}
               title={title}
             >
-              {s.anonymous ? (
-                <>
-                  {avatar}
-                  {crown}
-                  <span className={`text-[10px] md:text-sm whitespace-nowrap text-gray-400 italic ${collapseAmountBelowMd ? 'max-md:truncate' : ''}`}>
-                    {ANONYMOUS_LABEL}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleRevealed(id);
-                    }}
-                    className="inline-flex items-center gap-1.5 md:gap-2 flex-shrink-0 rounded-full cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-purple-300"
-                    aria-pressed={revealed}
-                    aria-label={
-                      revealed ? 'Hide name' : rank ? `Show #${rank} champion` : 'Show supporter'
-                    }
-                  >
-                    {avatar}
-                    {crown}
-                  </button>
-                  {revealed && (
-                    <Link
-                      to={getUserProfileUrl(s.user)}
-                      onClick={(e) => e.stopPropagation()}
-                      className={`text-[10px] md:text-sm whitespace-nowrap text-white hover:underline ${collapseAmountBelowMd ? 'max-md:max-w-[4.5rem] max-md:truncate' : ''}`}
-                    >
-                      {s.user.username}
-                    </Link>
-                  )}
-                </>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleRevealed(id);
+                }}
+                className="inline-flex items-center gap-1.5 md:gap-2 flex-shrink-0 rounded-full cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-purple-300"
+                aria-pressed={revealed}
+                aria-label={
+                  revealed
+                    ? 'Hide name and tip'
+                    : rank
+                      ? `Show #${rank} champion`
+                      : 'Show supporter'
+                }
+              >
+                {avatar}
+                {crown}
+              </button>
+              {revealed && s.anonymous && (
+                <span className={`text-[10px] md:text-sm whitespace-nowrap text-gray-400 italic ${stackBelowMd ? 'max-md:truncate' : ''}`}>
+                  {ANONYMOUS_LABEL}
+                </span>
               )}
-              <span className={amountClass}>
-                {penceToPounds(s.total)}
-              </span>
+              {revealed && !s.anonymous && (
+                <Link
+                  to={getUserProfileUrl(s.user)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`text-[10px] md:text-sm whitespace-nowrap text-white hover:underline ${stackBelowMd ? 'max-md:max-w-[4.5rem] max-md:truncate' : ''}`}
+                >
+                  {s.user.username}
+                </Link>
+              )}
+              {revealed && (
+                <span className="text-[10px] md:text-sm text-green-300 flex-shrink-0">
+                  {penceToPounds(s.total)}
+                </span>
+              )}
             </span>
           );
         })}

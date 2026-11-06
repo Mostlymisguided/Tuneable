@@ -213,41 +213,38 @@ export function MiniSupportersBar({
         ) : null;
         return (
           <View key={s.id} style={styles.chip}>
-            {s.anonymous ? (
-              <>
-                {avatar}
-                {crown}
-                <Text style={[styles.username, styles.anonymousName]} numberOfLines={1}>
+            <Pressable
+              style={styles.identity}
+              onPress={() => toggleRevealed(s.id)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: revealed }}
+              accessibilityLabel={
+                revealed
+                  ? 'Hide name and tip'
+                  : rank
+                    ? `Show number ${rank} champion`
+                    : 'Show supporter'
+              }>
+              {avatar}
+              {crown}
+            </Pressable>
+            {revealed && s.anonymous ? (
+              <Text style={[styles.username, styles.anonymousName]} numberOfLines={1}>
+                {s.username}
+              </Text>
+            ) : null}
+            {revealed && !s.anonymous ? (
+              <Pressable
+                onPress={() => router.push(`/user/${s.id}`)}
+                accessibilityRole="link"
+                accessibilityLabel={s.username}>
+                <Text style={styles.username} numberOfLines={1}>
                   {s.username}
                 </Text>
-              </>
-            ) : (
-              <>
-                <Pressable
-                  style={styles.identity}
-                  onPress={() => toggleRevealed(s.id)}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: revealed }}
-                  accessibilityLabel={
-                    revealed ? 'Hide name' : rank ? `Show number ${rank} champion` : 'Show supporter'
-                  }>
-                  {avatar}
-                  {crown}
-                </Pressable>
-                {revealed ? (
-                  <Pressable
-                    onPress={() => router.push(`/user/${s.id}`)}
-                    accessibilityRole="link"
-                    accessibilityLabel={s.username}>
-                    <Text style={styles.username} numberOfLines={1}>
-                      {s.username}
-                    </Text>
-                  </Pressable>
-                ) : null}
-              </>
-            )}
-            <Text style={styles.amount}>{formatPoundsFromPence(s.total)}</Text>
+              </Pressable>
+            ) : null}
+            {revealed ? <Text style={styles.amount}>{formatPoundsFromPence(s.total)}</Text> : null}
           </View>
         );
       })}

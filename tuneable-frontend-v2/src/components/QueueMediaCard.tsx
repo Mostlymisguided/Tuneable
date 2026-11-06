@@ -172,7 +172,7 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
         limit={5}
         scrollable={false}
         alignEnd
-        collapseAmountBelowMd
+        stackBelowMd
         className=""
       />
     </>
