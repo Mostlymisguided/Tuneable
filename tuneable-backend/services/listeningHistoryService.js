@@ -168,9 +168,9 @@ async function trackListeningSession({
     history = await ListeningHistory.findOneAndUpdate(
       { userId, sessionId },
       {
+        // mediaId is only in $set. Mongo rejects the same path in both operators.
         $setOnInsert: {
           userId,
-          mediaId: media._id,
           sessionId,
           uuid: uuidv7(),
           startedAt: startedAt ? new Date(startedAt) : now,

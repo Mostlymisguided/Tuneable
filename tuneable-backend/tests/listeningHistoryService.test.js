@@ -89,6 +89,12 @@ describe('trackListeningSession', () => {
     expect(result.playCounted).toBe(false);
     expect(Media.updateOne).not.toHaveBeenCalled();
     expect(ListeningHistory.findOneAndUpdate).toHaveBeenCalledTimes(1);
+
+    const update = ListeningHistory.findOneAndUpdate.mock.calls[0][1];
+    const overlap = Object.keys(update.$set).filter((key) => Object.prototype.hasOwnProperty.call(update.$setOnInsert, key));
+    expect(overlap).toEqual([]);
+    expect(update.$set.mediaId).toBe(mediaId);
+    expect(update.$setOnInsert).not.toHaveProperty('mediaId');
   });
 
   it('increments playCount once when the session first qualifies', async () => {
