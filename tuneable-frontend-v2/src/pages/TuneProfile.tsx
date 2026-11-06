@@ -2272,14 +2272,12 @@ const TuneProfile: React.FC = () => {
     : (media as any).releaseYear
       ? String((media as any).releaseYear)
       : null;
-  const heroCopy = [media.album, releaseYearLabel].filter((part): part is string => Boolean(part));
+  const albumLabel = typeof media.album === 'string' ? media.album.trim() : '';
   const durationLabel = media.duration ? formatDuration(media.duration) : null;
+  const showDuration = Boolean(durationLabel && durationLabel !== 'Unknown');
   const keyLabel = typeof media.key === 'string' ? media.key.trim() : '';
   const bpmLabel = formatBpmLabel(media.bpm);
   const heroMetricChips = [
-    durationLabel && durationLabel !== 'Unknown'
-      ? { id: 'duration', label: durationLabel, title: 'Duration' }
-      : null,
     keyLabel ? { id: 'key', label: keyLabel, title: 'Key' } : null,
     bpmLabel ? { id: 'bpm', label: bpmLabel, title: 'BPM' } : null,
   ].filter((chip): chip is { id: string; label: string; title: string } => Boolean(chip));
@@ -2659,12 +2657,34 @@ const TuneProfile: React.FC = () => {
             
             {/* Song Info */}
             <div className="flex-1 w-full text-white">
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2">
+              <div className="flex flex-wrap items-baseline justify-center md:justify-start gap-x-2 gap-y-1 px-2">
                 <h1 className="text-2xl md:text-4xl font-bold text-center md:text-left">{media.title}</h1>
+                {showDuration && (
+                  <>
+                    <span className="text-lg md:text-2xl text-gray-500" aria-hidden>·</span>
+                    <span title="Duration" className="text-base md:text-xl tabular-nums text-gray-400">
+                      {durationLabel}
+                    </span>
+                  </>
+                )}
                 <AiAssistedBadge aiUsage={media.aiUsage} />
               </div>
-              <div className="text-lg md:text-3xl text-purple-300 mb-2 text-center md:text-left px-2">
-                <ClickableArtistDisplay media={media} />
+              <div className="flex flex-wrap items-baseline justify-center md:justify-start gap-x-2 gap-y-1 mb-2 text-center md:text-left px-2">
+                <div className="text-lg md:text-3xl text-purple-300">
+                  <ClickableArtistDisplay media={media} />
+                </div>
+                {releaseYearLabel && (
+                  <>
+                    <span className="text-base md:text-xl text-gray-500" aria-hidden>·</span>
+                    <Link
+                      to={getTagProfilePath(releaseYearLabel)}
+                      title={`Released ${releaseYearLabel}`}
+                      className="text-base md:text-xl tabular-nums text-gray-400 hover:text-white hover:underline underline-offset-2 transition-colors no-underline"
+                    >
+                      {releaseYearLabel}
+                    </Link>
+                  </>
+                )}
               </div>
               <MediaLicenceCard
                 mediaId={media._id}
@@ -2673,11 +2693,11 @@ const TuneProfile: React.FC = () => {
                 onSaved={(licence) => setMedia((current) => current ? { ...current, licence } : current)}
               />
 
-              {(heroCopy.length > 0 || heroMetricChips.length > 0) && (
+              {(albumLabel || heroMetricChips.length > 0) && (
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-1.5 px-2 mb-2">
-                  {heroCopy.length > 0 && (
+                  {albumLabel && (
                     <p className="text-sm text-gray-400">
-                      {heroCopy.join(' · ')}
+                      {albumLabel}
                     </p>
                   )}
                   {heroMetricChips.length > 0 && (
@@ -2688,7 +2708,6 @@ const TuneProfile: React.FC = () => {
                           title={chip.title}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-gray-100"
                         >
-                          {chip.id === 'duration' && <Clock className="h-3 w-3 text-gray-300" aria-hidden />}
                           {chip.id === 'key' && (
                             <span className="text-[10px] uppercase tracking-wide text-gray-400">Key</span>
                           )}

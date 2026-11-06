@@ -290,7 +290,7 @@ export function MediaLicenceCard({ mediaId, saved, canEdit, onSaved }: EditorPro
   if (!saved?.chosen && !canEdit) return null;
 
   return (
-    <div className="mt-3 px-2">
+    <div className="mt-3 mb-3 px-2">
       <LicenceMarkRow
         saved={saved}
         trailing={canEdit && !editing ? (
