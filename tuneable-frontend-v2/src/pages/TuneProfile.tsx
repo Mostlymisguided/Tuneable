@@ -4195,9 +4195,15 @@ const TuneProfile: React.FC = () => {
           }
           onClaimed={(result) => {
             if (result.rankedTags) setRankedTags(result.rankedTags);
-            if (result.tags) {
+            if (result.tags || result.elements) {
               setMedia((prev: any) =>
-                prev ? { ...prev, tags: result.tags } : prev
+                prev
+                  ? {
+                      ...prev,
+                      ...(result.tags ? { tags: result.tags } : {}),
+                      ...(result.elements ? { elements: result.elements } : {}),
+                    }
+                  : prev
               );
             }
           }}

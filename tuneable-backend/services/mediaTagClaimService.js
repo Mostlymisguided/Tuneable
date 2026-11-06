@@ -54,6 +54,27 @@ function normalizeClaimTags(chips) {
 }
 
 /**
+ * Split a claim into £-backed discovery tags and musical elements.
+ * Elements are stored on the tune and are not discovery-tag claims.
+ * @param {string[]} chips
+ * @returns {{ claimTags: string[], elements: string[] }}
+ */
+function partitionClaimChips(chips) {
+  const classified = classifyTipChips(Array.isArray(chips) ? chips : []);
+  const elements = [];
+  for (const element of classified.elements) {
+    if (!element) continue;
+    if (elements.some((existing) => existing.toLowerCase() === element.toLowerCase())) continue;
+    elements.push(element);
+    if (elements.length >= MAX_CLAIM_TAGS) break;
+  }
+  return {
+    claimTags: normalizeClaimTags(classified.tags),
+    elements,
+  };
+}
+
+/**
  * Upsert claims for tags, adding `amountPence` to each (tip path).
  * @param {object} params
  */
@@ -312,8 +333,8 @@ async function claimTagsForTipper({
     requested.push(...tags);
   }
 
-  const claimTags = normalizeClaimTags(requested);
-  if (!claimTags.length) {
+  const { claimTags, elements } = partitionClaimChips(requested);
+  if (!claimTags.length && !elements.length) {
     const err = new Error('No tags to claim');
     err.status = 400;
     throw err;
@@ -323,7 +344,7 @@ async function claimTagsForTipper({
   const applied = await applyChipsAndRecordClaims({
     media,
     userId,
-    chips: claimTags,
+    chips: [...claimTags, ...elements],
     amountPence: totalPence,
     source,
     saveMedia: true,
@@ -369,6 +390,7 @@ module.exports = {
   MAX_CLAIM_TAGS,
   getUserActiveTipOnMedia,
   normalizeClaimTags,
+  partitionClaimChips,
   incrementClaimsForTags,
   syncClaimsToUserTipTotal,
   applyChipsAndRecordClaims,

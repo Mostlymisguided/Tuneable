@@ -37,6 +37,7 @@ type Props = {
   onClose: () => void;
   onClaimed?: (result: {
     tags?: string[];
+    elements?: string[];
     rankedTags?: RankedTag[];
   }) => void;
 };
@@ -116,6 +117,7 @@ export function TagClaimSheet({
       });
       onClaimed?.({
         tags: result.tags,
+        elements: result.elements,
         rankedTags: result.rankedTags,
       });
       onClose();
@@ -206,51 +208,53 @@ export function TagClaimSheet({
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Add your own</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  value={tagInput}
-                  onChangeText={setTagInput}
-                  placeholder="e.g. chill, workout"
-                  placeholderTextColor={colors.textMuted}
-                  maxLength={32}
-                  editable={!submitting}
-                  onSubmitEditing={handleAddTag}
-                  returnKeyType="done"
-                />
-                <Pressable
-                  style={[
-                    styles.addBtn,
-                    (!tagInput.trim() || tags.length >= 5 || submitting) &&
-                      styles.addBtnDisabled,
-                  ]}
-                  onPress={handleAddTag}
-                  disabled={!tagInput.trim() || tags.length >= 5 || submitting}>
-                  <Text style={styles.addBtnText}>Add</Text>
-                </Pressable>
-              </View>
-              {tags.length > 0 ? (
-                <View style={styles.chips}>
-                  {tags.map((tag) => (
-                    <View
-                      key={tag}
-                      style={[
-                        styles.chip,
-                        isKnownElement(tag) ? styles.chipElement : styles.chipSelected,
-                      ]}>
-                      <Text style={styles.chipText}>{tag}</Text>
-                      <Pressable
-                        onPress={() =>
-                          setTags((prev) => prev.filter((t) => t !== tag))
-                        }
-                        hitSlop={8}
-                        disabled={submitting}>
-                        <Text style={styles.remove}>×</Text>
-                      </Pressable>
-                    </View>
-                  ))}
+              <View style={styles.composer}>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.input}
+                    value={tagInput}
+                    onChangeText={setTagInput}
+                    placeholder="e.g. chill, workout"
+                    placeholderTextColor={colors.textMuted}
+                    maxLength={32}
+                    editable={!submitting}
+                    onSubmitEditing={handleAddTag}
+                    returnKeyType="done"
+                  />
+                  <Pressable
+                    style={[
+                      styles.addBtn,
+                      (!tagInput.trim() || tags.length >= 5 || submitting) &&
+                        styles.addBtnDisabled,
+                    ]}
+                    onPress={handleAddTag}
+                    disabled={!tagInput.trim() || tags.length >= 5 || submitting}>
+                    <Text style={styles.addBtnText}>Add</Text>
+                  </Pressable>
                 </View>
-              ) : null}
+                {tags.length > 0 ? (
+                  <View style={styles.chips}>
+                    {tags.map((tag) => (
+                      <View
+                        key={tag}
+                        style={[
+                          styles.chip,
+                          isKnownElement(tag) ? styles.chipElement : styles.chipSelected,
+                        ]}>
+                        <Text style={styles.chipText}>{tag}</Text>
+                        <Pressable
+                          onPress={() =>
+                            setTags((prev) => prev.filter((t) => t !== tag))
+                          }
+                          hitSlop={8}
+                          disabled={submitting}>
+                          <Text style={styles.remove}>×</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -372,6 +376,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontSize: 16,
     fontWeight: '700',
+  },
+  composer: {
+    gap: 12,
   },
   inputRow: {
     flexDirection: 'row',

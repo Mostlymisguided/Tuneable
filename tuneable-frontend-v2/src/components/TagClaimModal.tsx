@@ -21,6 +21,7 @@ interface TagClaimModalProps {
   postTipPrompt?: boolean;
   onClaimed?: (result: {
     tags?: string[];
+    elements?: string[];
     rankedTags?: RankedTag[];
   }) => void;
 }
@@ -91,6 +92,7 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
       );
       onClaimed?.({
         tags: result.tags,
+        elements: result.elements,
         rankedTags: result.rankedTags,
       });
       onClose();
