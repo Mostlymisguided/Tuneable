@@ -241,7 +241,11 @@ const { getBlockState, getBlockedUserIds, isBlockedBetween } = require('../utils
 const { createProfilePictureUpload, processAndUploadImage, getPublicUrl } = require('../utils/r2Upload');
 const { resolveInviteForSignup, applyInviteUsage, inviteAttributionForSignup } = require('../utils/inviteSignup');
 const { enrichMediaWithPlayability, playabilityOptionsFromRequest } = require('../utils/mediaPlayability');
-const { resolveCreatorDisplay } = require('../utils/creatorHelpers');
+const {
+  resolveCreatorDisplay,
+  PROFILE_CREDIT_ROLES,
+  belongsOnCreatorLibrary,
+} = require('../utils/creatorHelpers');
 
 const router = express.Router();
 const SECRET_KEY = require('../config/jwtSecret').getJwtSecret();
@@ -1331,26 +1335,26 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
       }
     });
 
-    // Creator profiles also list music they own, even when they have not tipped on it.
-    // A 0% mediaOwners row is a library-import curator placeholder, not ownership.
+    // Creator profiles also list music they own or are credited on, even with no tips.
+    // A 0% mediaOwners row with no credit is a library-import placeholder, not a release.
     const profileRoles = Array.isArray(user?.role) ? user.role : [];
     if (profileRoles.includes('creator')) {
       const ownerMatchId = mongoose.Types.ObjectId.isValid(user._id)
         ? new mongoose.Types.ObjectId(user._id)
         : user._id;
-      const ownedMedia = await Media.find({
-        'mediaOwners.userId': ownerMatchId,
+      const catalogMedia = await Media.find({
         status: { $nin: ['deleted', 'vetoed'] },
+        $or: [
+          { 'mediaOwners.userId': ownerMatchId },
+          ...PROFILE_CREDIT_ROLES.map((role) => ({ [`${role}.userId`]: ownerMatchId })),
+        ],
       })
-        .select('_id createdAt uploadedAt mediaOwners')
+        .select(`_id createdAt uploadedAt mediaOwners ${PROFILE_CREDIT_ROLES.join(' ')}`)
         .lean();
 
-      ownedMedia.forEach((mediaDoc) => {
+      catalogMedia.forEach((mediaDoc) => {
         const mediaId = mediaDoc._id.toString();
-        const stake = (mediaDoc.mediaOwners || []).find((owner) =>
-          owner?.userId && String(owner.userId) === String(user._id)
-        );
-        if (!stake || Number(stake.percentage) === 0) return;
+        if (!belongsOnCreatorLibrary(mediaDoc, user._id)) return;
         if (mediaAggregates[mediaId]) return;
         const addedAt = mediaDoc.uploadedAt || mediaDoc.createdAt || new Date(0);
         mediaAggregates[mediaId] = {

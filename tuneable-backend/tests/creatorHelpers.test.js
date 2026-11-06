@@ -7,6 +7,7 @@ const {
   isPlaceholderCreatorLabel,
   resolveCreatorDisplay,
   newlyLinkedUserIds,
+  belongsOnCreatorLibrary,
 } = require('../utils/creatorHelpers');
 
 describe('isPlaceholderCreatorLabel', () => {
@@ -101,5 +102,30 @@ describe('newlyLinkedUserIds', () => {
   it('treats a first save as new links except the person saving', () => {
     expect(newlyLinkedUserIds([], [{ userId: 'uploader' }], 'uploader')).toEqual([]);
     expect(newlyLinkedUserIds(null, [{ userId: 'guest' }], null)).toEqual(['guest']);
+  });
+});
+
+describe('belongsOnCreatorLibrary', () => {
+  const userId = 'artist-1';
+
+  it('includes a tune the creator is credited on even with no ownership stake', () => {
+    expect(belongsOnCreatorLibrary({
+      artist: [{ name: 'Radjlion', userId }],
+      mediaOwners: [],
+    }, userId)).toBe(true);
+  });
+
+  it('includes a real ownership stake', () => {
+    expect(belongsOnCreatorLibrary({
+      artist: [{ name: 'Someone Else' }],
+      mediaOwners: [{ userId, percentage: 100 }],
+    }, userId)).toBe(true);
+  });
+
+  it('skips a 0% ownership row that is not a credit', () => {
+    expect(belongsOnCreatorLibrary({
+      artist: [{ name: 'Someone Else' }],
+      mediaOwners: [{ userId, percentage: 0 }],
+    }, userId)).toBe(false);
   });
 });

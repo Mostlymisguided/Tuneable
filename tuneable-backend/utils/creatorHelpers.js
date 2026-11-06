@@ -228,6 +228,35 @@ async function linkCreatorToUser(media, creatorName, userId) {
   return linksCreated;
 }
 
+const PROFILE_CREDIT_ROLES = [
+  'artist', 'producer', 'featuring', 'songwriter', 'composer',
+  'host', 'guest', 'narrator',
+  'director', 'cinematographer', 'editor',
+  'author',
+];
+
+function userIsCredited(media, userId) {
+  const id = userId == null || userId === '' ? '' : String(userId);
+  if (!id) return false;
+  return PROFILE_CREDIT_ROLES.some((role) =>
+    Array.isArray(media?.[role]) &&
+    media[role].some((person) => person?.userId && String(person.userId) === id)
+  );
+}
+
+/**
+ * Creator profiles list tunes the person owns or is credited on.
+ * A 0% mediaOwners row with no credit is a library-import placeholder.
+ */
+function belongsOnCreatorLibrary(media, userId) {
+  if (userIsCredited(media, userId)) return true;
+  const id = userId == null || userId === '' ? '' : String(userId);
+  const stake = (media?.mediaOwners || []).find((owner) =>
+    owner?.userId && String(owner.userId) === id
+  );
+  return Boolean(stake && Number(stake.percentage) !== 0);
+}
+
 /**
  * Get all media where a user is credited
  * @param {string} userId - User ObjectId
@@ -235,18 +264,10 @@ async function linkCreatorToUser(media, creatorName, userId) {
  * @returns {Promise<Array>} Array of media documents
  */
 async function getMediaByUser(userId, Media) {
-  const roles = [
-    'artist.userId', 'producer.userId', 'featuring.userId', 
-    'songwriter.userId', 'composer.userId',
-    'host.userId', 'guest.userId', 'narrator.userId',
-    'director.userId', 'cinematographer.userId', 'editor.userId',
-    'author.userId'
-  ];
-  
   const query = {
-    $or: roles.map(role => ({ [role]: userId }))
+    $or: PROFILE_CREDIT_ROLES.map((role) => ({ [`${role}.userId`]: userId })),
   };
-  
+
   return await Media.find(query);
 }
 
@@ -275,6 +296,9 @@ module.exports = {
   creatorUserId,
   newlyLinkedUserIds,
   linkCreatorToUser,
+  PROFILE_CREDIT_ROLES,
+  userIsCredited,
+  belongsOnCreatorLibrary,
   getMediaByUser,
   getMediaByCreatorName
 };
