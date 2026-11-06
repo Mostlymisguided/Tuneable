@@ -2038,12 +2038,12 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
 router.get('/:mediaId/ownership', authMiddleware, async (req, res) => {
   try {
     const { mediaId } = req.params;
-
-    if (!isValidObjectId(mediaId)) {
-      return res.status(400).json({ error: 'Invalid media ID format' });
+    const resolvedMediaId = await resolveMediaIdFromParam(mediaId);
+    if (!resolvedMediaId) {
+      return res.status(404).json({ error: 'Media not found' });
     }
 
-    const media = await Media.findById(mediaId)
+    const media = await Media.findById(resolvedMediaId)
       .populate([
         { path: 'mediaOwners.userId', select: 'username email profilePic uuid' },
         { path: 'mediaOwners.verifiedBy', select: 'username email profilePic uuid' },
@@ -2062,7 +2062,7 @@ router.get('/:mediaId/ownership', authMiddleware, async (req, res) => {
 
     const { owners, history } = buildOwnershipResponse(media);
 
-    const claims = await Claim.find({ mediaId })
+    const claims = await Claim.find({ mediaId: resolvedMediaId })
       .populate('userId', 'username email profilePic uuid')
       .populate('reviewedBy', 'username email profilePic uuid')
       .sort({ submittedAt: -1 });
@@ -2100,15 +2100,16 @@ router.put('/:mediaId/ownership', authMiddleware, async (req, res) => {
     const { mediaId } = req.params;
     const { owners, note } = req.body || {};
 
-    if (!isValidObjectId(mediaId)) {
-      return res.status(400).json({ error: 'Invalid media ID format' });
+    const resolvedMediaId = await resolveMediaIdFromParam(mediaId);
+    if (!resolvedMediaId) {
+      return res.status(404).json({ error: 'Media not found' });
     }
 
     if (!Array.isArray(owners) || owners.length === 0) {
       return res.status(400).json({ error: 'At least one ownership entry is required' });
     }
 
-    const media = await Media.findById(mediaId);
+    const media = await Media.findById(resolvedMediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -2125,7 +2126,7 @@ router.put('/:mediaId/ownership', authMiddleware, async (req, res) => {
 
     await media.save();
 
-    const refreshedMedia = await Media.findById(mediaId)
+    const refreshedMedia = await Media.findById(resolvedMediaId)
       .populate([
         { path: 'mediaOwners.userId', select: 'username email profilePic uuid' },
         { path: 'mediaOwners.verifiedBy', select: 'username email profilePic uuid' },
@@ -2136,7 +2137,7 @@ router.put('/:mediaId/ownership', authMiddleware, async (req, res) => {
 
     const { owners: updatedOwners, history } = buildOwnershipResponse(refreshedMedia);
 
-    const claims = await Claim.find({ mediaId })
+    const claims = await Claim.find({ mediaId: resolvedMediaId })
       .populate('userId', 'username email profilePic uuid')
       .populate('reviewedBy', 'username email profilePic uuid')
       .sort({ submittedAt: -1 });

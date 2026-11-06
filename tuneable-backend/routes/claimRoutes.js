@@ -6,7 +6,6 @@ const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { canEditMedia } = require('../utils/permissionHelpers');
-const { isValidObjectId } = require('../utils/validators');
 const { sendClaimNotification, sendOwnershipNotification, sendClaimStatusNotification } = require('../utils/emailService');
 const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
 const { softDeleteMedia } = require('../services/mediaLifecycleService');
@@ -149,11 +148,7 @@ router.get('/media/:mediaId', authMiddleware, async (req, res) => {
   try {
     const { mediaId } = req.params;
 
-    if (!isValidObjectId(mediaId)) {
-      return res.status(400).json({ error: 'Invalid media ID format' });
-    }
-
-    const media = await Media.findById(mediaId);
+    const media = await Media.findByIdentifier(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
     }
@@ -162,7 +157,7 @@ router.get('/media/:mediaId', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to view claims for this media' });
     }
 
-    const claims = await Claim.find({ mediaId })
+    const claims = await Claim.find({ mediaId: media._id })
       .populate('userId', 'username email profilePic uuid')
       .populate('reviewedBy', 'username email profilePic uuid')
       .sort({ submittedAt: -1 });

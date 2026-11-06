@@ -4140,7 +4140,7 @@ const TuneProfile: React.FC = () => {
             {editTab === 'ownership' && mediaId && (
               <div className="card p-6">
                 <MediaOwnershipTab
-                  mediaId={mediaId}
+                  mediaId={media?._id || mediaId}
                   canEdit={canEditTune()}
                   currentUser={user as any}
                   mediaTitle={media?.title}
