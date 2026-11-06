@@ -1398,7 +1398,7 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
 
     const [mediaItems, tuneBytesByMedia, supporterStats, viewerTotals] = await Promise.all([
       Media.find({ _id: { $in: mediaIds } })
-        .select('title artist featuring creatorDisplay host author coverArt duration bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries createdAt uploadedAt')
+        .select('title artist featuring creatorDisplay host author coverArt duration waveformPeaks bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries createdAt uploadedAt')
         .populate('podcastSeries', 'title')
         .populate('globalMediaAggregateTopUser', 'username uuid _id')
         .lean(),
@@ -1622,6 +1622,9 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
             artist,
             coverArt,
             duration,
+            waveformPeaks: Array.isArray(media?.waveformPeaks) && media.waveformPeaks.length
+              ? media.waveformPeaks
+              : undefined,
             bpm,
             releaseDate,
             releaseYear,

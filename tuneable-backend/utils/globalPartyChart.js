@@ -37,6 +37,7 @@ const MEDIA_CHART_SELECT = [
   'coverArt',
   'sources',
   'duration',
+  'waveformPeaks',
   'tags',
   'category',
   'bpm',
@@ -784,6 +785,9 @@ async function fetchAllTimeGlobalChart({
       featuring: media.featuring || [],
       creatorDisplay: media.creatorDisplay,
       duration: media.duration || '666',
+      waveformPeaks: Array.isArray(media.waveformPeaks) && media.waveformPeaks.length
+        ? media.waveformPeaks
+        : undefined,
       coverArt: media.coverArt || DEFAULT_COVER_ART,
       sources: playability.sources,
       availablePlatforms: availablePlatformsFromSources(playability.sources),
