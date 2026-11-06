@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Download, Headphones, Megaphone, RefreshCw } from 'lucide-react';
+import { Download, Headphones, Megaphone, Plus, RefreshCw } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
 import { toast } from '../utils/toast';
 
@@ -137,13 +137,12 @@ function poundsFromPence(pence: number | null | undefined): string {
   return ((pence || 1) / 100).toFixed(2);
 }
 
-/** Licences that are actually on. Off grants stay out of the public row. */
+/** Licences that are on. Streaming is included before a choice is saved. Off grants stay out of the row. */
 export function activeLicenceMarks(saved?: SavedLicence | null): Array<{
   id: LicenceId;
   name: string;
   hint: string;
 }> {
-  if (!saved?.chosen) return [];
   const marks: Array<{ id: LicenceId; name: string; hint: string }> = [
     {
       id: 'streaming',
@@ -151,6 +150,7 @@ export function activeLicenceMarks(saved?: SavedLicence | null): Array<{
       hint: 'People can keep this in a library and play it on Tuneable, including in a party and on the charts. The file is not handed over.',
     },
   ];
+  if (!saved?.chosen) return marks;
   if (saved.personalDownload) {
     marks.push({
       id: 'download',
@@ -294,16 +294,16 @@ export function MediaLicenceCard({ mediaId, saved, canEdit, onSaved }: EditorPro
       <LicenceMarkRow
         saved={saved}
         trailing={canEdit && !editing ? (
-          <button type="button" onClick={startEditing} className="text-sm text-purple-300 underline shrink-0">
-            {saved?.chosen ? 'Change' : 'Choose'}
+          <button
+            type="button"
+            onClick={startEditing}
+            aria-label={saved?.chosen ? 'Change licences' : 'Add licences'}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-purple-300/50 bg-black/30 text-purple-100 hover:border-purple-400/70 hover:bg-purple-900/40"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
           </button>
         ) : null}
       />
-      {!saved?.chosen && canEdit && (
-        <p className="text-xs text-gray-400 mt-1 text-center md:text-left">
-          Streaming is included. Download, rework, and commercial stay off until you turn them on.
-        </p>
-      )}
       {editing && (
         <div className="mt-3">
           <LicencePicker value={choice} onChange={setChoice} />
