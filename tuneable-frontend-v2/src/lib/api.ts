@@ -1237,7 +1237,7 @@ export const tagAPI = {
       tag: { name: string; slug: string; canonicalTag?: string; kind?: 'tag' | 'year' | 'bpm' };
       timePeriod?: string;
       contentScope?: 'music' | 'podcast';
-      stats?: { mediaCount?: number; globalTagAggregate?: number };
+      stats?: { mediaCount?: number; globalTagAggregate?: number; tuneBytesAggregate?: number };
       relatedTags?: Array<{ name: string; slug: string }>;
       topOriginPlaces?: Array<{ placeId: string; name: string; featureType?: string | null }>;
       topSupportPlaces?: Array<{ placeId: string; name: string; featureType?: string | null }>;

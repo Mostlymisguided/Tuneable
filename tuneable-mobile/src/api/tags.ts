@@ -18,7 +18,7 @@ export type TagProfileResponse = {
   };
   timePeriod?: string;
   contentScope?: TagProfileScope;
-  stats?: { mediaCount?: number; globalTagAggregate?: number };
+  stats?: { mediaCount?: number; globalTagAggregate?: number; tuneBytesAggregate?: number };
   relatedTags?: Array<{ name: string; slug: string }>;
   topOriginPlaces?: TagPlaceChip[];
   topSupportPlaces?: TagPlaceChip[];

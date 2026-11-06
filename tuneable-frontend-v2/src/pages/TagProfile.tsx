@@ -1,7 +1,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
-import { Tag, Music, Mic, Coins, MapPin, Clock, Play } from 'lucide-react';
+import { Tag, Music, Mic, Coins, MapPin, Clock, Play, Sparkles } from 'lucide-react';
 import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -29,6 +29,7 @@ import PodcastQueueMediaCard, {
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import { getMediaCoverArt } from '../utils/coverArt';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getTagProfilePath, tagsMatch } from '../utils/tagNormalizer';
 import { episodeMatchesTag, relatedPodcastTags } from '../utils/podcastTags';
@@ -53,6 +54,7 @@ interface TagEntity {
 interface TagStats {
   mediaCount?: number;
   globalTagAggregate?: number;
+  tuneBytesAggregate?: number;
 }
 
 interface RelatedTag {
@@ -180,6 +182,7 @@ const TagProfile: React.FC = () => {
   const [tipTarget, setTipTarget] = useState<PodcastEpisodeCardData | null>(null);
   const [isPlacingTip, setIsPlacingTip] = useState(false);
   const [fetchingPlayId, setFetchingPlayId] = useState<string | null>(null);
+  const [showSupportInPounds, setShowSupportInPounds] = useState(false);
 
   const loadProfile = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -236,6 +239,10 @@ const TagProfile: React.FC = () => {
               (sum, episode) => sum + (episode.globalMediaAggregate || 0),
               0
             ),
+            tuneBytesAggregate: matched.reduce(
+              (sum, episode) => sum + (episode.tuneBytesEarned || 0),
+              0
+            ),
           });
           setRelatedTags(relatedPodcastTags(matched, nextTag.name));
           setTopOriginPlaces([]);
@@ -263,6 +270,10 @@ const TagProfile: React.FC = () => {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    setShowSupportInPounds(false);
+  }, [slug, isPodcast]);
 
   const episodes = media as unknown as PodcastEpisodeCardData[];
   const tipStats = useMemo(() => resolveTipStatInputs(tipTarget, user), [tipTarget, user]);
@@ -416,6 +427,11 @@ const TagProfile: React.FC = () => {
     path: `/tag/${encodeURIComponent(tag?.slug || slug)}`,
   } : null);
   const tipTotal = stats?.globalTagAggregate ?? 0;
+  const tuneBytesTotal = stats?.tuneBytesAggregate ?? 0;
+  const supportLabel =
+    selectedTimePeriod === 'all-time'
+      ? 'total support'
+      : `${formatTimePeriodLabel(selectedTimePeriod).toLowerCase()} support`;
   const mosaicCovers = media.slice(0, 4).map((item, index) => ({
     id: item._id || `${item.title}-${index}`,
     src: podcastCover(item),
@@ -532,16 +548,32 @@ const TagProfile: React.FC = () => {
                         : `${total} ${total === 1 ? 'track' : 'tracks'}`}
                   </span>
                 </span>
-                {!loading && tipTotal > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm">
-                    <Coins className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="font-semibold">{penceToPounds(tipTotal)}</span>
-                    <span className="text-gray-400">
-                      {selectedTimePeriod === 'all-time'
-                        ? 'total support'
-                        : `${formatTimePeriodLabel(selectedTimePeriod).toLowerCase()} support`}
-                    </span>
-                  </span>
+                {!loading && (tuneBytesTotal > 0 || tipTotal > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSupportInPounds((open) => !open)}
+                    aria-pressed={showSupportInPounds}
+                    title={showSupportInPounds ? 'Show TuneBytes' : 'Show total support'}
+                    aria-label={
+                      showSupportInPounds
+                        ? `${penceToPounds(tipTotal)} ${supportLabel}`
+                        : `${formatTuneBytes(tuneBytesTotal)} TuneBytes`
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm cursor-pointer hover:bg-white/10 transition-colors"
+                  >
+                    {showSupportInPounds ? (
+                      <>
+                        <Coins className="h-3.5 w-3.5 text-gray-400" />
+                        <span className="font-semibold">{penceToPounds(tipTotal)}</span>
+                        <span className="text-gray-400">{supportLabel}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5 text-purple-300" aria-hidden />
+                        <span className="font-semibold tabular-nums">{formatTuneBytes(tuneBytesTotal)}</span>
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
 

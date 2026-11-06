@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,7 +20,7 @@ import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
-import { formatPoundsFromPence } from '@/src/lib/format';
+import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
 import {
@@ -118,6 +118,8 @@ export default function TagProfileScreen() {
   const [tagName, setTagName] = useState(slug.replace(/-/g, ' '));
   const [tagKind, setTagKind] = useState<'tag' | 'year' | 'bpm'>('tag');
   const [tipTotal, setTipTotal] = useState(0);
+  const [tuneBytesTotal, setTuneBytesTotal] = useState(0);
+  const [showSupportInPounds, setShowSupportInPounds] = useState(false);
   const [total, setTotal] = useState(0);
   const [relatedTags, setRelatedTags] = useState<Array<{ name: string; slug: string }>>(
     []
@@ -181,11 +183,18 @@ export default function TagProfileScreen() {
               0
             )
           );
+          setTuneBytesTotal(
+            matched.reduce(
+              (sum, episode) => sum + (episode.tuneBytesEarned || 0),
+              0
+            )
+          );
           setRelatedTags(relatedPodcastTags(matched, name));
           setTopOriginPlaces([]);
           setTopSupportPlaces([]);
         } else {
           setTipTotal(data?.stats?.globalTagAggregate ?? 0);
+          setTuneBytesTotal(data?.stats?.tuneBytesAggregate ?? 0);
           setTotal(data?.pagination?.total ?? profileMedia.length);
           setRelatedTags(data?.relatedTags || []);
           setTopOriginPlaces(data?.topOriginPlaces || []);
@@ -213,6 +222,10 @@ export default function TagProfileScreen() {
       void load();
     }, [load])
   );
+
+  useEffect(() => {
+    setShowSupportInPounds(false);
+  }, [slug, contentScope]);
 
   const sortedMedia = useMemo(
     () =>
@@ -352,16 +365,38 @@ export default function TagProfileScreen() {
                 : `${total} ${total === 1 ? 'track' : 'tracks'}`}
           </Text>
         </View>
-        {!loading && tipTotal > 0 ? (
-          <View style={styles.statChip}>
-            <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
-            <Text style={styles.statChipText}>{formatPoundsFromPence(tipTotal)}</Text>
-            <Text style={styles.statChipMuted}>
-              {period === 'all-time'
-                ? 'total support'
-                : `${formatTimePeriodLabel(period).toLowerCase()} support`}
-            </Text>
-          </View>
+        {!loading && (tuneBytesTotal > 0 || tipTotal > 0) ? (
+          <Pressable
+            onPress={() => setShowSupportInPounds((open) => !open)}
+            accessibilityRole="button"
+            accessibilityLabel={
+              showSupportInPounds
+                ? `${formatPoundsFromPence(tipTotal)} ${
+                    period === 'all-time'
+                      ? 'total support'
+                      : `${formatTimePeriodLabel(period).toLowerCase()} support`
+                  }. Tap to show TuneBytes.`
+                : `${formatTuneBytes(tuneBytesTotal)} TuneBytes. Tap to show total support.`
+            }
+            style={styles.statChip}>
+            {showSupportInPounds ? (
+              <>
+                <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.statChipText}>{formatPoundsFromPence(tipTotal)}</Text>
+                <Text style={styles.statChipMuted}>
+                  {period === 'all-time'
+                    ? 'total support'
+                    : `${formatTimePeriodLabel(period).toLowerCase()} support`}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="sparkles-outline" size={14} color={colors.accentLight} />
+                <Text style={styles.statChipText}>{formatTuneBytes(tuneBytesTotal)}</Text>
+                <Text style={styles.statChipMuted}>TuneBytes</Text>
+              </>
+            )}
+          </Pressable>
         ) : null}
       </View>
 

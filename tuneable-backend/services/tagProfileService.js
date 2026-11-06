@@ -741,12 +741,17 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const pageSlice = ordered.slice(skip, skip + limitNum);
   const tipTotal = ordered.reduce((sum, m) => sum + (m.globalMediaAggregate || 0), 0);
 
-  // Attach active bids (with tipper user info) for supporters display on the page slice only
+  // Attach active bids (with tipper user info) for supporters display on the page slice only.
+  // Header TuneBytes cover the same tracks as the tip total, including a time window.
   const pageIds = pageSlice.map((m) => m._id);
   const [bidsByMediaId, tuneBytesByMedia] = await Promise.all([
     loadBidsByMediaId(pageIds),
-    sumConfirmedTuneBytesByMediaId(pageIds),
+    sumConfirmedTuneBytesByMediaId(ordered.map((m) => m._id)),
   ]);
+  const tuneBytesAggregate = [...tuneBytesByMedia.values()].reduce(
+    (sum, value) => sum + (value || 0),
+    0
+  );
   const media = pageSlice.map((m) => ({
     ...m,
     ...enrichMediaWithPlayability(m, { authenticated }),
@@ -778,6 +783,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
     stats: {
       mediaCount: total,
       globalTagAggregate: tipTotal,
+      tuneBytesAggregate,
     },
     relatedParty,
     relatedTags,
