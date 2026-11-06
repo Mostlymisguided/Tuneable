@@ -1158,6 +1158,9 @@ async function fetchPeriodGlobalChart({
       featuring: media.featuring || [],
       creatorDisplay: media.creatorDisplay,
       duration: media.duration,
+      waveformPeaks: Array.isArray(media.waveformPeaks) && media.waveformPeaks.length
+        ? media.waveformPeaks
+        : undefined,
       coverArt: media.coverArt || DEFAULT_COVER_ART,
       sources: playability.sources,
       availablePlatforms: availablePlatformsFromSources(playability.sources),

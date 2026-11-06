@@ -4,6 +4,11 @@ const path = require('path');
 const router = express.Router();
 const Media = require('../models/Media');
 const Comment = require('../models/Comment');
+const {
+  listTimelineMarks,
+  createTimelineMark,
+  deleteTimelineMark,
+} = require('../utils/timelineMarks');
 const Claim = require('../models/Claim');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -838,6 +843,14 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       uploadLicence = stampLicence(parsedLicence.licence, userId);
     }
 
+    let waveformPeaks = null;
+    try {
+      const { scanWaveformPeaks } = require('../utils/waveformScan');
+      waveformPeaks = await scanWaveformPeaks(audioFile.buffer, audioFile.originalname);
+    } catch (scanError) {
+      console.warn('waveform scan failed:', scanError.message);
+    }
+
     // Create Media entry with extracted and manual metadata
     const media = new Media({
       // Basic information (user input takes priority)
@@ -899,6 +912,7 @@ router.post('/upload', authMiddleware, mixedUpload.fields([
       contentForm: ['tune'],
       mediaType: [audioFormat.mediaType],
       fileSize: audioFile.size,
+      ...(waveformPeaks ? { waveformPeaks } : {}),
       
       // System fields
       addedBy: userId,
@@ -1206,6 +1220,13 @@ router.post('/:mediaId/attach-upload', authMiddleware, attachAudioUpload.fields(
     }
     media.sources.set('upload', fileUrl);
     media.fileSize = audioFile.size;
+    try {
+      const { scanWaveformPeaks } = require('../utils/waveformScan');
+      const scannedPeaks = await scanWaveformPeaks(audioFile.buffer, audioFile.originalname);
+      if (scannedPeaks) media.waveformPeaks = scannedPeaks;
+    } catch (scanError) {
+      console.warn('waveform scan failed:', scanError.message);
+    }
     Object.assign(
       media,
       adminPermitted
@@ -3243,6 +3264,81 @@ router.post('/:mediaId/comments', authMiddleware, async (req, res) => {
   }
 });
 
+function sendTimelineError(res, error, fallback) {
+  const status = error.status || 500;
+  if (status >= 500) {
+    console.error(fallback, error);
+    return res.status(500).json({ error: fallback, details: error.message });
+  }
+  return res.status(status).json({ error: error.message, code: error.code });
+}
+
+// @route   GET /api/media/:mediaId/timeline
+// @desc    Tip marks on a tune. A note is optional.
+// @access  Public (viewer.canMark when signed in)
+router.get('/:mediaId/timeline', async (req, res) => {
+  try {
+    const media = await findMediaByParam(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    const blockedIds = req.user ? [...(await getBlockedUserIds(req.user._id))] : [];
+    const timeline = await listTimelineMarks(media._id, {
+      viewerId: req.user?._id || null,
+      blockedUserIds: blockedIds,
+    });
+    res.json(timeline);
+  } catch (error) {
+    sendTimelineError(res, error, 'Error fetching timeline');
+  }
+});
+
+// @route   POST /api/media/:mediaId/timeline
+// @desc    Drop a mark using an unused tip. Note is optional.
+// @access  Private
+router.post('/:mediaId/timeline', authMiddleware, async (req, res) => {
+  try {
+    const media = await findMediaByParam(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    const mark = await createTimelineMark({
+      media,
+      userId: req.user._id,
+      timestampSeconds: req.body?.timestampSeconds,
+      note: req.body?.note,
+      bidId: req.body?.bidId,
+    });
+    res.status(201).json({ mark });
+  } catch (error) {
+    sendTimelineError(res, error, 'Error creating timeline mark');
+  }
+});
+
+// @route   DELETE /api/media/:mediaId/timeline/:markId
+// @desc    Remove your mark. The tip stays; it can hold a new mark.
+// @access  Private
+router.delete('/:mediaId/timeline/:markId', authMiddleware, async (req, res) => {
+  try {
+    const { markId } = req.params;
+    if (!isValidObjectId(markId)) {
+      return res.status(400).json({ error: 'Invalid mark ID format' });
+    }
+    const media = await findMediaByParam(req.params.mediaId);
+    if (!media) {
+      return res.status(404).json({ error: 'Media not found' });
+    }
+    const result = await deleteTimelineMark({
+      mediaId: media._id,
+      markId,
+      userId: req.user._id,
+    });
+    res.json(result);
+  } catch (error) {
+    sendTimelineError(res, error, 'Error deleting timeline mark');
+  }
+});
+
 // @route   POST /api/comments/:commentId/like
 // @desc    Like/unlike a comment
 // @access  Private (requires authentication)
@@ -3800,6 +3896,11 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           console.error('Failed to send high-value bid notification:', emailError);
         });
       });
+    }
+
+    if (req.body?.moment) {
+      const { attachTipMoment } = require('../utils/timelineMarks');
+      await attachTipMoment({ media, userId, bid, moment: req.body.moment });
     }
 
     res.json({

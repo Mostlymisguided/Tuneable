@@ -12,6 +12,7 @@ const Bid = require('../models/Bid');
 const Party = require('../models/Party');
 const Media = require('../models/Media');
 const Comment = require('../models/Comment');
+const TimelineMark = require('../models/TimelineMark');
 const Notification = require('../models/Notification');
 const ListeningHistory = require('../models/ListeningHistory');
 const TuneableLedger = require('../models/TuneableLedger');
@@ -433,6 +434,7 @@ async function deleteOwnedDocs(userId) {
       $or: [{ tipperUserId: userId }, { artistUserId: userId }, { bidId: { $in: bidIds } }],
     }),
     Report.deleteMany({ $or: [{ userId }, { reportedBy: userId }] }),
+    TimelineMark.deleteMany({ userId }),
   ]);
 
   return {

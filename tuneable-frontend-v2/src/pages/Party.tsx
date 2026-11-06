@@ -1266,7 +1266,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     setValidationDuration(0);
   };
 
-  const handleBidConfirmation = async (tags: string[], bidAmountOverride: number, setProgress?: (step: 'placing' | 'processing' | 'updating' | null) => void) => {
+  const handleBidConfirmation = async (
+    tags: string[],
+    bidAmountOverride: number,
+    setProgress?: (step: 'placing' | 'processing' | 'updating' | null) => void,
+    moment?: { timestampSeconds: number; note: string } | null
+  ) => {
     // ✅ Early return if already bidding - prevent double-clicks
     if (isBidding) {
       console.log('Already processing a tip, please wait...');
@@ -1350,7 +1355,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         
         try {
           setProgress?.('processing');
-          const response = await partyAPI.placeBid(partyId, queueItemId, bidAmount, tags);
+          const response = await partyAPI.placeBid(partyId, queueItemId, bidAmount, tags, moment);
           const mediaTitle = safePendingMedia?.title || 'media';
           
           // Optimistically update user balance from response
@@ -3861,9 +3866,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
               console.error('Error closing modal:', e);
             }
           }}
-          onConfirm={(tags, amount, setProgress) => {
+          onConfirm={(tags, amount, setProgress, moment) => {
             try {
-              handleBidConfirmation(tags, amount, setProgress);
+              handleBidConfirmation(tags, amount, setProgress, moment);
             } catch (e) {
               console.error('Error in onConfirm:', e);
               toast.error('An error occurred. Please try again.');
@@ -3890,6 +3895,8 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           party={party}
           user={user}
           userBalance={confirmationUserBalance}
+          waveformPeaks={(pendingMedia as any)?.waveformPeaks || (pendingMedia as any)?.mediaId?.waveformPeaks}
+          durationSeconds={(pendingMedia as any)?.duration || (pendingMedia as any)?.mediaId?.duration}
         />
       )}
 

@@ -185,7 +185,11 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       if (isNativeAudioPlatform()) {
         setIsPlayerReady(false);
         setIsLoading(true);
-        setCurrentTime(0);
+        const pending = useWebPlayerStore.getState().pendingSeek;
+        const pendingKey = String(media._id || media.id || '');
+        if (!pending || pending.mediaKey !== pendingKey) {
+          setCurrentTime(0);
+        }
         setDuration(0);
 
         const artistName = typeof media.artist === 'string'
@@ -243,7 +247,11 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       // Reset state
       setIsPlayerReady(false);
       setIsLoading(true);
-      setCurrentTime(0);
+      const pendingOnLoad = useWebPlayerStore.getState().pendingSeek;
+      const pendingKey = String(media._id || media.id || '');
+      if (!pendingOnLoad || pendingOnLoad.mediaKey !== pendingKey) {
+        setCurrentTime(0);
+      }
       setDuration(0);
       
       // Set up audio element
@@ -445,10 +453,11 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
 
   // Handle seeking
   const handleSeek = (newTime: number) => {
-    if (!duration) return;
+    const limit = duration || audioRef.current?.duration || durationRef.current || 0;
+    if (!limit && !isNativeAudioPlatform()) return;
     
     isSeekingRef.current = true;
-    const clampedTime = Math.max(0, Math.min(newTime, duration));
+    const clampedTime = limit ? Math.max(0, Math.min(newTime, limit)) : Math.max(0, newTime);
     setCurrentTime(clampedTime);
     
     try {
@@ -468,6 +477,20 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       isSeekingRef.current = false;
     }, 100);
   };
+
+  const pendingSeekNonce = useWebPlayerStore((state) => state.pendingSeek?.nonce ?? 0);
+
+  useEffect(() => {
+    if (!pendingSeekNonce || !isPlayerReady || !media) return;
+    const pending = useWebPlayerStore.getState().pendingSeek;
+    if (!pending) return;
+    const key = String(media._id || media.id || '');
+    if (pending.mediaKey !== key) return;
+    const limit = audioRef.current?.duration || duration || media.duration || 0;
+    if (!limit && !isNativeAudioPlatform()) return;
+    handleSeek(pending.time);
+    useWebPlayerStore.getState().clearPendingSeek();
+  }, [pendingSeekNonce, isPlayerReady, duration, media?.id, media?._id]);
 
   useEffect(() => {
     currentTimeRef.current = currentTime;

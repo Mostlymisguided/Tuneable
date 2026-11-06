@@ -37,6 +37,7 @@ export interface TippedQueueItem {
   creatorDisplay?: string | null;
   coverArt?: string | null;
   duration?: number;
+  waveformPeaks?: number[];
   bpm?: number | null;
   releaseDate?: string | Date | null;
   releaseYear?: number | null;
@@ -261,7 +262,12 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     setItemToTip(item);
   };
 
-  const handleConfirmTip = async (tags: string[], amount: number) => {
+  const handleConfirmTip = async (
+    tags: string[],
+    amount: number,
+    _setProgress?: unknown,
+    moment?: { timestampSeconds: number; note: string } | null
+  ) => {
     if (!user || !itemToTip) return;
 
     const tipAmount =
@@ -283,7 +289,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
 
     setIsPlacingTip(true);
     try {
-      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags);
+      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
       toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${itemToTip.title}"!`);
       setItemToTip(null);
       await onTipPlaced?.();
@@ -376,6 +382,8 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingTip}
         isNonPlayable={itemToTip ? !isQueueItemPlayable(itemToTip) : false}
+        waveformPeaks={itemToTip?.waveformPeaks}
+        durationSeconds={itemToTip?.duration}
         initialTags={defaultTipTags}
         user={user}
       />

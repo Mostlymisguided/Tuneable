@@ -14,6 +14,8 @@ import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
 import { TuneBytesMark } from './TuneBytesMark';
+import WaveformBars, { waveformPeaksOf } from './WaveformBars';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
 
 function QueueCover({ media }: { media: { coverArt?: string | null; title?: string; contentForm?: string | string[]; contentType?: string | string[] } }) {
   const alt = media.title || 'Unknown Media';
@@ -119,6 +121,13 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   const rank = rankProp ?? index + 1;
   const tuneBytesLabel = formatMediaTuneBytes(mediaData.tuneBytesEarned);
   const bids = mediaData.bids || [];
+  const peaks = waveformPeaksOf(mediaData.waveformPeaks);
+  const playProgress = useWebPlayerStore((state) => {
+    if (!peaks) return 0;
+    const activeId = String(state.currentMedia?._id || state.currentMedia?.id || '');
+    if (!mediaId || activeId !== String(mediaId) || !state.duration) return 0;
+    return Math.max(0, Math.min(1, state.currentTime / state.duration));
+  });
 
   const place = country ? (
     countryPath ? (
@@ -258,6 +267,11 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
               <div className="hidden md:block">
                 <TagList tags={tags} mediaId={mediaId} limit={5} />
               </div>
+            </div>
+          )}
+          {peaks && (
+            <div className="mt-2 hidden md:block">
+              <WaveformBars peaks={peaks} progress={playProgress} />
             </div>
           )}
         </div>

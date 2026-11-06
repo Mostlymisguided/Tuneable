@@ -422,13 +422,22 @@ export const partyAPI = {
     return response.data;
   },
   
-  placeBid: async (partyId: string, mediaId: string, bidAmount: number, tags?: string[]) => {
+  placeBid: async (
+    partyId: string,
+    mediaId: string,
+    bidAmount: number,
+    tags?: string[],
+    moment?: { timestampSeconds: number; note?: string } | null
+  ) => {
     const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
     const currentLocation = getTipCurrentLocation();
     const response = await api.post(`/parties/${partyId}/media/${mediaId}/bid`, {
       bidAmount,
       ...(tags && tags.length > 0 ? { tags } : {}),
       ...(currentLocation ? { currentLocation } : {}),
+      ...(moment && Number.isFinite(moment.timestampSeconds)
+        ? { moment: { timestampSeconds: moment.timestampSeconds, note: moment.note || '' } }
+        : {}),
     });
     return response.data;
   },
@@ -696,6 +705,39 @@ export const mediaAPI = {
   
   deleteComment: async (commentId: string) => {
     const response = await api.delete(`/comments/${commentId}`);
+    return response.data;
+  },
+
+  getTimeline: async (mediaId: string) => {
+    const response = await api.get(`/media/${mediaId}/timeline`);
+    return response.data as {
+      marks: Array<{
+        _id: string;
+        timestampSeconds: number;
+        note: string;
+        amountPence: number;
+        createdAt: string;
+        user: {
+          _id: string;
+          username: string;
+          profilePic?: string | null;
+          uuid?: string | null;
+        };
+      }>;
+      viewer: { unusedBidCount: number; canMark: boolean } | null;
+    };
+  },
+
+  createTimelineMark: async (
+    mediaId: string,
+    body: { timestampSeconds: number; note?: string; bidId?: string }
+  ) => {
+    const response = await api.post(`/media/${mediaId}/timeline`, body);
+    return response.data as { mark: unknown };
+  },
+
+  deleteTimelineMark: async (mediaId: string, markId: string) => {
+    const response = await api.delete(`/media/${mediaId}/timeline/${markId}`);
     return response.data;
   },
 
@@ -1068,15 +1110,19 @@ export const mediaAPI = {
     category?: string;
     tags?: string[];
     sources: Record<string, string>;
-  }, tags?: string[]) => {
+  }, tags?: string[], moment?: { timestampSeconds: number; note?: string } | null) => {
     const { getTipCurrentLocation } = await import('../utils/currentLocationCache');
     const currentLocation = getTipCurrentLocation();
+    const momentPayload = moment && Number.isFinite(moment.timestampSeconds)
+      ? { moment: { timestampSeconds: moment.timestampSeconds, note: moment.note || '' } }
+      : {};
     const payload = externalMedia
-      ? { amount, externalMedia, ...(currentLocation ? { currentLocation } : {}) }
+      ? { amount, externalMedia, ...(currentLocation ? { currentLocation } : {}), ...momentPayload }
       : {
           amount,
           ...(tags && tags.length > 0 ? { tags } : {}),
           ...(currentLocation ? { currentLocation } : {}),
+          ...momentPayload,
         };
     const response = await api.post(`/media/${mediaId}/global-bid`, payload);
     return response.data as {

@@ -7,6 +7,7 @@ const Bid = require('../models/Bid');
 const Party = require('../models/Party');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
+const TimelineMark = require('../models/TimelineMark');
 const Report = require('../models/Report');
 const Claim = require('../models/Claim');
 const ListeningHistory = require('../models/ListeningHistory');
@@ -128,12 +129,14 @@ async function previewMerge(sourceId, keepId) {
     claimCount,
     partyCount,
     reportCount,
+    timelineCount,
   ] = await Promise.all([
     Bid.countDocuments({ mediaId: sourceOid }),
     Comment.countDocuments({ mediaId: sourceOid }),
     Claim.countDocuments({ mediaId: sourceOid }),
     Party.countDocuments({ 'media.mediaId': sourceOid }),
     Report.countDocuments({ mediaId: sourceOid }),
+    TimelineMark.countDocuments({ mediaId: sourceOid }),
   ]);
 
   return {
@@ -142,6 +145,7 @@ async function previewMerge(sourceId, keepId) {
     willReassign: {
       bids: bidCount,
       comments: commentCount,
+      timelineMarks: timelineCount,
       claims: claimCount,
       parties: partyCount,
       reports: reportCount,
@@ -326,6 +330,7 @@ async function mergeMedia(sourceId, keepId, actorId, { dryRun = false } = {}) {
   // 2) Reassign foreign refs
   const bidResult = await reassignSimpleRefs(Bid, sourceOid, keepOid);
   await reassignSimpleRefs(Comment, sourceOid, keepOid);
+  await reassignSimpleRefs(TimelineMark, sourceOid, keepOid);
   await reassignSimpleRefs(Claim, sourceOid, keepOid);
   await reassignSimpleRefs(ListeningHistory, sourceOid, keepOid);
   await Notification.updateMany(

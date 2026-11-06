@@ -16,13 +16,29 @@ import {
 import TipStatChips from './TipStatChips';
 import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
 import { HOW_MONEY_WORKS_PATH } from '../constants';
+import WaveformBars, { waveformPeaksOf, type TipMoment } from './WaveformBars';
 
 type ProgressStep = 'placing' | 'processing' | 'updating' | null;
+
+function formatMoment(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
 
 interface BidConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (tags: string[], amount: number, setProgress?: (step: ProgressStep) => void) => void;
+  onConfirm: (
+    tags: string[],
+    amount: number,
+    setProgress?: (step: ProgressStep) => void,
+    moment?: TipMoment | null
+  ) => void;
+  /** Real scanned peaks. The moment step is hidden without them. */
+  waveformPeaks?: number[] | null;
+  durationSeconds?: number | null;
   bidAmount: number;
   mediaTitle: string;
   mediaArtist?: string;
@@ -63,12 +79,19 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   viewerAggregate = 0,
   viewerIsChampion = false,
   initialTags,
+  waveformPeaks,
+  durationSeconds,
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [amountInput, setAmountInput] = useState('');
   const [userLocationParty, setUserLocationParty] = useState<{ id?: string; _id?: string } | null>(null);
   const [progressStep, setProgressStep] = useState<ProgressStep>(null);
+  const [markOpen, setMarkOpen] = useState(false);
+  const [markRatio, setMarkRatio] = useState(0);
+  const [momentNote, setMomentNote] = useState('');
+  const scannedPeaks = waveformPeaksOf(waveformPeaks);
+  const momentDuration = typeof durationSeconds === 'number' && durationSeconds > 0 ? durationSeconds : 0;
   const [isEnablingCurrentLocation, setIsEnablingCurrentLocation] = useState(false);
   const { user: authUser } = useAuth();
   const liveBalancePounds =
@@ -153,6 +176,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setProgressStep(null);
+      setMarkOpen(false);
+      setMarkRatio(0);
+      setMomentNote('');
     }
   }, [isOpen]);
 
@@ -232,7 +258,13 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
 
   const handleSubmit = () => {
     if (!isAmountValid) return;
-    onConfirm(tags, effectiveAmount, setProgressStep);
+    const moment = markOpen && scannedPeaks && momentDuration
+      ? {
+          timestampSeconds: Math.round(markRatio * momentDuration * 10) / 10,
+          note: momentNote.trim(),
+        }
+      : null;
+    onConfirm(tags, effectiveAmount, setProgressStep, moment);
     setTags([]);
     setTagInput('');
   };
@@ -549,6 +581,40 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             </div>
           )}
         </div>
+
+        {scannedPeaks && momentDuration > 0 && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setMarkOpen((open) => !open)}
+              className="text-sm font-medium text-purple-300 hover:text-white"
+              disabled={isLoading}
+            >
+              {markOpen ? 'Skip the moment' : 'Mark a moment (optional)'}
+            </button>
+            {markOpen && (
+              <div className="mt-2">
+                <WaveformBars
+                  peaks={scannedPeaks}
+                  progress={markRatio}
+                  onSelect={setMarkRatio}
+                />
+                <div className="mt-1 text-xs text-gray-400 tabular-nums">
+                  {formatMoment(markRatio * momentDuration)}
+                </div>
+                <input
+                  type="text"
+                  value={momentNote}
+                  maxLength={140}
+                  onChange={(event) => setMomentNote(event.target.value)}
+                  placeholder="Note (optional)"
+                  disabled={isLoading}
+                  className="mt-2 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-500 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex space-x-3">

@@ -64,9 +64,12 @@ interface WebPlayerState {
   // Time tracking
   currentTime: number;
   duration: number;
+  pendingSeek: { mediaKey: string; time: number; nonce: number } | null;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   seekTo: (time: number) => void;
+  requestSeek: (time: number) => void;
+  clearPendingSeek: () => void;
   
   // Video display
   showVideo: boolean;
@@ -128,6 +131,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       // Time tracking state
       currentTime: 0,
       duration: 0,
+      pendingSeek: null,
       
       // Video display state
       showVideo: false,
@@ -149,6 +153,23 @@ export const useWebPlayerStore = create<WebPlayerState>()(
       seekTo: (time) => {
         set({ currentTime: time });
         // The actual seeking will be handled by the player component
+      },
+
+      requestSeek: (time) => {
+        const safe = Math.max(0, time);
+        set((state) => ({
+          currentTime: safe,
+          pendingSeek: {
+            mediaKey: mediaKey(get().currentMedia),
+            time: safe,
+            nonce: (state.pendingSeek?.nonce || 0) + 1,
+          },
+        }));
+      },
+
+      clearPendingSeek: () => {
+        if (!get().pendingSeek) return;
+        set({ pendingSeek: null });
       },
       
       // Video display actions
@@ -177,6 +198,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
           isPlaying: false, // Always start paused - user must manually play (autotransition handled in next())
           currentTime: 0, // Reset time when changing media
           duration: 0,
+          pendingSeek: null,
           topBidder: null // Clear top bidder when changing media
         });
       },
@@ -216,6 +238,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
             currentMedia: null,
             currentMediaIndex: 0,
             isPlaying: false,
+            pendingSeek: null,
           });
           return;
         }
@@ -226,6 +249,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
             currentMedia: null,
             currentMediaIndex: 0,
             isPlaying: false,
+            pendingSeek: null,
           });
           return;
         }
@@ -236,6 +260,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
           isPlaying: true,
           currentTime: 0,
           duration: 0,
+          pendingSeek: null,
           topBidder: null,
         });
 
@@ -257,6 +282,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
           isPlaying,
           currentTime: 0,
           duration: 0,
+          pendingSeek: null,
           topBidder: null,
         });
 
@@ -277,6 +303,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
             isPlaying: false,
             currentTime: 0,
             duration: 0,
+            pendingSeek: null,
             topBidder: null,
           });
           return;
@@ -288,6 +315,7 @@ export const useWebPlayerStore = create<WebPlayerState>()(
           isPlaying,
           currentTime: 0,
           duration: 0,
+          pendingSeek: null,
           topBidder: null,
         });
       },

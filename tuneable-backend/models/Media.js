@@ -61,6 +61,8 @@ const mediaSchema = new mongoose.Schema({
   
   // Flexible metadata (conditional based on contentType)
   duration: { type: Number }, // For time-based media
+  // Precomputed bar heights, 0–1. Drawn only when a real scan exists.
+  waveformPeaks: { type: [Number], default: undefined },
   fileSize: { type: Number }, // For all media types
   
   // ROLE-SPECIFIC CREATORS (music)

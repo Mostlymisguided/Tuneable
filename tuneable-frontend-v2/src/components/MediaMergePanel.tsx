@@ -23,6 +23,7 @@ interface MergePreview {
   willReassign: {
     bids: number;
     comments: number;
+    timelineMarks?: number;
     claims: number;
     parties: number;
     reports: number;

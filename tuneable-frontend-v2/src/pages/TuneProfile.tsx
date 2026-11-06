@@ -58,6 +58,7 @@ import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { waveformPeaksOf, type TipMoment } from '../components/WaveformBars';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { canEditMedia, canDeleteMedia, isAdmin } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
@@ -143,6 +144,7 @@ interface Media {
   globalMediaAggregateTop?: number;
   globalMediaAggregateTopRank?: number;
   bpm?: number;
+  waveformPeaks?: number[];
   pitch?: number;
   key?: string;
   elements?: string[];
@@ -229,6 +231,7 @@ interface RecommendedMediaItem {
   artist: string;
   coverArt?: string | null;
   duration?: number;
+  waveformPeaks?: number[];
   bpm?: number | null;
   releaseDate?: string | Date | null;
   releaseYear?: number | null;
@@ -1709,7 +1712,7 @@ const TuneProfile: React.FC = () => {
   };
 
   // Handle play button click
-  const handlePlaySong = () => {
+  const handlePlaySong = (startTime?: number) => {
     if (!media) return;
     if (!requireAuthToPlay()) return;
 
@@ -1777,6 +1780,9 @@ const TuneProfile: React.FC = () => {
     // Clear any existing queue and set new media
     setQueue([formattedSong]);
     setCurrentMedia(formattedSong, 0); // Set media without autoplay
+    if (typeof startTime === 'number' && Number.isFinite(startTime)) {
+      useWebPlayerStore.getState().requestSeek(Math.max(0, startTime));
+    }
     play(); // Explicitly start playback when user clicks play button
     setGlobalPlayerActive(true);
     setCurrentPartyId(null); // Not in a party context
@@ -1883,7 +1889,12 @@ const TuneProfile: React.FC = () => {
     setRecommendedItemToTip(item);
   };
 
-  const handleConfirmRecommendedTip = async (tags: string[], amount: number) => {
+  const handleConfirmRecommendedTip = async (
+    tags: string[],
+    amount: number,
+    _setProgress?: unknown,
+    moment?: TipMoment | null
+  ) => {
     if (!user || !recommendedItemToTip) return;
 
     const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : (user?.preferences?.defaultTip || 1.11);
@@ -1904,7 +1915,7 @@ const TuneProfile: React.FC = () => {
 
     setIsPlacingRecommendedTip(true);
     try {
-      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags);
+      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
       toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${recommendedItemToTip.title}"!`);
       setRecommendedItemToTip(null);
       await loadRelatedPlaylists();
@@ -1960,7 +1971,12 @@ const TuneProfile: React.FC = () => {
     setShowBidConfirmationModal(true);
   };
 
-  const handleConfirmGlobalBid = async (tags: string[], amount: number) => {
+  const handleConfirmGlobalBid = async (
+    tags: string[],
+    amount: number,
+    _setProgress?: unknown,
+    moment?: TipMoment | null
+  ) => {
     if (!user || !mediaId) return;
 
     const bidAmount = Number.isFinite(amount) && amount > 0 ? amount : defaultTipAmount;
@@ -1969,7 +1985,7 @@ const TuneProfile: React.FC = () => {
     setIsPlacingGlobalBid(true);
 
     try {
-      const result = await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags);
+      const result = await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags, moment);
       
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
       
@@ -2574,7 +2590,7 @@ const TuneProfile: React.FC = () => {
                     ? 'bg-black/40 opacity-0 group-hover:opacity-100 cursor-pointer'
                     : 'bg-black/50 opacity-100 cursor-default'
                 }`}
-                onClick={coverPlayable ? handlePlaySong : undefined}
+                onClick={coverPlayable ? () => handlePlaySong() : undefined}
               >
                 {coverPlayable ? (
                   <div className="w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-2xl bg-purple-600 hover:bg-purple-700">
@@ -2760,7 +2776,7 @@ const TuneProfile: React.FC = () => {
                 {isMediaPlayable(media) && (
                   <button
                     type="button"
-                    onClick={handlePlaySong}
+                    onClick={() => handlePlaySong()}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2 text-sm"
                   >
                     <Play className="h-4 w-4" fill="currentColor" />
@@ -4182,6 +4198,8 @@ const TuneProfile: React.FC = () => {
         isOpen={showBidConfirmationModal}
         onClose={() => setShowBidConfirmationModal(false)}
         onConfirm={handleConfirmGlobalBid}
+        waveformPeaks={waveformPeaksOf(media?.waveformPeaks)}
+        durationSeconds={media?.duration}
         bidAmount={defaultTipAmount}
         minTip={minimumBid}
         avgTip={media ? calculateGlobalMediaBidAvg(media) || undefined : undefined}
@@ -4231,6 +4249,8 @@ const TuneProfile: React.FC = () => {
         isOpen={!!recommendedItemToTip}
         onClose={() => setRecommendedItemToTip(null)}
         onConfirm={handleConfirmRecommendedTip}
+        waveformPeaks={waveformPeaksOf(recommendedItemToTip?.waveformPeaks)}
+        durationSeconds={recommendedItemToTip?.duration}
         bidAmount={user?.preferences?.defaultTip || 1.11}
         minTip={minimumBid}
         avgTip={recommendedTipStats.avgTip}

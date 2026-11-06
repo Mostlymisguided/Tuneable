@@ -183,6 +183,9 @@ const formatMediaEntry = (record, playabilityOptions = {}) => {
     artist: getPrimaryArtistName(media) || 'Unknown Artist',
     coverArt: media.coverArt || null,
     duration: media.duration || 0,
+    waveformPeaks: Array.isArray(media.waveformPeaks) && media.waveformPeaks.length
+      ? media.waveformPeaks
+      : undefined,
     bpm: roundBpm(media.bpm),
     releaseDate: media.releaseDate || null,
     releaseYear: typeof media.releaseYear === 'number' ? media.releaseYear : null,

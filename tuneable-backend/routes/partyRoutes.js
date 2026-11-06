@@ -1752,6 +1752,19 @@ router.post('/:partyId/media/add', authMiddleware, resolvePartyId(), async (req,
 
         await bid.save();
 
+        try {
+          const { attachTipMoment } = require('../utils/timelineMarks');
+          const momentMedia = (typeof populatedMedia !== 'undefined' && populatedMedia) ? populatedMedia : media;
+          await attachTipMoment({
+            media: momentMedia,
+            userId,
+            bid,
+            moment: req.body?.moment,
+          });
+        } catch (momentError) {
+          console.warn('Timeline mark skipped:', momentError.message);
+        }
+
         // Hybrid: explicit tip tags → £-backed claims (no auto-back when tags omitted)
         if (Array.isArray(tags) && tags.length > 0) {
           try {
@@ -2362,6 +2375,19 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
         });
 
         await bid.save();
+
+        try {
+          const { attachTipMoment } = require('../utils/timelineMarks');
+          const momentMedia = (typeof populatedMedia !== 'undefined' && populatedMedia) ? populatedMedia : media;
+          await attachTipMoment({
+            media: momentMedia,
+            userId,
+            bid,
+            moment: req.body?.moment,
+          });
+        } catch (momentError) {
+          console.warn('Timeline mark skipped:', momentError.message);
+        }
 
         // Hybrid: explicit tip tags → £-backed claims (no auto-back when tags omitted)
         if (Array.isArray(tags) && tags.length > 0) {
