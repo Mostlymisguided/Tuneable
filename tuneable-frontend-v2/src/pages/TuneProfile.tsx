@@ -298,6 +298,7 @@ const TuneProfile: React.FC = () => {
   const { user } = useAuth();
   
   const [media, setMedia] = useState<Media | null>(null);
+  const [showSupportInPounds, setShowSupportInPounds] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -443,6 +444,10 @@ const TuneProfile: React.FC = () => {
     return Number.isFinite(parsed) ? parsed : NaN;
   }, [globalBidInput]);
   const isGlobalBidValid = Number.isFinite(parsedGlobalBidAmount) && parsedGlobalBidAmount >= minimumBid;
+
+  useEffect(() => {
+    setShowSupportInPounds(false);
+  }, [mediaId]);
 
   useEffect(() => {
     console.log('🔍 TuneProfile useEffect triggered with mediaId:', mediaId);
@@ -2697,20 +2702,32 @@ const TuneProfile: React.FC = () => {
               )}
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 px-2 mb-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm">
-                  <Coins className="h-3.5 w-3.5 text-gray-400" />
-                  <span className="font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
-                </span>
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm"
-                  title="TuneBytes"
-                  aria-label={`${formatMediaTuneBytes(media.tuneBytesEarned) ?? '0'} TuneBytes`}
+                <button
+                  type="button"
+                  onClick={() => setShowSupportInPounds((open) => !open)}
+                  aria-pressed={showSupportInPounds}
+                  title={showSupportInPounds ? 'Show TuneBytes' : 'Show total support'}
+                  aria-label={
+                    showSupportInPounds
+                      ? `${penceToPounds(media.globalMediaAggregate)} total support`
+                      : `${formatMediaTuneBytes(media.tuneBytesEarned) ?? '0'} TuneBytes`
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-100 shadow-sm backdrop-blur-sm cursor-pointer hover:bg-white/10 transition-colors"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-purple-400" aria-hidden />
-                  <span className="font-semibold tabular-nums">
-                    {formatMediaTuneBytes(media.tuneBytesEarned) ?? '0'}
-                  </span>
-                </span>
+                  {showSupportInPounds ? (
+                    <>
+                      <Coins className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-semibold">{penceToPounds(media.globalMediaAggregate)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5 text-purple-300" aria-hidden />
+                      <span className="font-semibold tabular-nums">
+                        {formatMediaTuneBytes(media.tuneBytesEarned) ?? '0'}
+                      </span>
+                    </>
+                  )}
+                </button>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 border border-white/10 text-sm text-gray-200 shadow-sm backdrop-blur-sm">
                   <Globe className="h-3.5 w-3.5 text-gray-400" />
                   <span className="font-medium">#{media.globalMediaAggregateTopRank || '—'} global</span>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -83,6 +83,7 @@ export default function TuneProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, updateBalance } = useAuth();
   const [media, setMedia] = useState<ChartMediaItem | null>(null);
+  const [showSupportInPounds, setShowSupportInPounds] = useState(false);
   const [related, setRelated] = useState<RelatedMediaItem[]>([]);
   const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
   const [locationRankings, setLocationRankings] = useState<MediaLocationRanking[]>([]);
@@ -145,6 +146,10 @@ export default function TuneProfileScreen() {
       void load();
     }, [load])
   );
+
+  useEffect(() => {
+    setShowSupportInPounds(false);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -526,20 +531,31 @@ export default function TuneProfileScreen() {
             ) : null}
 
             <View style={styles.statChips}>
-              <View style={styles.statChip}>
-                <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
-                <Text style={styles.statChipText}>
-                  {formatPoundsFromPence(tipTotal)}
-                </Text>
-              </View>
-              <View
-                style={styles.statChip}
-                accessibilityLabel={`${formatTuneBytesDecimal(media.tuneBytesEarned)} TuneBytes`}>
-                <Ionicons name="sparkles-outline" size={14} color={colors.accentLight} />
-                <Text style={styles.statChipText}>
-                  {formatTuneBytesDecimal(media.tuneBytesEarned)}
-                </Text>
-              </View>
+              <Pressable
+                onPress={() => setShowSupportInPounds((open) => !open)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showSupportInPounds
+                    ? `${formatPoundsFromPence(tipTotal)} total support. Tap to show TuneBytes.`
+                    : `${formatTuneBytesDecimal(media.tuneBytesEarned)} TuneBytes. Tap to show total support.`
+                }
+                style={styles.statChip}>
+                {showSupportInPounds ? (
+                  <>
+                    <Ionicons name="cash-outline" size={14} color={colors.textMuted} />
+                    <Text style={styles.statChipText}>
+                      {formatPoundsFromPence(tipTotal)}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="sparkles-outline" size={14} color={colors.accentLight} />
+                    <Text style={styles.statChipText}>
+                      {formatTuneBytesDecimal(media.tuneBytesEarned)}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
               <View style={styles.statChip}>
                 <Ionicons name="globe-outline" size={14} color={colors.textMuted} />
                 <Text style={styles.statChipText}>
