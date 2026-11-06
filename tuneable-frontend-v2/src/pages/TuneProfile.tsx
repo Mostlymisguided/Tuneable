@@ -2267,17 +2267,22 @@ const TuneProfile: React.FC = () => {
     return true;
   });
 
-  const heroMetadata = [
-    media.album,
-    media.releaseDate
-      ? String(new Date(media.releaseDate).getFullYear())
-      : (media as any).releaseYear
-        ? String((media as any).releaseYear)
-        : null,
-    media.duration ? formatDuration(media.duration) : null,
-    media.key,
-    formatBpmLabel(media.bpm),
-  ].filter((part): part is string => Boolean(part));
+  const releaseYearLabel = media.releaseDate
+    ? String(new Date(media.releaseDate).getFullYear())
+    : (media as any).releaseYear
+      ? String((media as any).releaseYear)
+      : null;
+  const heroCopy = [media.album, releaseYearLabel].filter((part): part is string => Boolean(part));
+  const durationLabel = media.duration ? formatDuration(media.duration) : null;
+  const keyLabel = typeof media.key === 'string' ? media.key.trim() : '';
+  const bpmLabel = formatBpmLabel(media.bpm);
+  const heroMetricChips = [
+    durationLabel && durationLabel !== 'Unknown'
+      ? { id: 'duration', label: durationLabel, title: 'Duration' }
+      : null,
+    keyLabel ? { id: 'key', label: keyLabel, title: 'Key' } : null,
+    bpmLabel ? { id: 'bpm', label: bpmLabel, title: 'BPM' } : null,
+  ].filter((chip): chip is { id: string; label: string; title: string } => Boolean(chip));
 
   const topTagRankings = tagRankings.slice(0, 3);
   const topLocationRankings = locationRankings.slice(0, 3);
@@ -2668,10 +2673,31 @@ const TuneProfile: React.FC = () => {
                 onSaved={(licence) => setMedia((current) => current ? { ...current, licence } : current)}
               />
 
-              {heroMetadata.length > 0 && (
-                <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-2">
-                  {heroMetadata.join(' · ')}
-                </p>
+              {(heroCopy.length > 0 || heroMetricChips.length > 0) && (
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-1.5 px-2 mb-2">
+                  {heroCopy.length > 0 && (
+                    <p className="text-sm text-gray-400">
+                      {heroCopy.join(' · ')}
+                    </p>
+                  )}
+                  {heroMetricChips.length > 0 && (
+                    <div className="inline-flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                      {heroMetricChips.map((chip) => (
+                        <span
+                          key={chip.id}
+                          title={chip.title}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-gray-100"
+                        >
+                          {chip.id === 'duration' && <Clock className="h-3 w-3 text-gray-300" aria-hidden />}
+                          {chip.id === 'key' && (
+                            <span className="text-[10px] uppercase tracking-wide text-gray-400">Key</span>
+                          )}
+                          {chip.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {(topTagRankings.length > 0 || topLocationRankings.length > 0) && (
