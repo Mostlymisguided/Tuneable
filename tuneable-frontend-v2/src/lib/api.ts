@@ -3425,7 +3425,114 @@ export const rightsAPI = {
     const response = await api.get('/rights/admin/contacts', { params });
     return response.data as { candidates: RightsContactCandidate[] };
   },
+  listArtists: async (params?: {
+    filter?: string;
+    search?: string;
+    sort?: string;
+    staleDays?: number;
+    page?: number;
+    limit?: number;
+  }) => {
+    const response = await api.get('/rights/admin/artists', { params });
+    return response.data as {
+      artists: CatalogArtist[];
+      total: number;
+      page: number;
+      limit: number;
+      filter: string;
+      sort: string;
+      staleDays: number;
+      counts: Record<string, number>;
+    };
+  },
+  getArtist: async (partyKey: string) => {
+    const response = await api.get('/rights/admin/artists/detail', { params: { partyKey } });
+    return response.data as { artist: CatalogArtist };
+  },
+  previewArtistOutreach: async (body: {
+    partyKey: string;
+    template?: string;
+    customMessage?: string;
+    format?: 'email' | 'instagram' | 'link';
+  }) => {
+    const response = await api.post('/rights/admin/artists/preview', body);
+    return response.data as {
+      template: string;
+      subject: string;
+      text: string;
+      tuneUrl?: string;
+      registerUrl?: string;
+      format?: string;
+      instagramHandle?: string | null;
+      email?: string | null;
+    };
+  },
+  sendArtistOutreach: async (body: {
+    partyKey: string;
+    channel: 'email' | 'instagram' | 'link';
+    template?: string;
+    customMessage?: string;
+    to?: string;
+    body?: string;
+  }) => {
+    const response = await api.post('/rights/admin/artists/outreach', body);
+    return response.data as { artist: CatalogArtist };
+  },
+  saveArtistContacts: async (body: { partyKey: string; email?: string; instagram?: string }) => {
+    const response = await api.post('/rights/admin/artists/contacts', body);
+    return response.data as { artist: CatalogArtist };
+  },
+  importArtists: async (csv: string) => {
+    const response = await api.post('/rights/admin/artists/import', { csv });
+    return response.data as {
+      imported: number;
+      updated: number;
+      unchanged: number;
+      unmatched: Array<{ artist: string; email?: string; instagram?: string; reason: string }>;
+      warnings: Array<{ artist: string; message: string }>;
+    };
+  },
 };
+
+export interface CatalogArtist {
+  partyKey: string;
+  displayName: string;
+  email: string;
+  instagram: string;
+  status: string;
+  tunes: {
+    total: number;
+    pending: number;
+    permitted: number;
+    cleared: number;
+    disputed: number;
+  };
+  lastOutboundAt: string | null;
+  lastInboundAt: string | null;
+  nextFollowUpAt: string | null;
+  caseCount: number;
+  flagshipMediaId?: string | null;
+  flagshipCaseId?: string | null;
+  media?: Array<{
+    _id: string;
+    title: string;
+    uuid?: string;
+    rightsStatus?: string;
+    coverArt?: string | null;
+  }>;
+  outreach?: Array<{
+    _id?: string;
+    sentAt?: string;
+    channel?: string;
+    direction?: string;
+    template?: string;
+    subject?: string;
+    body?: string;
+    to?: string;
+    caseId?: string;
+    mediaTitle?: string;
+  }>;
+}
 
 export interface RightsContactCandidate {
   id: string;

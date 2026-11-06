@@ -76,6 +76,82 @@ router.get('/admin/contacts', adminMiddleware, async (req, res) => {
   }
 });
 
+router.get('/admin/artists', adminMiddleware, async (req, res) => {
+  try {
+    const result = await rightsCaseService.listArtists(req.query);
+    res.json(result);
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
+router.get('/admin/artists/detail', adminMiddleware, async (req, res) => {
+  try {
+    const artist = await rightsCaseService.getArtist(req.query.partyKey);
+    res.json({ artist });
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
+router.post('/admin/artists/preview', adminMiddleware, async (req, res) => {
+  try {
+    const preview = await rightsCaseService.previewArtistOutreach({
+      partyKey: req.body.partyKey,
+      template: req.body.template,
+      customMessage: req.body.customMessage,
+      format: req.body.format,
+      actorId: req.user._id,
+    });
+    res.json(preview);
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
+router.post('/admin/artists/outreach', adminMiddleware, async (req, res) => {
+  try {
+    const artist = await rightsCaseService.sendArtistOutreach({
+      partyKey: req.body.partyKey,
+      channel: req.body.channel,
+      template: req.body.template,
+      customMessage: req.body.customMessage,
+      to: req.body.to,
+      body: req.body.body,
+      actorId: req.user._id,
+    });
+    res.status(201).json({ artist });
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
+router.post('/admin/artists/contacts', adminMiddleware, async (req, res) => {
+  try {
+    const artist = await rightsCaseService.saveArtistContacts({
+      partyKey: req.body.partyKey,
+      email: req.body.email,
+      instagram: req.body.instagram,
+      actorId: req.user._id,
+    });
+    res.json({ artist });
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
+router.post('/admin/artists/import', adminMiddleware, async (req, res) => {
+  try {
+    const result = await rightsCaseService.importArtistContacts({
+      csv: req.body.csv,
+      actorId: req.user._id,
+    });
+    res.json(result);
+  } catch (error) {
+    handleServiceError(res, error);
+  }
+});
+
 router.get('/admin/cases', adminMiddleware, async (req, res) => {
   try {
     const result = await rightsCaseService.listCases(req.query);

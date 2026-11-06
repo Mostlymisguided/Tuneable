@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { rightsAPI } from '../lib/api';
+import ArtistsAdmin from './ArtistsAdmin';
 import type { RightsContactCandidate } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -28,13 +29,14 @@ import {
   type RightsStatus,
 } from '../utils/rightsStatus';
 
-type QueueId = 'all' | 'limbo' | 'follow_ups' | 'open' | 'inbound' | 'stalled';
+type QueueId = 'artists' | 'all' | 'limbo' | 'follow_ups' | 'open' | 'inbound' | 'stalled';
 
 interface RightsAdminProps {
   onAttentionCountChange?: (count: number) => void;
 }
 
 const QUEUE_LABELS: { id: QueueId; label: string }[] = [
+  { id: 'artists', label: 'Artists' },
   { id: 'all', label: 'All' },
   { id: 'limbo', label: 'Limbo' },
   { id: 'follow_ups', label: 'Follow-ups' },
@@ -141,6 +143,7 @@ function mediaIdFromSelection(limbo: any, rightsCase: any, catalogue?: any): str
 
 const TEMPLATE_LABELS: Record<string, string> = {
   claim_keep_invite: 'Claim-keep invite',
+  founding_catalog_invite: 'Founding catalog invite',
   takedown_option: 'Takedown option',
   follow_up: 'Follow-up',
   copyright_reporter: 'Copyright reporter reply',
@@ -574,6 +577,10 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   }, [onAttentionCountChange]);
 
   const loadList = useCallback(async () => {
+    if (!catalogueStatus && queue === 'artists') {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       if (catalogueStatus) {
@@ -1055,7 +1062,8 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
     }
   };
 
-  const countFor = (id: QueueId) => {
+  const countFor = (id: QueueId): number | null => {
+    if (id === 'artists') return null;
     if (id === 'all') return counts.all;
     if (id === 'limbo') return counts.limbo;
     if (id === 'follow_ups') return counts.followUps;
@@ -1227,7 +1235,9 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
             }`}
           >
             {item.label}
-            <span className="ml-2 text-xs opacity-80">{countFor(item.id)}</span>
+            {countFor(item.id) != null && (
+              <span className="ml-2 text-xs opacity-80">{countFor(item.id)}</span>
+            )}
           </button>
         ))}
       </div>
@@ -1237,6 +1247,10 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
         </p>
       )}
 
+      {!catalogueStatus && queue === 'artists' ? (
+        <ArtistsAdmin />
+      ) : (
+      <>
       <div className="relative w-full max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
         <input
@@ -1660,6 +1674,8 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

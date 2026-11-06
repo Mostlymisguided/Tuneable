@@ -79,11 +79,65 @@ const CASE_SOURCES = ['import', 'report', 'claim', 'manual'];
 
 const OUTREACH_TEMPLATES = [
   'claim_keep_invite',
+  'founding_catalog_invite',
   'takedown_option',
   'follow_up',
   'copyright_reporter',
   'custom',
 ];
+
+const ARTIST_FILTERS = [
+  'all',
+  'no_contact',
+  'has_email',
+  'instagram_only',
+  'never',
+  'stale',
+  'declined',
+];
+
+const ARTIST_SORTS = ['pending', 'name', 'lastOutbound', 'followUp'];
+
+/** Least-progressed open case wins, so a sibling still marked identified stays visible. */
+const OPEN_STATUS_RANK = {
+  identified: 0,
+  contact_found: 1,
+  no_response: 2,
+  outreach_sent: 3,
+  awaiting_reply: 4,
+  in_conversation: 5,
+  claim_filed: 6,
+};
+
+const FLAGSHIP_RIGHTS_PRIORITY = {
+  pending: 0,
+  disputed: 1,
+  permitted: 2,
+  cleared: 3,
+};
+
+const CSV_HEADER_ALIASES = {
+  artist: 'artist',
+  artists: 'artist',
+  name: 'artist',
+  'artist name': 'artist',
+  displayname: 'artist',
+  'display name': 'artist',
+  email: 'email',
+  'e-mail': 'email',
+  'email address': 'email',
+  instagram: 'instagram',
+  ig: 'instagram',
+  'instagram handle': 'instagram',
+  'ig handle': 'instagram',
+  'last contact': 'lastContact',
+  'last contacted': 'lastContact',
+  'last contact date': 'lastContact',
+  lastcontact: 'lastContact',
+  'last contacted at': 'lastContact',
+  notes: 'notes',
+  note: 'notes',
+};
 
 const DEFAULT_FOLLOW_UP_DAYS = 7;
 
@@ -281,6 +335,259 @@ function normalizeInviteCode(inviteCode) {
   return /^[A-Z0-9]{5}$/.test(code) ? code : '';
 }
 
+function preferDisplayName(current, next) {
+  const existing = String(current || '').trim();
+  const incoming = String(next || '').trim();
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+  const existingHasCase = /[A-Z]/.test(existing);
+  const incomingHasCase = /[A-Z]/.test(incoming);
+  if (incomingHasCase && !existingHasCase) return incoming;
+  return existing;
+}
+
+function partyNameRegex(partyKey) {
+  const parts = normalizePartyKey(partyKey).split(' ').filter(Boolean).map(escapeRegex);
+  if (!parts.length) return null;
+  return new RegExp(`^\\s*${parts.join('\\s+')}\\s*$`, 'i');
+}
+
+function pickFlagshipMedia(mediaList) {
+  const items = Array.isArray(mediaList) ? mediaList.filter(Boolean) : [];
+  if (!items.length) return null;
+  return [...items].sort((a, b) => {
+    const rankA = FLAGSHIP_RIGHTS_PRIORITY[a.rightsStatus] ?? 9;
+    const rankB = FLAGSHIP_RIGHTS_PRIORITY[b.rightsStatus] ?? 9;
+    if (rankA !== rankB) return rankA - rankB;
+    return (b.globalMediaAggregate || 0) - (a.globalMediaAggregate || 0);
+  })[0];
+}
+
+function rollupArtistStatus(statuses) {
+  const list = (statuses || []).filter(Boolean);
+  const open = list.filter((status) => OPEN_STATUSES.includes(status));
+  if (open.length) {
+    return open.reduce((worst, status) => (
+      (OPEN_STATUS_RANK[status] ?? 99) < (OPEN_STATUS_RANK[worst] ?? 99) ? status : worst
+    ));
+  }
+  if (list.includes('declined')) return 'declined';
+  if (list.includes('takedown')) return 'takedown';
+  if (list.includes('cleared')) return 'cleared';
+  return 'none';
+}
+
+function artistMatchesFilter(artist, filter, { staleDays = 14, now = new Date() } = {}) {
+  const chosen = ARTIST_FILTERS.includes(filter) ? filter : 'all';
+  const hasEmail = Boolean(String(artist?.email || '').trim());
+  const hasInstagram = Boolean(String(artist?.instagram || '').trim());
+  const lastOutbound = artist?.lastOutboundAt ? new Date(artist.lastOutboundAt) : null;
+  const lastOutboundValid = lastOutbound && !Number.isNaN(lastOutbound.getTime());
+  if (chosen === 'no_contact') return !hasEmail && !hasInstagram;
+  if (chosen === 'has_email') return hasEmail;
+  if (chosen === 'instagram_only') return hasInstagram && !hasEmail;
+  if (chosen === 'never') return !lastOutboundValid;
+  if (chosen === 'stale') {
+    if (!lastOutboundValid) return false;
+    const days = (now.getTime() - lastOutbound.getTime()) / (24 * 60 * 60 * 1000);
+    return days >= Math.max(1, Number(staleDays) || 14);
+  }
+  if (chosen === 'declined') return artist?.status === 'declined';
+  return true;
+}
+
+function compareArtists(a, b, sort) {
+  const chosen = ARTIST_SORTS.includes(sort) ? sort : 'pending';
+  const byName = () => String(a.displayName || '').localeCompare(String(b.displayName || ''));
+  if (chosen === 'name') return byName();
+  if (chosen === 'lastOutbound') {
+    const aTime = a.lastOutboundAt ? new Date(a.lastOutboundAt).getTime() : null;
+    const bTime = b.lastOutboundAt ? new Date(b.lastOutboundAt).getTime() : null;
+    const aValid = Number.isFinite(aTime);
+    const bValid = Number.isFinite(bTime);
+    if (!aValid && !bValid) return byName();
+    if (!aValid) return -1;
+    if (!bValid) return 1;
+    if (aTime !== bTime) return aTime - bTime;
+    return byName();
+  }
+  if (chosen === 'followUp') {
+    const aTime = a.nextFollowUpAt ? new Date(a.nextFollowUpAt).getTime() : null;
+    const bTime = b.nextFollowUpAt ? new Date(b.nextFollowUpAt).getTime() : null;
+    const aValid = Number.isFinite(aTime);
+    const bValid = Number.isFinite(bTime);
+    if (!aValid && !bValid) return (b.tunes?.pending || 0) - (a.tunes?.pending || 0);
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+    if (aTime !== bTime) return aTime - bTime;
+    return byName();
+  }
+  const pending = (b.tunes?.pending || 0) - (a.tunes?.pending || 0);
+  if (pending !== 0) return pending;
+  const total = (b.tunes?.total || 0) - (a.tunes?.total || 0);
+  if (total !== 0) return total;
+  return byName();
+}
+
+function parseContactDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const match = raw.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+  if (match) {
+    let day = Number(match[1]);
+    let month = Number(match[2]);
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+    if (month > 12 && day <= 12) {
+      const swap = day;
+      day = month;
+      month = swap;
+    }
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() !== year
+      || parsed.getUTCMonth() !== month - 1
+      || parsed.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return parsed;
+  }
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function detectCsvDelimiter(text) {
+  const firstLine = String(text || '').split(/\r?\n/, 1)[0] || '';
+  const commas = (firstLine.match(/,/g) || []).length;
+  const semis = (firstLine.match(/;/g) || []).length;
+  const tabs = (firstLine.match(/\t/g) || []).length;
+  if (tabs > commas && tabs >= semis) return '\t';
+  if (semis > commas) return ';';
+  return ',';
+}
+
+function parseCsvTable(text, delimiter = ',') {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let inQuotes = false;
+  const source = String(text || '').replace(/^\uFEFF/, '');
+  for (let i = 0; i < source.length; i += 1) {
+    const ch = source[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (source[i + 1] === '"') {
+          cell += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cell += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === delimiter) {
+      row.push(cell);
+      cell = '';
+    } else if (ch === '\n') {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else if (ch !== '\r') {
+      cell += ch;
+    }
+  }
+  if (cell.length || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((line) => line.some((value) => String(value || '').trim()));
+}
+
+function parseArtistCsv(text) {
+  const source = String(text || '').replace(/^\uFEFF/, '').trim();
+  if (!source) return { rows: [], error: 'The file is empty' };
+  const table = parseCsvTable(source, detectCsvDelimiter(source));
+  if (!table.length) return { rows: [], error: 'The file is empty' };
+  const header = table[0].map((cell) => String(cell || '').trim().toLowerCase());
+  const index = {};
+  header.forEach((cell, i) => {
+    const key = CSV_HEADER_ALIASES[cell];
+    if (key && index[key] === undefined) index[key] = i;
+  });
+  if (index.artist === undefined) {
+    return { rows: [], error: 'A header row with an Artist or Name column is required' };
+  }
+  const rows = [];
+  for (const line of table.slice(1)) {
+    const artist = String(line[index.artist] || '').trim();
+    if (!artist) continue;
+    rows.push({
+      artist,
+      email: index.email === undefined ? '' : String(line[index.email] || '').trim(),
+      instagram: index.instagram === undefined ? '' : String(line[index.instagram] || '').trim(),
+      lastContact: index.lastContact === undefined ? '' : String(line[index.lastContact] || '').trim(),
+      notes: index.notes === undefined ? '' : String(line[index.notes] || '').trim(),
+    });
+  }
+  return { rows };
+}
+
+function joinQuotedTitles(titles) {
+  const quoted = titles.map((title) => `"${title}"`);
+  if (quoted.length <= 1) return quoted[0] || '';
+  if (quoted.length === 2) return `${quoted[0]} and ${quoted[1]}`;
+  return `${quoted.slice(0, -1).join(', ')}, and ${quoted[quoted.length - 1]}`;
+}
+
+/**
+ * One founding invite for an artist's catalog. `catalogTotal` counts tunes
+ * that were not included in `catalog` (the message only names a few).
+ */
+function catalogInviteCopy({ media, catalog, catalogTotal, format = 'email' } = {}) {
+  const limit = format === 'instagram' ? 3 : 8;
+  const titles = [];
+  const seen = new Set();
+  const add = (title) => {
+    const value = String(title || '').trim();
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    titles.push(value);
+  };
+  add(media?.title);
+  for (const item of catalog || []) add(item?.title || item);
+  const shown = titles.slice(0, limit);
+  const knownTotal = Math.max(Number(catalogTotal) || 0, titles.length);
+  const extra = Math.max(0, knownTotal - shown.length);
+  const lead = shown[0] || 'your work';
+  let catalogSentence;
+  if (shown.length === 0) {
+    catalogSentence = 'Your music is on Tuneable as a catalog entry.';
+  } else if (shown.length === 1 && extra === 0) {
+    catalogSentence = `"${lead}" is on Tuneable as a catalog entry.`;
+  } else if (extra > 0) {
+    catalogSentence = `${joinQuotedTitles(shown)}, plus ${extra} more, are on Tuneable as catalog entries.`;
+  } else {
+    catalogSentence = `${joinQuotedTitles(shown)} are on Tuneable as catalog entries.`;
+  }
+  const many = shown.length + extra > 1;
+  const noLine = many
+    ? 'Reply NO to have these entries removed from the charts.'
+    : 'Reply NO to have your entry removed from the charts.';
+  return { lead, catalogSentence, noLine, shown, extra, total: shown.length + extra };
+}
+
 function creatorRegisterUrl(media, frontendUrl = 'https://tuneable.stream', inviteCode = null) {
   const base = frontendBase(frontendUrl);
   const params = new URLSearchParams({ from: 'rights' });
@@ -294,6 +601,8 @@ function buildOutreachContent({
   template = 'claim_keep_invite',
   media,
   party,
+  catalog,
+  catalogTotal,
   customMessage = '',
   frontendUrl = 'https://tuneable.stream',
   format = 'email',
@@ -317,6 +626,34 @@ function buildOutreachContent({
   const note = customMessage?.trim() || '';
   const chosenFormat = OUTREACH_FORMATS.includes(format) ? format : 'email';
   const resolvedTemplate = OUTREACH_TEMPLATES.includes(template) ? template : 'custom';
+  const invite = catalogInviteCopy({ media, catalog, catalogTotal, format: chosenFormat });
+  const yesCatalogEmail = 'Reply YES to this email, or click the invite link below, to make it playable and start earning tips.';
+  const yesCatalogShort = 'Reply YES, or click the invite link, to make it playable and start earning tips.';
+  const catalogEmailIntro =
+    `Hi ${greetName},\n\n` +
+    `You are invited to become a founding creator on Tuneable. ${invite.catalogSentence}\n\n` +
+    `${yesCatalogEmail}\n\n` +
+    `${invite.noLine}\n\n` +
+    `${registerUrl}\n\n` +
+    `${rightsLine}\n\n` +
+    `${listingLine}\n\n` +
+    signOff;
+  const catalogShortIntro =
+    `Hey ${greetName} — you are invited to become a founding creator on Tuneable. ${invite.catalogSentence}\n\n` +
+    `${yesCatalogShort}\n\n` +
+    `${invite.noLine}\n\n` +
+    `${registerUrl}\n\n` +
+    `${rightsLine}\n\n` +
+    `${tuneUrl}\n\n` +
+    signOff;
+  const catalogLinkIntro =
+    `You are invited to become a founding creator on Tuneable. ${invite.catalogSentence}\n\n` +
+    `${yesCatalogShort}\n\n` +
+    `${invite.noLine}\n\n` +
+    `${registerUrl}\n\n` +
+    `${rightsLine}\n\n` +
+    `${tuneUrl}\n\n` +
+    signOff;
 
   const emailTemplates = {
     claim_keep_invite: {
@@ -331,6 +668,10 @@ function buildOutreachContent({
         `${rightsLine}\n\n` +
         `${listingLine}\n\n` +
         signOff,
+    },
+    founding_catalog_invite: {
+      subject: `You are invited to become a founding creator on Tuneable — ${invite.lead}`,
+      intro: catalogEmailIntro,
     },
     takedown_option: {
       subject: `Take-down option for "${title}" on Tuneable`,
@@ -374,6 +715,7 @@ function buildOutreachContent({
       `${rightsLine}\n\n` +
       `${tuneUrl}\n\n` +
       signOff,
+    founding_catalog_invite: catalogShortIntro,
     takedown_option:
       `Hey ${greetName} — "${title}" is on Tuneable in rights-pending limbo. ` +
       `If you want it taken down, just reply.\n\n${tuneUrl}`,
@@ -398,6 +740,7 @@ function buildOutreachContent({
       `${rightsLine}\n\n` +
       `${tuneUrl}\n\n` +
       signOff,
+    founding_catalog_invite: catalogLinkIntro,
     takedown_option: `Take-down option for "${title}" on Tuneable.\n\n${tuneUrl}`,
     follow_up:
       `Following up: your tune "${title}" has been tipped on Tuneable.\n\n` +
@@ -459,6 +802,8 @@ module.exports = {
   CASE_SOURCES,
   OUTREACH_TEMPLATES,
   OUTREACH_FORMATS,
+  ARTIST_FILTERS,
+  ARTIST_SORTS,
   DEFAULT_FOLLOW_UP_DAYS,
   normalizePartyKey,
   suggestedPartiesFromMedia,
@@ -476,6 +821,15 @@ module.exports = {
   tuneUrlFromMedia,
   creatorRegisterUrl,
   buildOutreachContent,
+  catalogInviteCopy,
+  preferDisplayName,
+  partyNameRegex,
+  pickFlagshipMedia,
+  rollupArtistStatus,
+  artistMatchesFilter,
+  compareArtists,
+  parseContactDate,
+  parseArtistCsv,
   escapeRegex,
   namesMatch,
   candidateDedupeKey,
