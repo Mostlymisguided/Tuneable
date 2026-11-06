@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Tag, X } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
-import { normalizeTagForStorage, tagsMatch } from '../utils/tagNormalizer';
+import { tagsMatch } from '../utils/tagNormalizer';
+import { isKnownElement, normalizeTipChipForDisplay } from '../utils/elementNormalizer';
 import { penceToPounds } from '../utils/currency';
 
 type RankedTag = {
@@ -59,18 +60,28 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
   if (!isOpen) return null;
 
   const addTag = () => {
-    const display = normalizeTagForStorage(tagInput);
-    if (!display) return;
-    if (tags.some((t) => tagsMatch(t, display)) || tags.length >= 5) return;
-    setTags([...tags, display]);
+    const input = tagInput.trim();
+    if (!input || tags.length >= 5) return;
+    const next = input
+      .split(',')
+      .map((part) => normalizeTipChipForDisplay(part))
+      .filter(Boolean)
+      .filter((chip) => !tags.some((tag) => tagsMatch(tag, chip)));
+    const remaining = 5 - tags.length;
+    if (!next.length || remaining <= 0) return;
+    setTags([...tags, ...next.slice(0, remaining)]);
     setTagInput('');
   };
 
+  const removeTag = (tag: string) => {
+    setTags((prev) => prev.filter((item) => !tagsMatch(item, tag)));
+  };
+
   const toggleSuggested = (tag: string) => {
-    const display = normalizeTagForStorage(tag);
+    const display = normalizeTipChipForDisplay(tag);
     if (!display) return;
     if (tags.some((t) => tagsMatch(t, display))) {
-      setTags(tags.filter((t) => !tagsMatch(t, display)));
+      removeTag(display);
       return;
     }
     if (tags.length >= 5) return;
@@ -165,32 +176,60 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
         ) : null}
 
         <div className="mb-4">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addTag();
-                }
-              }}
-              placeholder="Add a tag"
-              maxLength={20}
-              className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              disabled={submitting}
-            />
-            <button
-              type="button"
-              onClick={addTag}
-              disabled={!tagInput.trim() || tags.length >= 5 || submitting}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              Add
-            </button>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addTag();
+                  }
+                }}
+                placeholder="e.g. chill, workout"
+                maxLength={32}
+                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={submitting}
+              />
+              <button
+                type="button"
+                onClick={addTag}
+                disabled={!tagInput.trim() || tags.length >= 5 || submitting}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+              >
+                Add
+              </button>
+            </div>
+            {tags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => {
+                  const asElement = isKnownElement(tag);
+                  return (
+                    <span
+                      key={tag}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium text-white flex items-center gap-1.5 ${
+                        asElement ? 'bg-teal-600' : 'bg-purple-600'
+                      }`}
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        disabled={submitting}
+                        aria-label={`Remove ${tag}`}
+                        className="text-white/80 hover:text-white leading-none text-base"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
-          <p className="text-xs text-gray-500 mt-1">Max 5 · {tags.length}/5</p>
+          <p className="text-xs text-gray-500 mt-2">Max 5 · {tags.length}/5</p>
         </div>
 
         <div className="flex flex-col gap-2">
