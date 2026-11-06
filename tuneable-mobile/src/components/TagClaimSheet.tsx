@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { mediaAPI } from '@/src/api/media';
 import {
+  appendTipChips,
   isKnownElement,
   normalizeTipChipForDisplay,
 } from '@/src/lib/elementNormalizer';
@@ -77,18 +78,10 @@ export function TagClaimSheet({
   const handleAddTag = () => {
     const input = tagInput.trim();
     if (!input) return;
-    const next = input
-      .split(',')
-      .map((t) => normalizeTipChipForDisplay(t.trim()))
-      .filter(Boolean)
-      .filter(
-        (chip) => !tags.some((t) => t.toLowerCase() === chip.toLowerCase())
-      );
-    const remaining = 5 - tags.length;
-    if (remaining > 0 && next.length) {
-      setTags([...tags, ...next.slice(0, remaining)]);
-      setTagInput('');
-    }
+    const next = appendTipChips(tags, input.split(','));
+    if (next.length === tags.length) return;
+    setTags(next);
+    setTagInput('');
   };
 
   const toggleSuggested = (tag: string) => {
@@ -98,8 +91,7 @@ export function TagClaimSheet({
       if (prev.some((t) => t.toLowerCase() === display.toLowerCase())) {
         return prev.filter((t) => t.toLowerCase() !== display.toLowerCase());
       }
-      if (prev.length >= 5) return prev;
-      return [...prev, display];
+      return appendTipChips(prev, [display]);
     });
   };
 
@@ -224,11 +216,10 @@ export function TagClaimSheet({
                   <Pressable
                     style={[
                       styles.addBtn,
-                      (!tagInput.trim() || tags.length >= 5 || submitting) &&
-                        styles.addBtnDisabled,
+                      (!tagInput.trim() || submitting) && styles.addBtnDisabled,
                     ]}
                     onPress={handleAddTag}
-                    disabled={!tagInput.trim() || tags.length >= 5 || submitting}>
+                    disabled={!tagInput.trim() || submitting}>
                     <Text style={styles.addBtnText}>Add</Text>
                   </Pressable>
                 </View>

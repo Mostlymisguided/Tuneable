@@ -9,10 +9,7 @@ import type { User } from '../contexts/AuthContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { isGeolocationSupported } from '../utils/currentLocationCache';
-import {
-  isKnownElement,
-  normalizeTipChipForDisplay,
-} from '../utils/elementNormalizer';
+import { appendTipChips, isKnownElement } from '../utils/elementNormalizer';
 import TipStatChips from './TipStatChips';
 import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
 import { HOW_MONEY_WORKS_PATH } from '../constants';
@@ -194,14 +191,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const initialTagsKey = (initialTags || []).join(',');
   useEffect(() => {
     if (isOpen) {
-      const seeded = (initialTags || [])
-        .map((tag) => normalizeTipChipForDisplay(tag))
-        .filter(Boolean)
-        .filter((chip, index, arr) =>
-          arr.findIndex((c) => c.toLowerCase() === chip.toLowerCase()) === index
-        )
-        .slice(0, 5);
-      setTags(seeded);
+      setTags(appendTipChips([], initialTags || []));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialTagsKey]);
@@ -225,24 +215,10 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     if (!input) return;
 
     // Split by comma; classify display form client-side (backend re-classifies on save)
-    const newTags = input
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0)
-      .map(tag => normalizeTipChipForDisplay(tag))
-      .filter(tag => {
-        const tagLower = tag.toLowerCase();
-        return !tags.some(existingTag => existingTag.toLowerCase() === tagLower);
-      });
-
-    const remainingSlots = 5 - tags.length;
-    if (remainingSlots > 0 && newTags.length > 0) {
-      const tagsToAdd = newTags.slice(0, remainingSlots);
-      setTags([...tags, ...tagsToAdd]);
-      setTagInput('');
-    } else if (remainingSlots === 0) {
-      setTagInput('');
-    }
+    const next = appendTipChips(tags, input.split(','));
+    if (next.length === tags.length) return;
+    setTags(next);
+    setTagInput('');
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
@@ -540,14 +516,14 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             />
             <button
               onClick={handleAddTag}
-              disabled={!tagInput.trim() || tags.length >= 5 || isLoading}
+              disabled={!tagInput.trim() || isLoading}
               className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
             >
               Add
             </button>
           </div>
           <p className="text-xs text-gray-400">
-            Press Enter to add • Max 5 • {tags.length}/5 used
+            Press Enter to add
           </p>
 
           {tags.length > 0 && (

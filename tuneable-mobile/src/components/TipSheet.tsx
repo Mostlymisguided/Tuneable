@@ -31,6 +31,7 @@ import {
   type CurrentLocationStatus,
 } from '@/src/lib/currentLocation';
 import {
+  appendTipChips,
   isKnownElement,
   normalizeTipChipForDisplay,
 } from '@/src/lib/elementNormalizer';
@@ -283,15 +284,7 @@ export function TipSheet({
     setAgreeTags([]);
     setSelectedAgree([]);
     setClaimMediaId(null);
-    const seeded = (initialTags || [])
-      .map((tag) => normalizeTipChipForDisplay(tag))
-      .filter(Boolean)
-      .filter(
-        (chip, index, arr) =>
-          arr.findIndex((c) => c.toLowerCase() === chip.toLowerCase()) === index
-      )
-      .slice(0, 5);
-    setTags(seeded);
+    setTags(appendTipChips([], initialTags || []));
   }, [
     visible,
     defaultTipPounds,
@@ -331,23 +324,10 @@ export function TipSheet({
     const input = tagInput.trim();
     if (!input) return;
 
-    const newTags = input
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0)
-      .map((tag) => normalizeTipChipForDisplay(tag))
-      .filter((tag) => {
-        const tagLower = tag.toLowerCase();
-        return !tags.some((existing) => existing.toLowerCase() === tagLower);
-      });
-
-    const remainingSlots = 5 - tags.length;
-    if (remainingSlots > 0 && newTags.length > 0) {
-      setTags([...tags, ...newTags.slice(0, remainingSlots)]);
-      setTagInput('');
-    } else if (remainingSlots === 0) {
-      setTagInput('');
-    }
+    const next = appendTipChips(tags, input.split(','));
+    if (next.length === tags.length) return;
+    setTags(next);
+    setTagInput('');
   };
 
   const handleEnableCurrentLocation = async () => {
@@ -774,17 +754,13 @@ export function TipSheet({
                 <Pressable
                   style={[
                     styles.addTagBtn,
-                    (!tagInput.trim() || tags.length >= 5 || submitting) &&
-                      styles.addTagBtnDisabled,
+                    (!tagInput.trim() || submitting) && styles.addTagBtnDisabled,
                   ]}
                   onPress={handleAddTag}
-                  disabled={!tagInput.trim() || tags.length >= 5 || submitting}>
+                  disabled={!tagInput.trim() || submitting}>
                   <Text style={styles.addTagBtnText}>Add</Text>
                 </Pressable>
               </View>
-              <Text style={styles.tagsMeta}>
-                Max 5 · {tags.length}/5 used
-              </Text>
               {tags.length > 0 ? (
                 <View style={styles.tagChips}>
                   {tags.map((tag) => {

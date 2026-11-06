@@ -217,4 +217,22 @@ export function normalizeTipChipForDisplay(chip: string): string {
   return normalizeTagForStorage(trimmed);
 }
 
+/** Quiet safety ceilings. Not shown in the UI. Elements do not use discovery-tag slots. */
+export const MAX_DISCOVERY_TAGS = 20;
+export const MAX_TIP_ELEMENTS = 40;
+
+/** Append chips, skipping duplicates. Instruments do not consume discovery-tag room. */
+export function appendTipChips(existing: string[], incoming: string[]): string[] {
+  const next = [...existing];
+  for (const raw of incoming) {
+    const chip = normalizeTipChipForDisplay(raw);
+    if (!chip || next.some((item) => tagsMatch(item, chip))) continue;
+    const asElement = isKnownElement(chip);
+    const count = next.filter((item) => isKnownElement(item) === asElement).length;
+    if (count >= (asElement ? MAX_TIP_ELEMENTS : MAX_DISCOVERY_TAGS)) continue;
+    next.push(chip);
+  }
+  return next;
+}
+
 export { ELEMENT_ALIASES, PREFER_TAG_MATCH_KEYS };

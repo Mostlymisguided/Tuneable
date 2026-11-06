@@ -27,4 +27,20 @@ describe('partitionClaimChips', () => {
       elements: [],
     });
   });
+
+  it('does not let elements consume discovery-tag room', () => {
+    const chips = [
+      'Keys',
+      'Guitar',
+      'Piano',
+      'Bass',
+      'Drums',
+      'Synth',
+      'chill',
+      'workout',
+    ];
+    const result = partitionClaimChips(chips);
+    expect(result.elements).toEqual(['Keys', 'Guitar', 'Piano', 'Bass', 'Drums', 'Synth']);
+    expect(result.claimTags).toEqual(['Chill', 'Workout']);
+  });
 });

@@ -3,7 +3,11 @@ import { Loader2, Tag, X } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { mediaAPI } from '../lib/api';
 import { tagsMatch } from '../utils/tagNormalizer';
-import { isKnownElement, normalizeTipChipForDisplay } from '../utils/elementNormalizer';
+import {
+  appendTipChips,
+  isKnownElement,
+  normalizeTipChipForDisplay,
+} from '../utils/elementNormalizer';
 import { penceToPounds } from '../utils/currency';
 
 type RankedTag = {
@@ -61,15 +65,10 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
 
   const addTag = () => {
     const input = tagInput.trim();
-    if (!input || tags.length >= 5) return;
-    const next = input
-      .split(',')
-      .map((part) => normalizeTipChipForDisplay(part))
-      .filter(Boolean)
-      .filter((chip) => !tags.some((tag) => tagsMatch(tag, chip)));
-    const remaining = 5 - tags.length;
-    if (!next.length || remaining <= 0) return;
-    setTags([...tags, ...next.slice(0, remaining)]);
+    if (!input) return;
+    const next = appendTipChips(tags, input.split(','));
+    if (next.length === tags.length) return;
+    setTags(next);
     setTagInput('');
   };
 
@@ -84,8 +83,9 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
       removeTag(display);
       return;
     }
-    if (tags.length >= 5) return;
-    setTags([...tags, display]);
+    const next = appendTipChips(tags, [display]);
+    if (next.length === tags.length) return;
+    setTags(next);
   };
 
   const submit = async (agreeTop = false) => {
@@ -196,7 +196,7 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
               <button
                 type="button"
                 onClick={addTag}
-                disabled={!tagInput.trim() || tags.length >= 5 || submitting}
+                disabled={!tagInput.trim() || submitting}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
               >
                 Add
@@ -229,7 +229,6 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
               </div>
             ) : null}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Max 5 · {tags.length}/5</p>
         </div>
 
         <div className="flex flex-col gap-2">

@@ -12,7 +12,12 @@ const {
   applyTipChipsToMedia,
 } = require('../utils/elementNormalizer');
 
-const MAX_CLAIM_TAGS = 5;
+/** Discovery tags backed by a tip. Not shown in the client. */
+const MAX_CLAIM_TAGS = 20;
+/** Musical elements stored on the tune. They do not consume discovery-tag slots. */
+const MAX_CLAIM_ELEMENTS = 40;
+/** "Agree with top tags" still backs a short list, separate from custom claims. */
+const MAX_AGREE_TAGS = 5;
 
 /**
  * @param {string|import('mongoose').Types.ObjectId} userId
@@ -66,7 +71,7 @@ function partitionClaimChips(chips) {
     if (!element) continue;
     if (elements.some((existing) => existing.toLowerCase() === element.toLowerCase())) continue;
     elements.push(element);
-    if (elements.length >= MAX_CLAIM_TAGS) break;
+    if (elements.length >= MAX_CLAIM_ELEMENTS) break;
   }
   return {
     claimTags: normalizeClaimTags(classified.tags),
@@ -297,7 +302,7 @@ async function getTopTagsForAgree(mediaId, limit = 5) {
     includeUnclaimed: true,
     limit: Math.max(limit, 10),
   });
-  return ranked.slice(0, Math.min(limit, MAX_CLAIM_TAGS)).map((r) => r.tag);
+  return ranked.slice(0, Math.min(limit, MAX_AGREE_TAGS)).map((r) => r.tag);
 }
 
 /**
@@ -388,6 +393,8 @@ async function getUserTagAggregatesFromClaims(userId) {
 
 module.exports = {
   MAX_CLAIM_TAGS,
+  MAX_CLAIM_ELEMENTS,
+  MAX_AGREE_TAGS,
   getUserActiveTipOnMedia,
   normalizeClaimTags,
   partitionClaimChips,
