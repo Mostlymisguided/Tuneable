@@ -98,7 +98,11 @@ const PersistentPodcastPlayer: React.FC = () => {
     const fullUrl = resolveFullUrl(audioUrl);
     setIsPlayerReady(false);
     setIsLoading(true);
-    setCurrentTime(0);
+    const pending = usePodcastPlayerStore.getState().pendingSeek;
+    const episodeKey = String(currentEpisode._id || currentEpisode.id || '');
+    if (!pending || pending.episodeKey !== episodeKey) {
+      setCurrentTime(0);
+    }
     setDuration(0);
 
     const el = audioRef.current;
@@ -108,10 +112,16 @@ const PersistentPodcastPlayer: React.FC = () => {
     el.playbackRate = usePodcastPlayerStore.getState().playbackRate;
 
     el.onloadedmetadata = () => {
-      if (el.duration && isFinite(el.duration)) {
-        setDuration(el.duration);
-      } else if (currentEpisode.duration) {
-        setDuration(currentEpisode.duration);
+      const loadedDuration = el.duration && isFinite(el.duration) ? el.duration : 0;
+      const dur = loadedDuration || currentEpisode.duration || 0;
+      if (dur) setDuration(dur);
+      const pending = usePodcastPlayerStore.getState().pendingSeek;
+      const loadedKey = String(currentEpisode._id || currentEpisode.id || '');
+      if (pending && pending.episodeKey === loadedKey && dur) {
+        const t = Math.max(0, Math.min(pending.time, dur));
+        el.currentTime = t;
+        setCurrentTime(t);
+        usePodcastPlayerStore.getState().clearPendingSeek();
       }
       setIsPlayerReady(true);
       setIsLoading(false);
@@ -188,11 +198,27 @@ const PersistentPodcastPlayer: React.FC = () => {
   const handleSeek = (newTime: number) => {
     if (!audioRef.current) return;
     isSeekingRef.current = true;
-    const t = Math.max(0, Math.min(newTime, duration || 0));
+    const audioDuration = audioRef.current.duration;
+    const limit = Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : duration || 0;
+    const t = limit ? Math.max(0, Math.min(newTime, limit)) : Math.max(0, newTime);
     setCurrentTime(t);
     audioRef.current.currentTime = t;
     setTimeout(() => { isSeekingRef.current = false; }, 100);
   };
+
+  const pendingSeekNonce = usePodcastPlayerStore((state) => state.pendingSeek?.nonce ?? 0);
+
+  useEffect(() => {
+    if (!pendingSeekNonce || !isPlayerReady || !currentEpisode || !audioRef.current) return;
+    const pending = usePodcastPlayerStore.getState().pendingSeek;
+    if (!pending) return;
+    const key = String(currentEpisode._id || currentEpisode.id || '');
+    if (pending.episodeKey !== key) return;
+    const audioDuration = audioRef.current.duration;
+    if (!Number.isFinite(audioDuration) || audioDuration <= 0 || audioRef.current.readyState < 1) return;
+    handleSeek(Math.min(pending.time, audioDuration));
+    usePodcastPlayerStore.getState().clearPendingSeek();
+  }, [pendingSeekNonce, isPlayerReady, duration, currentEpisode?._id, currentEpisode?.id]);
 
   const skipBack = () => handleSeek(Math.max(0, currentTime - 15));
   const skipForward = () => handleSeek(Math.min(duration || 0, currentTime + 30));

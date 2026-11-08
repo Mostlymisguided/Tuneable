@@ -31,8 +31,6 @@ import {
   CheckCircle,
   Users,
   Upload,
-  Minus,
-  Plus,
   Share2,
   Copy,
   Check,
@@ -59,6 +57,7 @@ import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMe
 import { useAuth } from '../contexts/AuthContext';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { waveformPeaksOf, type TipMoment } from '../components/WaveformBars';
+import ProfileWaveform from '../components/ProfileWaveform';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { canEditMedia, canDeleteMedia, isAdmin } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
@@ -75,7 +74,6 @@ import {
 import MediaOwnershipTab from '../components/ownership/MediaOwnershipTab';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import TagClaimModal from '../components/TagClaimModal';
-import TipStatChips from '../components/TipStatChips';
 import TipCtaLabel from '../components/TipCtaLabel';
 import MiniSupportersBar from '../components/MiniSupportersBar';
 import EntertainingLoader from '../components/EntertainingLoader';
@@ -2285,26 +2283,6 @@ const TuneProfile: React.FC = () => {
   const topTagRankings = tagRankings.slice(0, 3);
   const topLocationRankings = locationRankings.slice(0, 3);
 
-  const avgTipPounds = media ? calculateGlobalMediaBidAvg(media) || undefined : undefined;
-
-  const applyTipShortcut = (amount: number) => {
-    setHasInitializedBidInput(true);
-    setGlobalBidInput(amount.toFixed(2));
-  };
-
-  const renderTipStatShortcuts = (className?: string) => (
-    <TipStatChips
-      className={className}
-      minTip={minimumBid}
-      avgTip={avgTipPounds}
-      championAggregate={mediaChampionTip?.championAggregate}
-      viewerAggregate={mediaChampionTip?.viewerAggregate}
-      viewerIsChampion={mediaChampionTip?.viewerIsChampion}
-      disabled={isPlacingGlobalBid}
-      onSelect={applyTipShortcut}
-    />
-  );
-
   const renderShareButton = () => (
     isMobile ? (
       <button
@@ -2374,92 +2352,27 @@ const TuneProfile: React.FC = () => {
 
   const copyAccessLine = () => (copyAccess ? copyAccessSentence(copyAccess) : null);
 
-  const renderSlimSupportSection = () => (
-    <div id="support-tune" className="mb-6 px-2 md:px-0">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border border-purple-500/30 rounded-lg p-4 md:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div className="text-center sm:text-left">
-              <h3 className="text-lg md:text-xl font-bold text-white flex items-center justify-center sm:justify-start gap-2">
-                <Coins className="h-5 w-5 text-yellow-400" />
-                Support This Tune
-              </h3>
-              <p className="text-gray-300 text-sm mt-1">
-                {!isMediaPlayable(media)
-                  ? 'This track is not playable on Tuneable yet. Your tip still supports the listing.'
-                  : 'Boost global ranking and support the artist'}
-              </p>
-              {copyAccessLine() && (
-                <p className="text-purple-200 text-xs mt-1">{copyAccessLine()}</p>
-              )}
-            </div>
-            {user && (
-              <p className="text-xs text-gray-400 text-center sm:text-right shrink-0">
-                Balance: {penceToPounds((user as any)?.balance)}
-              </p>
-            )}
-          </div>
+  const seekTune = (seconds: number) => {
+    const state = useWebPlayerStore.getState();
+    const activeId = String(state.currentMedia?._id || state.currentMedia?.id || '');
+    const keys = [media._id, media.uuid].filter(Boolean).map(String);
+    if (keys.includes(activeId)) {
+      state.requestSeek(seconds);
+      if (!state.isPlaying) state.play();
+      return;
+    }
+    handlePlaySong(seconds);
+  };
 
-          <div className="flex flex-row items-center justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                const current = parseFloat(globalBidInput) || minimumBid;
-                setGlobalBidInput(Math.max(minimumBid, current - 0.01).toFixed(2));
-                setHasInitializedBidInput(true);
-              }}
-              disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-              className="px-2 py-2.5 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tl-lg rounded-bl-lg transition-colors flex items-center justify-center"
-            >
-              <Minus className="h-4 w-4 text-white" />
-            </button>
-            <div className="flex items-center bg-gray-800 overflow-hidden">
-              <input
-                type="number"
-                step="0.01"
-                min={minimumBid}
-                value={globalBidInput}
-                onChange={(e) => {
-                  setHasInitializedBidInput(true);
-                  setGlobalBidInput(e.target.value);
-                }}
-                className="w-20 sm:w-24 bg-gray-800 p-2 text-white text-lg font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const current = parseFloat(globalBidInput) || minimumBid;
-                const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
-                setGlobalBidInput(Math.min(balanceInPounds || 999999, current + 0.01).toFixed(2));
-                setHasInitializedBidInput(true);
-              }}
-              disabled={isPlacingGlobalBid || (user ? (() => {
-                const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-              })() : false)}
-              className="px-2 py-2.5 bg-gray-600 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-br-lg transition-colors flex items-center justify-center"
-            >
-              <Plus className="h-4 w-4 text-white" />
-            </button>
-            <button
-              onClick={handleGlobalBid}
-              disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
-              className="ml-3 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all flex items-center justify-center text-sm md:text-base"
-            >
-              <TipCtaLabel
-                amount={globalBidInput}
-                signedIn={Boolean(user)}
-                loading={isPlacingGlobalBid}
-                fallback="Tip"
-              />
-            </button>
-          </div>
-
-          {renderTipStatShortcuts('flex flex-wrap justify-center gap-2 mt-3')}
-        </div>
-      </div>
-    </div>
+  const renderProfileWaveform = () => (
+    <ProfileWaveform
+      peaks={media.waveformPeaks}
+      mediaKeys={[media._id, media.uuid]}
+      duration={media.duration}
+      player="web"
+      caption={copyAccessLine()}
+      onSeek={isMediaPlayable(media) ? seekTune : undefined}
+    />
   );
 
   const renderRecommendedQueueList = (items: RecommendedMediaItem[]) => (
@@ -3004,7 +2917,7 @@ const TuneProfile: React.FC = () => {
         {!isEditMode ? (
           /* NORMAL VIEW - All existing content */
           <>
-        {renderSlimSupportSection()}
+        {renderProfileWaveform()}
 
         {/* Production Stack Section */}
         {hasProductionStack(media.productionStack) && (
@@ -3214,98 +3127,7 @@ const TuneProfile: React.FC = () => {
             {editTab === 'info' && (
               /* Tune Info Tab - Show normal content when viewing info tab in edit mode */
               <div className="space-y-8">
-                {/* Global Bid Section - Support This Tune */}
-                <div className="mb-6 px-2 md:px-0">
-                  <div className="max-w-2xl mx-auto">
-                    <div className="bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-2 border-purple-500/30 rounded-lg p-4 md:p-8 text-center">
-                      <h3 className="text-xl md:text-2xl font-bold text-white mb-2 flex items-center justify-center">
-                        <Coins className="h-5 w-5 md:h-7 md:w-7 mr-2 md:mr-3 text-yellow-400" />
-                        Support This Tune
-                      </h3>
-                      <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6">
-                        Boost this tune's global ranking and support the artist
-                      </p>
-                      {copyAccessLine() && (
-                        <p className="text-purple-200 text-xs md:text-sm mb-4">{copyAccessLine()}</p>
-                      )}
-                      
-                      <div className="flex flex-col md:flex-row items-center justify-center space-y-3 md:space-y-0 md:space-x-3 mb-4">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const current = parseFloat(globalBidInput) || minimumBid;
-                            const newAmount = Math.max(minimumBid, current - 0.01);
-                            setGlobalBidInput(newAmount.toFixed(2));
-                            setHasInitializedBidInput(true);
-                          }}
-                          disabled={isPlacingGlobalBid || parseFloat(globalBidInput) <= minimumBid}
-                          className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
-                        >
-                          <Minus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                        </button>
-                        <div className="flex items-center bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                          <span className="px-2 md:px-3 text-gray-400 text-lg md:text-xl">£</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min={minimumBid}
-                            value={globalBidInput}
-                            onChange={(e) => {
-                              setHasInitializedBidInput(true);
-                              setGlobalBidInput(e.target.value);
-                            }}
-                            className="w-24 md:w-28 bg-gray-800 p-2 md:p-3 text-white text-xl md:text-2xl font-bold text-center focus:outline-none border-l border-gray-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const current = parseFloat(globalBidInput) || minimumBid;
-                            const balanceInPounds = user ? penceToPoundsNumber((user as any)?.balance) : 999999;
-                            const newAmount = Math.min(balanceInPounds || 999999, current + 0.01);
-                            setGlobalBidInput(newAmount.toFixed(2));
-                            setHasInitializedBidInput(true);
-                          }}
-                          disabled={isPlacingGlobalBid || (user ? (() => {
-                            const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-                            return balanceInPounds > 0 && parseFloat(globalBidInput) >= balanceInPounds;
-                          })() : false)}
-                          className="px-2 md:px-3 py-2 md:py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center"
-                        >
-                          <Plus className="h-4 w-4 md:h-5 md:w-5 text-white" />
-                        </button>
-                        <button
-                          onClick={handleGlobalBid}
-                          disabled={isPlacingGlobalBid || (Boolean(user) && !isGlobalBidValid)}
-                          className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                        >
-                          <TipCtaLabel
-                            amount={globalBidInput}
-                            signedIn={Boolean(user)}
-                            loading={isPlacingGlobalBid}
-                            fallback="Enter Tip"
-                          />
-                        </button>
-                      </div>
-                      
-                      {renderTipStatShortcuts('flex flex-wrap justify-center gap-2 mb-4')}
-                      
-                      <p className="text-xs md:text-sm text-gray-400">
-                        Minimum tip: £{minimumBid.toFixed(2)}
-                      </p>
-                      {user && (
-                        <p className="text-xs md:text-sm text-gray-400 mt-2">
-                          Your balance: {penceToPounds((user as any)?.balance)}
-                        </p>
-                      )}
-                      {!user && (
-                        <p className="text-xs md:text-sm text-gray-400 mt-2">
-                          Sign in to tip and support this tune
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                {renderProfileWaveform()}
 
                 {/* All other normal content sections would go here - comments, top bidders, etc. */}
                 {/* For now, showing a message that user can switch to edit tab */}

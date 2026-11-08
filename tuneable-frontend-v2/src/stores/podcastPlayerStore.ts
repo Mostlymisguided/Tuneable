@@ -32,6 +32,7 @@ interface PodcastPlayerState {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  pendingSeek: { episodeKey: string; time: number; nonce: number } | null;
   volume: number;
   isMuted: boolean;
   playbackRate: number;
@@ -45,6 +46,8 @@ interface PodcastPlayerState {
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
   seekTo: (time: number) => void;
+  requestSeek: (time: number) => void;
+  clearPendingSeek: () => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
   setPlaybackRate: (rate: number) => void;
@@ -63,6 +66,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
       isPlaying: false,
       currentTime: 0,
       duration: 0,
+      pendingSeek: null,
       volume: 50,
       isMuted: false,
       playbackRate: 1,
@@ -76,6 +80,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
           isPlaying: false,
           currentTime: 0,
           duration: 0,
+          pendingSeek: null,
         });
       },
 
@@ -113,6 +118,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
             isPlaying: false,
             currentTime: 0,
             duration: 0,
+            pendingSeek: null,
           });
           return;
         }
@@ -123,12 +129,30 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
           isPlaying: true,
           currentTime: 0,
           duration: 0,
+          pendingSeek: null,
         });
       },
 
       setCurrentTime: (time) => set({ currentTime: time }),
       setDuration: (duration) => set({ duration }),
       seekTo: (time) => set({ currentTime: Math.max(0, time) }),
+      requestSeek: (time) => {
+        const safe = Math.max(0, time);
+        const episode = get().currentEpisode;
+        const episodeKey = String(episode?._id || episode?.id || '');
+        set((state) => ({
+          currentTime: safe,
+          pendingSeek: {
+            episodeKey,
+            time: safe,
+            nonce: (state.pendingSeek?.nonce || 0) + 1,
+          },
+        }));
+      },
+      clearPendingSeek: () => {
+        if (!get().pendingSeek) return;
+        set({ pendingSeek: null });
+      },
 
       setVolume: (volume) => set({ volume: Math.max(0, Math.min(100, volume)) }),
       toggleMute: () => set((s) => ({ isMuted: !s.isMuted })),
@@ -150,6 +174,7 @@ export const usePodcastPlayerStore = create<PodcastPlayerState>()(
           isPlaying: false,
           currentTime: 0,
           duration: 0,
+          pendingSeek: null,
         });
       },
     }),
