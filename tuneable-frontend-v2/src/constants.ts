@@ -8,12 +8,12 @@ export const hasCustomProfilePic = (profilePic?: string | null) =>
 /** Default tip amount in pounds for new users / fallbacks */
 export const DEFAULT_TIP_POUNDS = 1.11;
 
-/** Public page explaining the current 70/30 split and the 90/10 + DAO commitments */
+/** Public page explaining the current 80/20 split and the 90/10 + DAO commitments */
 export const HOW_MONEY_WORKS_PATH = '/about#how-money-works';
 
-/** Share of each tip allocated to artists today (before payment-processor fees) */
-export const ARTIST_TIP_SHARE_TODAY_PERCENT = 70;
-export const PLATFORM_TAKE_TODAY_PERCENT = 30;
+/** Share of each tip allocated to artists today. Processor fees are already off the wallet. */
+export const ARTIST_TIP_SHARE_TODAY_PERCENT = 80;
+export const PLATFORM_TAKE_TODAY_PERCENT = 20;
 export const ARTIST_TIP_SHARE_TARGET_PERCENT = 90;
 export const PLATFORM_TAKE_TARGET_PERCENT = 10;
 

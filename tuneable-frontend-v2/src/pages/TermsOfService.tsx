@@ -1,5 +1,11 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import {
+  ARTIST_TIP_SHARE_TARGET_PERCENT,
+  ARTIST_TIP_SHARE_TODAY_PERCENT,
+  PLATFORM_TAKE_TARGET_PERCENT,
+  PLATFORM_TAKE_TODAY_PERCENT,
+} from '../constants';
 
 const TermsOfService: React.FC = () => {
   const { hash } = useLocation();
@@ -80,7 +86,7 @@ const TermsOfService: React.FC = () => {
                   <li>Allow users to place monetary tips to influence social rankings and party queues</li>
                   <li>Host content uploaded by creators who have declared themselves as rights holders</li>
                   <li>Allow users to import public catalogue information (for example titles and artists from a public YouTube playlist) so it can be matched to tracks already in Tuneable's library. Imports are catalogue metadata only; they do not add YouTube playback to Tuneable</li>
-                  <li>Share revenue with artists and rights-holders through an escrow and tipping system (70% to artists, 30% to platform)</li>
+                  <li>Share revenue with artists and rights-holders through an escrow and tipping system ({ARTIST_TIP_SHARE_TODAY_PERCENT}% to artists, {PLATFORM_TAKE_TODAY_PERCENT}% to platform)</li>
                   <li>Facilitate community support for musicians and creators</li>
                 </ul>
                 <p className="mb-2">
@@ -138,13 +144,13 @@ const TermsOfService: React.FC = () => {
                   <li>Once placed, tips cannot be refunded or transferred (except as required by law or platform policy)</li>
                   <li>Hosts may set minimum tip amounts for their parties</li>
                   <li>Tips are final when confirmed and deducted from your wallet</li>
-                  <li>70% of each tip is allocated to the artist(s) via our escrow system</li>
-                  <li>30% of each tip goes to Tuneable as a platform fee, except where an artist-invite commission applies as described in section 4.5</li>
+                  <li>{ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip is allocated to the artist(s) via our escrow system</li>
+                  <li>{PLATFORM_TAKE_TODAY_PERCENT}% of each tip goes to Tuneable as a platform fee, except where an artist-invite commission applies as described in section 4.5</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">4.3 Artist Escrow System</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>When users tip on media, 70% of the tip amount is allocated to the artist's escrow balance</li>
+                  <li>When users tip on media, {ARTIST_TIP_SHARE_TODAY_PERCENT}% of the tip amount is allocated to the artist&apos;s escrow balance</li>
                   <li>Escrow allocations are split among media owners based on their ownership percentages</li>
                   <li>For registered artists, paid escrow is immediately added to their withdrawable balance. The welcome-credit portion is held as pending promotional escrow until the tipper tops up with real money (or it expires after 90 days)</li>
                   <li>For unregistered artists, escrow is stored and can be claimed when they register and verify their identity, subject to the same promotional-pending rules</li>
@@ -173,7 +179,7 @@ const TermsOfService: React.FC = () => {
               <div className="space-y-4 text-gray-700">
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Only Founding Creators with a complete, verified creator profile may earn artist-invite commission. The invited artist must also have a complete, verified creator profile and have uploaded their own work. Commission is 3% of that artist&apos;s paid tip revenue for 12 months from the date their creator profile is verified</li>
-                  <li>The commission is taken from Tuneable&apos;s platform share, not from the artist&apos;s 70% share</li>
+                  <li>The commission is taken from Tuneable&apos;s platform share, not from the artist&apos;s {ARTIST_TIP_SHARE_TODAY_PERCENT}% share</li>
                   <li>Commission applies only to media the invited artist uploaded themselves. It does not apply to claimed library imports, catalog-only listings, or welcome-credit-only tips</li>
                   <li>Commission is added to your escrow balance and paid out under the same payout rules as artist earnings. Tuneable may withhold or reverse commission in cases of abuse (including self-invite or circular tipping)</li>
                   <li>Users who are not Founding Creators may still invite others; those invites do not earn commission under this section</li>
@@ -371,27 +377,30 @@ const TermsOfService: React.FC = () => {
                   Revenue from tips placed on media content is distributed as follows:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>Artists/Creators:</strong> 70% of tip revenue (split among media owners based on ownership percentages)</li>
-                  <li><strong>Tuneable Platform:</strong> 30% of tip revenue (operating costs and platform maintenance)</li>
+                  <li><strong>Artists/Creators:</strong> {ARTIST_TIP_SHARE_TODAY_PERCENT}% of tip revenue (split among media owners based on ownership percentages)</li>
+                  <li><strong>Tuneable Platform:</strong> {PLATFORM_TAKE_TODAY_PERCENT}% of tip revenue (operating costs and platform maintenance)</li>
                 </ul>
                 <p className="mb-2 mt-4">
-                  <strong>Multi-Artist Splits:</strong> When media has multiple owners, the 70% artist share is divided proportionally 
-                  based on the ownership percentages declared in the media's ownership information.
+                  <strong>Multi-Artist Splits:</strong> When media has multiple owners, the {ARTIST_TIP_SHARE_TODAY_PERCENT}% artist share is divided proportionally 
+                  based on the ownership percentages declared in the media&apos;s ownership information. Each owner can choose how much of their own share is earmarked for a perk fund.
+                </p>
+                <p className="mb-2">
+                  <strong>Perk fund:</strong> A creator may set aside anywhere from 0% to {ARTIST_TIP_SHARE_TODAY_PERCENT}% of each future tip for a perk fund, which will pay for fan perks, rewards, and merch. Until those perks can be redeemed, the full artist share stays in withdrawable escrow and the setting does not move money already allocated. Welcome credit is never placed in the perk fund. The fund remains the creator&apos;s money.
                 </p>
 
                 <h3 className="text-xl font-medium text-gray-900">8.2 Payment Processing</h3>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li>All revenue shares are calculated after standard payment processing fees</li>
-                  <li>Payments are processed securely through Stripe</li>
-                  <li>Payment-processing fees charged by Stripe or app stores are separate from Tuneable&apos;s platform take rate</li>
-                  <li>Tuneable&apos;s platform take rate will not increase above 30% of tip revenue. We may reduce our take rate (increasing the artist share) as the platform scales, with 30 days&apos; notice of any change</li>
+                  <li>Card and app-store fees are deducted before wallet credit. The {ARTIST_TIP_SHARE_TODAY_PERCENT}/{PLATFORM_TAKE_TODAY_PERCENT} split applies to the tip taken from that balance, not to the checkout total</li>
+                  <li>Payments are processed securely through Stripe on the web, and through Apple or Google on the mobile apps</li>
+                  <li>Payment-processing fees are separate from Tuneable&apos;s platform take rate</li>
+                  <li>Tuneable&apos;s platform take rate will not increase above {PLATFORM_TAKE_TODAY_PERCENT}% of tip revenue. We may reduce our take rate (increasing the artist share) as the platform scales, with 30 days&apos; notice of any change</li>
                 </ul>
 
                 <h3 className="text-xl font-medium text-gray-900">8.3 Revenue Share Commitment</h3>
                 <p className="mb-2">
-                  Tuneable currently retains 30% of each tip, with 70% allocated to artists and rights-holders.
-                  We are committed to reducing our platform take rate to 10% of each tip once the platform is
-                  operating at scale, so that 90% of tip revenue reaches artists. Until that reduction takes
+                  Tuneable currently retains {PLATFORM_TAKE_TODAY_PERCENT}% of each tip, with {ARTIST_TIP_SHARE_TODAY_PERCENT}% allocated to artists and rights-holders.
+                  We are committed to reducing our platform take rate to {PLATFORM_TAKE_TARGET_PERCENT}% of each tip once the platform is
+                  operating at scale, so that {ARTIST_TIP_SHARE_TARGET_PERCENT}% of tip revenue reaches artists. Until that reduction takes
                   effect, artists continue to receive the majority of each tip. We will provide transparent
                   reporting on revenue distribution upon request.
                 </p>
@@ -442,7 +451,7 @@ const TermsOfService: React.FC = () => {
                   that artists receive their entitled revenue even if they have not yet registered or claimed their account on Tuneable.
                 </p>
                 <p className="mb-2">
-                  <strong>Escrow Allocation:</strong> When a user places a tip on media, 70% of the tip amount is automatically 
+                  <strong>Escrow Allocation:</strong> When a user places a tip on media, {ARTIST_TIP_SHARE_TODAY_PERCENT}% of the tip amount is automatically 
                   allocated to the artist's escrow balance (or stored for unknown artists until they register). The allocation 
                   happens immediately upon tip placement.
                 </p>
@@ -472,7 +481,7 @@ const TermsOfService: React.FC = () => {
                   Standard platform fees apply to all escrowed and paid-out revenue:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
-                  <li>Platform operating fee: 30% of tip revenue (as outlined in section 8.1)</li>
+                  <li>Platform operating fee: {PLATFORM_TAKE_TODAY_PERCENT}% of tip revenue (as outlined in section 8.1)</li>
                   <li>Payment processing fees: Standard Stripe fees apply to all payouts</li>
                   <li>No additional fees are charged for escrow services</li>
                 </ul>

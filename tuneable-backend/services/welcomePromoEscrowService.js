@@ -17,6 +17,7 @@ const {
   PROMO_ESCROW_STATUS,
   isPaidTopUpMethod,
 } = require('../utils/welcomePromoEscrow');
+const { ARTIST_SHARE_PERCENTAGE } = require('../utils/revenueSplit');
 
 function idStr(value) {
   if (!value) return null;
@@ -496,7 +497,7 @@ async function reverseEscrowForBid(bid, refundAmount) {
     const mediaWithOwners = await Media.findById(bid.mediaId).select('mediaOwners');
     if (!mediaWithOwners?.mediaOwners?.length) return;
 
-    const fallbackShare = Math.round((refundAmount || bid.amount || 0) * 0.7);
+    const fallbackShare = Math.round((refundAmount || bid.amount || 0) * ARTIST_SHARE_PERCENTAGE);
     for (const owner of mediaWithOwners.mediaOwners) {
       if (!owner.userId) continue;
       const ownerShare = Math.round(fallbackShare * ((owner.percentage || 0) / 100));

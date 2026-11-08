@@ -349,7 +349,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
           )}
 
           <p className="mt-3 text-xs text-purple-200/90 text-center">
-            70% of this {actionLabelLower} goes to the artist.{' '}
+            80% of this {actionLabelLower} goes to the artist.{' '}
             <Link
               to={HOW_MONEY_WORKS_PATH}
               onClick={onClose}

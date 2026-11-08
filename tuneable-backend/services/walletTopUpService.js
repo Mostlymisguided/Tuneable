@@ -117,6 +117,15 @@ async function creditIapTopUpOnce({
             `Wallet top-up via ${paymentMethod === 'apple_iap' ? 'Apple' : 'Google Play'} (£${(creditPence / 100).toFixed(2)})`,
           username: updatedUser.username,
           customerPrice: customerPriceFromIapCheck(metadata),
+          ...(metadata.priceCheck === 'ok' ? {
+            proceeds: {
+              currency: 'GBP',
+              amountMajor: creditPence / 100,
+              gbpPence: creditPence,
+              recordedAt: new Date(),
+              source: 'store_estimate',
+            },
+          } : {}),
           metadata: {
             ...metadata,
             storeProductId,
@@ -343,8 +352,9 @@ async function resolveStripeCheckoutNetAmount(stripe, session) {
 }
 
 /**
- * Frozen customer charge and, for Stripe, the settled cash. Store payouts are
- * not known until a financial report arrives, so those top-ups omit proceeds.
+ * Frozen customer charge and, for Stripe, the settled cash. Store top-ups
+ * record estimated proceeds (commission and included tax taken off the
+ * customer price). The wallet is credited that estimate.
  */
 function customerPriceFromIapCheck(metadata = {}) {
   if (metadata.priceCheck !== 'ok') return undefined;

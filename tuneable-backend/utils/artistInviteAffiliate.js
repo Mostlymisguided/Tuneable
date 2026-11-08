@@ -1,7 +1,7 @@
 /**
  * Artist-invite affiliate: 3% of an invited artist's paid tip revenue
  * for 12 months after that artist is verified, taken from Tuneable's platform share
- * (artist still gets 70%).
+ * (artist still gets 80%).
  * Only original artist uploads qualify — not claimed library imports.
  * Only founding creators with a complete, verified profile earn the commission,
  * and only once the invited artist is complete and verified too.
@@ -97,7 +97,7 @@ function isInvitedCreator(user) {
 
 /**
  * Sentence sent to the invited artist when the inviter is a founding creator.
- * The cut comes from Tuneable, not their 70%. Returns null when no disclosure.
+ * The cut comes from Tuneable, not their 80%. Returns null when no disclosure.
  */
 function inviteeAffiliateDisclosure(inviterName, { inviterIsFounding = true } = {}) {
   if (!inviterIsFounding) return null;

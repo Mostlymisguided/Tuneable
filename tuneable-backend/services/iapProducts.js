@@ -2,9 +2,9 @@
  * Wallet top-up packs sold via Apple IAP / Google Play Billing.
  * Product IDs must match App Store Connect + Play Console exactly.
  *
- * The pack id is the catalogue item. The wallet is credited the pound value
- * of the price the store charged, not these face amounts. A $4.99 purchase
- * adds about £3.74 while the pound is strong, which is what was collected.
+ * The pack id is the catalogue item. A real purchase credits store proceeds
+ * in pounds (sticker price, minus commission and any tax in that price),
+ * not these face amounts and not the full amount the customer paid.
  */
 
 const WALLET_IAP_PRODUCTS = [

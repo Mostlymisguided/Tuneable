@@ -1,12 +1,12 @@
 /**
  * Welcome-credit artist escrow helpers (pure).
  *
- * Welcome-funded artist share (70% of the welcome portion) is provisional until
+ * Welcome-funded artist share (80% of the welcome portion) is provisional until
  * the tipper completes a real Stripe / Apple / Google top-up. Tips themselves
  * stay on charts; only artist-withdrawable cash is gated.
  */
 
-const ARTIST_SHARE_PERCENTAGE = 0.70;
+const { ARTIST_SHARE_PERCENTAGE } = require('./revenueSplit');
 const PROMO_ESCROW_EXPIRY_DAYS = 90;
 const PAID_TOPUP_METHODS = ['stripe', 'apple_iap', 'google_play'];
 
@@ -29,7 +29,7 @@ function isPaidTopUpMethod(paymentMethod) {
 }
 
 /**
- * Split a tip's artist share (70%) into paid vs provisional promo pence.
+ * Split a tip's artist share (80%) into paid vs provisional promo pence.
  *
  * @param {{ bidAmountPence: number, welcomeCreditAppliedPence?: number, treatWelcomeAsPaid?: boolean }} opts
  */

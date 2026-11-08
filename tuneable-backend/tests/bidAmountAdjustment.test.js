@@ -57,15 +57,15 @@ describe('validateAdjustmentRequest', () => {
 });
 
 describe('escrow delta planning', () => {
-  it('moves 70% of a £1.00 decrease onto a single owner', () => {
+  it('moves 80% of a £1.00 decrease onto a single owner', () => {
     const { plans } = planOwnerDeltas({
       oldAmountPence: 111,
       newAmountPence: 11,
       owners: [{ userId: 'artist', percentage: 100 }],
     });
     expect(plans).toHaveLength(1);
-    expect(plans[0].oldShare - plans[0].newShare).toBe(70);
-    expect(plans[0].oldPaid - plans[0].newPaid).toBe(70);
+    expect(plans[0].oldShare - plans[0].newShare).toBe(80);
+    expect(plans[0].oldPaid - plans[0].newPaid).toBe(80);
     expect(plans[0].newPromo).toBe(0);
   });
 

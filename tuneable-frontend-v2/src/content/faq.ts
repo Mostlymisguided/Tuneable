@@ -54,7 +54,7 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         id: 'where-tips-go',
         question: 'Where does my tip go?',
-        answer: `${ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip goes to the artist, or is split among rights-holders. Tuneable keeps ${PLATFORM_TAKE_TODAY_PERCENT}% today and is committed to cutting that to ${PLATFORM_TAKE_TARGET_PERCENT}% at scale, so ${ARTIST_TIP_SHARE_TARGET_PERCENT}% reaches artists. Card and app-store fees are charged separately.`,
+        answer: `${ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip goes to the artist, or is split among rights-holders. Tuneable keeps ${PLATFORM_TAKE_TODAY_PERCENT}% today and is committed to cutting that to ${PLATFORM_TAKE_TARGET_PERCENT}% at scale, so ${ARTIST_TIP_SHARE_TARGET_PERCENT}% reaches artists. Card and app-store fees are taken off when you top up, before this split.`,
         links: [{ to: HOW_MONEY_WORKS_PATH, label: 'How money works' }],
       },
       {
@@ -104,7 +104,7 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         id: 'getting-paid',
         question: 'How and when do I get paid?',
-        answer: `Verified creators receive ${ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip in escrow and request a payout from the artist dashboard. Tips are stored until an unverified artist claims them. The part of a tip paid with welcome credit stays pending until that listener tops up with real money.`,
+        answer: `Verified creators receive ${ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip in escrow and request a payout from the artist dashboard. They can earmark part of that share for a perk fund; until fan perks launch, the full share stays payable. Tips are stored until an unverified artist claims them. The part of a tip paid with welcome credit stays pending until that listener tops up with real money.`,
         links: [
           { to: HOW_MONEY_WORKS_PATH, label: 'How money works' },
           { to: '/help#creating-content', label: 'Artist earnings' },

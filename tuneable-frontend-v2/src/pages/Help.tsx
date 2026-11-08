@@ -5,6 +5,10 @@ import {
   SUPPORT_EMAIL,
   HOW_MONEY_WORKS_PATH,
   ARTIST_INVITE_AFFILIATE_PERCENT,
+  ARTIST_TIP_SHARE_TARGET_PERCENT,
+  ARTIST_TIP_SHARE_TODAY_PERCENT,
+  PLATFORM_TAKE_TARGET_PERCENT,
+  PLATFORM_TAKE_TODAY_PERCENT,
   FOUNDING_CREATOR_CAP,
   FOUNDING_UPLOAD_QUOTA_MB,
 } from '../constants';
@@ -63,9 +67,9 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Where your tip goes</h3>
             <p className="text-gray-300">
-              70% of each tip goes to the artist (or is split among rights-holders). Tuneable keeps 30% today
-              to run the platform. We are committed to cutting that take to 10% at scale, so 90% reaches artists.
-              Processing fees from Stripe or app stores are separate.{' '}
+              {ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip goes to the artist (or is split among rights-holders). Tuneable keeps {PLATFORM_TAKE_TODAY_PERCENT}% today
+              to run the platform. We are committed to cutting that take to {PLATFORM_TAKE_TARGET_PERCENT}% at scale, so {ARTIST_TIP_SHARE_TARGET_PERCENT}% reaches artists.
+              Card and app-store fees are taken off when you top up, before this split.{' '}
               <Link to={HOW_MONEY_WORKS_PATH} className="text-purple-300 underline">
                 How money works
               </Link>
@@ -90,8 +94,7 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Adding Credit</h3>
             <p className="text-gray-300">
-              You can add credit to your account through the Wallet page. We accept secure payments via 
-              Stripe. Your balance is always displayed in your profile and wallet.
+              You can add credit to your account through the Wallet page. On the web, the card fee is added on top of the amount you want in your wallet. In the iOS and Android apps, the store&apos;s fee and any tax in the price are taken off before the balance is credited. Your balance is always displayed in your profile and wallet.
             </p>
           </div>
           <div>
@@ -121,8 +124,8 @@ const Help: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-white mb-2">Artist earnings</h3>
             <p className="text-gray-300">
-              Verified creators receive 70% of each tip on their media via escrow. Tuneable keeps 30% today
-              and is committed to reducing that to 10% at scale. Eligible creators — those with an invite or an
+              Verified creators receive {ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip on their media via escrow. Tuneable keeps {PLATFORM_TAKE_TODAY_PERCENT}% today
+              and is committed to reducing that to {PLATFORM_TAKE_TARGET_PERCENT}% at scale. A creator can earmark part of their share for a perk fund; until fan perks launch, the full share stays payable. Eligible creators — those with an invite or an
               approved request — claim a founding seat when they upload their own music, up to{' '}
               {FOUNDING_CREATOR_CAP.toLocaleString()} ({FOUNDING_UPLOAD_QUOTA_MB.toLocaleString()} MB upload allowance).
               Founding creators with a complete verified profile who invite an artist earn {ARTIST_INVITE_AFFILIATE_PERCENT}% of

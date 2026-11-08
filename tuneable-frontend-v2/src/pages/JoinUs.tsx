@@ -287,7 +287,7 @@ const JoinUs: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-white mb-3">Support Artists</h3>
               <p className="text-gray-300">
-                Your investment funds a CIC built so artists keep more of every tip over time — 70% today, 90% at scale — not a vehicle for private fortune.
+                Your investment funds a CIC built so artists keep more of every tip over time — 80% today, 90% at scale — not a vehicle for private fortune.
               </p>
             </div>
 

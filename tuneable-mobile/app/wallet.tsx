@@ -509,9 +509,9 @@ export default function WalletScreen() {
                   <Text style={styles.quickText}>{displayPrice || pack.label}</Text>
                   <Text style={styles.feeHint}>
                     {creditPence
-                      ? `Adds £${(creditPence / 100).toFixed(2)}`
+                      ? `Adds £${(creditPence / 100).toFixed(2)} after store fees`
                       : iapReady
-                        ? 'Adds the pound value of this price'
+                        ? 'Checking what this adds…'
                         : 'Loading…'}
                   </Text>
                 </Pressable>
@@ -520,9 +520,9 @@ export default function WalletScreen() {
           </View>
           <Text style={styles.note}>
             You pay the {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} price
-            in your local currency. Your wallet is credited the pound value of that
-            price, at the rate on the day you pay. Custom amounts are available on
-            the website via card.
+            in your local currency. Your wallet is credited what Tuneable receives
+            after the store fee and any tax in that price, in pounds. Custom amounts
+            are available on the website via card.
           </Text>
         </>
       ) : (

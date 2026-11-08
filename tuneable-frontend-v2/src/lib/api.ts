@@ -3067,6 +3067,11 @@ export const artistEscrowAPI = {
     return response.data;
   },
 
+  savePerkFund: async (perkFundTipPercent: number) => {
+    const response = await api.patch('/artist-escrow/perk-fund', { perkFundTipPercent });
+    return response.data;
+  },
+
   payoutQuote: async (currency: string) => {
     const response = await api.get<{
       balancePence: number;

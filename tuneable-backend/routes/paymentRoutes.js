@@ -304,8 +304,9 @@ router.get('/iap/products', authMiddleware, async (_req, res) => {
 });
 
 /**
- * Preview the pound value that will be added for each store price.
- * Body: { items: [{ productId, amountMajor, currency }] }
+ * Preview the pounds added for each store price, after store commission and
+ * any tax included in that price.
+ * Body: { items: [{ productId, amountMajor, currency, storefront? }] }
  */
 router.post('/iap/price-preview', authMiddleware, async (req, res) => {
   try {
@@ -325,12 +326,14 @@ router.post('/iap/price-preview', authMiddleware, async (req, res) => {
         const assessment = await assessStorePrice({
           amountMajor: Number(item.amountMajor),
           currency: item.currency,
+          storefront: item.storefront || item.regionCode || null,
         });
         results.push({
           productId,
           accepted: assessment.accepted,
-          creditPence: assessment.paidPenceEstimate,
+          creditPence: assessment.creditPence,
           paidPenceEstimate: assessment.paidPenceEstimate,
+          storeFeePence: assessment.storeFeePence,
           currency: assessment.currency,
           amountMajor: assessment.amountMajor,
         });
@@ -407,6 +410,7 @@ router.post('/iap/verify', authMiddleware, async (req, res) => {
       environment: verified.environment,
       priceCheckSkip: verified.priceCheckSkip,
       storePrice: verified.storePrice,
+      storefront: verified.storefront || verified.regionCode || null,
     });
 
     const paymentMethod = platform === 'ios' ? 'apple_iap' : 'google_play';

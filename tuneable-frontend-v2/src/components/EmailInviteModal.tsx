@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Mail, Send, Loader2 } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { emailAPI } from '../lib/api';
-import { ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP } from '../constants';
+import { ARTIST_INVITE_AFFILIATE_PERCENT, ARTIST_TIP_SHARE_TODAY_PERCENT, FOUNDING_CREATOR_CAP } from '../constants';
 
 interface EmailInviteModalProps {
   isOpen: boolean;
@@ -210,7 +210,7 @@ const EmailInviteModal: React.FC<EmailInviteModalProps> = ({
               Recipients get a creator signup link with invite code{' '}
               <span className="font-mono text-purple-400">{inviteCode}</span> filled in.
               {inviterIsFounding
-                ? ` The email says they receive paid tips (currently 70%, with a commitment to increase this to 90% as the platform grows), and that once their profile is verified you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of those tips for the following year from Tuneable's share when they upload their own music.`
+                ? ` The email says they receive paid tips (currently ${ARTIST_TIP_SHARE_TODAY_PERCENT}%, with a commitment to increase this to 90% as the platform grows), and that once their profile is verified you earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of those tips for the following year from Tuneable's share when they upload their own music.`
                 : ` The email says your invite makes them eligible for a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}).`}
             </p>
           </div>

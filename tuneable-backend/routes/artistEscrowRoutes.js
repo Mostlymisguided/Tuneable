@@ -33,6 +33,9 @@ router.get('/info', authMiddleware, async (req, res) => {
         unclaimedAllocations: escrowInfo.unclaimedAllocations,
         promoBalance: escrowInfo.promoBalance || 0,
         promoBalancePounds: escrowInfo.promoBalancePounds || 0,
+        perkFundTipPercent: escrowInfo.perkFundTipPercent || 0,
+        artistSharePercent: escrowInfo.artistSharePercent,
+        perkFundActive: false,
       }
     });
   } catch (error) {
@@ -42,6 +45,40 @@ router.get('/info', authMiddleware, async (req, res) => {
       error: 'Failed to fetch escrow information',
       details: error.message 
     });
+  }
+});
+
+/**
+ * @route   PATCH /api/artist-escrow/perk-fund
+ * @desc    Save how much of each future tip (0–80) should go to the perk fund
+ *          once fan perks can be redeemed. Does not move escrow.
+ * @access  Private
+ */
+router.patch('/perk-fund', authMiddleware, async (req, res) => {
+  try {
+    const { normalizePerkFundTipPercent, ARTIST_SHARE_PERCENT } = require('../utils/revenueSplit');
+    const perkFundTipPercent = normalizePerkFundTipPercent(req.body?.perkFundTipPercent);
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { perkFundTipPercent } },
+      { new: true }
+    ).select('perkFundTipPercent');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      perkFundTipPercent: user.perkFundTipPercent || 0,
+      artistSharePercent: ARTIST_SHARE_PERCENT,
+      cashTipPercent: ARTIST_SHARE_PERCENT - (user.perkFundTipPercent || 0),
+      perkFundActive: false,
+    });
+  } catch (error) {
+    const status = error.status || 500;
+    if (status >= 500) console.error('Error saving perk fund preference:', error);
+    res.status(status).json({ error: error.message || 'Failed to save perk fund preference' });
   }
 });
 

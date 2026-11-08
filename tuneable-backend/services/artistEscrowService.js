@@ -5,9 +5,13 @@
  * Phase 1: Internal ledger system (no Stripe Connect yet)
  * 
  * Revenue Split:
- * - 70% to artists (split by mediaOwners percentages)
- * - 30% to Tuneable platform
- * 
+ * - 80% to artists (split by mediaOwners percentages)
+ * - 20% to Tuneable platform
+ *
+ * Processor fees are taken off before the wallet is credited, so this split
+ * is of the tip, not of the checkout total. A creator's perk-fund preference
+ * does not move money until fan perks can be redeemed.
+ *
  * All amounts are stored in PENCE (integer), not pounds.
  */
 
@@ -29,10 +33,7 @@ const {
   ownerPaidSharePence,
   AFFILIATE_SHARE_PERCENT,
 } = require('../utils/artistInviteAffiliate');
-
-// Revenue split constants
-const ARTIST_SHARE_PERCENTAGE = 0.70; // 70% to artists
-const TUNEABLE_FEE_PERCENTAGE = 0.30; // 30% to platform
+const { ARTIST_SHARE_PERCENTAGE, ARTIST_SHARE_PERCENT } = require('../utils/revenueSplit');
 
 class ArtistEscrowService {
   /**
@@ -76,7 +77,7 @@ class ArtistEscrowService {
         });
       }
       
-      // Calculate artist share (70% of bid amount)
+      // Calculate artist share (80% of bid amount)
       const artistSharePence = bidSplit.artistSharePence;
 
       const { isEscrowUntilClaim } = require('../utils/mediaRights');
@@ -613,7 +614,7 @@ class ArtistEscrowService {
       await expireDuePromoEscrowForArtist(userId);
 
       const user = await User.findById(userId)
-        .select('artistEscrowBalance artistPromoEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory referralCommissionEarned')
+        .select('artistEscrowBalance artistPromoEscrowBalance totalEscrowEarned lastPayoutTotalEarned artistEscrowHistory referralCommissionEarned perkFundTipPercent')
         .populate('artistEscrowHistory.mediaId', 'title artist coverArt')
         .populate('artistEscrowHistory.bidId', 'amount createdAt promoEscrowStatus promoEscrowExpiresAt');
       
@@ -685,6 +686,9 @@ class ArtistEscrowService {
         remainingToEligible: remainingToEligible, // In pence
         remainingToEligiblePounds: remainingToEligible / 100,
         history: user.artistEscrowHistory || [],
+        perkFundTipPercent: user.perkFundTipPercent || 0,
+        artistSharePercent: ARTIST_SHARE_PERCENT,
+        perkFundActive: false,
         unclaimedAllocations: unclaimedAllocations.map(a => ({
           _id: a._id,
           mediaId: a.mediaId,

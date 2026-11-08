@@ -112,7 +112,7 @@ Navigate to **Store presence > Main store listing**:
   music ecosystem.
   
   ✨ What Makes Tuneable Different
-  • 70% of every tip goes directly to artists (committed to 90% at scale)
+  • 80% of every tip goes directly to artists (committed to 90% at scale)
   • Communities democratically curate music together
   • Create and join music listening parties
   • Support artists directly through tipping
@@ -129,7 +129,7 @@ Navigate to **Store presence > Main store listing**:
   Download now and be part of the change.
   
   tuneable.stream | Community Interest Company
-  70% to artists today. 90% at scale. Community-owned future.
+  80% to artists today. 90% at scale. Community-owned future.
   ```
   
   *For the complete optimized 4000-character description, copy from BUSINESS_DESCRIPTIONS.md*

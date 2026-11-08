@@ -1,5 +1,7 @@
 # Artist Escrow System - Phase 1 Complete ✅
 
+> Current live split is **80% to artists / 20% to the platform**. The 70/30 figures below describe the original phase.
+
 ## 🎉 Implementation Summary
 
 Phase 1 (Internal Ledger) of the Artist Escrow System is now **feature-complete** and ready for testing.

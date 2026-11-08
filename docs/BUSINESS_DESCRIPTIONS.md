@@ -10,7 +10,7 @@ Various business descriptions for different platforms and character limits.
 
 Tuneable is a revolutionary social music platform where communities collectively curate and enjoy music together. As a registered Community Interest Company (CIC), we're legally committed to using our assets and profits for community benefit, not shareholder returns.
 
-Our platform empowers users to create listening parties, tip artists directly, and democratically influence what plays next. With 70% of every tip going straight to artists (committed to increasing to 90% at scale), we're building a fairer music economy.
+Our platform empowers users to create listening parties, tip artists directly, and democratically influence what plays next. With 80% of every tip going straight to artists (committed to increasing to 90% at scale), we're building a fairer music economy.
 
 Join music listening parties, discover new artists, support creators you love, and be part of a community-driven platform. Available on iOS, Android, and web at tuneable.stream.
 
@@ -35,7 +35,7 @@ Tuneable is a revolutionary social music platform that puts power back in the ha
 
 Unlike traditional streaming platforms, Tuneable is legally committed to community benefit. We're building a platform where:
 
-• 70% of every tip goes directly to artists (committed to 90% at scale)
+• 80% of every tip goes directly to artists (committed to 90% at scale)
 • Communities democratically curate music together
 • Artists receive fair compensation for their work
 • Users influence what plays next through tipping
@@ -54,7 +54,7 @@ Experience music together:
 
 Your support makes a real difference:
 • Tip on individual songs and albums
-• 70% goes directly to verified artists
+• 80% goes directly to verified artists
 • Artists can claim earnings and request payouts
 • Support independent creators and discover new talent
 • Track your impact on artists you love
@@ -94,13 +94,13 @@ Tuneable is a registered CIC, which means:
 
 **🌟 Our Commitment**
 
-We're committed to reducing our platform fee from 30% to just 10% as we scale, meaning 90% of every tip reaches artists. And if we reach £1 billion valuation, we commit to becoming a community-governed DAO owned and steered by artists and users.
+We're committed to reducing our platform fee from 20% to just 10% as we scale, meaning 90% of every tip reaches artists. And if we reach £1 billion valuation, we commit to becoming a community-governed DAO owned and steered by artists and users.
 
 **📱 Features at a Glance**
 
 ✓ Create and join music listening parties
 ✓ Democratic queue with tip-based voting
-✓ Direct artist tipping (70%+ to creators)
+✓ Direct artist tipping (80%+ to creators)
 ✓ Multi-platform music search and playback
 ✓ Podcast discovery and support
 ✓ Digital wallet for seamless tipping
@@ -143,7 +143,7 @@ Download now and be part of the change.
 ---
 
 *Tuneable CIC - Legally committed to community benefit*
-*70% to artists today. 90% at scale. 100% community-owned at £1B.*
+*80% to artists today. 90% at scale. 100% community-owned at £1B.*
 
 ---
 
@@ -156,11 +156,11 @@ Download now and be part of the change.
 ## Social Media Bios
 
 ### Twitter/X Bio (160 characters)
-Democratic music platform | Create parties, tip artists directly | 70% to artists | Community Interest Company | 🎵 tuneable.stream
+Democratic music platform | Create parties, tip artists directly | 80% to artists | Community Interest Company | 🎵 tuneable.stream
 
 ### Instagram Bio (150 characters)  
 🎵 Democratic music curation
-💰 70% to artists (90% at scale)
+💰 80% to artists (90% at scale)
 🎪 Create listening parties
 🤝 Community Interest Company
 👇 Download now
@@ -175,7 +175,7 @@ Tuneable is a democratic music curation platform and registered Community Intere
 
 We're legally committed to using our assets and profits for community benefit, not shareholder returns. Our mission is to:
 
-• Create a fairer compensation model for artists (70% today, 90% at scale)
+• Create a fairer compensation model for artists (80% today, 90% at scale)
 • Democratically chart the global music catalogue through community engagement
 • Provide participatory musical experiences that bring people together
 • Promote healing and communication through music
@@ -183,7 +183,7 @@ We're legally committed to using our assets and profits for community benefit, n
 
 **The Platform**
 
-Tuneable enables users to create and join music listening parties where communities collectively curate what plays next through tipping. Unlike traditional streaming platforms that pay artists fractions of pennies, Tuneable puts listeners in direct financial relationship with creators—70% of every tip goes straight to the artist.
+Tuneable enables users to create and join music listening parties where communities collectively curate what plays next through tipping. Unlike traditional streaming platforms that pay artists fractions of pennies, Tuneable puts listeners in direct financial relationship with creators—80% of every tip goes straight to the artist.
 
 **Community Interest Company Status**
 
@@ -209,7 +209,7 @@ Discord: discord.gg/hwGMZV89up
 
 ## Elevator Pitch (30 seconds)
 
-Tuneable is a democratic music platform where communities create listening parties and tip to influence what plays next. As a registered Community Interest Company, we're building a fairer music economy—70% of every tip goes directly to artists, and we're committed to increasing that to 90% at scale. Unlike streaming services that pay fractions of pennies, Tuneable puts listeners in direct financial relationship with creators. We're the music platform built for the community, by the community.
+Tuneable is a democratic music platform where communities create listening parties and tip to influence what plays next. As a registered Community Interest Company, we're building a fairer music economy—80% of every tip goes directly to artists, and we're committed to increasing that to 90% at scale. Unlike streaming services that pay fractions of pennies, Tuneable puts listeners in direct financial relationship with creators. We're the music platform built for the community, by the community.
 
 ---
 
@@ -219,7 +219,7 @@ Tuneable is a democratic music platform where communities create listening parti
 Democratic music platform. Tip artists. Create parties. Community-owned.
 
 **15 words:**
-Tuneable: Create music parties, tip artists directly, democratically curate playlists. 70% to creators. Community Interest Company.
+Tuneable: Create music parties, tip artists directly, democratically curate playlists. 80% to creators. Community Interest Company.
 
 **20 words:**
 Tuneable is a democratic music platform where communities create listening parties, tip artists directly, and collectively curate music. Legally committed to community benefit.
@@ -243,7 +243,7 @@ music party, tip artists, music streaming, social music, democratic music, artis
 
 ## Press Release Boilerplate (100 words)
 
-Tuneable is a democratic music curation platform and registered Community Interest Company (CIC) transforming how people discover, share, and support music. The platform enables users to create listening parties, tip artists directly, and democratically influence playlists through community engagement. With 70% of every tip going straight to artists (committed to 90% at scale), Tuneable is building a fairer music economy. As a CIC, Tuneable is legally committed to using profits for community benefit and plans to transition to an artist-run DAO upon reaching £1 billion valuation. Available on iOS, Android, and web at tuneable.stream.
+Tuneable is a democratic music curation platform and registered Community Interest Company (CIC) transforming how people discover, share, and support music. The platform enables users to create listening parties, tip artists directly, and democratically influence playlists through community engagement. With 80% of every tip going straight to artists (committed to 90% at scale), Tuneable is building a fairer music economy. As a CIC, Tuneable is legally committed to using profits for community benefit and plans to transition to an artist-run DAO upon reaching £1 billion valuation. Available on iOS, Android, and web at tuneable.stream.
 
 ---
 
@@ -261,14 +261,14 @@ Tuneable is addressing two critical problems in the music industry:
 
 Tuneable is a social music platform where communities create listening parties and democratically curate music through tipping. This creates:
 
-• **Direct Artist Compensation**: 70% of tips go to artists (90% at scale)—exponentially better than streaming
+• **Direct Artist Compensation**: 80% of tips go to artists (90% at scale)—exponentially better than streaming
 • **Active Community Engagement**: Real-time synchronized parties with democratic curation
 • **Discovery Mechanisms**: Chart influenced by community support, not just plays
 • **Multi-Platform Integration**: Works with YouTube, Spotify, Apple Music, and direct uploads
 
 **Business Model**
 
-• 30% platform fee on all tips (reducing to 10% at scale)
+• 20% platform fee on all tips (reducing to 10% at scale)
 • In-app purchases for wallet top-ups (iOS, Android, web)
 • Freemium model—free to join and listen, pay to tip and influence
 
@@ -293,7 +293,7 @@ As a registered Community Interest Company (CIC), we're legally committed to com
 
 ## Website Meta Description (160 characters)
 
-Democratic music platform where communities create listening parties, tip artists directly, and curate music together. 70% to artists. Join the movement.
+Democratic music platform where communities create listening parties, tip artists directly, and curate music together. 80% to artists. Join the movement.
 
 ---
 
@@ -302,6 +302,6 @@ Democratic music platform where communities create listening parties, tip artist
 **Tuneable** 🎵  
 Democratic Music Curation Platform  
 tuneable.stream | Community Interest Company  
-70% to Artists | Community-Owned Future
+80% to Artists | Community-Owned Future
 
 ---

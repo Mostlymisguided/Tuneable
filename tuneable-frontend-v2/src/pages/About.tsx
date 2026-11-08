@@ -1,4 +1,10 @@
 import React, { useEffect } from 'react';
+import {
+  ARTIST_TIP_SHARE_TARGET_PERCENT,
+  ARTIST_TIP_SHARE_TODAY_PERCENT,
+  PLATFORM_TAKE_TARGET_PERCENT,
+  PLATFORM_TAKE_TODAY_PERCENT,
+} from '../constants';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen,
@@ -171,24 +177,24 @@ const About: React.FC = () => {
           <div className="mb-10 text-center">
             <h2 className="mb-4 text-3xl font-bold md:text-4xl">Artists keep more as we grow</h2>
             <p className="text-lg leading-relaxed text-indigo-100">
-              Shares below are of the tip itself. Card and app-store fees are charged separately.
+              Shares below are of the tip itself. Card and app-store fees come off when someone tops up.
             </p>
           </div>
           <div className="mb-10 grid gap-6 md:grid-cols-3">
             <div className="rounded-xl border border-white/15 bg-white/10 p-6">
               <Percent className="mb-4 h-8 w-8 text-pink-400" />
               <h3 className="mb-2 font-semibold text-white">Today</h3>
-              <p className="text-3xl font-bold text-white">70%</p>
+              <p className="text-3xl font-bold text-white">{ARTIST_TIP_SHARE_TODAY_PERCENT}%</p>
               <p className="mt-2 text-sm leading-relaxed text-indigo-100">
-                of each tip goes to the artist. 30% funds Tuneable while we are still small.
+                of each tip goes to the artist. {PLATFORM_TAKE_TODAY_PERCENT}% funds Tuneable while we are still small.
               </p>
             </div>
             <div className="rounded-xl border border-white/15 bg-white/10 p-6">
               <Coins className="mb-4 h-8 w-8 text-yellow-400" />
               <h3 className="mb-2 font-semibold text-white">At scale</h3>
-              <p className="text-3xl font-bold text-white">90%</p>
+              <p className="text-3xl font-bold text-white">{ARTIST_TIP_SHARE_TARGET_PERCENT}%</p>
               <p className="mt-2 text-sm leading-relaxed text-indigo-100">
-                to artists, 10% to the platform. The take rate is intended only to fall.
+                to artists, {PLATFORM_TAKE_TARGET_PERCENT}% to the platform. The take rate is intended only to fall.
               </p>
             </div>
             <div className="rounded-xl border border-white/15 bg-white/10 p-6">
@@ -252,7 +258,7 @@ const About: React.FC = () => {
               ))}
             </div>
             <p className="mx-auto mt-6 max-w-xl text-gray-600">
-              Creators set aside a share of their earnings. That pool buys the perks. Fans spend
+              Creators choose how much of their {ARTIST_TIP_SHARE_TODAY_PERCENT}% — from none of it up to all of it — goes into a perk fund. That pool buys the perks. Until the perks launch, the full {ARTIST_TIP_SHARE_TODAY_PERCENT}% stays payable. Fans spend
               the TuneBytes they earned.
             </p>
             <p id="tunebytes-spend" className="mx-auto mt-4 max-w-xl scroll-mt-24 text-sm text-gray-500">

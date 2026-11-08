@@ -9,6 +9,7 @@ import { toast } from '../utils/toast';
 import {
   DEFAULT_PROFILE_PIC,
   ARTIST_INVITE_AFFILIATE_PERCENT,
+  ARTIST_TIP_SHARE_TODAY_PERCENT,
   FOUNDING_CREATOR_CAP,
   FOUNDING_UPLOAD_QUOTA_MB,
 } from '../constants';
@@ -184,7 +185,7 @@ const Dashboard: React.FC = () => {
       ? `If you sign up with my invite code ${inviteCode || ''} and your creator profile is verified, I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% of your paid tips for the year after verification — taken from Tuneable's share, not yours. I'm a founding creator.`
       : `Use my invite code ${inviteCode || ''} to become eligible for a founding creator seat (first ${FOUNDING_CREATOR_CAP.toLocaleString()}). A seat is claimed when you upload your own music.`;
 
-    return `Hey! I'm inviting you to join Tuneable as a creator. Upload your own music and you keep 70% of paid tips.
+    return `Hey! I'm inviting you to join Tuneable as a creator. Upload your own music and you keep ${ARTIST_TIP_SHARE_TODAY_PERCENT}% of paid tips.
 
 ${affiliateBlurb}
 
@@ -245,7 +246,7 @@ Join here: ${inviteLink}`.trim();
     const inviteCode = user?.primaryInviteCode || user?.personalInviteCode;
     const quote = inviteCode
       ? (isFoundingCreator
-        ? `Invite artists to Tuneable — they keep 70% of paid tips, and as a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
+        ? `Invite artists to Tuneable — they keep ${ARTIST_TIP_SHARE_TODAY_PERCENT}% of paid tips, and as a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one. Code: ${inviteCode}`
         : `Join Tuneable as a creator — my invite code makes you eligible for a founding seat (first ${FOUNDING_CREATOR_CAP}). Code: ${inviteCode}`)
       : 'Support your favourite Creators on Tuneable! Join the social music platform for tipping on tunes.';
     const hashtag = 'Tuneable';
@@ -263,7 +264,7 @@ Join here: ${inviteLink}`.trim();
 
     // Create Instagram-friendly invite message
     const instagramMessage = isFoundingCreator
-      ? `Invite artists to Tuneable 🎵\n\nThey keep 70% of paid tips. As a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`
+      ? `Invite artists to Tuneable 🎵\n\nThey keep ${ARTIST_TIP_SHARE_TODAY_PERCENT}% of paid tips. As a founding creator I earn ${ARTIST_INVITE_AFFILIATE_PERCENT}% from Tuneable's share for year one.\n\nCode: ${inviteCode}\n\n${inviteLink}`
       : `Join Tuneable as a creator 🎵\n\nMy invite code makes you eligible for a founding seat (first ${FOUNDING_CREATOR_CAP}). A seat is claimed when you upload your own music.\n\nCode: ${inviteCode}\n\n${inviteLink}`;
 
     try {

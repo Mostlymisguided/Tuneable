@@ -901,7 +901,7 @@ async function sendInviteEmail(
           </div>
 
           <p style="color: #6b7280; font-size: 14px;">
-            *Creators currently receive 70% of all paid tips with a commitment to increase this to 90% as the platform grows 🙏
+            *Creators currently receive 80% of all paid tips. Card and store fees come off before that split. We remain committed to 90% as the platform grows 🙏
           </p>
 
           <div style="margin: 30px 0; text-align: center;">

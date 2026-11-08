@@ -18,11 +18,19 @@ import {
   Globe
 } from 'lucide-react';
 import { artistEscrowAPI } from '../lib/api';
-import { ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP, HOW_MONEY_WORKS_PATH } from '../constants';
+import {
+  ARTIST_INVITE_AFFILIATE_PERCENT,
+  ARTIST_TIP_SHARE_TARGET_PERCENT,
+  ARTIST_TIP_SHARE_TODAY_PERCENT,
+  FOUNDING_CREATOR_CAP,
+  HOW_MONEY_WORKS_PATH,
+  PLATFORM_TAKE_TARGET_PERCENT,
+  PLATFORM_TAKE_TODAY_PERCENT,
+} from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 
-const ESCROW_TAKE_RATE_NOTE_KEY = 'tuneable.escrowTakeRateNote.dismissed';
+const ESCROW_TAKE_RATE_NOTE_KEY = 'tuneable.escrowTakeRateNote.v2.dismissed';
 const PAYOUT_CURRENCY_KEY = 'tuneable.payoutCurrency';
 const PAYOUT_CURRENCIES = [
   'GBP', 'USD', 'EUR', 'AUD', 'CAD', 'NZD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK',
@@ -94,6 +102,9 @@ interface EscrowInfo {
     allocatedAt: string;
     artistName: string;
   }>;
+  perkFundTipPercent?: number;
+  artistSharePercent?: number;
+  perkFundActive?: boolean;
 }
 
 type PayoutMethod = 'paypal' | 'bank_transfer' | 'wise' | 'stripe' | 'other';
@@ -159,6 +170,9 @@ const ArtistEscrowDashboard: React.FC = () => {
     rateSource?: string;
   } | null>(null);
   const [payoutQuoteError, setPayoutQuoteError] = useState<string | null>(null);
+  const [perkFundDraft, setPerkFundDraft] = useState(0);
+  const [perkFundSaved, setPerkFundSaved] = useState(0);
+  const [savingPerkFund, setSavingPerkFund] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -195,6 +209,9 @@ const ArtistEscrowDashboard: React.FC = () => {
       const response = await artistEscrowAPI.getInfo();
       if (response.success) {
         setEscrowInfo(response.escrow);
+        const savedFund = response.escrow.perkFundTipPercent || 0;
+        setPerkFundSaved(savedFund);
+        setPerkFundDraft(savedFund);
         // Pre-fill artist name from creator profile if available
         if (user?.creatorProfile?.artistName && !artistName) {
           setArtistName(user.creatorProfile.artistName);
@@ -205,6 +222,23 @@ const ArtistEscrowDashboard: React.FC = () => {
       toast.error(error.response?.data?.error || 'Failed to load escrow information');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const artistShareMax = escrowInfo?.artistSharePercent || ARTIST_TIP_SHARE_TODAY_PERCENT;
+
+  const handleSavePerkFund = async () => {
+    try {
+      setSavingPerkFund(true);
+      const response = await artistEscrowAPI.savePerkFund(perkFundDraft);
+      const saved = response.perkFundTipPercent ?? perkFundDraft;
+      setPerkFundSaved(saved);
+      setPerkFundDraft(saved);
+      toast.success('Perk fund preference saved');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to save perk fund preference');
+    } finally {
+      setSavingPerkFund(false);
     }
   };
 
@@ -448,8 +482,10 @@ const ArtistEscrowDashboard: React.FC = () => {
               <div className="flex-1 text-sm text-indigo-100">
                 <p className="font-semibold text-white mb-1">Artists keep more as we grow</p>
                 <p className="mb-2">
-                  You receive 70% of each tip today. We are committed to cutting Tuneable&apos;s take
-                  to 10% at scale (90% to you). If the company ever reaches a £1 billion valuation,
+                  You receive {ARTIST_TIP_SHARE_TODAY_PERCENT}% of each tip. Card and store fees come off
+                  when a listener tops up, so this is a share of the tip. We are committed to cutting
+                  Tuneable&apos;s take to {PLATFORM_TAKE_TARGET_PERCENT}% at scale ({ARTIST_TIP_SHARE_TARGET_PERCENT}% to you).
+                  If the company ever reaches a £1 billion valuation,
                   we commit to community governance — a DAO owned by artists and users.
                 </p>
                 <Link
@@ -577,6 +613,42 @@ const ArtistEscrowDashboard: React.FC = () => {
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-6 backdrop-blur-sm">
+          <h2 className="text-xl font-semibold mb-2">Perk fund</h2>
+          <p className="text-sm text-gray-300 mb-4">
+            You keep {artistShareMax}% of each tip. Choose how much of the tip goes to your perk fund
+            once fan perks, rewards, and merch can be redeemed. The rest of your {artistShareMax}% is cash.
+            Until then, the full {artistShareMax}% stays in escrow you can pay out, and this setting does not
+            move money already earned. Welcome credit is never put in the fund.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label htmlFor="perk-fund-percent" className="text-sm text-gray-400 sm:w-40">
+              Perk fund: {perkFundDraft}%
+            </label>
+            <input
+              id="perk-fund-percent"
+              type="range"
+              min={0}
+              max={artistShareMax}
+              step={1}
+              value={perkFundDraft}
+              onChange={(event) => setPerkFundDraft(Number(event.target.value))}
+              className="flex-1 accent-purple-500"
+            />
+            <span className="text-sm text-gray-300 sm:w-36">
+              Cash: {artistShareMax - perkFundDraft}%
+            </span>
+            <button
+              type="button"
+              onClick={handleSavePerkFund}
+              disabled={savingPerkFund || perkFundDraft === perkFundSaved}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {savingPerkFund ? 'Saving…' : 'Save'}
+            </button>
           </div>
         </div>
 
@@ -1016,8 +1088,8 @@ const ArtistEscrowDashboard: React.FC = () => {
             <Info className="h-5 w-5 text-blue-400 mt-0.5" />
             <div className="flex-1 text-sm text-gray-300">
               <p className="mb-2">
-                <strong className="text-white">How it works:</strong> When users tip on your media, 70% of the tip amount is allocated to your escrow balance.
-                Tuneable keeps 30% today so we can run the platform; we are committed to reducing that to 10% at scale.
+                <strong className="text-white">How it works:</strong> When users tip on your media, {ARTIST_TIP_SHARE_TODAY_PERCENT}% of the tip amount is allocated to your escrow balance.
+                Tuneable keeps {PLATFORM_TAKE_TODAY_PERCENT}% today so we can run the platform; we are committed to reducing that to {PLATFORM_TAKE_TARGET_PERCENT}% at scale.
                 You can request payouts which are processed manually by our team.{' '}
                 <Link to={HOW_MONEY_WORKS_PATH} className="text-blue-300 underline hover:text-white">
                   How money works

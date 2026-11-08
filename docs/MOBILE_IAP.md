@@ -17,13 +17,13 @@ The display name is set in App Store Connect and Play Console. It is not a price
 
 Bundle / application ID: `stream.tuneable.app`
 
-The wallet is credited the **pound value of the price the store charged**, at the mid-market rate on that day. A US $4.99 purchase adds about £3.74 while the pound is strong, not a fixed £5. That is the amount the customer paid, so the balance is not a pound claim Tuneable has to fund from somewhere else. Card top-ups on the website are already in pounds and still credit the amount charged.
+The wallet is credited **store proceeds in pounds**, not the sticker price and not the pack face value. The customer price is converted at the mid-market rate, then the store commission (`IAP_STORE_COMMISSION_RATE`, default 15%) and any VAT or GST included in that price are taken off. A UK £4.99 purchase adds about £3.53. A US $4.99 purchase adds about £3.18 while the pound is at $1 = £0.75, because US sales tax is not inside the sticker price. Card top-ups on the website still add the card fee on top, then credit what Stripe settles.
 
 ## What gets added
 
-The server converts the receipt price into pounds (ECB rates via Frankfurter, with a fallback table) and credits that many pence. A zero price is refused. Unpaid Play grants (license testers, promos) still credit the catalogue amount, because there is no customer price on those receipts.
+The server converts the receipt price into pounds (ECB rates via Frankfurter, with a fallback table), deducts commission and included tax, and credits that many pence. A zero price is refused. Unpaid Play grants (license testers, promos) still credit the catalogue amount, because there is no customer price on those receipts.
 
-The app calls `POST /api/payments/iap/price-preview` and shows “Adds £3.74” before the purchase. Verification still checks the receipt:
+The app calls `POST /api/payments/iap/price-preview` and shows “Adds £3.53 after store fees” before the purchase. Verification still checks the receipt:
 
 - **Apple:** `price` (milliunits) and `currency` on the signed transaction
 - **Google:** `orders.get` on the order id. The Play service account needs **View financial data** in Play Console, or Android top-ups are refused
@@ -35,8 +35,8 @@ Acknowledgement runs only after the credit succeeds. Google refunds an unacknowl
 1. Mobile app loads store products and previews their prices
 2. Mobile app purchases a consumable via `expo-iap`
 3. App sends purchase to `POST /api/payments/iap/verify`
-4. Backend verifies with Apple App Store Server API or Google Play Developer API, then converts the receipt price into pounds
-5. Backend credits that pound value to `User.balance` and writes `WalletTransaction` (`apple_iap` / `google_play`)
+4. Backend verifies with Apple App Store Server API or Google Play Developer API, converts the receipt price into pounds, then deducts the store commission and any tax included in the price
+5. Backend credits those proceeds to `User.balance` and writes `WalletTransaction` (`apple_iap` / `google_play`)
 6. App finishes the Apple transaction, or the server acknowledges the Play purchase
 
 List packs: `GET /api/payments/iap/products` (auth required)

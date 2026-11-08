@@ -794,7 +794,7 @@ export function TipSheet({
             ) : null}
 
             <Text style={styles.splitHint}>
-              70% of this tip goes to the artist.{' '}
+              80% of this tip goes to the artist.{' '}
               <Text
                 style={styles.splitLink}
                 onPress={() => {

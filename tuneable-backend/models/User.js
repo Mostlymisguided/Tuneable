@@ -126,6 +126,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   }, // Paid artist-invite affiliate earnings in PENCE (also added to artistEscrowBalance)
+  // Percent of each future tip (0–80) to earmark for this creator's perk fund
+  // once fan perks can be redeemed. Until then the full artist share stays cash.
+  perkFundTipPercent: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 80,
+  },
 
   // ========================================
   // FOUNDING CREATORS (first N original uploaders)

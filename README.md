@@ -25,12 +25,12 @@ Tuneable is legally committed to using our assets and profits for the benefit of
 - **Party types**: Remote, live, global, and tag-based parties
 
 ### 💰 Fair Compensation Model
-- **Current fee structure**: 70% to artists, 30% platform fee
+- **Current fee structure**: 80% to artists, 20% platform fee. Card and store fees come off before the wallet is credited. Creators can earmark part of their 80% for a perk fund; until fan perks launch, the full 80% stays payable.
 - **Artist escrow system** - automatic allocation of tips to verified creators
 - **Media ownership tracking** - supports multiple owners with percentage-based revenue distribution
 - **Unclaimed funds protection** - artists can claim earnings when they register
 
-> **Our Commitment**: We are committed to reducing our take from 30% to **10%** once the platform is running at scale, so **90% of every tip reaches artists**. Tuneable is a CIC — not a vehicle for private fortune. If the company reaches a **£1 billion valuation**, we commit to becoming a community-governed DAO owned and steered by artists and users.
+> **Our Commitment**: We are committed to reducing our take from 20% to **10%** once the platform is running at scale, so **90% of every tip reaches artists**. Tuneable is a CIC — not a vehicle for private fortune. If the company reaches a **£1 billion valuation**, we commit to becoming a community-governed DAO owned and steered by artists and users.
 
 ### 🎨 Unified Media Platform
 - **Multi-content support**: Music, podcasts, video, images, and written content

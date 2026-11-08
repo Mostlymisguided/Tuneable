@@ -54,7 +54,7 @@ we're legally committed to using our assets and profits for community benefit,
 not shareholder returns.
 
 Our platform empowers users to create listening parties, tip artists directly, 
-and democratically influence what plays next. With 70% of every tip going straight 
+and democratically influence what plays next. With 80% of every tip going straight 
 to artists (committed to increasing to 90% at scale), we're building a fairer 
 music economy.
 
@@ -95,7 +95,7 @@ Add your services:
    - Description: Create and join democratic music listening parties
    
 2. **Artist Support Platform**
-   - Description: Tip artists directly with 70% going to creators
+   - Description: Tip artists directly with 80% going to creators
    
 3. **Music Discovery**
    - Description: Discover and support independent artists
@@ -118,7 +118,7 @@ Add your company registration date or platform launch date
 A short intro message from you:
 ```
 Welcome to Tuneable! We're building a fairer music economy where artists receive 
-70-90% of every tip. Join our community of music lovers and help us democratically 
+80-90% of every tip. Join our community of music lovers and help us democratically 
 curate the world's music. Download our app on iOS/Android or visit tuneable.stream.
 ```
 
@@ -134,7 +134,7 @@ Upload your app icon (512x512 PNG from `/tuneable-mobile/assets/images/icon.png`
 
 Create a 1024x576 cover photo featuring:
 - Tuneable branding
-- Key message: "70% to Artists" or "Democratic Music Platform"
+- Key message: "80% to Artists" or "Democratic Music Platform"
 - Visual of people enjoying music together
 
 ### Additional Photos
@@ -184,7 +184,7 @@ Download: tuneable.stream
 🎉 Milestone: £10,000 Paid to Artists!
 
 Thanks to our incredible community, we've now paid over £10,000 directly to 
-artists. 70% of every tip goes to creators—building a fairer music economy together.
+artists. 80% of every tip goes to creators—building a fairer music economy together.
 
 Join us: tuneable.stream
 #FairTrade #MusicEconomy
@@ -209,7 +209,7 @@ Learn more: tuneable.stream/about
 Add frequently asked questions:
 
 **Q: What is Tuneable?**
-A: Tuneable is a democratic music platform where communities create listening parties and tip artists directly. 70% of every tip goes to the artist.
+A: Tuneable is a democratic music platform where communities create listening parties and tip artists directly. 80% of every tip goes to the artist.
 
 **Q: How do I use Tuneable?**
 A: Download our iOS or Android app, or visit tuneable.stream. Create an account, join a party, and start discovering music!
@@ -218,10 +218,10 @@ A: Download our iOS or Android app, or visit tuneable.stream. Create an account,
 A: Tuneable is free to download and use. You can add funds to your wallet to tip artists and influence party queues.
 
 **Q: How do artists get paid?**
-A: 70% of every tip goes directly to verified artists. They can claim earnings and request payouts anytime.
+A: 80% of every tip goes directly to verified artists. They can claim earnings and request payouts anytime.
 
 **Q: What makes Tuneable different from Spotify?**
-A: We're a Community Interest Company committed to fair artist compensation. Unlike streaming services that pay fractions of pennies per play, we enable direct tipping where 70-90% reaches the artist.
+A: We're a Community Interest Company committed to fair artist compensation. Unlike streaming services that pay fractions of pennies per play, we enable direct tipping where 80-90% reaches the artist.
 
 ---
 

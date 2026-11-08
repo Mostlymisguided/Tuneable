@@ -68,7 +68,7 @@ export function InviteShareCard({
     ? `\n\nIf you upload your own music and your profile is verified, I earn 3% of your paid tips for the first year after verification, from Tuneable's share, not yours.`
     : '';
 
-  const shareMessage = `You are invited to join Tuneable as a founding ambassador - use my invite code ${code}.\n\nChampion the music you love and get it in the charts. You can take part without uploading music of your own. Creators keep 70% of paid tips on music they upload.${commissionLine}\n\nVerify your profile and be part of the future of music 🎶\n\n${getInviteShareUrl(code)}`;
+  const shareMessage = `You are invited to join Tuneable as a founding ambassador - use my invite code ${code}.\n\nChampion the music you love and get it in the charts. You can take part without uploading music of your own. Creators keep 80% of paid tips on music they upload.${commissionLine}\n\nVerify your profile and be part of the future of music 🎶\n\n${getInviteShareUrl(code)}`;
 
   const onCopy = async () => {
     try {
@@ -97,7 +97,7 @@ export function InviteShareCard({
       <Text style={[styles.hint, collapsible && styles.hintCollapsed]}>
         {isFoundingCreator
           ? "Listeners, DJs, and creators can use this code without uploading music of their own. If they upload and verify, you earn 3% of their paid tips for year one, from Tuneable's share."
-          : 'Listeners, DJs, and creators can use this code without uploading music of their own. Creators keep 70% of paid tips on music they upload.'}
+          : 'Listeners, DJs, and creators can use this code without uploading music of their own. Creators keep 80% of paid tips on music they upload.'}
       </Text>
       {ambassador ? (
         <View style={styles.stats}>

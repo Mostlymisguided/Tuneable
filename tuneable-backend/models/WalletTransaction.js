@@ -74,15 +74,15 @@ const walletTransactionSchema = new mongoose.Schema({
     }, { _id: false }),
   },
 
-  // Cash Tuneable actually received. Set for Stripe from the balance transaction.
-  // Left empty for Apple and Google until a store financial report fills it.
+  // Cash Tuneable received. Stripe uses the balance transaction. Apple and
+  // Google use an estimate: sticker price minus commission and included tax.
   proceeds: {
     type: new mongoose.Schema({
       currency: { type: String },
       amountMajor: { type: Number },
       gbpPence: { type: Number },
       recordedAt: { type: Date },
-      source: { type: String, enum: ['stripe_balance'] },
+      source: { type: String, enum: ['stripe_balance', 'store_estimate'] },
     }, { _id: false }),
   },
   

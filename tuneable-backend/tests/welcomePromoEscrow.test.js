@@ -15,7 +15,7 @@ const {
 } = require('../utils/welcomePromoEscrow');
 
 function testConstants() {
-  assert.strictEqual(ARTIST_SHARE_PERCENTAGE, 0.7);
+  assert.strictEqual(ARTIST_SHARE_PERCENTAGE, 0.8);
   assert.strictEqual(PROMO_ESCROW_EXPIRY_DAYS, 90);
   assert.strictEqual(PROMO_ESCROW_STATUS.PENDING, 'pending');
 }
@@ -34,8 +34,8 @@ function testFullWelcomeTip() {
     bidAmountPence: 111,
     welcomeCreditAppliedPence: 111,
   });
-  assert.strictEqual(split.artistSharePence, 78);
-  assert.strictEqual(split.promoArtistSharePence, 78);
+  assert.strictEqual(split.artistSharePence, 89);
+  assert.strictEqual(split.promoArtistSharePence, 89);
   assert.strictEqual(split.paidArtistSharePence, 0);
   assert.strictEqual(split.promoEscrowStatus, 'pending');
   assert.ok(split.promoEscrowExpiresAt instanceof Date);
@@ -48,7 +48,7 @@ function testPayingUserTreatsWelcomeAsPaid() {
     treatWelcomeAsPaid: true,
   });
   assert.strictEqual(split.promoArtistSharePence, 0);
-  assert.strictEqual(split.paidArtistSharePence, 78);
+  assert.strictEqual(split.paidArtistSharePence, 89);
   assert.strictEqual(split.promoEscrowStatus, 'none');
   assert.strictEqual(split.promoEscrowExpiresAt, null);
 }
@@ -58,10 +58,10 @@ function testMixedTip() {
     bidAmountPence: 111,
     welcomeCreditAppliedPence: 50,
   });
-  assert.strictEqual(split.artistSharePence, 78);
-  assert.strictEqual(split.promoArtistSharePence, Math.round(78 * (50 / 111)));
-  assert.strictEqual(split.promoArtistSharePence, 35);
-  assert.strictEqual(split.paidArtistSharePence, 43);
+  assert.strictEqual(split.artistSharePence, 89);
+  assert.strictEqual(split.promoArtistSharePence, Math.round(89 * (50 / 111)));
+  assert.strictEqual(split.promoArtistSharePence, 40);
+  assert.strictEqual(split.paidArtistSharePence, 49);
 }
 
 function testPaidOnlyTip() {
@@ -69,9 +69,9 @@ function testPaidOnlyTip() {
     bidAmountPence: 200,
     welcomeCreditAppliedPence: 0,
   });
-  assert.strictEqual(split.artistSharePence, 140);
+  assert.strictEqual(split.artistSharePence, 160);
   assert.strictEqual(split.promoArtistSharePence, 0);
-  assert.strictEqual(split.paidArtistSharePence, 140);
+  assert.strictEqual(split.paidArtistSharePence, 160);
   assert.strictEqual(split.promoEscrowStatus, 'none');
 }
 
@@ -80,12 +80,12 @@ function testOwnerSplitAllPromo() {
     bidAmountPence: 111,
     welcomeCreditAppliedPence: 111,
   });
-  const ownerA = splitOwnerShare(Math.round(78 * 0.7), bidSplit);
-  const ownerB = splitOwnerShare(Math.round(78 * 0.3), bidSplit);
+  const ownerA = splitOwnerShare(Math.round(89 * 0.7), bidSplit);
+  const ownerB = splitOwnerShare(Math.round(89 * 0.3), bidSplit);
   assert.strictEqual(ownerA.paidPence, 0);
-  assert.strictEqual(ownerA.promoPence, 55);
+  assert.strictEqual(ownerA.promoPence, 62);
   assert.strictEqual(ownerB.paidPence, 0);
-  assert.strictEqual(ownerB.promoPence, 23);
+  assert.strictEqual(ownerB.promoPence, 27);
   assert.strictEqual(ownerA.promoPence + ownerB.promoPence, bidSplit.promoArtistSharePence);
 }
 
@@ -94,11 +94,11 @@ function testOwnerSplitMixed() {
     bidAmountPence: 111,
     welcomeCreditAppliedPence: 50,
   });
-  const ownerA = splitOwnerShare(55, bidSplit);
-  const ownerB = splitOwnerShare(23, bidSplit);
+  const ownerA = splitOwnerShare(62, bidSplit);
+  const ownerB = splitOwnerShare(27, bidSplit);
   assert.strictEqual(ownerA.promoPence + ownerB.promoPence, bidSplit.promoArtistSharePence);
-  assert.strictEqual(ownerA.paidPence + ownerA.promoPence, 55);
-  assert.strictEqual(ownerB.paidPence + ownerB.promoPence, 23);
+  assert.strictEqual(ownerA.paidPence + ownerA.promoPence, 62);
+  assert.strictEqual(ownerB.paidPence + ownerB.promoPence, 27);
 }
 
 function testExpiryDate() {

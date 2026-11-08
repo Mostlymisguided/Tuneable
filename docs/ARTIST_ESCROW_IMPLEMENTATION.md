@@ -1,5 +1,7 @@
 # Artist Escrow System - Phase 1 Implementation Plan
 
+> Current live split is **80% to artists / 20% to the platform**. The 70/30 figures below describe the original phase.
+
 ## 🎯 Overview
 
 This document outlines the implementation of Phase 1 (Internal Ledger) for Tuneable's artist escrow system. This allows artists to receive their share of revenue (70% of tips/bids) while maintaining a simple, MVP-ready approach.
