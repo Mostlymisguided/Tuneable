@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DEFAULT_BOOK_COVER_ART } from '../constants';
 import { resolveBookCoverArt } from '../utils/coverArt';
+import { useNotedCover } from '../utils/coverMemory';
 
 type BookCoverProps = {
   src?: string | null;
@@ -14,6 +15,7 @@ const BookCover: React.FC<BookCoverProps> = ({ src, alt = '', className }) => {
   const resolved = resolveBookCoverArt(src);
   const showPlaceholder = failedSrc != null && failedSrc === (src || '');
   const imageSrc = showPlaceholder ? DEFAULT_BOOK_COVER_ART : resolved;
+  useNotedCover(showPlaceholder ? null : imageSrc);
 
   return (
     <img

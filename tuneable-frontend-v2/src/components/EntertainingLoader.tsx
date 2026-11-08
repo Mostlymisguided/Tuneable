@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { readLoaderCovers } from '../utils/coverMemory';
 
 export type LoaderFlavor = 'podcast' | 'music' | 'books' | 'party' | 'generic';
 export type LoaderSize = 'page' | 'section' | 'inline';
@@ -80,52 +82,6 @@ const WAITING_HINTS: Record<LoaderFlavor, { after: number; text: string }[]> = {
   ],
 };
 
-type LabelTone = 'violet' | 'coral' | 'gold' | 'sea';
-
-function VinylRecord({ tone, slow = false }: { tone: LabelTone; slow?: boolean }) {
-  return (
-    <>
-      <div className={`vinyl-rotor${slow ? ' is-slow' : ''}`}>
-        <div className={`vinyl-label tone-${tone}`}>
-          <span className="vinyl-spindle" />
-        </div>
-      </div>
-      <div className="vinyl-sheen" />
-    </>
-  );
-}
-
-function VinylStack({ size }: { size: LoaderSize }) {
-  const sizeClass = size === 'page' ? 'is-page' : size === 'inline' ? 'is-inline' : '';
-  return (
-    <div className={`loader-art is-vinyl ${sizeClass}`} aria-hidden>
-      <div className="vinyl-glow" />
-      <div className="vinyl-shadow" />
-      <div className="vinyl-disc is-back is-left">
-        <VinylRecord tone="gold" slow />
-      </div>
-      <div className="vinyl-disc is-back is-right">
-        <VinylRecord tone="sea" slow />
-      </div>
-      <div className="vinyl-disc is-drop is-drop-a">
-        <VinylRecord tone="violet" />
-      </div>
-      <div className="vinyl-disc is-drop is-drop-b">
-        <VinylRecord tone="coral" />
-      </div>
-      <div className="tonearm-anchor">
-        <div className="tonearm">
-          <span className="tonearm-weight" />
-          <span className="tonearm-pivot" />
-          <span className="tonearm-arm">
-            <span className="tonearm-head" />
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const SLEEVES = [
   { face: 'is-front', art: 'dusk' },
   { face: 'is-back', art: 'tide' },
@@ -135,21 +91,49 @@ const SLEEVES = [
   { face: 'is-bottom', art: 'ink' },
 ] as const;
 
-function CoverCube({ size }: { size: LoaderSize }) {
+function CoverFace({
+  face,
+  art,
+  photo,
+}: {
+  face: (typeof SLEEVES)[number]['face'];
+  art: (typeof SLEEVES)[number]['art'];
+  photo?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const showPhoto = Boolean(photo) && !failed;
+
+  return (
+    <div className={`cover-face ${face}`}>
+      <div className={`cover-art art-${art}${showPhoto ? ' has-photo' : ''}`}>
+        <span className="sleeve-orb" />
+        <span className="sleeve-line" />
+        <span className="sleeve-line is-thin" />
+        {showPhoto ? (
+          <img
+            src={photo}
+            alt=""
+            className="cover-photo"
+            decoding="async"
+            fetchPriority="low"
+            draggable={false}
+            onError={() => setFailed(true)}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function CoverCube({ size, photos }: { size: LoaderSize; photos: string[] }) {
   const sizeClass = size === 'page' ? 'is-page' : size === 'inline' ? 'is-inline' : '';
   return (
     <div className={`loader-art is-covers ${sizeClass}`} aria-hidden>
       <div className="cover-shadow" />
       <div className="cover-scene">
         <div className="cover-cube">
-          {SLEEVES.map(({ face, art }) => (
-            <div key={face} className={`cover-face ${face}`}>
-              <div className={`cover-art art-${art}`}>
-                <span className="sleeve-orb" />
-                <span className="sleeve-line" />
-                <span className="sleeve-line is-thin" />
-              </div>
-            </div>
+          {SLEEVES.map(({ face, art }, index) => (
+            <CoverFace key={face} face={face} art={art} photo={photos[index]} />
           ))}
         </div>
       </div>
@@ -157,9 +141,15 @@ function CoverCube({ size }: { size: LoaderSize }) {
   );
 }
 
-function LoaderArt({ flavor, size }: { flavor: LoaderFlavor; size: LoaderSize }) {
-  if (flavor === 'books' || flavor === 'podcast') return <CoverCube size={size} />;
-  return <VinylStack size={size} />;
+function useLoaderPhotos(): string[] {
+  const location = useLocation();
+  const [photos] = useState(() => {
+    const fromState = (location.state as { coverArt?: string } | null)?.coverArt;
+    const remembered = readLoaderCovers();
+    if (!fromState) return remembered;
+    return [fromState, ...remembered.filter((url) => url !== fromState)].slice(0, 6);
+  });
+  return photos;
 }
 
 const EntertainingLoader: React.FC<EntertainingLoaderProps> = ({
@@ -172,6 +162,7 @@ const EntertainingLoader: React.FC<EntertainingLoaderProps> = ({
   className = '',
 }) => {
   const lines = ROTATING[flavor];
+  const photos = useLoaderPhotos();
   const [lineIndex, setLineIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -198,7 +189,7 @@ const EntertainingLoader: React.FC<EntertainingLoaderProps> = ({
       aria-live="polite"
       className={`text-center ${size === 'inline' ? 'py-4' : 'py-10 px-4'} ${className}`}
     >
-      <LoaderArt flavor={flavor} size={size} />
+      <CoverCube size={size} photos={photos} />
 
       {headline ? (
         <p className={`${size === 'page' ? 'text-xl' : 'text-lg'} font-semibold text-white mb-2`}>

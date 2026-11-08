@@ -11,6 +11,7 @@ import {
 } from '../utils/locationHelpers';
 import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
 import { TuneBytesMark } from './TuneBytesMark';
+import { promoteCoverArt } from '../utils/coverMemory';
 
 const META_LINK_CLASS =
   'truncate max-w-[9rem] md:max-w-[12rem] text-gray-300 hover:text-white hover:underline underline-offset-2 transition-colors no-underline';
@@ -137,7 +138,12 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
       <div className="flex flex-row items-start gap-2 md:contents">
         <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden group flex-shrink-0">
           {href ? (
-            <Link to={href} className="block w-full h-full" tabIndex={-1}>
+            <Link
+              to={href}
+              className="block w-full h-full"
+              tabIndex={-1}
+              onClick={() => promoteCoverArt(book.coverArt)}
+            >
               <BookCover
                 src={book.coverArt}
                 alt={book.title}
@@ -167,7 +173,11 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
           <div className="flex items-center gap-2 min-w-0">
             <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
               {href ? (
-                <Link to={href} className="hover:text-purple-300 transition-colors">
+                <Link
+                  to={href}
+                  className="hover:text-purple-300 transition-colors"
+                  onClick={() => promoteCoverArt(book.coverArt)}
+                >
                   {book.title}
                 </Link>
               ) : (

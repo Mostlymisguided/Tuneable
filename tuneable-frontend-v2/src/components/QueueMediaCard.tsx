@@ -16,15 +16,18 @@ import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
 import { TuneBytesMark } from './TuneBytesMark';
 import WaveformBars, { waveformPeaksOf } from './WaveformBars';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { promoteCoverArt, useNotedCover } from '../utils/coverMemory';
 
 function QueueCover({ media }: { media: { coverArt?: string | null; title?: string; contentForm?: string | string[]; contentType?: string | string[] } }) {
   const alt = media.title || 'Unknown Media';
+  const src = media.coverArt || DEFAULT_COVER_ART;
+  useNotedCover(isWrittenMedia(media) ? null : src);
   if (isWrittenMedia(media)) {
     return <BookCover src={media.coverArt} alt={alt} className="w-full h-full object-cover" />;
   }
   return (
     <img
-      src={media.coverArt || DEFAULT_COVER_ART}
+      src={src}
       alt={alt}
       className="w-full h-full object-cover"
       width="96"
@@ -192,7 +195,12 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
       <div className="flex min-w-0 flex-1 items-start gap-2 md:gap-4">
         <div className="relative h-12 w-12 flex-shrink-0 cursor-pointer overflow-hidden rounded group md:h-20 md:w-20">
           {href ? (
-            <Link to={href} className="block h-full w-full" tabIndex={-1}>
+            <Link
+              to={href}
+              className="block h-full w-full"
+              tabIndex={-1}
+              onClick={() => promoteCoverArt(mediaData.coverArt)}
+            >
               <QueueCover media={mediaData} />
             </Link>
           ) : (
@@ -227,7 +235,11 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
           <div className="flex min-w-0 items-baseline gap-1.5">
             <h4 className="min-w-0 shrink text-sm font-medium text-white">
               {href ? (
-                <Link to={href} className="block truncate cursor-pointer transition-colors hover:text-purple-300">
+                <Link
+                  to={href}
+                  className="block truncate cursor-pointer transition-colors hover:text-purple-300"
+                  onClick={() => promoteCoverArt(mediaData.coverArt)}
+                >
                   {mediaData.title || 'Unknown Media'}
                 </Link>
               ) : (

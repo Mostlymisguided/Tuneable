@@ -7,6 +7,7 @@ import { DEFAULT_COVER_ART } from '../constants';
 import { getEpisodeDisplayTags } from '../utils/podcastTags';
 import { formatMediaTuneBytes } from '../utils/formatTuneBytes';
 import { TuneBytesMark } from './TuneBytesMark';
+import { promoteCoverArt, useNotedCover } from '../utils/coverMemory';
 
 function formatDuration(duration: number | string | undefined) {
   if (!duration) return '';
@@ -89,6 +90,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   const seriesTitle = episode.podcastSeries?.title || episode.podcastTitle;
   const coverArt =
     episode.coverArt || episode.podcastImage || episode.podcastSeries?.coverArt || DEFAULT_COVER_ART;
+  useNotedCover(coverArt);
   const mediaId = episode._id || episode.id;
   const durationLabel = formatDuration(episode.duration);
 
@@ -118,10 +120,18 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
       <div className="flex flex-row items-start gap-2 md:contents">
         <div
           className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden cursor-pointer group flex-shrink-0"
-          onClick={episodePath ? undefined : () => onEpisodeClick(episode)}
+          onClick={episodePath ? undefined : () => {
+            promoteCoverArt(coverArt);
+            onEpisodeClick(episode);
+          }}
         >
           {episodePath ? (
-            <Link to={episodePath} className="block w-full h-full" tabIndex={-1}>
+            <Link
+              to={episodePath}
+              className="block w-full h-full"
+              tabIndex={-1}
+              onClick={() => promoteCoverArt(coverArt)}
+            >
               <img
                 src={coverArt}
                 alt={episode.title}
@@ -198,13 +208,17 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
                 <Link
                   to={episodePath}
                   className="cursor-pointer hover:text-purple-300 transition-colors"
+                  onClick={() => promoteCoverArt(coverArt)}
                 >
                   {episode.title}
                 </Link>
               ) : (
                 <span
                   className="cursor-pointer hover:text-purple-300 transition-colors"
-                  onClick={() => onEpisodeClick(episode)}
+                  onClick={() => {
+                    promoteCoverArt(coverArt);
+                    onEpisodeClick(episode);
+                  }}
                 >
                   {episode.title}
                 </span>
