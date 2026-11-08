@@ -492,7 +492,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
   // Subscribe only to the slices this page reads — the full store also ticks currentTime
   const isHost = useWebPlayerStore((s) => s.isHost);
-  const currentMedia = useWebPlayerStore((s) => s.currentMedia);
   const setCurrentMedia = useWebPlayerStore((s) => s.setCurrentMedia);
   const setIsHost = useWebPlayerStore((s) => s.setIsHost);
   const setQueue = useWebPlayerStore((s) => s.setQueue);
@@ -3602,30 +3601,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         </button>
                       </div>
                     )}
-
-                    {/* Champions for currently playing media — below queue / Show more */}
-                    {(() => {
-                      const mediaId =
-                        currentMedia?._id ||
-                        currentMedia?.id ||
-                        (currentMedia as any)?.uuid ||
-                        null;
-                      if (!mediaId) return null;
-                      return (
-                        <div className="flex justify-center px-2 pt-2">
-                          <div className="w-full max-w-xl">
-                            <MediaChampions
-                              mediaId={String(mediaId)}
-                              maxDisplay={10}
-                              compact
-                              variant="strip"
-                              mediaTitle={currentMedia?.title}
-                              seedLocation={selectedLocation}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
 
