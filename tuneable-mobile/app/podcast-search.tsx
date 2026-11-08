@@ -44,6 +44,17 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'catalog', label: 'Catalog' },
 ];
 
+function formatEpisodeDate(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 function mergeUnique(
   existing: PodcastEpisode[],
   incoming: PodcastEpisode[]
@@ -473,6 +484,7 @@ export default function PodcastSearchScreen() {
           const label = podcastSearchSourceLabel(item);
           const library = !isExternalSearchEpisode(item);
           const durationLabel = formatDuration(item.duration);
+          const dateLabel = formatEpisodeDate(item.releaseDate || item.publishedAt);
           const showName = seriesTitle(item);
           return (
             <View style={styles.card}>
@@ -492,18 +504,38 @@ export default function PodcastSearchScreen() {
                   disabled={Boolean(openingKey)}
                   accessibilityRole="link"
                   accessibilityLabel={`Open episode ${item.title || 'episode'}`}>
-                  <Text style={styles.trackTitle} numberOfLines={2}>
-                    {item.title || 'Untitled episode'}
-                  </Text>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.trackTitle} numberOfLines={2}>
+                      {item.title || 'Untitled episode'}
+                    </Text>
+                    {durationLabel ? (
+                      <View style={styles.durationRow}>
+                        <Ionicons
+                          name="time-outline"
+                          size={11}
+                          color={colors.textMuted}
+                        />
+                        <Text style={styles.duration}>{durationLabel}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </Pressable>
                 <Pressable
                   onPress={() => void openShow(item)}
                   disabled={Boolean(openingKey)}
                   accessibilityRole="link"
                   accessibilityLabel={`Open show ${showName}`}>
-                  <Text style={styles.showTitle} numberOfLines={1}>
-                    {showName}
-                  </Text>
+                  <View style={styles.showRow}>
+                    <Text style={styles.showTitle} numberOfLines={1}>
+                      {showName}
+                    </Text>
+                    {dateLabel ? (
+                      <>
+                        <Text style={styles.metaDot}>·</Text>
+                        <Text style={styles.dateLabel}>{dateLabel}</Text>
+                      </>
+                    ) : null}
+                  </View>
                 </Pressable>
                 <View style={styles.metaRow}>
                   <Text
@@ -513,19 +545,6 @@ export default function PodcastSearchScreen() {
                     ]}>
                     {label}
                   </Text>
-                  {durationLabel ? (
-                    <>
-                      <Text style={styles.metaDot}>·</Text>
-                      <View style={styles.durationRow}>
-                        <Ionicons
-                          name="time-outline"
-                          size={11}
-                          color={colors.textMuted}
-                        />
-                        <Text style={styles.duration}>{durationLabel}</Text>
-                      </View>
-                    </>
-                  ) : null}
                 </View>
               </View>
               <Pressable
@@ -730,16 +749,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   meta: { flex: 1, minWidth: 0 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   trackTitle: {
+    flex: 1,
     color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
-  showTitle: {
+  showRow: {
     marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  showTitle: {
+    flexShrink: 1,
     color: '#c4b5fd',
     fontSize: 13,
     fontWeight: '600',
+  },
+  dateLabel: {
+    flexShrink: 0,
+    color: colors.textMuted,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
   },
   metaRow: {
     flexDirection: 'row',

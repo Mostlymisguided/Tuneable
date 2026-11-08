@@ -23,6 +23,18 @@ function formatDuration(duration: number | string | undefined) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function formatReleaseDate(value?: string | Date | number | null) {
+  if (value == null || value === '') return '';
+  const date =
+    value instanceof Date
+      ? value
+      : typeof value === 'number'
+        ? new Date(value < 1000000000000 ? value * 1000 : value)
+        : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export interface PodcastEpisodeCardData {
   _id?: string;
   id?: string;
@@ -30,6 +42,8 @@ export interface PodcastEpisodeCardData {
   coverArt?: string;
   podcastImage?: string;
   duration?: number;
+  releaseDate?: string | Date | number | null;
+  publishedAt?: string | Date | number | null;
   globalMediaAggregate?: number;
   tuneBytesEarned?: number;
   tags?: string[];
@@ -64,6 +78,8 @@ export interface PodcastQueueMediaCardProps {
   tipLabel?: string;
   /** When set, episode title/artwork render as real links to this path. */
   episodePath?: string;
+  /** Search results: publish date sits on the show line. */
+  showDate?: boolean;
   hideTag?: string;
   onEpisodeClick: (episode: PodcastEpisodeCardData) => void;
   onSeriesClick?: (episode: PodcastEpisodeCardData, e: React.MouseEvent) => void;
@@ -80,6 +96,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   canPlay = false,
   tipLabel = 'Send a tip',
   episodePath,
+  showDate = false,
   hideTag,
   onEpisodeClick,
   onSeriesClick,
@@ -93,6 +110,7 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   useNotedCover(coverArt);
   const mediaId = episode._id || episode.id;
   const durationLabel = formatDuration(episode.duration);
+  const dateLabel = showDate ? formatReleaseDate(episode.releaseDate || episode.publishedAt) : '';
 
   const tipButton = (
     <button
@@ -202,8 +220,8 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
         </div>
 
         <div className="flex-1 min-w-0 md:ml-4 pr-11 md:pr-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <h4 className="flex-1 min-w-0 font-medium text-white text-sm truncate">
+          <div className="flex items-baseline gap-1.5 min-w-0">
+            <h4 className="min-w-0 shrink font-medium text-white text-sm truncate">
               {episodePath ? (
                 <Link
                   to={episodePath}
@@ -231,19 +249,29 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
               </div>
             )}
           </div>
-          {(seriesTitle || tuneBytesLabel) && (
-            <div className="flex items-center gap-2 min-w-0">
+          {(seriesTitle || dateLabel || tuneBytesLabel) && (
+            <div className="flex items-baseline gap-1.5 min-w-0">
               {seriesTitle ? (
                 <p
-                  className={`text-gray-400 text-xs truncate min-w-0 flex-1 ${onSeriesClick ? 'cursor-pointer hover:text-purple-300 transition-colors' : ''}`}
+                  className={`text-gray-400 text-xs truncate min-w-0 shrink ${onSeriesClick ? 'cursor-pointer hover:text-purple-300 transition-colors' : ''}`}
                   onClick={onSeriesClick ? (e) => onSeriesClick(episode, e) : undefined}
                 >
                   {seriesTitle}
                 </p>
-              ) : (
-                <span className="flex-1" />
-              )}
-              {tuneBytesLabel ? <TuneBytesMark label={tuneBytesLabel} className="text-xs" /> : null}
+              ) : null}
+              {dateLabel ? (
+                <>
+                  {seriesTitle ? (
+                    <span className="shrink-0 text-xs text-gray-600" aria-hidden>
+                      ·
+                    </span>
+                  ) : null}
+                  <span className="shrink-0 text-xs tabular-nums text-gray-400">{dateLabel}</span>
+                </>
+              ) : null}
+              {tuneBytesLabel ? (
+                <TuneBytesMark label={tuneBytesLabel} className="text-xs ml-auto" />
+              ) : null}
             </div>
           )}
           {tags.length > 0 && (

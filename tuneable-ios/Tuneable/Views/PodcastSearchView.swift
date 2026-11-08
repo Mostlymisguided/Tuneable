@@ -65,7 +65,7 @@ struct PodcastSearchView: View {
                     List {
                         ForEach(episodes) { ep in
                             NavigationLink(value: ep) {
-                                EpisodeRow(episode: ep)
+                                EpisodeRow(episode: ep, showsReleaseMeta: true)
                             }
                             .listRowBackground(AppTheme.cardBackground)
                             .listRowSeparatorTint(AppTheme.cardBorder)

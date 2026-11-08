@@ -2015,6 +2015,7 @@ const Podcasts: React.FC = () => {
                   canPlay={canPlayEpisode(episode)}
                   tipLabel={isExternal ? 'Add & Tip' : 'Tip'}
                   episodePath={epId ? `/podcasts/${epId}` : undefined}
+                  showDate={showSearchResults}
                   onEpisodeClick={(ep) => handleEpisodeClick(ep as PodcastEpisode)}
                   onSeriesClick={(ep, e) => handleSeriesClick(ep as PodcastEpisode, e)}
                   onPlay={(ep, e) => handleQueuePlay(ep as PodcastEpisode, e)}

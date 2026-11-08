@@ -202,6 +202,7 @@ struct EpisodeCardSmall: View {
 
 struct EpisodeRow: View {
     let episode: PodcastEpisode
+    var showsReleaseMeta: Bool = false
 
     private var coverArtURL: URL? {
         episode.coverArt.flatMap { URL(string: $0) }
@@ -222,14 +223,35 @@ struct EpisodeRow: View {
                 .cornerRadius(6)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(episode.title ?? "Untitled")
-                    .font(.subheadline)
-                    .foregroundStyle(AppTheme.textPrimary)
-                    .lineLimit(1)
-                Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.textSecondary)
-                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(episode.title ?? "Untitled")
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.textPrimary)
+                        .lineLimit(1)
+                    if showsReleaseMeta, let duration = episodeDurationLabel(episode.duration) {
+                        Text(duration)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .monospacedDigit()
+                            .layoutPriority(1)
+                    }
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(episode.podcastSeries?.title ?? episode.podcastTitle ?? "")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .lineLimit(1)
+                    if showsReleaseMeta, let date = episodeDateLabel(episode.releaseDate) {
+                        Text("·")
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textTertiary)
+                        Text(date)
+                            .font(.caption2)
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
+                    }
+                }
                 if let agg = episode.globalMediaAggregate, agg > 0 {
                     Text(formatPence(agg))
                         .font(.caption2)
@@ -244,6 +266,34 @@ struct EpisodeRow: View {
         }
         .padding(.vertical, 8)
     }
+}
+
+private func episodeDurationLabel(_ seconds: Double?) -> String? {
+    guard let seconds, seconds.isFinite, seconds > 0 else { return nil }
+    let total = Int(seconds)
+    let hours = total / 3600
+    let minutes = (total % 3600) / 60
+    let secs = total % 60
+    if hours > 0 {
+        return String(format: "%d:%02d:%02d", hours, minutes, secs)
+    }
+    return String(format: "%d:%02d", minutes, secs)
+}
+
+private func episodeDateLabel(_ raw: String?) -> String? {
+    guard let raw, !raw.isEmpty else { return nil }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    var date = iso.date(from: raw)
+    if date == nil {
+        iso.formatOptions = [.withInternetDateTime]
+        date = iso.date(from: raw)
+    }
+    guard let date else { return nil }
+    let out = DateFormatter()
+    out.dateStyle = .medium
+    out.timeStyle = .none
+    return out.string(from: date)
 }
 
 private func formatPence(_ pence: Double) -> String {

@@ -6,7 +6,6 @@ import {
   Link as LinkIcon, 
   Clock, 
   Play, 
-  Calendar,
   Music,
   Loader,
   X
@@ -191,13 +190,14 @@ const PodcastSearch: React.FC = () => {
   };
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return 'N/A';
+    if (!seconds) return '';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
     if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}`;
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
-    return `${minutes}:${seconds % 60}`;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
   const formatDate = (dateString?: string) => {
@@ -544,9 +544,29 @@ const PodcastSearch: React.FC = () => {
 
                   {/* Episode Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-bold mb-2">{episode.title}</h3>
-                    {episode.podcastSeries && (
-                      <p className="text-purple-300 text-sm mb-2">{episode.podcastSeries.title}</p>
+                    <div className="flex items-baseline gap-2 min-w-0 mb-2">
+                      <h3 className="text-xl font-bold min-w-0 shrink truncate">{episode.title}</h3>
+                      {episode.duration ? (
+                        <span className="flex items-center gap-1 shrink-0 text-sm text-gray-400">
+                          <Clock className="h-4 w-4" />
+                          <span className="tabular-nums">{formatDuration(episode.duration)}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    {(episode.podcastSeries || episode.releaseDate) && (
+                      <p className="text-sm mb-2 flex items-baseline gap-1.5 min-w-0">
+                        {episode.podcastSeries ? (
+                          <span className="text-purple-300 truncate min-w-0 shrink">{episode.podcastSeries.title}</span>
+                        ) : null}
+                        {episode.releaseDate ? (
+                          <>
+                            {episode.podcastSeries ? (
+                              <span className="text-gray-600 shrink-0" aria-hidden>·</span>
+                            ) : null}
+                            <span className="text-gray-400 shrink-0 tabular-nums">{formatDate(episode.releaseDate)}</span>
+                          </>
+                        ) : null}
+                      </p>
                     )}
                     {episode.host && episode.host.length > 0 && (
                       <p className="text-gray-400 text-sm mb-2">
@@ -563,22 +583,12 @@ const PodcastSearch: React.FC = () => {
                       <div className="flex items-center space-x-1 text-purple-400">
                         <span className="font-semibold">{penceToPounds(episode.globalMediaAggregate)}</span>
                       </div>
-                      {episode.duration && (
-                        <div className="flex items-center space-x-1 text-gray-400">
-                          <Clock className="h-4 w-4" />
-                          <span>{formatDuration(episode.duration)}</span>
-                        </div>
-                      )}
                       {episode.playCount !== undefined && (
                         <div className="flex items-center space-x-1 text-gray-400">
                           <Play className="h-4 w-4" />
                           <span>{episode.playCount.toLocaleString()}</span>
                         </div>
                       )}
-                      <div className="flex items-center space-x-1 text-gray-400">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatDate(episode.releaseDate)}</span>
-                      </div>
                     </div>
 
                     {/* Tags */}
