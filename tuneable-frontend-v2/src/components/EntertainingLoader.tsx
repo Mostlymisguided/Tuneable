@@ -80,19 +80,86 @@ const WAITING_HINTS: Record<LoaderFlavor, { after: number; text: string }[]> = {
   ],
 };
 
-function Equalizer({ compact }: { compact?: boolean }) {
-  const heights = compact ? [14, 22, 18, 26, 16] : [22, 36, 28, 42, 24, 34, 20];
+type LabelTone = 'violet' | 'coral' | 'gold' | 'sea';
+
+function VinylRecord({ tone, slow = false }: { tone: LabelTone; slow?: boolean }) {
   return (
-    <div className={`flex items-end justify-center gap-1 ${compact ? 'h-8' : 'h-12'}`} aria-hidden>
-      {heights.map((h, i) => (
-        <span
-          key={i}
-          className="entertaining-loader-bar w-1.5 rounded-full bg-gradient-to-t from-purple-600 to-pink-400"
-          style={{ height: h, animationDelay: `${i * 0.11}s` }}
-        />
-      ))}
+    <>
+      <div className={`vinyl-rotor${slow ? ' is-slow' : ''}`}>
+        <div className={`vinyl-label tone-${tone}`}>
+          <span className="vinyl-spindle" />
+        </div>
+      </div>
+      <div className="vinyl-sheen" />
+    </>
+  );
+}
+
+function VinylStack({ size }: { size: LoaderSize }) {
+  const sizeClass = size === 'page' ? 'is-page' : size === 'inline' ? 'is-inline' : '';
+  return (
+    <div className={`loader-art is-vinyl ${sizeClass}`} aria-hidden>
+      <div className="vinyl-glow" />
+      <div className="vinyl-shadow" />
+      <div className="vinyl-disc is-back is-left">
+        <VinylRecord tone="gold" slow />
+      </div>
+      <div className="vinyl-disc is-back is-right">
+        <VinylRecord tone="sea" slow />
+      </div>
+      <div className="vinyl-disc is-drop is-drop-a">
+        <VinylRecord tone="violet" />
+      </div>
+      <div className="vinyl-disc is-drop is-drop-b">
+        <VinylRecord tone="coral" />
+      </div>
+      <div className="tonearm-anchor">
+        <div className="tonearm">
+          <span className="tonearm-weight" />
+          <span className="tonearm-pivot" />
+          <span className="tonearm-arm">
+            <span className="tonearm-head" />
+          </span>
+        </div>
+      </div>
     </div>
   );
+}
+
+const SLEEVES = [
+  { face: 'is-front', art: 'dusk' },
+  { face: 'is-back', art: 'tide' },
+  { face: 'is-right', art: 'heat' },
+  { face: 'is-left', art: 'noir' },
+  { face: 'is-top', art: 'blush' },
+  { face: 'is-bottom', art: 'ink' },
+] as const;
+
+function CoverCube({ size }: { size: LoaderSize }) {
+  const sizeClass = size === 'page' ? 'is-page' : size === 'inline' ? 'is-inline' : '';
+  return (
+    <div className={`loader-art is-covers ${sizeClass}`} aria-hidden>
+      <div className="cover-shadow" />
+      <div className="cover-scene">
+        <div className="cover-cube">
+          {SLEEVES.map(({ face, art }) => (
+            <div key={face} className={`cover-face ${face}`}>
+              <div className={`cover-art art-${art}`}>
+                <span className="sleeve-orb" />
+                <span className="sleeve-line" />
+                <span className="sleeve-line is-thin" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoaderArt({ flavor, size }: { flavor: LoaderFlavor; size: LoaderSize }) {
+  if (flavor === 'books' || flavor === 'podcast') return <CoverCube size={size} />;
+  return <VinylStack size={size} />;
 }
 
 const EntertainingLoader: React.FC<EntertainingLoaderProps> = ({
@@ -131,9 +198,7 @@ const EntertainingLoader: React.FC<EntertainingLoaderProps> = ({
       aria-live="polite"
       className={`text-center ${size === 'inline' ? 'py-4' : 'py-10 px-4'} ${className}`}
     >
-      <div className="mb-5">
-        <Equalizer compact={size === 'inline'} />
-      </div>
+      <LoaderArt flavor={flavor} size={size} />
 
       {headline ? (
         <p className={`${size === 'page' ? 'text-xl' : 'text-lg'} font-semibold text-white mb-2`}>
