@@ -1768,11 +1768,12 @@ const Podcasts: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowImportSection(!showImportSection)}
-                className="text-sm font-medium text-gray-300 hover:text-white transition-colors flex items-center gap-1.5"
+                aria-expanded={showImportSection}
+                className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm ${
+                  showImportSection ? 'bg-gray-700 ring-1 ring-purple-500/50' : 'bg-gray-800'
+                }`}
               >
-                <LinkIcon className="h-4 w-4 text-purple-400" />
                 Import
-                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showImportSection ? 'rotate-180' : ''}`} />
               </button>
             </div>
             {searchQuery.trim() && !showSearchResults && displayEpisodes.length > 0 && (
