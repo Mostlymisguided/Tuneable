@@ -2599,12 +2599,6 @@ const TuneProfile: React.FC = () => {
                   </>
                 )}
               </div>
-              <MediaLicenceCard
-                mediaId={media._id}
-                saved={media.licence}
-                canEdit={canEditTune()}
-                onSaved={(licence) => setMedia((current) => current ? { ...current, licence } : current)}
-              />
 
               {(albumLabel || heroMetricChips.length > 0) && (
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-1.5 px-2 mb-2">
@@ -2718,6 +2712,13 @@ const TuneProfile: React.FC = () => {
                   <span>{(media.playCount || 0).toLocaleString()} {(media.playCount || 0) === 1 ? 'play' : 'plays'}</span>
                 </span>
               </div>
+
+              <MediaLicenceCard
+                mediaId={media._id}
+                saved={media.licence}
+                canEdit={canEditTune()}
+                onSaved={(licence) => setMedia((current) => current ? { ...current, licence } : current)}
+              />
 
               {media.bids && media.bids.length > 0 && (
                 <div className="px-2 mb-3">
