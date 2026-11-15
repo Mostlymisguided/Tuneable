@@ -2600,29 +2600,25 @@ const TuneProfile: React.FC = () => {
                 )}
               </div>
 
-              {(albumLabel || heroMetricChips.length > 0) && (
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-1.5 px-2 mb-2">
-                  {albumLabel && (
-                    <p className="text-sm text-gray-400">
-                      {albumLabel}
-                    </p>
-                  )}
-                  {heroMetricChips.length > 0 && (
-                    <div className="inline-flex flex-wrap items-center justify-center md:justify-start gap-1.5">
-                      {heroMetricChips.map((chip) => (
-                        <span
-                          key={chip.id}
-                          title={chip.title}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-gray-100"
-                        >
-                          {chip.id === 'key' && (
-                            <span className="text-[10px] uppercase tracking-wide text-gray-400">Key</span>
-                          )}
-                          {chip.label}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+              {albumLabel && (
+                <p className="text-sm text-gray-400 text-center md:text-left px-2 mb-1.5">
+                  {albumLabel}
+                </p>
+              )}
+              {heroMetricChips.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 px-2 mb-2">
+                  {heroMetricChips.map((chip) => (
+                    <span
+                      key={chip.id}
+                      title={chip.title}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-medium text-gray-100"
+                    >
+                      {chip.id === 'key' && (
+                        <span className="text-[10px] uppercase tracking-wide text-gray-400">Key</span>
+                      )}
+                      {chip.label}
+                    </span>
+                  ))}
                 </div>
               )}
 
