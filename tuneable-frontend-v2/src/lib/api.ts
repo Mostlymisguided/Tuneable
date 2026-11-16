@@ -1446,6 +1446,31 @@ export type BlockedUser = {
   profilePic?: string;
 };
 
+export interface HomeListenQueueItem {
+  mediaId: string;
+  mediaUuid: string;
+  slug?: string | null;
+  title: string;
+  artist: string;
+  coverArt?: string | null;
+  duration?: number | null;
+  contentForm?: string[];
+  tags?: string[];
+  sources?: Record<string, string>;
+  rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
+  rightsCleared?: boolean;
+  isPlayable?: boolean;
+  hasHostedAudio?: boolean;
+  playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
+  queued: boolean;
+  addedAt?: string | null;
+  heard: boolean;
+  qualifiedAt?: string | null;
+  tipped: boolean;
+  userBidTotal: number;
+  lastBidAt?: string | null;
+}
+
 export const userAPI = {
   getProfile: async (userId: string) => {
     const response = await api.get(`/users/${encodeURIComponent(userId)}/profile`);
@@ -1876,6 +1901,15 @@ export const userAPI = {
     return response.data;
   },
 
+  getHomeListenQueue: async () => {
+    const response = await api.get('/users/me/home-queue');
+    return response.data as {
+      unheard: HomeListenQueueItem[];
+      heard: HomeListenQueueItem[];
+      counts: { unheard: number; heard: number; tipped: number };
+    };
+  },
+
   // Get authenticated user's personal playback queue
   getPlaybackQueue: async () => {
     const response = await api.get('/users/me/queue');
@@ -1887,6 +1921,7 @@ export const userAPI = {
         note?: string;
         mediaId: string;
         mediaUuid: string;
+        slug?: string | null;
         title: string;
         artist: string;
         coverArt?: string;
@@ -1899,7 +1934,12 @@ export const userAPI = {
     };
   },
 
-  addToPlaybackQueue: async (payload: { mediaId: string; sourceType?: string; note?: string }) => {
+  addToPlaybackQueue: async (payload: {
+    mediaId: string;
+    sourceType?: string;
+    note?: string;
+    position?: 'start' | 'end';
+  }) => {
     const response = await api.post('/users/me/queue', payload);
     return response.data;
   },

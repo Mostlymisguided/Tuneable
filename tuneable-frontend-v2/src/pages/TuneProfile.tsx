@@ -14,6 +14,7 @@ import {
   ThumbsUp,
   Trash2,
   Play,
+  ListMusic,
   Globe,
   Tag,
   Mic,
@@ -299,6 +300,59 @@ const TuneProfile: React.FC = () => {
   const { user } = useAuth();
   
   const [media, setMedia] = useState<Media | null>(null);
+  const [queued, setQueued] = useState(false);
+  const [queueBusy, setQueueBusy] = useState(false);
+
+  useEffect(() => {
+    if (!user || !media?._id) {
+      setQueued(false);
+      return;
+    }
+    let cancelled = false;
+    const id = String(media._id);
+    const uuid = media.uuid ? String(media.uuid) : '';
+    userAPI.getPlaybackQueue()
+      .then((data) => {
+        if (cancelled) return;
+        setQueued((data.queue || []).some((item) => item.mediaId === id || (uuid && item.mediaUuid === uuid)));
+      })
+      .catch(() => {
+        if (!cancelled) setQueued(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, media?._id, media?.uuid]);
+
+  const handleToggleQueue = async () => {
+    if (!user || !media) {
+      toast.info('Please sign in to queue a tune');
+      navigate('/login');
+      return;
+    }
+    const mediaKey = media.uuid || media._id;
+    if (!mediaKey) return;
+    setQueueBusy(true);
+    try {
+      if (queued) {
+        await userAPI.removeFromPlaybackQueue(mediaKey);
+        setQueued(false);
+        toast.success(`Removed "${media.title}" from your queue`);
+      } else {
+        await userAPI.addToPlaybackQueue({
+          mediaId: mediaKey,
+          sourceType: 'profile',
+          position: 'start',
+        });
+        setQueued(true);
+        toast.success(`Added "${media.title}" to your queue`);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update your queue');
+    } finally {
+      setQueueBusy(false);
+    }
+  };
   const [showSupportInPounds, setShowSupportInPounds] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -2738,6 +2792,19 @@ const TuneProfile: React.FC = () => {
                     Play
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => void handleToggleQueue()}
+                  disabled={queueBusy}
+                  className={`px-4 py-2 font-semibold rounded-lg transition-all flex items-center gap-2 text-sm border ${
+                    queued
+                      ? 'bg-purple-900/60 border-purple-400 text-white'
+                      : 'bg-gray-900/80 hover:bg-gray-800/80 border-purple-500/50 text-white'
+                  } disabled:opacity-50`}
+                >
+                  <ListMusic className="h-4 w-4" />
+                  {queued ? 'Queued' : 'Queue'}
+                </button>
                 {renderShareButton()}
                 {user && media.bids?.some((bid: any) => {
                   const bidderId = bid?.userId?._id || bid?.userId?.uuid || bid?.userId;

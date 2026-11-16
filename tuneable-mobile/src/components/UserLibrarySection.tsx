@@ -134,6 +134,7 @@ type Props = {
   onEmptyAction?: () => void;
   searchHint?: string;
   compactHeader?: boolean;
+  hideHeader?: boolean;
   loading?: boolean;
   /** Show each tune's TuneBytes to one decimal. Own library only. */
   referenceTuneBytes?: boolean;
@@ -159,6 +160,7 @@ export function UserLibrarySection({
   onEmptyAction,
   searchHint = 'Filters your tipped tunes.',
   compactHeader = false,
+  hideHeader = false,
   loading = false,
   referenceTuneBytes = false,
 }: Props) {
@@ -341,6 +343,7 @@ export function UserLibrarySection({
 
   return (
     <View>
+      {hideHeader ? null : (
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text style={[styles.title, compactHeader && styles.titleCompact]}>
@@ -356,6 +359,7 @@ export function UserLibrarySection({
           </Pressable>
         ) : null}
       </View>
+      )}
 
       {showFilters ? (
         <ChartFilterToolbar

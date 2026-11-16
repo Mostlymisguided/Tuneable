@@ -108,6 +108,7 @@ export interface ChartMediaItem {
     openToCommercial?: boolean;
   } | null;
   isPlayable?: boolean;
+  sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
   hasHostedAudio?: boolean;
   playabilityBlockReason?: 'rights' | 'audio' | 'disputed' | null;
   addedBy?: {

@@ -16,9 +16,11 @@ import { Screen } from '@/src/components/Screen';
 import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
 import { searchAPI } from '@/src/api/search';
+import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
+import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, GLOBAL_PARTY_ID } from '@/src/types/media';
 import {
@@ -41,6 +43,11 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 function isLibraryResult(item: SearchResultItem): boolean {
   return Boolean(item.isLocal) || item.sourceLabel === 'Library';
+}
+
+function queueableMediaId(item: SearchResultItem): string | null {
+  if (!isLibraryResult(item)) return null;
+  return item._id || item.uuid || null;
 }
 
 function resultLabel(item: SearchResultItem): string {
@@ -196,6 +203,21 @@ export default function MusicSearchScreen() {
       setError(err instanceof Error ? err.message : 'Failed to load more');
     } finally {
       setLoadingMore(false);
+    }
+  };
+
+  const addToQueue = async (item: SearchResultItem) => {
+    const id = queueableMediaId(item);
+    if (!id) return;
+    try {
+      await userAPI.addToPlaybackQueue({
+        mediaId: id,
+        sourceType: 'search',
+        position: 'start',
+      });
+      showToast(`Added ${item.title || 'tune'} to Unheard`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not add that tune');
     }
   };
 
@@ -468,6 +490,16 @@ export default function MusicSearchScreen() {
                   ) : null}
                 </View>
               </View>
+              {queueableMediaId(item) ? (
+                <Pressable
+                  style={styles.queueBtn}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${item.title || 'tune'} to your queue`}
+                  onPress={() => void addToQueue(item)}>
+                  <Ionicons name="add" size={18} color={colors.accentLight} />
+                </Pressable>
+              ) : null}
               <Pressable
                 style={styles.heartBtn}
                 hitSlop={8}
@@ -728,6 +760,16 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     fontVariant: ['tabular-nums'],
+  },
+  queueBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.45)',
   },
   heartBtn: {
     width: 40,

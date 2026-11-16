@@ -169,7 +169,7 @@ function onStatus(session: number, status: AVPlaybackStatus) {
       coverArt: item.coverArt,
       currentTime: (status.positionMillis ?? 0) / 1000,
       duration: (status.durationMillis || (item.duration ?? 0) * 1000) / 1000,
-      sourceType: 'direct',
+      sourceType: item.sourceType || 'direct',
       isPlaying: playing,
     });
     updateNowPlayingElapsed({

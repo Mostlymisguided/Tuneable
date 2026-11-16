@@ -1768,6 +1768,19 @@ router.get('/me/tune-library', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/me/home-queue
+// @desc    Unheard / heard / tipped music for the home listen queue
+router.get('/me/home-queue', authMiddleware, async (req, res) => {
+  try {
+    const { getHomeListenQueue } = require('../services/homeListenQueueService');
+    const result = await getHomeListenQueue(req.user._id);
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching home listen queue:', error);
+    res.status(500).json({ error: 'Error fetching home listen queue', details: error.message });
+  }
+});
+
 // @route   POST /api/users/me/tip-raise/preview
 // @desc    Price bringing the caller's tips up to a target. Writes nothing.
 router.post('/me/tip-raise/preview', authMiddleware, async (req, res) => {
@@ -1941,7 +1954,7 @@ router.get('/me/queue', authMiddleware, async (req, res) => {
 // Add media to authenticated user's playback queue
 router.post('/me/queue', authMiddleware, async (req, res) => {
   try {
-    const { mediaId, sourceType = 'unknown', note = '' } = req.body || {};
+    const { mediaId, sourceType = 'unknown', note = '', position = 'end' } = req.body || {};
     const media = await resolveMediaByIdentifier(mediaId);
     if (!media) {
       return res.status(404).json({ error: 'Media not found' });
@@ -1954,6 +1967,7 @@ router.post('/me/queue', authMiddleware, async (req, res) => {
       user.playbackQueue = [];
     }
 
+    const placeAtStart = position === 'start';
     const existingIndex = user.playbackQueue.findIndex(
       (entry) => entry.mediaId?.toString() === media._id.toString()
     );
@@ -1962,18 +1976,29 @@ router.post('/me/queue', authMiddleware, async (req, res) => {
       user.playbackQueue.splice(existingIndex, 1);
     }
 
-    user.playbackQueue.push({
+    const entry = {
       mediaId: media._id,
       addedAt: new Date(),
       sourceType,
       note,
-    });
+    };
+    if (placeAtStart) {
+      user.playbackQueue.unshift(entry);
+    } else {
+      user.playbackQueue.push(entry);
+    }
 
     await user.save();
     const result = await buildPlaybackQueueResponse(user);
+    let message = 'Media added to queue';
+    if (existingIndex >= 0) {
+      message = placeAtStart ? 'Media moved to the front of your queue' : 'Media moved to end of queue';
+    } else if (placeAtStart) {
+      message = 'Media added to the front of your queue';
+    }
     res.status(existingIndex >= 0 ? 200 : 201).json({
       success: true,
-      message: existingIndex >= 0 ? 'Media moved to end of queue' : 'Media added to queue',
+      message,
       ...result,
     });
   } catch (error) {

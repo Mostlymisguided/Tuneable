@@ -6,6 +6,7 @@ import type {
   UserLibraryResponse,
   UserProfileResponse,
 } from '@/src/types/user';
+import type { HomeListenQueueResponse } from '@/src/types/homeQueue';
 
 export type BlockedUser = {
   id: string;
@@ -58,6 +59,32 @@ export const userAPI = {
 
   getTuneLibrary: async (): Promise<UserLibraryResponse> => {
     const response = await api.get<UserLibraryResponse>('/users/me/tune-library');
+    return response.data;
+  },
+
+  getHomeListenQueue: async (): Promise<HomeListenQueueResponse> => {
+    const response = await api.get<HomeListenQueueResponse>('/users/me/home-queue');
+    return response.data;
+  },
+
+  getPlaybackQueue: async () => {
+    const response = await api.get<{
+      queue: Array<{ mediaId: string; mediaUuid?: string }>;
+    }>('/users/me/queue');
+    return response.data;
+  },
+
+  addToPlaybackQueue: async (payload: {
+    mediaId: string;
+    sourceType?: 'library' | 'search' | 'profile' | 'party' | 'direct' | 'unknown';
+    position?: 'start' | 'end';
+  }) => {
+    const response = await api.post('/users/me/queue', payload);
+    return response.data;
+  },
+
+  removeFromPlaybackQueue: async (mediaId: string) => {
+    const response = await api.delete(`/users/me/queue/${encodeURIComponent(mediaId)}`);
     return response.data;
   },
 

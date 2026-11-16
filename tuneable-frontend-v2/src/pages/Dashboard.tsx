@@ -28,6 +28,8 @@ import CollectiveInvitations from '../components/CollectiveInvitations';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import MediaValidationModal from '../components/MediaValidationModal';
 import TuneLibraryTable, { type LibraryItem } from '../components/TuneLibraryTable';
+import HomeListenSection from '../components/HomeListenSection';
+import type { HomeListenQueueItem } from '../lib/api';
 import BringTipsUpControl from '../components/BringTipsUpControl';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
@@ -65,6 +67,7 @@ const Dashboard: React.FC = () => {
   const [isLoadingInvited, setIsLoadingInvited] = useState(false);
   const [tuneLibrary, setTuneLibrary] = useState<LibraryItem[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [queueRefresh, setQueueRefresh] = useState(0);
   const [sortField, setSortField] = useState<string>('lastBidAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showAllInvitedUsers, setShowAllInvitedUsers] = useState(false);
@@ -663,6 +666,62 @@ Join here: ${inviteLink}`.trim();
     setLibraryItemToTip(item);
   };
 
+  const handleOpenQueueTip = (item: HomeListenQueueItem) => {
+    handleOpenTipModal({
+      mediaId: item.mediaId,
+      mediaUuid: item.mediaUuid,
+      slug: item.slug,
+      title: item.title,
+      artist: item.artist,
+      coverArt: item.coverArt || undefined,
+      duration: item.duration || undefined,
+      sources: item.sources,
+      rightsStatus: item.rightsStatus,
+      rightsCleared: item.rightsCleared,
+      isPlayable: item.isPlayable,
+      hasHostedAudio: item.hasHostedAudio,
+      playabilityBlockReason: item.playabilityBlockReason,
+      globalMediaAggregate: 0,
+      globalMediaAggregateAvg: 0,
+      globalUserMediaAggregate: item.userBidTotal || 0,
+      bidCount: item.tipped ? 1 : 0,
+      tuneBytesEarned: 0,
+      lastBidAt: item.lastBidAt || new Date().toISOString(),
+    });
+  };
+
+  const handleQueueLibraryItem = async (item: LibraryItem) => {
+    const mediaId = item.mediaUuid || item.mediaId;
+    if (!mediaId) return;
+    try {
+      await userAPI.addToPlaybackQueue({
+        mediaId,
+        sourceType: 'library',
+        position: 'start',
+      });
+      toast.success(`Added "${item.title}" to Unheard`);
+      setQueueRefresh((current) => current + 1);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add to your queue');
+    }
+  };
+
+  const handleQueueSearchResult = async (media: SearchResult) => {
+    const mediaId = media._id || media.id;
+    if (!media.isLocal || !mediaId) return;
+    try {
+      await userAPI.addToPlaybackQueue({
+        mediaId,
+        sourceType: 'search',
+        position: 'start',
+      });
+      toast.success(`Added "${media.title}" to Unheard`);
+      setQueueRefresh((current) => current + 1);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add to your queue');
+    }
+  };
+
   const handlePlaceLibraryTip = async (tags: string[], amount: number) => {
     if (!libraryItemToTip || !user) return;
     if (isNaN(amount) || amount < minimumBid) {
@@ -682,6 +741,7 @@ Join here: ${inviteLink}`.trim();
       setLibraryItemToTip(null);
       const data = await userAPI.getTuneLibrary();
       setTuneLibrary(data.library || []);
+      setQueueRefresh((current) => current + 1);
     } catch (error: any) {
       console.error('Error placing bid:', error);
       toast.error(error.response?.data?.error || 'Failed to place tip');
@@ -827,6 +887,7 @@ Join here: ${inviteLink}`.trim();
       // Reload library to show new tune
       const data = await userAPI.getTuneLibrary();
       setTuneLibrary(data.library || []);
+      setQueueRefresh((current) => current + 1);
       
       setPendingAddTuneResult(null);
     } catch (error: any) {
@@ -910,6 +971,61 @@ Join here: ${inviteLink}`.trim();
       </div>
 
       <WelcomeCreditClaimCard />
+
+      <HomeListenSection
+        refreshKey={queueRefresh}
+        tippedCount={tuneLibrary.length}
+        tippedLoading={isLoadingLibrary}
+        onTip={handleOpenQueueTip}
+        tippedActions={
+          <>
+            {tuneLibrary.length > 0 && (
+              <BringTipsUpControl
+                defaultTipPounds={user?.preferences?.defaultTip || 1.11}
+                onCompleted={async (balanceAfterPence) => {
+                  if (typeof balanceAfterPence === 'number') updateBalance(balanceAfterPence);
+                  const data = await userAPI.getTuneLibrary();
+                  setTuneLibrary(data.library || []);
+                  setQueueRefresh((current) => current + 1);
+                }}
+              />
+            )}
+            {user && (user._id || user.uuid) && (
+              <Link
+                to={getUserProfileUrl(user, 'view=tip-history')}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
+              >
+                <History className="h-4 w-4" />
+                <span className="hidden md:block">View Tip History</span>
+                <ArrowRight className="hidden md:block h-4 w-4" />
+              </Link>
+            )}
+          </>
+        }
+        tipped={
+          tuneLibrary.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
+              <p>You haven't tipped on any media yet.</p>
+              <p className="text-sm mt-2">Start tipping on tunes to build your library!</p>
+            </div>
+          ) : (
+            <TuneLibraryTable
+              items={getSortedLibrary()}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
+              onPlay={handlePlay}
+              onTip={handleOpenTipModal}
+              onQueue={handleQueueLibraryItem}
+              showTipButton
+              showQueueButton
+              artistColumnLabel="Artist / Show / Author"
+              initialVisibleCount={5}
+            />
+          )
+        }
+      />
 
         {/* Creator Dashboard */}
         {showCreatorDashboard(user) && (
@@ -2645,6 +2761,18 @@ Join here: ${inviteLink}`.trim();
                         <Plus className="h-3 w-3" />
                       </button>
                     </div>
+                    {result.isLocal && mediaId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleQueueSearchResult(result);
+                        }}
+                        className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs md:text-sm whitespace-nowrap"
+                      >
+                        Queue
+                      </button>
+                    )}
                     <button
                       disabled={isAddingTune}
                       onClick={(e) => {
@@ -2967,64 +3095,7 @@ Join here: ${inviteLink}`.trim();
       </div>
       )}
 
-      {/* Tune Library Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
-        <div className="card flex items-center justify-center md:justify-between mb-4">
-          <div className="flex items-center">
-            <Music className="h-6 w-6 text-purple-400 mr-2" />
-            <h2 className="text-2xl font-semibold text-white">Tune Library</h2>
-            <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
-              {tuneLibrary.length}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mx-4 md:mx-0">
-            {tuneLibrary.length > 0 && (
-              <BringTipsUpControl
-                defaultTipPounds={user?.preferences?.defaultTip || 1.11}
-                onCompleted={async (balanceAfterPence) => {
-                  if (typeof balanceAfterPence === 'number') updateBalance(balanceAfterPence);
-                  const data = await userAPI.getTuneLibrary();
-                  setTuneLibrary(data.library || []);
-                }}
-              />
-            )}
-            {user && (user._id || user.uuid) && (
-              <Link
-                to={getUserProfileUrl(user, 'view=tip-history')}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white rounded-lg transition-colors"
-              >
-                <History className="h-4 w-4" />
-                <span className="hidden md:block">View Tip History</span>
-                <ArrowRight className="hidden md:block h-4 w-4" />
-              </Link>
-            )}
-          </div>
-        </div>
-        
-        {isLoadingLibrary ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-          </div>
-        ) : tuneLibrary.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            <Music className="h-12 w-12 mx-auto mb-4 text-gray-500" />
-            <p>You haven't tipped on any media yet.</p>
-            <p className="text-sm mt-2">Start tipping on tunes to build your library!</p>
-          </div>
-        ) : (
-          <TuneLibraryTable
-            items={getSortedLibrary()}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onPlay={handlePlay}
-            onTip={handleOpenTipModal}
-            showTipButton
-            artistColumnLabel="Artist / Show / Author"
-            initialVisibleCount={5}
-          />
-        )}
-
       {/* Create Label Modal */}
       <LabelCreateModal
         isOpen={isLabelModalOpen}

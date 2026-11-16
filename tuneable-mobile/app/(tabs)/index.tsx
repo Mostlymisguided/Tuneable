@@ -18,9 +18,10 @@ import { DashboardPrompts } from '@/src/components/DashboardPrompts';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LibraryImportCards } from '@/src/components/LibraryImportCards';
-import { UserLibrarySection } from '@/src/components/UserLibrarySection';
+import { HomeListenQueue } from '@/src/components/HomeListenQueue';
 import { partyAPI } from '@/src/api/party';
 import { userAPI } from '@/src/api/user';
+import { showToast } from '@/src/stores/toastStore';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
@@ -89,6 +90,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [libraryLoading, setLibraryLoading] = useState(true);
+  const [queueRevision, setQueueRevision] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -196,6 +198,21 @@ export default function HomeScreen() {
 
   const onPlayRisingItem = (_item: CoverRailItem, index: number) => {
     void setQueueAndPlay(rising, index);
+  };
+
+  const onQueueRisingItem = async (item: CoverRailItem) => {
+    if (!item.key) return;
+    try {
+      await userAPI.addToPlaybackQueue({
+        mediaId: item.key,
+        sourceType: 'direct',
+        position: 'start',
+      });
+      showToast(`Added ${item.title} to Unheard`);
+      setQueueRevision((current) => current + 1);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not add that tune');
+    }
   };
 
   const openSearch = () => {
@@ -446,25 +463,12 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.librarySection}>
-          <UserLibrarySection
-            items={library}
+          <HomeListenQueue
+            revision={queueRevision}
+            library={library}
+            libraryLoading={libraryLoading}
             user={user}
-            referenceTuneBytes
-            loading={libraryLoading}
             onBalanceUpdate={updateBalance}
-            title="Recently tipped"
-            actionLabel="Library"
-            onAction={() => router.push('/(tabs)/profile')}
-            showTime={false}
-            showBpm={false}
-            sortBy="recent"
-            previewLimit={10}
-            compactHeader
-            searchHint="Filters your recently tipped tunes."
-            emptyTitle="No tipped tunes yet"
-            emptyBody="Search a track and send a tip — it lands in your library and on the charts."
-            emptyActionLabel="Add your first tip"
-            onEmptyAction={() => router.push('/music-search')}
           />
         </View>
 
@@ -483,6 +487,9 @@ export default function HomeScreen() {
             if (item.key) router.push(`/tune/${item.key}`);
           }}
           onPlay={onPlayRisingItem}
+          onQueue={(item) => {
+            void onQueueRisingItem(item);
+          }}
         />
 
         <View style={styles.padded}>

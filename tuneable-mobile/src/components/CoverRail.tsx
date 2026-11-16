@@ -23,6 +23,7 @@ type Props = {
   onEmptyAction?: () => void;
   onOpen: (item: CoverRailItem, index: number) => void;
   onPlay: (item: CoverRailItem, index: number) => void;
+  onQueue?: (item: CoverRailItem, index: number) => void;
 };
 
 export function CoverRail({
@@ -36,6 +37,7 @@ export function CoverRail({
   onEmptyAction,
   onOpen,
   onPlay,
+  onQueue,
 }: Props) {
   return (
     <View style={styles.section}>
@@ -96,6 +98,15 @@ export function CoverRail({
                   </Text>
                 ) : null}
               </Pressable>
+              {onQueue ? (
+                <Pressable
+                  onPress={() => onQueue(item, index)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${item.title} to your queue`}>
+                  <Text style={styles.queueText}>Queue</Text>
+                </Pressable>
+              ) : null}
             </View>
           ))}
         </ScrollView>
@@ -189,6 +200,12 @@ const styles = StyleSheet.create({
     color: colors.accentLight,
     fontSize: 11,
     fontWeight: '600',
+  },
+  queueText: {
+    marginTop: 4,
+    color: colors.accentLight,
+    fontSize: 12,
+    fontWeight: '700',
   },
   empty: {
     marginHorizontal: 16,

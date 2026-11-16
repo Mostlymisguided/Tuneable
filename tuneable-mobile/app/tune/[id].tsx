@@ -29,6 +29,7 @@ import { EditMediaButton } from '@/src/components/EditMediaButton';
 import { LicenceMarks } from '@/src/components/LicencePicker';
 import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
+import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { formatDuration, formatPoundsFromPence, formatBpmLabel, formatTuneBytesDecimal, roundBpm } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
@@ -48,6 +49,7 @@ import {
   resolveTipStatInputs,
 } from '@/src/lib/tipStats';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
+import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import {
   DEFAULT_COVER_ART,
@@ -98,10 +100,58 @@ export default function TuneProfileScreen() {
   const [tagClaimOpen, setTagClaimOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [queueBusy, setQueueBusy] = useState(false);
   const [rankedTags, setRankedTags] = useState<
     Array<{ tag: string; aggregate?: number; tipperCount?: number }>
   >([]);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
+
+  useEffect(() => {
+    const id = media ? mediaId(media) : '';
+    if (!id) {
+      setQueued(false);
+      return;
+    }
+    let cancelled = false;
+    userAPI.getPlaybackQueue()
+      .then((data) => {
+        if (cancelled) return;
+        setQueued((data.queue || []).some((item) => item.mediaId === id || item.mediaUuid === id));
+      })
+      .catch(() => {
+        if (!cancelled) setQueued(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [media]);
+
+  const toggleQueue = async () => {
+    if (!media) return;
+    const id = media.uuid || mediaId(media);
+    if (!id) return;
+    setQueueBusy(true);
+    try {
+      if (queued) {
+        await userAPI.removeFromPlaybackQueue(id);
+        setQueued(false);
+        showToast(`Removed ${media.title || 'tune'} from your queue`);
+      } else {
+        await userAPI.addToPlaybackQueue({
+          mediaId: id,
+          sourceType: 'profile',
+          position: 'start',
+        });
+        setQueued(true);
+        showToast(`Added ${media.title || 'tune'} to your queue`);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not update your queue');
+    } finally {
+      setQueueBusy(false);
+    }
+  };
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -587,6 +637,15 @@ export default function TuneProfileScreen() {
                   <Text style={styles.playBtnText}>Play</Text>
                 </Pressable>
               ) : null}
+              <Pressable
+                style={[styles.shareBtn, queued && styles.queueBtnOn]}
+                onPress={() => void toggleQueue()}
+                disabled={queueBusy}
+                accessibilityRole="button"
+                accessibilityLabel={queued ? 'Remove from your queue' : 'Add to your queue'}>
+                <Ionicons name={queued ? 'checkmark' : 'add'} size={16} color={colors.text} />
+                <Text style={styles.shareBtnText}>{queued ? 'Queued' : 'Queue'}</Text>
+              </Pressable>
               {showClaimCta ? (
                 <Pressable
                   style={styles.claimBtn}
@@ -1138,6 +1197,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 14,
+  },
+  queueBtnOn: {
+    borderColor: colors.accentLight,
+    backgroundColor: 'rgba(88, 28, 135, 0.55)',
   },
   shareBtn: {
     flexDirection: 'row',
