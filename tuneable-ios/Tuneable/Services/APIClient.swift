@@ -43,12 +43,46 @@ final class APIClient {
         try await requestData(path: path, method: "POST", body: body, queryItems: nil, authenticated: authenticated)
     }
 
+    private func wipeSession() {
+        _ = KeychainHelper.delete(forKey: KeychainHelper.tokenKey)
+        _ = KeychainHelper.delete(forKey: KeychainHelper.refreshTokenKey)
+        _ = KeychainHelper.delete(forKey: KeychainHelper.userKey)
+    }
+
+    /// Returns a new access token, or throws unauthorized when the refresh token is rejected.
+    private func renewedAccessToken() async throws -> String {
+        guard let refresh = KeychainHelper.string(forKey: KeychainHelper.refreshTokenKey),
+              let url = url(for: "/auth/refresh") else {
+            wipeSession()
+            throw APIError.unauthorized
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["refreshToken": refresh])
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        if http.statusCode == 401 || http.statusCode == 403 {
+            wipeSession()
+            throw APIError.unauthorized
+        }
+        if http.statusCode < 200 || http.statusCode >= 300 {
+            throw APIError.http(statusCode: http.statusCode, message: "Could not refresh session")
+        }
+        struct Response: Decodable { let token: String; let refreshToken: String }
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        _ = KeychainHelper.save(decoded.token, forKey: KeychainHelper.tokenKey)
+        _ = KeychainHelper.save(decoded.refreshToken, forKey: KeychainHelper.refreshTokenKey)
+        return decoded.token
+    }
+
     private func requestData(
         path: String,
         method: String,
         body: Encodable?,
         queryItems: [URLQueryItem]?,
-        authenticated: Bool
+        authenticated: Bool,
+        allowRefresh: Bool = true
     ) async throws -> Data {
         guard let url = url(for: path, queryItems: queryItems) else {
             throw APIError.invalidURL(path)
@@ -62,8 +96,17 @@ final class APIClient {
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         if http.statusCode == 401, authenticated {
-            _ = KeychainHelper.delete(forKey: KeychainHelper.tokenKey)
-            _ = KeychainHelper.delete(forKey: KeychainHelper.userKey)
+            if allowRefresh {
+                do {
+                    _ = try await renewedAccessToken()
+                    return try await requestData(path: path, method: method, body: body, queryItems: queryItems, authenticated: authenticated, allowRefresh: false)
+                } catch let error as APIError where error.isUnauthorized {
+                    throw error
+                } catch {
+                    throw APIError.http(statusCode: 401, message: "Could not refresh session")
+                }
+            }
+            wipeSession()
             throw APIError.unauthorized
         }
         if http.statusCode < 200 || http.statusCode >= 300 {
@@ -86,7 +129,8 @@ final class APIClient {
         method: String,
         body: Encodable?,
         queryItems: [URLQueryItem]?,
-        authenticated: Bool
+        authenticated: Bool,
+        allowRefresh: Bool = true
     ) async throws -> T {
         guard let url = url(for: path, queryItems: queryItems) else {
             throw APIError.invalidURL(path)
@@ -104,8 +148,17 @@ final class APIClient {
         }
 
         if http.statusCode == 401, authenticated {
-            _ = KeychainHelper.delete(forKey: KeychainHelper.tokenKey)
-            _ = KeychainHelper.delete(forKey: KeychainHelper.userKey)
+            if allowRefresh {
+                do {
+                    _ = try await renewedAccessToken()
+                    return try await request(path: path, method: method, body: body, queryItems: queryItems, authenticated: authenticated, allowRefresh: false)
+                } catch let error as APIError where error.isUnauthorized {
+                    throw error
+                } catch {
+                    throw APIError.http(statusCode: 401, message: "Could not refresh session")
+                }
+            }
+            wipeSession()
             throw APIError.unauthorized
         }
 

@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("../models/User"); // Import User model
 const { isTokenRevoked } = require("../utils/sessionRevocation");
+const { isAccessSessionActive } = require("../utils/authSessions");
 const { getJwtSecret } = require("../config/jwtSecret");
 
 module.exports = async (req, res, next) => {
@@ -38,7 +39,7 @@ module.exports = async (req, res, next) => {
             return res.status(401).json({ error: "User not found" });
         }
 
-        if (isTokenRevoked(decoded, user)) {
+        if (isTokenRevoked(decoded, user) || !(await isAccessSessionActive(decoded.sid))) {
             return res.status(401).json({ error: "Session expired. Please sign in again.", code: "SESSION_REVOKED" });
         }
 

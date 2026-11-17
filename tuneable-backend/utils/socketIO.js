@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const { resolvePartyIdValue } = require('./idResolver');
 const { isTokenRevoked } = require('./sessionRevocation');
+const { isAccessSessionActive } = require('./authSessions');
 
 let io = null;
 
@@ -42,6 +43,7 @@ const verifyTokenAndGetUser = async (token) => {
     }
 
     if (isTokenRevoked(decoded, user)) return null;
+    if (!(await isAccessSessionActive(decoded.sid))) return null;
     return user;
   } catch (error) {
     console.error('Token verification error:', error.message);

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import { authAPI, setAuthTokenGetter } from '../lib/api';
+import { authAPI, rememberAccessToken, refreshSession, setAuthTokenGetter } from '../lib/api';
 import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
@@ -137,9 +137,9 @@ interface AuthContextType {
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateBalance: (newBalance: number) => void;
-  handleOAuthCallback: (token: string) => Promise<User>;
+  handleOAuthCallback: (token: string, refreshToken?: string | null) => Promise<User>;
   /** Swap in a new JWT for this session, e.g. after a password change. */
-  replaceToken: (token: string) => void;
+  replaceToken: (token: string, refreshToken?: string | null) => void;
   isLoading: boolean;
 }
 
@@ -174,9 +174,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Sync auth state when another tab clears token (e.g. after 401)
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'token' && e.newValue === null) {
-        setToken(null);
-        setUser(null);
+      if (e.key === 'token') {
+        if (e.newValue) {
+          rememberAccessToken(e.newValue);
+          setToken(e.newValue);
+        } else {
+          rememberAccessToken(null);
+          setToken(null);
+          setUser(null);
+        }
       }
     };
     window.addEventListener('storage', onStorage);
@@ -186,25 +192,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const storedToken = localStorage.getItem('token');
+        let storedToken = localStorage.getItem('token');
         const storedUser = localStorage.getItem('user');
+        if (!storedToken && localStorage.getItem('refreshToken')) {
+          const renewed = await refreshSession().catch(() => false);
+          if (renewed) storedToken = localStorage.getItem('token');
+        }
 
-        if (storedToken && storedUser) {
+        if (storedToken) {
           try {
+            rememberAccessToken(storedToken);
+            tokenRef.current = storedToken;
             setToken(storedToken);
-            setUser(JSON.parse(storedUser));
+            if (storedUser) setUser(JSON.parse(storedUser));
 
-            // Verify token is still valid by fetching profile
             const response = await authAPI.getProfile();
             setUser(response.user);
             localStorage.setItem('user', JSON.stringify(response.user));
           } catch (error) {
-            // Token is invalid, clear storage
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setToken(null);
-            setUser(null);
-            clearPlayers();
+            const status = (error as { response?: { status?: number } })?.response?.status;
+            if (status === 401 || status === 403) {
+              rememberAccessToken(null);
+              localStorage.removeItem('refreshToken');
+              localStorage.removeItem('user');
+              tokenRef.current = null;
+              setToken(null);
+              setUser(null);
+              clearPlayers();
+            }
           }
         } else {
           clearPlayers();
@@ -233,12 +248,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (identifier: string, password: string): Promise<User> => {
     try {
       const response = await authAPI.login(identifier, password);
-      const { token: newToken, user: newUser } = response;
+      const { token: newToken, refreshToken, user: newUser } = response;
       
+      rememberAccessToken(newToken);
+      tokenRef.current = newToken;
       setToken(newToken);
       setUser(newUser);
-      localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       return newUser;
     } catch (error) {
       throw error;
@@ -248,12 +265,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (userData: RegisterData): Promise<User> => {
     try {
       const response = await authAPI.register(userData);
-      const { token: newToken, user: newUser } = response;
+      const { token: newToken, refreshToken, user: newUser } = response;
       
+      rememberAccessToken(newToken);
+      tokenRef.current = newToken;
       setToken(newToken);
       setUser(newUser);
-      localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       return newUser;
     } catch (error) {
       throw error;
@@ -261,29 +280,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    void authAPI.logoutDevice();
+    rememberAccessToken(null);
+    tokenRef.current = null;
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     clearPlayers();
   };
 
-  const handleOAuthCallback = useCallback(async (token: string): Promise<User> => {
+  const handleOAuthCallback = useCallback(async (token: string, refreshToken?: string | null): Promise<User> => {
     try {
-      // Store token first
+      rememberAccessToken(token);
+      tokenRef.current = token;
       setToken(token);
-      localStorage.setItem('token', token);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       
-      // Fetch user data using the token
       const response = await authAPI.getProfile();
       setUser(response.user);
       localStorage.setItem('user', JSON.stringify(response.user));
       return response.user;
     } catch (error) {
-      // If fetching user fails, clear the token
       console.error('Failed to fetch user after OAuth:', error);
+      rememberAccessToken(null);
+      tokenRef.current = null;
       setToken(null);
-      localStorage.removeItem('token');
       throw error;
     }
   }, []);
@@ -298,9 +320,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const replaceToken = useCallback((newToken: string) => {
+  const replaceToken = useCallback((newToken: string, refreshToken?: string | null) => {
+    rememberAccessToken(newToken);
+    tokenRef.current = newToken;
     setToken(newToken);
-    localStorage.setItem('token', newToken);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
   }, []);
 
   const updateBalance = (newBalance: number) => {

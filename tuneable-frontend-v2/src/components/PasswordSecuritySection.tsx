@@ -54,7 +54,7 @@ const PasswordSecuritySection: React.FC = () => {
         authAPI.changePassword(currentPassword, newPassword, acceptPasswordWarnings)
       );
       if (!result) return;
-      replaceToken(result.token);
+      replaceToken(result.token, result.refreshToken);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');

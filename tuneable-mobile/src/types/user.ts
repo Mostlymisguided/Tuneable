@@ -258,5 +258,6 @@ export interface ChampionTitlesResponse {
 
 export interface LoginResponse {
   token: string;
+  refreshToken?: string;
   user: User;
 }

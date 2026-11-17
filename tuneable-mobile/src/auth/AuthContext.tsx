@@ -10,10 +10,17 @@ import React, {
 } from 'react';
 import { authAPI } from '@/src/api/auth';
 import { userAPI } from '@/src/api/user';
-import { setAuthTokenGetter, setUnauthorizedHandler } from '@/src/api/client';
+import {
+  refreshAccessToken,
+  revokeStoredSession,
+  setAuthTokenGetter,
+  setTokenRefreshedHandler,
+  setUnauthorizedHandler,
+} from '@/src/api/client';
 import type { User } from '@/src/types/user';
 import {
   clearSession,
+  loadRefreshToken,
   loadToken,
   loadUserJson,
   saveSession,
@@ -42,13 +49,18 @@ interface AuthContextValue {
   refreshUser: () => Promise<void>;
   applyUser: (next: User) => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
-  handleOAuthCallback: (token: string) => Promise<User>;
-  applySession: (token: string, user: User) => Promise<User>;
+  handleOAuthCallback: (token: string, refreshToken?: string | null) => Promise<User>;
+  applySession: (token: string, user: User, refreshToken?: string | null) => Promise<User>;
   /** Swap in a new JWT for this session, e.g. after a password change. */
-  replaceToken: (token: string) => Promise<void>;
+  replaceToken: (token: string, refreshToken?: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function isUnauthorized(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  return status === 401 || status === 403;
+}
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
@@ -63,10 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const tokenRef = useRef<string | null>(null);
-  tokenRef.current = token;
 
   const logout = useCallback(async () => {
-    const pushUnregister = unregisterPushOnSignOut(tokenRef.current);
+    const accessToken = tokenRef.current;
+    const refreshToken = await loadRefreshToken().catch(() => null);
+    const pushUnregister = unregisterPushOnSignOut(accessToken);
+    const revoke = revokeStoredSession(accessToken, refreshToken).catch(() => undefined);
+    tokenRef.current = null;
     setToken(null);
     setUser(null);
     useBlockedUsersStore.getState().clear();
@@ -78,17 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void usePodcastPlayerStore.getState().clear().catch(() => undefined);
     }, 800);
     await Promise.race([
-      Promise.all([clearSession().catch(() => undefined), pushUnregister]),
+      Promise.all([clearSession().catch(() => undefined), pushUnregister, revoke]),
       new Promise<void>((resolve) => {
         setTimeout(resolve, 2000);
       }),
     ]);
   }, []);
 
-  const applySession = useCallback(async (newToken: string, newUser: User) => {
+  const applySession = useCallback(async (newToken: string, newUser: User, refreshToken?: string | null) => {
+    tokenRef.current = newToken;
     setToken(newToken);
     setUser(newUser);
-    await saveSession(newToken, JSON.stringify(newUser));
+    await saveSession(newToken, JSON.stringify(newUser), refreshToken);
     void syncPushTokenIfGranted(newUser.preferences?.notifications?.push !== false);
     void useBlockedUsersStore.getState().load();
     return newUser;
@@ -101,49 +117,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setAuthTokenGetter(() => tokenRef.current);
+    setTokenRefreshedHandler((next) => {
+      tokenRef.current = next;
+      setToken(next);
+    });
     setUnauthorizedHandler(() => {
       void logout();
     });
     return () => {
       setAuthTokenGetter(null);
+      setTokenRefreshedHandler(null);
       setUnauthorizedHandler(null);
     };
   }, [logout]);
 
   useEffect(() => {
+    let cancelled = false;
     const init = async () => {
       try {
-        const storedToken = await loadToken();
+        let storedToken = await loadToken();
+        if (!storedToken) {
+          storedToken = await refreshAccessToken().catch(() => null);
+        }
+        if (!storedToken || cancelled) return;
+        // The request interceptor reads this ref, not React state. Setting
+        // state here does not update the ref before getProfile runs.
+        tokenRef.current = storedToken;
+        if (cancelled) return;
+        setToken(storedToken);
+
+        let cached: User | null = null;
         const storedUser = await loadUserJson();
-        if (storedToken && storedUser) {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser) as User);
+        if (storedUser) {
           try {
-            const { user: fresh } = await authAPI.getProfile();
-            setUser(fresh);
-            await saveSession(storedToken, JSON.stringify(fresh));
-            void syncPushTokenIfGranted(fresh.preferences?.notifications?.push !== false);
-            void useBlockedUsersStore.getState().load();
+            cached = JSON.parse(storedUser) as User;
+            if (!cancelled) setUser(cached);
           } catch {
-            await clearSession();
-            setToken(null);
-            setUser(null);
-            useBlockedUsersStore.getState().clear();
+            cached = null;
           }
         }
+
+        try {
+          tokenRef.current = storedToken;
+          const { user: fresh } = await authAPI.getProfile();
+          if (cancelled) return;
+          setUser(fresh);
+          await saveSession(storedToken, JSON.stringify(fresh)).catch(() => undefined);
+          void syncPushTokenIfGranted(fresh.preferences?.notifications?.push !== false);
+          void useBlockedUsersStore.getState().load();
+        } catch (error) {
+          if (!isUnauthorized(error)) {
+            if (cached) {
+              void syncPushTokenIfGranted(cached.preferences?.notifications?.push !== false);
+              void useBlockedUsersStore.getState().load();
+            } else {
+              tokenRef.current = null;
+              if (!cancelled) setToken(null);
+            }
+            return;
+          }
+          tokenRef.current = null;
+          if (!cancelled) {
+            setToken(null);
+            setUser(null);
+          }
+          useBlockedUsersStore.getState().clear();
+          await clearSession().catch(() => undefined);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
     void init();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(async (identifier: string, password: string) => {
-    const { token: newToken, user: newUser } = await authAPI.login(
+    const { token: newToken, refreshToken, user: newUser } = await authAPI.login(
       identifier.trim(),
       password
     );
-    return applySession(newToken, newUser);
+    return applySession(newToken, newUser, refreshToken);
   }, [applySession]);
 
   const register = useCallback(
@@ -155,14 +211,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       acceptPasswordWarnings?: boolean;
     }) => {
       const code = input.parentInviteCode?.trim().toUpperCase();
-      const { token: newToken, user: newUser } = await authAPI.register({
+      const { token: newToken, refreshToken, user: newUser } = await authAPI.register({
         username: input.username.trim(),
         email: input.email.trim(),
         password: input.password,
         ...(code ? { parentInviteCode: code } : {}),
         acceptPasswordWarnings: input.acceptPasswordWarnings,
       });
-      return applySession(newToken, newUser);
+      return applySession(newToken, newUser, refreshToken);
     },
     [applySession]
   );
@@ -174,12 +230,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const replaceToken = useCallback(async (newToken: string) => {
+  const replaceToken = useCallback(async (newToken: string, refreshToken?: string | null) => {
     tokenRef.current = newToken;
     setToken(newToken);
     const storedUser = await loadUserJson();
     if (storedUser) {
-      await saveSession(newToken, storedUser);
+      await saveSession(newToken, storedUser, refreshToken);
     }
   }, []);
 
@@ -199,19 +255,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const handleOAuthCallback = useCallback(async (oauthToken: string) => {
+  const handleOAuthCallback = useCallback(async (oauthToken: string, refreshToken?: string | null) => {
+    tokenRef.current = oauthToken;
     setToken(oauthToken);
     try {
-      // Temporarily set getter so getProfile uses the new token
-      tokenRef.current = oauthToken;
       const { user: fresh } = await authAPI.getProfile();
       setUser(fresh);
-      await saveSession(oauthToken, JSON.stringify(fresh));
+      await saveSession(oauthToken, JSON.stringify(fresh), refreshToken);
       void syncPushTokenIfGranted(fresh.preferences?.notifications?.push !== false);
       return fresh;
     } catch (error) {
-      setToken(null);
       tokenRef.current = null;
+      setToken(null);
       await clearSession();
       throw error;
     }

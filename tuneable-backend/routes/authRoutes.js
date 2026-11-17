@@ -3,12 +3,24 @@ const passport = require('../config/passport');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
-const authMiddleware = require('../middleware/authMiddleware');
 const { isTokenRevoked } = require('../utils/sessionRevocation');
 const { resolveOAuthCallbackURL } = require('../utils/oauthCallbackUrl');
+const {
+  issueAuthSession,
+  rotateAuthSession,
+  redeemExchangeCode,
+  revokeAuthSessionByRefreshToken,
+  revokeAuthSessionById,
+} = require('../utils/authSessions');
 
 const router = express.Router();
 const SECRET_KEY = require('../config/jwtSecret').getJwtSecret();
+
+/** Access token plus a one-time code the client exchanges for the refresh token. */
+async function loginRedirectQuery(user, extra = {}) {
+  const issued = await issueAuthSession(user, { exchange: true });
+  return { token: issued.token, code: issued.exchangeCode, ...extra };
+}
 
 /** Append query params to a URL that may already include a query string. */
 function appendQueryParams(url, params) {
@@ -344,22 +356,11 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           console.log('✅ Account linking successful for user:', user.uuid);
         }
 
-        const token = jwt.sign(
-          {
-            userId: user.uuid,
-            email: user.email,
-            username: user.username
-          },
-          SECRET_KEY,
-          { expiresIn: '24h' }
-        );
+        const query = await loginRedirectQuery(user, { oauth_success: 'true' });
 
         clearFacebookSession();
 
-        return finishRedirect(appendQueryParams(baseRedirect, {
-          token,
-          oauth_success: 'true'
-        }));
+        return finishRedirect(appendQueryParams(baseRedirect, query));
       } catch (error) {
         console.error('Facebook callback error:', error);
         clearFacebookSession();
@@ -582,16 +583,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           console.log('✅ Account linking successful for user:', req.user.uuid);
         }
         
-        // Generate JWT token for the authenticated user using UUID
-        const token = jwt.sign(
-          { 
-            userId: req.user.uuid,  // Use UUID instead of _id
-            email: req.user.email, 
-            username: req.user.username 
-          }, 
-          SECRET_KEY, 
-          { expiresIn: '24h' }
-        );
+        const query = await loginRedirectQuery(req.user, { oauth_success: 'true' });
 
         // Check if we have a custom redirect URL (for account linking)
         if (req.session?.oauthRedirect) {
@@ -600,11 +592,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           delete req.session.linkAccount;
           delete req.session.linkingUserId;
           delete req.session.linkingUserUuid;
-          // Redirect to custom URL with token
-          res.redirect(`${redirectUrl}&token=${token}`);
+          res.redirect(appendQueryParams(redirectUrl, query));
         } else {
-          // Default redirect to auth callback
-          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+          res.redirect(appendQueryParams(`${frontendUrl}/auth/callback`, query));
         }
         
       } catch (error) {
@@ -798,15 +788,7 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           console.log('✅ Account linking successful for user:', req.user.uuid);
         }
         
-        const token = jwt.sign(
-          { 
-            userId: req.user.uuid,
-            email: req.user.email, 
-            username: req.user.username 
-          }, 
-          SECRET_KEY, 
-          { expiresIn: '24h' }
-        );
+        const query = await loginRedirectQuery(req.user);
 
         if (req.session?.oauthRedirect) {
           // Express already decodes query params once — do not decodeURIComponent again
@@ -816,11 +798,12 @@ if (process.env.SOUNDCLOUD_CLIENT_ID && process.env.SOUNDCLOUD_CLIENT_SECRET) {
           delete req.session.linkAccount;
           delete req.session.linkingUserId;
           delete req.session.linkingUserUuid;
-          const sep = redirectUrl.includes('?') ? '&' : '?';
-          res.redirect(`${redirectUrl}${sep}token=${encodeURIComponent(token)}`);
+          res.redirect(appendQueryParams(redirectUrl, query));
         } else {
-          console.log('✅ Redirecting to:', `${frontendUrl}/auth/callback?token=${token.substring(0, 20)}...`);
-          res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&oauth_success=true`);
+          res.redirect(appendQueryParams(`${frontendUrl}/auth/callback`, {
+            ...query,
+            oauth_success: 'true',
+          }));
         }
         
       } catch (error) {
@@ -1034,16 +1017,7 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           console.log('✅ Account linking successful for user:', req.user.uuid);
         }
         
-        // Generate JWT token for the authenticated user using UUID
-        const token = jwt.sign(
-          { 
-            userId: req.user.uuid,  // Use UUID instead of _id
-            email: req.user.email, 
-            username: req.user.username 
-          }, 
-          SECRET_KEY, 
-          { expiresIn: '24h' }
-        );
+        const query = await loginRedirectQuery(req.user, { oauth_success: 'true' });
 
         // Check if we have a custom redirect URL (for account linking)
         if (req.session?.oauthRedirect) {
@@ -1052,11 +1026,9 @@ if (process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET) {
           delete req.session.linkAccount;
           delete req.session.linkingUserId;
           delete req.session.linkingUserUuid;
-          // Redirect to custom URL with token
-          res.redirect(`${redirectUrl}&token=${token}`);
+          res.redirect(appendQueryParams(redirectUrl, query));
         } else {
-          // Default redirect to auth callback
-          res.redirect(`${frontendUrl}/auth/callback?token=${token}&oauth_success=true`);
+          res.redirect(appendQueryParams(`${frontendUrl}/auth/callback`, query));
         }
         
       } catch (error) {
@@ -1171,11 +1143,7 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
     async (req, res) => {
       try {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const token = jwt.sign(
-          { userId: req.user.uuid, email: req.user.email, username: req.user.username },
-          SECRET_KEY,
-          { expiresIn: '24h' }
-        );
+        const query = await loginRedirectQuery(req.user, { oauth_success: 'true' });
         const baseRedirect = req.session?.oauthRedirect || `${frontendUrl}/auth/callback`;
         if (req.session) {
           delete req.session.oauthRedirect;
@@ -1183,10 +1151,7 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
           delete req.session.linkingUserId;
           delete req.session.linkingUserUuid;
         }
-        res.redirect(appendQueryParams(baseRedirect, {
-          token,
-          oauth_success: 'true'
-        }));
+        res.redirect(appendQueryParams(baseRedirect, query));
       } catch (error) {
         console.error('Spotify callback error:', error);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -1202,28 +1167,64 @@ if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
   router.get('/spotify/callback', (req, res) => res.status(503).json({ error: 'Spotify OAuth not configured' }));
 }
 
-// Token refresh endpoint
-router.post('/refresh', authMiddleware, async (req, res) => {
+// Exchange a refresh token for a new short-lived access token.
+router.post('/refresh', async (req, res) => {
   try {
-    // User is already authenticated via authMiddleware
-    // Generate a new token with fresh expiry using UUID
-    const newToken = jwt.sign(
-      { 
-        userId: req.user.uuid,  // Use UUID instead of _id
-        email: req.user.email, 
-        username: req.user.username 
-      },
-      SECRET_KEY,
-      { expiresIn: '24h' }
-    );
-
-    res.json({ 
-      message: 'Token refreshed successfully',
-      token: newToken 
-    });
+    const refreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : '';
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is required' });
+    }
+    const result = await rotateAuthSession(refreshToken);
+    if (!result.ok) {
+      return res.status(401).json({
+        error: 'Session expired. Please sign in again.',
+        code: 'SESSION_REVOKED',
+      });
+    }
+    res.json({ token: result.token, refreshToken: result.refreshToken });
   } catch (error) {
     console.error('Token refresh error:', error);
     res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// Trade the one-time OAuth code for the device refresh token.
+router.post('/exchange', async (req, res) => {
+  try {
+    const code = typeof req.body?.code === 'string' ? req.body.code : '';
+    const result = await redeemExchangeCode(code);
+    if (!result.ok) {
+      return res.status(401).json({
+        error: 'Sign-in link expired. Please try again.',
+        code: 'SESSION_REVOKED',
+      });
+    }
+    res.json({ token: result.token, refreshToken: result.refreshToken });
+  } catch (error) {
+    console.error('OAuth exchange error:', error);
+    res.status(500).json({ error: 'Failed to finish sign-in' });
+  }
+});
+
+// Revoke this device. The access token may already be expired.
+router.post('/logout', async (req, res) => {
+  try {
+    const refreshToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : '';
+    if (refreshToken) await revokeAuthSessionByRefreshToken(refreshToken);
+    const header = req.headers.authorization || '';
+    const access = header.startsWith('Bearer ') ? header.slice(7) : '';
+    if (access) {
+      try {
+        const decoded = jwt.verify(access, SECRET_KEY, { ignoreExpiration: true });
+        if (decoded?.sid) await revokeAuthSessionById(decoded.sid);
+      } catch {
+        // An unreadable access token does not keep the refresh session alive.
+      }
+    }
+    res.json({ message: 'Signed out' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Failed to sign out' });
   }
 });
 
@@ -1289,12 +1290,13 @@ router.post('/apple', async (req, res) => {
       user.lastLoginAt = new Date();
       await user.save();
 
-      const token = jwt.sign(
-        { userId: user.uuid, email: user.email, username: user.username },
-        SECRET_KEY,
-        { expiresIn: '24h' }
-      );
-      return res.json({ message: 'Login successful!', token, user: withWelcomeCreditOffer(user) });
+      const issued = await issueAuthSession(user);
+      return res.json({
+        message: 'Login successful!',
+        token: issued.token,
+        refreshToken: issued.refreshToken,
+        user: withWelcomeCreditOffer(user),
+      });
     }
 
     // New user — invite optional (attribution when provided)
@@ -1384,15 +1386,12 @@ router.post('/apple', async (req, res) => {
       console.error('Failed to auto-join Apple user to Global Party:', globalPartyError);
     }
 
-    const token = jwt.sign(
-      { userId: user.uuid, email: user.email, username: user.username },
-      SECRET_KEY,
-      { expiresIn: '24h' }
-    );
+    const issued = await issueAuthSession(user);
 
     return res.status(201).json({
       message: 'User registered successfully',
-      token,
+      token: issued.token,
+      refreshToken: issued.refreshToken,
       user: withWelcomeCreditOffer(user),
     });
   } catch (error) {

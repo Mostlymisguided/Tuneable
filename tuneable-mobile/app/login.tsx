@@ -32,8 +32,8 @@ import { API_ORIGIN } from '@/src/api/client';
 import {
   buildOAuthStartUrl,
   extractOAuthError,
-  extractTokenFromUrl,
   getOAuthCallbackRedirect,
+  sessionFromOAuthRedirect,
 } from '@/src/lib/oauth';
 import { getPostAuthHref } from '@/src/lib/onboarding';
 import { colors } from '@/src/theme/colors';
@@ -106,12 +106,8 @@ export default function LoginScreen() {
           setError(oauthError.replace(/_/g, ' '));
           return;
         }
-        const token = extractTokenFromUrl(result.url);
-        if (!token) {
-          setError(`${provider} sign-in did not return a token.`);
-          return;
-        }
-        const nextUser = await handleOAuthCallback(token);
+        const session = await sessionFromOAuthRedirect(result.url);
+        const nextUser = await handleOAuthCallback(session.token, session.refreshToken);
         router.replace(getPostAuthHref(nextUser));
       } else if (result.type === 'cancel') {
         setError(null);
@@ -131,8 +127,8 @@ export default function LoginScreen() {
     setError(null);
     setOauthLoading('apple');
     try {
-      const { token, user: appleUser } = await signInWithApple();
-      const nextUser = await applySession(token, appleUser);
+      const { token, refreshToken, user: appleUser } = await signInWithApple();
+      const nextUser = await applySession(token, appleUser, refreshToken);
       router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       if (

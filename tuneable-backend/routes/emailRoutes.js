@@ -14,6 +14,7 @@ const {
 
 const rateLimit = require('../middleware/rateLimit');
 const { checkNewPassword } = require('../utils/passwordPolicy');
+const { revokeAllAuthSessions } = require('../utils/authSessions');
 
 const router = express.Router();
 
@@ -181,6 +182,7 @@ router.post('/password-reset/confirm', [
     }
 
     await user.save();
+    await revokeAllAuthSessions(user._id);
 
     sendPasswordChangedNotification(user).catch(() => {});
 

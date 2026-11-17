@@ -34,7 +34,7 @@ import {
   Ban,
   Sparkles,
 } from 'lucide-react';
-import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI } from '../lib/api';
+import { userAPI, authAPI, creatorAPI, mediaAPI, searchAPI, partyAPI, exchangeOAuthCode } from '../lib/api';
 
 /** SoundCloud brand mark (waveform + cloud) — lucide has no official logo */
 const SoundCloudIcon = ({ className }: { className?: string }) => (
@@ -927,12 +927,15 @@ const UserProfile: React.FC = () => {
     const token = searchParams.get('token');
     if (token && ownProfile) {
       // Handle OAuth callback
-      handleOAuthCallback(token).then(() => {
+      exchangeOAuthCode(searchParams.get('code')).then((exchanged) =>
+        handleOAuthCallback(exchanged?.token || token, exchanged?.refreshToken)
+      ).then(() => {
         // Refresh user profile to show updated OAuth connections
         fetchUserProfile();
         // Remove token and oauth_success from URL
         const newParams = new URLSearchParams(searchParams);
         newParams.delete('token');
+        newParams.delete('code');
         newParams.delete('oauth_success');
         setSearchParams(newParams, { replace: true });
         toast.success('Account connected successfully!');

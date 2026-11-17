@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const { isTokenRevoked } = require("../utils/sessionRevocation");
+const { isAccessSessionActive } = require("../utils/authSessions");
 const { getJwtSecret } = require("../config/jwtSecret");
 
 /**
@@ -41,7 +42,7 @@ module.exports = async (req, res, next) => {
             return next();
         }
 
-        if (user && !isTokenRevoked(decoded, user)) {
+        if (user && !isTokenRevoked(decoded, user) && (await isAccessSessionActive(decoded.sid))) {
             req.user = user;
             console.log("✅ Authenticated User:", req.user.username, "(UUID:", req.user.uuid + ")");
         } else {

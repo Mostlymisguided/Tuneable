@@ -16,6 +16,7 @@ final class AuthService {
         }
         struct LoginResponse: Decodable {
             let token: String
+            let refreshToken: String?
             let user: User
         }
         let data = try await client.postData("/users/login", body: LoginBody(identifier: identifier, password: password), authenticated: false)
@@ -33,6 +34,9 @@ final class AuthService {
         do {
             let res = try decoder.decode(LoginResponse.self, from: data)
             _ = KeychainHelper.save(res.token, forKey: KeychainHelper.tokenKey)
+            if let refresh = res.refreshToken {
+                _ = KeychainHelper.save(refresh, forKey: KeychainHelper.refreshTokenKey)
+            }
             if let userData = try? JSONEncoder().encode(res.user) {
                 _ = KeychainHelper.save(userData, forKey: KeychainHelper.userKey)
             }
@@ -67,7 +71,20 @@ final class AuthService {
 
     /// Log out: clear token and user from Keychain.
     func logout() {
+        let refresh = KeychainHelper.string(forKey: KeychainHelper.refreshTokenKey)
+        let access = KeychainHelper.string(forKey: KeychainHelper.tokenKey)
         _ = KeychainHelper.delete(forKey: KeychainHelper.tokenKey)
+        _ = KeychainHelper.delete(forKey: KeychainHelper.refreshTokenKey)
         _ = KeychainHelper.delete(forKey: KeychainHelper.userKey)
+        guard refresh != nil || access != nil, let url = APIClient.shared.url(for: "/auth/logout") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let access {
+            request.setValue("Bearer \(access)", forHTTPHeaderField: "Authorization")
+        }
+        let body = ["refreshToken": refresh ?? ""]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: request).resume()
     }
 }

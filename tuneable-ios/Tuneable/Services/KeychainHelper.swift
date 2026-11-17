@@ -50,5 +50,6 @@ enum KeychainHelper {
     }
 
     static let tokenKey = "jwt_token"
+    static let refreshTokenKey = "refresh_token"
     static let userKey = "user_json"
 }

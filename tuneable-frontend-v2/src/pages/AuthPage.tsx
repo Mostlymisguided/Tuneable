@@ -315,7 +315,7 @@ const AuthPage: React.FC = () => {
         email: credential.email,
         fullName: credential.fullName,
       });
-      const user = await handleOAuthCallback(response.token);
+      const user = await handleOAuthCallback(response.token, response.refreshToken);
       toast.success('Login successful!');
       navigate(getPostAuthPath(user, returnPathParam), { replace: true });
     } catch (err: unknown) {

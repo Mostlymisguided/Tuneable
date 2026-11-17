@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
-import { mediaAPI, locationAPI } from '../lib/api';
+import { mediaAPI, locationAPI, exchangeOAuthCode } from '../lib/api';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import MediaChampions from '../components/MediaChampions';
 import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
@@ -330,10 +330,13 @@ const Podcasts: React.FC = () => {
     const error = searchParams.get('error');
     const message = searchParams.get('message');
     if (urlToken && oauthSuccess === 'true') {
-      handleOAuthCallback(urlToken).then(() => {
+      exchangeOAuthCode(searchParams.get('code')).then((exchanged) =>
+        handleOAuthCallback(exchanged?.token || urlToken, exchanged?.refreshToken)
+      ).then(() => {
         refreshUser?.();
         const next = new URLSearchParams(searchParams);
         next.delete('token');
+        next.delete('code');
         next.delete('oauth_success');
         setSearchParams(next, { replace: true });
         toast.success('Spotify connected! You can now import your podcasts.');

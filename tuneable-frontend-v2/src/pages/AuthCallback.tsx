@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { exchangeOAuthCode } from '../lib/api';
 import { toast } from '../utils/toast';
 import { getPostAuthPath, buildSpotifyRequestAccessPath } from '../utils/authHelpers';
 import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../utils/oauthErrorMessage';
@@ -83,7 +84,8 @@ const AuthCallback: React.FC = () => {
 
       if (token) {
         try {
-          const user = await handleOAuthCallback(token);
+          const exchanged = await exchangeOAuthCode(searchParams.get('code'));
+          const user = await handleOAuthCallback(exchanged?.token || token, exchanged?.refreshToken);
 
           const returnUrlParam = searchParams.get('returnUrl');
           const linked = searchParams.get('oauth_success') === 'true'

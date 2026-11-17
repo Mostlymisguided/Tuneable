@@ -148,9 +148,102 @@ export const setAuthTokenGetter = (getter: (() => string | null) | null) => {
   authTokenGetter = getter;
 };
 
+/** Set after a refresh so requests do not keep sending the access token that just expired. */
+let latestAccessToken: string | null | undefined;
+
+export function rememberAccessToken(token: string | null) {
+  latestAccessToken = token;
+  if (token) localStorage.setItem('token', token);
+  else localStorage.removeItem('token');
+}
+
+function readAccessToken(): string | null {
+  if (latestAccessToken !== undefined) return latestAccessToken;
+  return authTokenGetter?.() ?? localStorage.getItem('token');
+}
+
+const REFRESH_LOCK = 'tuneable.refreshLock';
+
+let refreshPromise: Promise<boolean> | null = null;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Renew the access token. False means this device must sign in again. */
+export function refreshSession(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const previousRefresh = localStorage.getItem('refreshToken');
+      if (!previousRefresh) return false;
+      const lock = Number(localStorage.getItem(REFRESH_LOCK) || 0);
+      if (lock && Date.now() - lock < 10000) {
+        await sleep(400);
+        const newerRefresh = localStorage.getItem('refreshToken');
+        const newerAccess = localStorage.getItem('token');
+        if (newerRefresh && newerRefresh !== previousRefresh && newerAccess) {
+          rememberAccessToken(newerAccess);
+          return true;
+        }
+      }
+      localStorage.setItem(REFRESH_LOCK, String(Date.now()));
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) return false;
+        const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, { refreshToken });
+        const token = response.data?.token as string | undefined;
+        const nextRefresh = response.data?.refreshToken as string | undefined;
+        if (!token || !nextRefresh) return false;
+        rememberAccessToken(token);
+        localStorage.setItem('refreshToken', nextRefresh);
+        return true;
+      } catch (error) {
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+        if (status === 401 || status === 403) {
+          const newerRefresh = localStorage.getItem('refreshToken');
+          const newerAccess = localStorage.getItem('token');
+          if (newerRefresh && newerRefresh !== previousRefresh && newerAccess) {
+            rememberAccessToken(newerAccess);
+            return true;
+          }
+          return false;
+        }
+        throw error;
+      } finally {
+        localStorage.removeItem(REFRESH_LOCK);
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+export async function exchangeOAuthCode(
+  code: string | null
+): Promise<{ token?: string; refreshToken?: string } | null> {
+  if (!code) return null;
+  try {
+    const response = await axios.post(`${API_BASE_URL}/api/auth/exchange`, { code });
+    return response.data;
+  } catch {
+    return null;
+  }
+}
+
+function isSessionEndpoint(url: string): boolean {
+  return (
+    url.includes('/users/login') ||
+    url.includes('/users/register') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/exchange') ||
+    url.includes('/auth/logout')
+  );
+}
+
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
-  const token = authTokenGetter?.() ?? localStorage.getItem('token');
+  const token = readAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -166,36 +259,37 @@ api.interceptors.request.use((config) => {
 // Response interceptor to handle auth errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Only redirect on 401 if it's not a login/register attempt
-    // Login/register endpoints handle their own 401 errors
-    if (error.response?.status === 401) {
-      const isAuthEndpoint = error.config?.url?.includes('/users/login') || 
-                             error.config?.url?.includes('/users/register');
-      const errorMessage = String(error.response?.data?.error || error.response?.data?.message || '');
-      // Provider OAuth token expiry (Spotify/SoundCloud/etc.) must not clear the Tuneable JWT
-      const isProviderReauth =
-        error.response?.data?.code === 'PROVIDER_REAUTH_REQUIRED' ||
-        /spotify|soundcloud|reconnect/i.test(errorMessage);
+  async (error) => {
+    const config = error.config as AxiosRequestConfig & { _retry?: boolean };
+    const url = config?.url || '';
+    if (error.response?.status !== 401 || !config || config._retry || isSessionEndpoint(url)) {
+      return Promise.reject(error);
+    }
+    const errorMessage = String(error.response?.data?.error || error.response?.data?.message || '');
+    const isProviderReauth =
+      error.response?.data?.code === 'PROVIDER_REAUTH_REQUIRED' ||
+      /spotify|soundcloud|reconnect/i.test(errorMessage);
+    const hadToken = readAccessToken();
+    if (isProviderReauth || !hadToken) return Promise.reject(error);
 
-      // Only redirect if user had a token (meaning they were authenticated but token expired/invalid)
-      // If no token exists, the route might be public and we shouldn't redirect
-      const hadToken = authTokenGetter?.() ?? localStorage.getItem('token');
-      
-      if (!isAuthEndpoint && !isProviderReauth && hadToken) {
-        // Clear auth data and redirect to login for other endpoints
-        // Only do this if user was previously authenticated (had a token)
-        localStorage.removeItem('token');
+    try {
+      const renewed = await refreshSession();
+      if (!renewed) {
+        rememberAccessToken(null);
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        // Add a small delay to allow any error messages to be displayed first
         setTimeout(() => {
           window.location.href = '/login?expired=true';
         }, 100);
+        return Promise.reject(error);
       }
-      // If no token existed, don't redirect - let the component handle the error
-      // This allows public routes (party details, tune profiles) to work without auth
+      config._retry = true;
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${readAccessToken()}`;
+      return api(config);
+    } catch {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
   }
 );
 
@@ -236,8 +330,26 @@ export const authAPI = {
   },
   
   refreshToken: async () => {
-    const response = await api.post('/auth/refresh');
-    return response.data;
+    const ok = await refreshSession();
+    if (!ok) throw new Error('Session expired');
+    return { token: localStorage.getItem('token'), refreshToken: localStorage.getItem('refreshToken') };
+  },
+
+  logoutDevice: async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    const access = readAccessToken();
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/auth/logout`,
+        { refreshToken },
+        {
+          headers: access ? { Authorization: `Bearer ${access}` } : undefined,
+          timeout: 5000,
+        }
+      );
+    } catch {
+      // Local sign-out still proceeds when the server is unreachable.
+    }
   },
 
   appleSignIn: async (body: {
@@ -249,7 +361,7 @@ export const authAPI = {
     fullName?: { givenName?: string; familyName?: string };
   }) => {
     const response = await api.post('/auth/apple', body);
-    return response.data as { message: string; token: string; user: User };
+    return response.data as { message: string; token: string; refreshToken?: string; user: User };
   },
   
   getReferrals: async (code?: string) => {
@@ -293,7 +405,7 @@ export const authAPI = {
   /** Signs out other sessions; returns a fresh token for this one. */
   changePassword: async (currentPassword: string, newPassword: string, acceptPasswordWarnings = false) => {
     const response = await api.post('/users/me/password', { currentPassword, newPassword, acceptPasswordWarnings });
-    return response.data as { message: string; token: string };
+    return response.data as { message: string; token: string; refreshToken?: string };
   },
 };
 

@@ -71,7 +71,7 @@ export default function ChangePasswordScreen() {
         authAPI.changePassword(currentPassword, newPassword, acceptPasswordWarnings)
       );
       if (!result) return;
-      await replaceToken(result.token);
+      await replaceToken(result.token, result.refreshToken);
       showToast('Password changed. Other devices have been signed out.');
       router.back();
     } catch (err) {

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
-import { userAPI } from '../lib/api';
+import { userAPI, exchangeOAuthCode } from '../lib/api';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
 import { buildOAuthStartUrl } from '../utils/platform';
@@ -414,12 +414,14 @@ const LibraryImport: React.FC = () => {
     if (!urlToken || !handleOAuthCallback || oauthHandledRef.current) return;
     oauthHandledRef.current = true;
 
-    handleOAuthCallback(urlToken)
+    exchangeOAuthCode(searchParams.get('code'))
+      .then((exchanged) => handleOAuthCallback(exchanged?.token || urlToken, exchanged?.refreshToken))
       .then(async () => {
         await refreshUser?.();
         await checkConnections();
         const next = new URLSearchParams(searchParams);
         next.delete('token');
+        next.delete('code');
         next.delete('oauth_success');
         if (!next.get('autoScan')) next.set('autoScan', '1');
         setSearchParams(next, { replace: true });

@@ -120,13 +120,21 @@ export const authAPI = {
     return response.data;
   },
 
+  exchangeCode: async (code: string): Promise<{ token: string; refreshToken: string }> => {
+    const response = await api.post<{ token: string; refreshToken: string }>(
+      '/auth/exchange',
+      { code }
+    );
+    return response.data;
+  },
+
   /** Signs out other sessions; returns a fresh token for this one. */
   changePassword: async (
     currentPassword: string,
     newPassword: string,
     acceptPasswordWarnings = false
-  ): Promise<{ message: string; token: string }> => {
-    const response = await api.post<{ message: string; token: string }>(
+  ): Promise<{ message: string; token: string; refreshToken?: string }> => {
+    const response = await api.post<{ message: string; token: string; refreshToken?: string }>(
       '/users/me/password',
       { currentPassword, newPassword, acceptPasswordWarnings }
     );

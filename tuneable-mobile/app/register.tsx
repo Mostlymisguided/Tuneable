@@ -41,8 +41,8 @@ import {
 import {
   buildOAuthStartUrl,
   extractOAuthError,
-  extractTokenFromUrl,
   getOAuthCallbackRedirect,
+  sessionFromOAuthRedirect,
 } from '@/src/lib/oauth';
 import { getPostAuthHref } from '@/src/lib/onboarding';
 import { colors } from '@/src/theme/colors';
@@ -222,12 +222,8 @@ export default function RegisterScreen() {
           setError(oauthError.replace(/_/g, ' '));
           return;
         }
-        const token = extractTokenFromUrl(result.url);
-        if (!token) {
-          setError(`${provider} sign-up did not return a token.`);
-          return;
-        }
-        const nextUser = await handleOAuthCallback(token);
+        const session = await sessionFromOAuthRedirect(result.url);
+        const nextUser = await handleOAuthCallback(session.token, session.refreshToken);
         router.replace(getPostAuthHref(nextUser));
       }
     } catch (err) {
@@ -245,10 +241,10 @@ export default function RegisterScreen() {
       if (optionalInvite && inviteStatus !== 'valid') {
         await validateInvite(optionalInvite);
       }
-      const { token, user } = await signInWithApple({
+      const { token, refreshToken, user } = await signInWithApple({
         inviteCode: optionalInvite,
       });
-      const nextUser = await applySession(token, user);
+      const nextUser = await applySession(token, user, refreshToken);
       router.replace(getPostAuthHref(nextUser));
     } catch (err) {
       if (

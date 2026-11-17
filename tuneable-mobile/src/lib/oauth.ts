@@ -1,4 +1,5 @@
 import * as Linking from 'expo-linking';
+import { authAPI } from '@/src/api/auth';
 import { API_ORIGIN } from '@/src/api/client';
 
 export type OAuthProvider = 'google' | 'facebook' | 'spotify';
@@ -27,12 +28,42 @@ export function buildOAuthStartUrl(
   return `${API_ORIGIN}/api/auth/${provider}?${params.toString()}`;
 }
 
-export function extractTokenFromUrl(url: string): string | null {
+function queryValue(url: string, key: string): string | null {
   const parsed = Linking.parse(url);
-  const token = parsed.queryParams?.token;
-  if (typeof token === 'string' && token.length > 0) return token;
-  if (Array.isArray(token) && token[0]) return String(token[0]);
+  const value = parsed.queryParams?.[key];
+  if (typeof value === 'string' && value.length > 0) return value;
+  if (Array.isArray(value) && value[0]) return String(value[0]);
   return null;
+}
+
+export function extractTokenFromUrl(url: string): string | null {
+  return queryValue(url, 'token');
+}
+
+export function extractCodeFromUrl(url: string): string | null {
+  return queryValue(url, 'code');
+}
+
+/** Access token from the redirect, plus the device refresh token when the code is still valid. */
+export async function sessionFromOAuthRedirect(
+  url: string
+): Promise<{ token: string; refreshToken?: string }> {
+  const token = extractTokenFromUrl(url);
+  const code = extractCodeFromUrl(url);
+  if (code) {
+    try {
+      const exchanged = await authAPI.exchangeCode(code);
+      return {
+        token: exchanged.token || token || '',
+        refreshToken: exchanged.refreshToken,
+      };
+    } catch {
+      if (token) return { token };
+      throw new Error('Sign-in link expired. Please try again.');
+    }
+  }
+  if (!token) throw new Error('Missing auth token.');
+  return { token };
 }
 
 export function extractOAuthError(url: string): string | null {

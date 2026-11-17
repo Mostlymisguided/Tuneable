@@ -20,6 +20,27 @@ const emailService = require('../utils/emailService');
 const loginThrottle = require('../utils/loginThrottle');
 const { getJwtSecret } = require('../config/jwtSecret');
 
+jest.mock('../utils/authSessions', () => {
+  const jwtLib = require('jsonwebtoken');
+  const { getJwtSecret: secret } = require('../config/jwtSecret');
+  return {
+    issueAuthSession: jest.fn(async (user) => ({
+      token: jwtLib.sign(
+        { userId: user.uuid, email: user.email, username: user.username },
+        secret(),
+        { expiresIn: '1h' }
+      ),
+      refreshToken: 'refresh-test',
+    })),
+    revokeAllAuthSessions: jest.fn(async () => {}),
+    revokeAuthSessionByRefreshToken: jest.fn(async () => {}),
+    revokeAuthSessionById: jest.fn(async () => {}),
+    rotateAuthSession: jest.fn(),
+    redeemExchangeCode: jest.fn(),
+    isAccessSessionActive: jest.fn(async () => true),
+  };
+});
+
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());

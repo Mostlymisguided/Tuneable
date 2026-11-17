@@ -5,12 +5,14 @@ import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getPostAuthHref } from '@/src/lib/onboarding';
 import { clarifyOAuthErrorMessage } from '@/src/lib/oauthErrorMessage';
+import { authAPI } from '@/src/api/auth';
 import { colors } from '@/src/theme/colors';
 
 export default function AuthCallbackScreen() {
   const { handleOAuthCallback, isAuthenticated, user } = useAuth();
   const params = useLocalSearchParams<{
     token?: string;
+    code?: string;
     oauth_success?: string;
     error?: string;
     message?: string;
@@ -34,15 +36,28 @@ export default function AuthCallbackScreen() {
         return;
       }
 
-      const token = typeof params.token === 'string' ? params.token : null;
-      if (!token) {
+      const token = typeof params.token === 'string' ? params.token : '';
+      const code = typeof params.code === 'string' ? params.code : '';
+      if (!token && !code) {
         setError('Missing auth token from Google.');
         setDone(true);
         return;
       }
 
       try {
-        const nextUser = await handleOAuthCallback(token);
+        let accessToken = token;
+        let refreshToken: string | undefined;
+        if (code) {
+          const exchanged = await authAPI.exchangeCode(code);
+          accessToken = exchanged.token || token;
+          refreshToken = exchanged.refreshToken;
+        }
+        if (!accessToken) {
+          setError('Missing auth token from Google.');
+          setDone(true);
+          return;
+        }
+        const nextUser = await handleOAuthCallback(accessToken, refreshToken);
         router.replace(getPostAuthHref(nextUser));
       } catch {
         setError('Signed in with Google, but failed to load your profile.');
@@ -50,7 +65,7 @@ export default function AuthCallbackScreen() {
       }
     };
     void run();
-  }, [params.token, params.error, params.message, handleOAuthCallback]);
+  }, [params.token, params.code, params.error, params.message, handleOAuthCallback]);
 
   if (isAuthenticated && !error) {
     return <Redirect href={getPostAuthHref(user)} />;

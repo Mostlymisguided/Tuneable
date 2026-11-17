@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { issueAuthSession, revokeAllAuthSessions } = require('../utils/authSessions');
 const { check, body, validationResult } = require('express-validator');
 const multer = require('multer');
 const fs = require('fs');
@@ -561,21 +562,13 @@ router.post(
         }
       }
 
-      // Generate JWT token for auto-login using UUID
-      const token = jwt.sign(
-        { 
-          userId: user.uuid,  // Use UUID instead of _id
-          email: user.email, 
-          username: user.username 
-        },
-        SECRET_KEY,
-        { expiresIn: '24h' }
-      );
+      const issued = await issueAuthSession(user);
 
       const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
       res.status(201).json({
         message: 'User registered successfully',
-        token,  // Include token for auto-login
+        token: issued.token,
+        refreshToken: issued.refreshToken,
         user: withWelcomeCreditOffer(user),
       });
     } catch (error) {
@@ -655,16 +648,16 @@ router.post(
       user.lastLoginAt = new Date();
       await user.save();
       
-      // Generate JWT token using UUID
-      const token = jwt.sign({ 
-        userId: user.uuid,  // Use UUID instead of _id
-        email: user.email, 
-        username: user.username 
-      }, SECRET_KEY, { expiresIn: '24h' });
+      const issued = await issueAuthSession(user);
 
       console.log(`✅ Login successful for user: ${user.username} (${user.email})`);
       const { withWelcomeCreditOffer } = require('../utils/betaCreditHelper');
-      res.json({ message: 'Login successful!', token, user: withWelcomeCreditOffer(user) });
+      res.json({
+        message: 'Login successful!',
+        token: issued.token,
+        refreshToken: issued.refreshToken,
+        user: withWelcomeCreditOffer(user),
+      });
     } catch (error) {
       console.error('Login error:', error);
       // Don't expose error details in production for security
@@ -752,16 +745,16 @@ router.post('/me/password', authMiddleware, changePasswordLimit, async (req, res
 
     user.setPassword(newPassword);
     await user.save();
-
-    const token = jwt.sign({
-      userId: user.uuid,
-      email: user.email,
-      username: user.username,
-    }, SECRET_KEY, { expiresIn: '24h' });
+    await revokeAllAuthSessions(user._id);
+    const issued = await issueAuthSession(user);
 
     sendPasswordChangedNotification(user).catch(() => {});
 
-    res.json({ message: 'Password changed. Other devices have been signed out.', token });
+    res.json({
+      message: 'Password changed. Other devices have been signed out.',
+      token: issued.token,
+      refreshToken: issued.refreshToken,
+    });
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Failed to change password' });
@@ -1908,6 +1901,7 @@ router.delete('/me', authMiddleware, async (req, res) => {
       spotify: false,
     };
 
+    await revokeAllAuthSessions(user._id);
     await user.save();
 
     console.log(`🗑️ Account deleted/anonymized: ${anonymizedUsername}`);
