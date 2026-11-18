@@ -82,48 +82,116 @@ function Wheel({
   const listRef = useRef<FlatList<WheelItem>>(null);
   const selectedRef = useRef(selected);
   const lastEmitted = useRef(selected);
-  const animateChanges = useRef(false);
+  const offsetRef = useRef(selected * ITEM_HEIGHT);
   const dragging = useRef(false);
+  const snapping = useRef(false);
+  const animateChanges = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   selectedRef.current = selected;
+
+  const clearSettleTimer = () => {
+    if (!settleTimer.current) return;
+    clearTimeout(settleTimer.current);
+    settleTimer.current = null;
+  };
+
+  const scrollToValue = (index: number, animated: boolean) => {
+    const clamped = Math.max(0, Math.min(count - 1, index));
+    const offset = clamped * ITEM_HEIGHT;
+    snapping.current = true;
+    if (snapTimer.current) clearTimeout(snapTimer.current);
+    listRef.current?.scrollToOffset({ offset, animated });
+    // Ignore the scroll events this jump creates. If it does not land, jump once more.
+    snapTimer.current = setTimeout(() => {
+      snapping.current = false;
+      if (Math.abs(offsetRef.current - offset) <= 0.5) return;
+      offsetRef.current = offset;
+      listRef.current?.scrollToOffset({ offset, animated: false });
+    }, animated ? 450 : 80);
+  };
+
+  const settle = (offsetY: number) => {
+    if (snapping.current) return;
+    dragging.current = false;
+    const index = Math.max(0, Math.min(count - 1, Math.round(offsetY / ITEM_HEIGHT)));
+    const aligned = index * ITEM_HEIGHT;
+    if (index !== selectedRef.current) {
+      lastEmitted.current = index;
+      onSelect(index);
+    }
+    if (Math.abs(offsetY - aligned) <= 0.5) return;
+    // Snap on the next frame, without animation. An animated correction from
+    // inside the scroll callback leaves iOS UIScrollView between rows and
+    // ignores later drags until the next layout.
+    requestAnimationFrame(() => {
+      scrollToValue(index, false);
+    });
+  };
+
+  const armSettle = () => {
+    clearSettleTimer();
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      settle(offsetRef.current);
+    }, 140);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
       animateChanges.current = true;
     }, 400);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      clearSettleTimer();
+      if (snapTimer.current) clearTimeout(snapTimer.current);
+    };
   }, []);
 
   useEffect(() => {
-    if (dragging.current) return;
     if (lastEmitted.current === selected) return;
     lastEmitted.current = selected;
-    listRef.current?.scrollToOffset({
-      offset: selected * ITEM_HEIGHT,
-      animated: animateChanges.current,
-    });
+    clearSettleTimer();
+    dragging.current = false;
+    scrollToValue(selected, animateChanges.current);
   }, [selected]);
 
-  const settle = (offsetY: number) => {
-    const index = Math.max(0, Math.min(count - 1, Math.round(offsetY / ITEM_HEIGHT)));
-    const aligned = index * ITEM_HEIGHT;
-    if (Math.abs(offsetY - aligned) > 0.5) {
-      listRef.current?.scrollToOffset({ offset: aligned, animated: true });
-    }
-    if (index !== selectedRef.current) {
-      lastEmitted.current = index;
-      onSelect(index);
-    }
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const moved = Math.abs(y - offsetRef.current) > 0.5;
+    offsetRef.current = y;
+    if (dragging.current || snapping.current || !moved) return;
+    armSettle();
+  };
+
+  const onScrollBeginDrag = () => {
+    dragging.current = true;
+    snapping.current = false;
+    clearSettleTimer();
   };
 
   const onScrollEndDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const velocity = event.nativeEvent.velocity?.y ?? 0;
-    if (Math.abs(velocity) > 0.05) return;
     dragging.current = false;
-    settle(event.nativeEvent.contentOffset.y);
+    offsetRef.current = event.nativeEvent.contentOffset.y;
+    const velocity = Math.abs(event.nativeEvent.velocity?.y ?? 0);
+    if (velocity < 0.05) {
+      clearSettleTimer();
+      settle(offsetRef.current);
+      return;
+    }
+    // A flick should end in onMomentumScrollEnd. If that event never arrives,
+    // the timer still snaps once the offset stops changing.
+    armSettle();
   };
 
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    dragging.current = false;
+    offsetRef.current = event.nativeEvent.contentOffset.y;
+    if (snapping.current) {
+      snapping.current = false;
+      if (snapTimer.current) clearTimeout(snapTimer.current);
+      return;
+    }
+    clearSettleTimer();
     settle(event.nativeEvent.contentOffset.y);
   };
 
@@ -142,30 +210,20 @@ function Wheel({
       showsVerticalScrollIndicator={false}
       scrollEnabled={!disabled}
       nestedScrollEnabled
-      bounces
+      bounces={false}
       overScrollMode="never"
       removeClippedSubviews={false}
       initialNumToRender={11}
       maxToRenderPerBatch={16}
       windowSize={7}
+      scrollEventThrottle={16}
       accessibilityLabel={accessibilityLabel}
-      onLayout={() => {
-        if (dragging.current) return;
-        listRef.current?.scrollToOffset({
-          offset: selectedRef.current * ITEM_HEIGHT,
-          animated: false,
-        });
-      }}
-      onScrollBeginDrag={() => {
-        dragging.current = true;
-      }}
+      onScroll={onScroll}
+      onScrollBeginDrag={onScrollBeginDrag}
       onScrollEndDrag={onScrollEndDrag}
       onMomentumScrollEnd={onMomentumScrollEnd}
       onScrollToIndexFailed={(info) => {
-        listRef.current?.scrollToOffset({
-          offset: info.index * ITEM_HEIGHT,
-          animated: false,
-        });
+        scrollToValue(info.index, false);
       }}
     />
   );
