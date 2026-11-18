@@ -49,6 +49,8 @@ export interface PodcastEpisode {
   sources?: Record<string, string> | Array<{ platform?: string; url?: string }>;
   audioUrl?: string;
   enclosure?: { url?: string; type?: string };
+  /** Signed-in viewer has an active tip on this episode. */
+  viewerTipped?: boolean;
   bids?: PodcastEpisodeBid[];
   source?: PodcastCatalogSource;
   isExternal?: boolean;

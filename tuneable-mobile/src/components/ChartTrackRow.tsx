@@ -7,6 +7,8 @@ import {
   MiniSupportersBar,
 } from '@/src/components/MiniSupportersBar';
 import { TagChip } from '@/src/components/TagChip';
+import { useAuth } from '@/src/auth/AuthContext';
+import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
 import { bookCoverSource, isBlankCoverSize } from '@/src/lib/bookCover';
@@ -80,6 +82,9 @@ export function ChartTrackRow({
   onTip,
   referenceTuneBytes = false,
 }: Props) {
+  const { user } = useAuth();
+  const tipped = viewerHasTipped(item, user);
+  const tipLabel = tipped ? 'You tipped this. Send another tip' : 'Send a tip';
   const [footerExpanded, setFooterExpanded] = useState(false);
   const playable = isUploadPlayable(item);
   const displayTip = tipPence ?? item.partyMediaAggregate ?? 0;
@@ -178,8 +183,12 @@ export function ChartTrackRow({
             <TuneBytesAmount value={item.tuneBytesEarned} reference={referenceTuneBytes} />
           ) : null}
           <Text style={styles.tips}>{formatPoundsFromPence(displayTip)}</Text>
-          <Pressable onPress={onTip} hitSlop={8} style={styles.actionBtn} accessibilityLabel="Send a tip">
-            <Ionicons name="heart" size={16} color={colors.tipHeart} />
+          <Pressable
+            onPress={onTip}
+            hitSlop={8}
+            style={[styles.actionBtn, tipped && styles.actionBtnTipped]}
+            accessibilityLabel={tipLabel}>
+            <Ionicons name="heart" size={16} color={tipped ? colors.tipHeartTipped : colors.tipHeart} />
           </Pressable>
         </View>
       </View>
@@ -285,9 +294,9 @@ export function ChartTrackRow({
             <Pressable
               onPress={onTip}
               hitSlop={8}
-              style={styles.tipBtn}
-              accessibilityLabel="Send a tip">
-              <Ionicons name="heart" size={18} color={colors.tipHeart} />
+              style={[styles.tipBtn, tipped && styles.actionBtnTipped]}
+              accessibilityLabel={tipLabel}>
+              <Ionicons name="heart" size={18} color={tipped ? colors.tipHeartTipped : colors.tipHeart} />
             </Pressable>
           </View>
         </View>
@@ -394,6 +403,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tipHeartBg,
     borderWidth: 1,
     borderColor: colors.tipHeartBorder,
+  },
+  actionBtnTipped: {
+    backgroundColor: colors.tipHeartTippedBg,
+    borderColor: colors.tipHeartTippedBorder,
   },
   richCard: {
     marginBottom: 8,

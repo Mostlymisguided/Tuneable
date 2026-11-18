@@ -15,6 +15,7 @@ const {
 } = require('./mediaPlayability');
 const { normalizeChartSort, mediaChartMongoSort, sortChartItems } = require('./chartSort');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('./mediaTuneBytes');
+const { stampViewerTipped } = require('./viewerTipped');
 const {
   normalizeLocationScope,
   locationScopeIncludesOrigin,
@@ -829,13 +830,14 @@ async function fetchAllTimeGlobalChart({
     };
   });
 
-  const [topLocations, hiddenCount] = await Promise.all([
+  const [topLocations, hiddenCount, media] = await Promise.all([
     computeTopLocations({ startDate: null }),
     hiddenCountPromise,
+    stampViewerTipped(chartMedia, userId),
   ]);
 
   return {
-    media: chartMedia,
+    media,
     topLocations,
     meta: {
       count: chartMedia.length,
@@ -1206,7 +1208,7 @@ async function fetchPeriodGlobalChart({
   });
 
   return {
-    media: chartMedia,
+    media: await stampViewerTipped(chartMedia, userId),
     topLocations: await computeTopLocations({ startDate }),
     meta: {
       count: chartMedia.length,

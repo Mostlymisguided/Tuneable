@@ -105,6 +105,8 @@ import AiToolsDisplay from '../components/AiToolsDisplay';
 import AiAssistedBadge from '../components/AiAssistedBadge';
 import DeleteMediaSection from '../components/DeleteMediaSection';
 import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
+import TipHeartButton from '../components/TipHeartButton';
+import { viewerHasTipped } from '../utils/viewerTipped';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
 import { EMPTY_AI_USAGE, hasAiUsage, type AiUsage } from '../data/aiTools';
 import { getTagProfilePath } from '../utils/tagNormalizer';
@@ -2837,20 +2839,13 @@ const TuneProfile: React.FC = () => {
                     <ChevronDown className={`h-4 w-4 transition-transform ${showTuneInfo ? 'rotate-180' : ''}`} />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={handleOpenTipModal}
+                <TipHeartButton
+                  tipped={viewerHasTipped(media, user)}
+                  loading={isPlacingGlobalBid}
                   disabled={isPlacingGlobalBid}
-                  title="Send a tip"
-                  aria-label="Send a tip"
-                  className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isPlacingGlobalBid ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
-                  )}
-                </button>
+                  size="compact"
+                  onClick={handleOpenTipModal}
+                />
               </div>
             </div>
           </div>

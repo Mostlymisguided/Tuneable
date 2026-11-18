@@ -183,6 +183,7 @@ export function BookChartScreen({ onChartKindChange }: Props) {
         return {
           ...book,
           bids: nextBids,
+          viewerTipped: true,
           globalMediaAggregate: (book.globalMediaAggregate ?? 0) + tipPence,
           partyMediaAggregate: (book.partyMediaAggregate ?? 0) + tipPence,
           timePeriodBidValue: (book.timePeriodBidValue ?? book.globalMediaAggregate ?? 0) + tipPence,

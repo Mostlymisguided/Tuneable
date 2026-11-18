@@ -114,6 +114,7 @@ router.get('/:placeId/profile', optionalAuthMiddleware, async (req, res) => {
       timePeriod,
       sortBy,
       authenticated: Boolean(req.user),
+      viewerUserId: req.user?._id || null,
     });
     const { publicAmbassadorsForPlace } = require('../utils/ambassador');
     const ambassadorResult = await publicAmbassadorsForPlace(profile.place?.placeId || placeId);

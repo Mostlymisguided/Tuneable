@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Clock, Heart, Loader } from 'lucide-react';
+import { Play, Clock, Loader } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { viewerHasTipped } from '../utils/viewerTipped';
+import TipHeartButton from './TipHeartButton';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -59,11 +62,12 @@ export interface PodcastEpisodeCardData {
   source?: 'local' | 'podcastindex' | 'taddy' | 'apple';
   bids?: Array<{
     _id?: string;
-    userId: { username: string; profilePic?: string; uuid: string };
+    userId: { username: string; profilePic?: string; uuid: string; _id?: string; id?: string };
     amount: number;
     createdAt: string;
     status?: string;
   }>;
+  viewerTipped?: boolean;
 }
 
 /** Category/genre tags first, then tip tags — deduped, same TagList style as global party. */
@@ -103,6 +107,8 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   onPlay,
   onTip,
 }) => {
+  const { user } = useAuth();
+  const viewerTipped = viewerHasTipped(episode, user);
   const tags = getEpisodeDisplayTags(episode);
   const seriesTitle = episode.podcastSeries?.title || episode.podcastTitle;
   const coverArt =
@@ -113,20 +119,14 @@ const PodcastQueueMediaCard: React.FC<PodcastQueueMediaCardProps> = ({
   const dateLabel = showDate ? formatReleaseDate(episode.releaseDate || episode.publishedAt) : '';
 
   const tipButton = (
-    <button
-      type="button"
-      onClick={(e) => onTip(episode, e)}
+    <TipHeartButton
+      tipped={viewerTipped}
+      loading={isBidding}
       disabled={isBidding}
-      title={tipLabel}
-      aria-label={tipLabel}
-      className="group flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-    >
-      {isBidding ? (
-        <Loader className="h-5 w-5 animate-spin" />
-      ) : (
-        <Heart className="h-5 w-5 md:h-6 md:w-6 transition-transform group-hover:scale-110" />
-      )}
-    </button>
+      size="chart"
+      title={viewerTipped ? 'You tipped this. Send another tip' : tipLabel}
+      onClick={(event) => onTip(episode, event)}
+    />
   );
 
   const rank = index + 1;

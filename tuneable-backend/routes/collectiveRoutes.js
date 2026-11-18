@@ -12,6 +12,7 @@ const { createLabelProfilePictureUpload, processAndUploadLabelImage, getPublicUr
 const { createNotification } = require('../services/notificationService');
 const { isBlockedBetween } = require('../utils/userBlocks');
 const { tuneBytesTotalsForCollectives, tuneBytesChartForCollective } = require('../services/collectiveTuneBytesService');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 const {
   normalizeCollectiveType,
   resolvedVenueKind,
@@ -723,7 +724,7 @@ router.get('/:slug', optionalAuthMiddleware, async (req, res) => {
       collective: collectiveResponse,
       recentReleases: formattedRecentReleases,
       topMedia: formattedTopMedia,
-      tuneBytesMedia: tuneBytesChart.media,
+      tuneBytesMedia: await stampViewerTipped(tuneBytesChart.media, req.user?._id),
     });
   } catch (error) {
     console.error('Error fetching collective:', error);

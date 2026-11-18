@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useAuth } from '@/src/auth/AuthContext';
+import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
@@ -40,6 +42,9 @@ export function PodcastEpisodeRow({
   onTip,
   onOpenProfile,
 }: Props) {
+  const { user } = useAuth();
+  const tipped = viewerHasTipped(episode, user);
+  const tipLabel = tipped ? 'You tipped this. Send another tip' : 'Send a tip';
   const [footerExpanded, setFooterExpanded] = useState(false);
   const playable = isEpisodePlayable(episode);
   const displayTip = tipPence ?? episode.globalMediaAggregate ?? 0;
@@ -131,9 +136,9 @@ export function PodcastEpisodeRow({
           onPress={onTip}
           hitSlop={8}
           style={styles.tipBtn}
-          accessibilityLabel="Send a tip">
-          <View style={styles.heartCircle}>
-            <Ionicons name="heart" size={18} color={colors.tipHeart} />
+          accessibilityLabel={tipLabel}>
+          <View style={[styles.heartCircle, tipped && styles.heartCircleTipped]}>
+            <Ionicons name="heart" size={18} color={tipped ? colors.tipHeartTipped : colors.tipHeart} />
           </View>
           <Text style={styles.tipAmount}>{formatPoundsFromPence(displayTip)}</Text>
         </Pressable>
@@ -296,6 +301,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tipHeartBg,
     borderWidth: 1,
     borderColor: colors.tipHeartBorder,
+  },
+  heartCircleTipped: {
+    backgroundColor: colors.tipHeartTippedBg,
+    borderColor: colors.tipHeartTippedBorder,
   },
   tipAmount: {
     marginTop: 2,

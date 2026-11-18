@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Play, Heart } from 'lucide-react';
+import { Play } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { viewerHasTipped } from '../utils/viewerTipped';
+import TipHeartButton from './TipHeartButton';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
@@ -109,7 +112,9 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   mediaHref,
   rank: rankProp,
 }) => {
+  const { user } = useAuth();
   const routeLocation = useLocation();
+  const viewerTipped = viewerHasTipped(mediaData, user) || viewerHasTipped(item, user);
   const tags = mediaData.tags ?? [];
   const releaseYear = getReleaseYear(mediaData);
   const country = getCountryLabelFromLocation(mediaData.primaryLocation);
@@ -158,19 +163,13 @@ const QueueMediaCard: React.FC<QueueMediaCardProps> = ({
   );
 
   const tipButton = (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onTip(item);
-      }}
+    <TipHeartButton
+      tipped={viewerTipped}
+      loading={isBidding}
       disabled={isBidding}
-      title="Send a tip"
-      aria-label="Send a tip"
-      className="group flex h-10 w-10 items-center justify-center rounded-full border border-purple-500/40 bg-purple-900/40 text-purple-300 transition-colors hover:border-purple-500 hover:bg-purple-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 md:h-11 md:w-11"
-    >
-      <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
-    </button>
+      size="queue"
+      onClick={() => onTip(item)}
+    />
   );
 
   const scoreStack = (

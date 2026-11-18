@@ -5,6 +5,8 @@ const Media = require('../models/Media');
 const Bid = require('../models/Bid');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 const { isValidObjectId } = require('../utils/validators');
 const axios = require('axios');
 const xml2js = require('xml2js');
@@ -1647,7 +1649,7 @@ router.post('/import-opml', authMiddleware, upload.single('file'), async (req, r
 });
 
 // Global podcast chart with filtering
-router.get('/chart', async (req, res) => {
+router.get('/chart', optionalAuthMiddleware, async (req, res) => {
   try {
     const { 
       limit = 50, 
@@ -1976,6 +1978,8 @@ router.get('/chart', async (req, res) => {
         return [...new Set(flat)].sort();
       })
     ]);
+
+    episodes = await stampViewerTipped(episodes || [], req.user?._id || null);
 
     res.json({
       episodes,
@@ -2547,9 +2551,9 @@ async function computeSeriesEpisodeStats(seriesId) {
   };
 }
 
-async function serializeSeriesEpisodes(episodes, seriesCoverArt) {
+async function serializeSeriesEpisodes(episodes, seriesCoverArt, userId = null) {
   const tuneBytesByMedia = await sumConfirmedTuneBytesByMediaId(episodes.map((ep) => ep._id));
-  return episodes.map((ep) => {
+  const serialized = episodes.map((ep) => {
     const episode = withSeriesCoverArt({ ...ep }, seriesCoverArt);
     episode.tuneBytesEarned = tuneBytesFor(tuneBytesByMedia, episode._id);
     if (episode.sources instanceof Map) {
@@ -2564,10 +2568,11 @@ async function serializeSeriesEpisodes(episodes, seriesCoverArt) {
     }
     return episode;
   });
+  return stampViewerTipped(serialized, userId);
 }
 
 // Get podcast series with episodes
-router.get('/series/:seriesId', async (req, res) => {
+router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
   try {
     const resolved = await Media.findByIdentifier(req.params.seriesId, { select: '_id' });
     if (!resolved) {
@@ -3634,7 +3639,11 @@ router.get('/series/:seriesId', async (req, res) => {
       applyLimit && searching ? Media.countDocuments(episodeMatch) : Promise.resolve(null),
     ]);
 
-    const serializedEpisodes = await serializeSeriesEpisodes(episodes, seriesCoverArt);
+    const serializedEpisodes = await serializeSeriesEpisodes(
+      episodes,
+      seriesCoverArt,
+      req.user?._id || null
+    );
     const resultCount = searching
       ? (matchedCount ?? serializedEpisodes.length)
       : stats.totalEpisodes;

@@ -217,6 +217,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         if (mediaId(m) !== id) return m;
         return {
           ...m,
+          viewerTipped: true,
           partyMediaAggregate: (m.partyMediaAggregate ?? 0) + tipPence,
           timePeriodBidValue: (m.timePeriodBidValue ?? 0) + tipPence,
         };

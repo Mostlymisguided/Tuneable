@@ -230,8 +230,12 @@ export function HomeListenQueue({
               <Pressable
                 style={styles.iconBtn}
                 onPress={() => setTipTarget(item)}
-                accessibilityLabel={`Tip ${item.title}`}>
-                <Ionicons name="heart" size={16} color={colors.tipHeart} />
+                accessibilityLabel={item.tipped ? `You tipped ${item.title}. Send another tip` : `Tip ${item.title}`}>
+                <Ionicons
+                  name="heart"
+                  size={16}
+                  color={item.tipped ? colors.tipHeartTipped : colors.tipHeart}
+                />
               </Pressable>
               {item.queued ? (
                 <Pressable
@@ -253,6 +257,7 @@ export function HomeListenQueue({
         subtitle={tipTarget?.artist}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1}
+        tipMedia={tipTarget ? { tags: tipTarget.tags } : null}
         onClose={() => setTipTarget(null)}
         onConfirm={confirmTip}
       />

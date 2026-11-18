@@ -27,6 +27,7 @@ const {
   locationScopeRanksByLocalTips,
 } = require('../utils/locationScope');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 
 const router = express.Router();
 
@@ -298,12 +299,17 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
       sumConfirmedTuneBytesByMediaId(bookIds),
     ]);
 
-    res.json({
-      books: books.map((book) => serializeBook({
+    const serializedBooks = await stampViewerTipped(
+      books.map((book) => serializeBook({
         ...book,
         bids: supportersByMedia.get(book._id.toString()) || [],
         tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, book._id),
       })),
+      req.user?._id || null
+    );
+
+    res.json({
+      books: serializedBooks,
       count: books.length,
       timePeriod,
       locationPlaceId: locationPlaceId || null,
@@ -440,7 +446,7 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/:bookId', async (req, res) => {
+router.get('/:bookId', optionalAuthMiddleware, async (req, res) => {
   try {
     const { bookId } = req.params;
     const resolved = await Media.findByIdentifier(bookId, { select: '_id' });
@@ -449,7 +455,8 @@ router.get('/:bookId', async (req, res) => {
       .populate('addedBy', 'username profilePic uuid');
     if (!book) return res.status(404).json({ error: 'Book not found' });
     await Media.ensureSlug(book);
-    res.json({ book: serializeBook(book) });
+    const [stamped] = await stampViewerTipped([serializeBook(book)], req.user?._id || null);
+    res.json({ book: stamped });
   } catch (error) {
     console.error('Error loading book:', error);
     res.status(500).json({ error: 'Failed to load book' });

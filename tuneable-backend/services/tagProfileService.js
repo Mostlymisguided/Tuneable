@@ -10,6 +10,7 @@ const {
 } = require('../utils/tagNormalizer');
 const { generateSlug, getExistingTagParty } = require('./tagPartyService');
 const { loadBidsByMediaId } = require('./relatedMediaService');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
@@ -682,7 +683,7 @@ async function findPodcastMediaForTag({ displayName, canonicalTag, selectFields 
 /**
  * Fetch tag profile: media ranked by tip aggregate, stats, related party.
  */
-async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type, sortBy = 'most-tipped', authenticated = false } = {}) {
+async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-time', type, sortBy = 'most-tipped', authenticated = false, viewerUserId = null } = {}) {
   const resolved = await resolveTagFromSlug(rawSlug);
   if (!resolved) {
     const err = new Error('Tag not found');
@@ -752,12 +753,15 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
     (sum, value) => sum + (value || 0),
     0
   );
-  const media = pageSlice.map((m) => ({
-    ...m,
-    ...enrichMediaWithPlayability(m, { authenticated }),
-    bids: bidsByMediaId.get(m._id.toString()) || [],
-    tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, m._id),
-  }));
+  const media = await stampViewerTipped(
+    pageSlice.map((m) => ({
+      ...m,
+      ...enrichMediaWithPlayability(m, { authenticated }),
+      bids: bidsByMediaId.get(m._id.toString()) || [],
+      tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, m._id),
+    })),
+    viewerUserId
+  );
 
   let relatedParty = null;
   if (party) {

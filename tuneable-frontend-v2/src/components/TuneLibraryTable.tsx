@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Music, Podcast, Play, Heart, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { Music, Podcast, Play, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { viewerHasTipped } from '../utils/viewerTipped';
+import TipHeartButton from './TipHeartButton';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import MiniSupportersBar from './MiniSupportersBar';
@@ -62,6 +65,7 @@ export interface LibraryItem {
   firstBidAt?: string;
   createdAt?: string | null;
   bids?: LibraryBid[];
+  viewerTipped?: boolean;
 }
 
 export interface TuneLibraryTableProps {
@@ -103,6 +107,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
   initialVisibleCount,
 }) => {
   const [showAll, setShowAll] = useState(false);
+  const { user } = useAuth();
 
   const getSortIcon = (field: string) => {
     if (sortField !== field) {
@@ -276,15 +281,11 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                         </button>
                       )}
                       {onTip && (
-                        <button
-                          type="button"
+                        <TipHeartButton
+                          tipped={viewerHasTipped(item, user)}
+                          size="compact"
                           onClick={() => onTip(item)}
-                          title="Send a tip"
-                          aria-label="Send a tip"
-                          className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 transition-colors"
-                        >
-                          <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
-                        </button>
+                        />
                       )}
                     </div>
                   ) : (

@@ -189,6 +189,7 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
           episodeId(e) === id
             ? {
                 ...e,
+                viewerTipped: true,
                 globalMediaAggregate: (e.globalMediaAggregate ?? 0) + tipPence,
               }
             : e

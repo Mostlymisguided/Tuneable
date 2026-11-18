@@ -26,6 +26,7 @@ import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
+import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import {
@@ -177,6 +178,7 @@ export default function PodcastEpisodeProfileScreen() {
   const seriesName = episode ? seriesTitle(episode) : 'Podcast';
   const tipTotal = media?.globalMediaAggregate ?? 0;
   const tipCount = media?.tipCount ?? media?.bids?.length ?? 0;
+  const userHasTipped = viewerHasTipped(media, user);
   const durationLabel = formatDuration(media?.duration);
   const coverUri =
     media?.coverArt ||
@@ -295,10 +297,12 @@ export default function PodcastEpisodeProfileScreen() {
             ...prev,
             globalMediaAggregate: (prev.globalMediaAggregate ?? 0) + tipPence,
             tipCount: (prev.tipCount ?? prev.bids?.length ?? 0) + 1,
+            viewerTipped: true,
             bids: [
               ...(prev.bids ?? []),
               {
                 amount: tipPence,
+                status: 'active',
                 userId: {
                   _id: user._id || user.id,
                   uuid: user.uuid,
@@ -578,10 +582,14 @@ export default function PodcastEpisodeProfileScreen() {
                 <Text style={styles.shareBtnText}>{sharing ? 'Preparing…' : 'Share'}</Text>
               </Pressable>
               <Pressable
-                style={styles.heartBtn}
+                style={[styles.heartBtn, userHasTipped && styles.heartBtnTipped]}
                 onPress={() => openTipSheet()}
-                accessibilityLabel="Send a tip">
-                <Ionicons name="heart" size={20} color={colors.tipHeart} />
+                accessibilityLabel={userHasTipped ? 'You tipped this. Send another tip' : 'Send a tip'}>
+                <Ionicons
+                  name="heart"
+                  size={20}
+                  color={userHasTipped ? colors.tipHeartTipped : colors.tipHeart}
+                />
               </Pressable>
             </View>
 
@@ -1005,6 +1013,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tipHeartBg,
     borderWidth: 1,
     borderColor: colors.tipHeartBorder,
+  },
+  heartBtnTipped: {
+    backgroundColor: colors.tipHeartTippedBg,
+    borderColor: colors.tipHeartTippedBorder,
   },
   section: {
     width: '100%',

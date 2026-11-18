@@ -117,6 +117,8 @@ export interface ChartMediaItem {
     profilePic?: string;
     uuid?: string;
   };
+  /** Signed-in viewer has an active tip on this media. */
+  viewerTipped?: boolean;
   bids?: Array<{
     _id?: string;
     amount?: number;

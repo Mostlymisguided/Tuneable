@@ -24,6 +24,7 @@ import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getReadElsewhereTarget } from '@/src/lib/listenElsewhere';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
+import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { colors } from '@/src/theme/colors';
 import { bookCoverSource, isBlankCoverSize } from '@/src/lib/bookCover';
 import { type ChartMediaItem } from '@/src/types/media';
@@ -69,6 +70,7 @@ export default function BookProfileScreen() {
   );
 
   const author = useMemo(() => (book ? getCreatorDisplay(book) : ''), [book]);
+  const userHasTipped = viewerHasTipped(book, user);
   const support = book?.globalMediaAggregate ?? 0;
   const coverState =
     book?.rightsStatus === 'disputed'
@@ -90,7 +92,8 @@ export default function BookProfileScreen() {
     if (typeof res.updatedBalance === 'number') {
       updateBalance(res.updatedBalance);
     }
-    if (res.book) setBook(res.book);
+    if (res.book) setBook({ ...res.book, viewerTipped: true });
+    else setBook((prev) => (prev ? { ...prev, viewerTipped: true } : prev));
     return res;
   };
 
@@ -191,11 +194,11 @@ export default function BookProfileScreen() {
             </Text>
             <View style={styles.actions}>
               <Pressable
-                style={styles.tipBtn}
+                style={[styles.tipBtn, userHasTipped && styles.tipBtnTipped]}
                 onPress={() => setTipOpen(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Send a tip">
-                <Ionicons name="heart" size={18} color="#fff" />
+                accessibilityLabel={userHasTipped ? 'You tipped this. Send another tip' : 'Send a tip'}>
+                <Ionicons name="heart" size={18} color={userHasTipped ? colors.tipHeartTipped : '#fff'} />
                 <Text style={styles.tipBtnText}>Send a tip</Text>
               </Pressable>
               {coverState === 'clear' && readElsewhere ? (
@@ -400,6 +403,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
+  },
+  tipBtnTipped: {
+    backgroundColor: '#9f1239',
   },
   tipBtnText: {
     color: '#fff',

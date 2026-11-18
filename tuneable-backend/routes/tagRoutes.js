@@ -98,6 +98,7 @@ router.get('/:slug/profile', optionalAuthMiddleware, async (req, res) => {
       type,
       sortBy,
       authenticated: Boolean(req.user),
+      viewerUserId: req.user?._id || null,
     });
     const { publicAmbassadorsForTag } = require('../utils/ambassador');
     profile.ambassadors = await publicAmbassadorsForTag(profile.tag?.canonicalTag || profile.tag?.name);

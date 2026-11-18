@@ -1634,6 +1634,11 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
             globalMediaAggregateTopUser: media?.globalMediaAggregateTopUser || null,
             globalUserMediaAggregate: aggregate.userBidTotal || 0,
             bidCount: aggregate.bidCount || 0,
+            viewerTipped: viewerUserId
+              ? (viewerDiffers
+                ? (viewerTotalLookup[aggregate.mediaId] || 0) > 0
+                : (aggregate.userBidTotal || 0) > 0)
+              : false,
             tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,
             supporterCount: supporterStat.supporterCount || bids.length,
             lastBidAt: aggregate.lastBidAt,

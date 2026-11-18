@@ -43,6 +43,7 @@ import {
   isUploadPlayable,
   mediaId,
 } from '@/src/lib/media';
+import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { shareStoryCard } from '@/src/lib/shareStoryCard';
 import {
   buildTipStatChips,
@@ -216,22 +217,7 @@ export default function TuneProfileScreen() {
   const tipTotal = media?.globalMediaAggregate ?? 0;
   const tipCount = media?.tipCount ?? media?.bids?.length ?? 0;
   const durationLabel = formatDuration(media?.duration);
-  const userHasTipped = useMemo(() => {
-    if (!user || !media?.bids?.length) return false;
-    const uid = String(user._id || user.id || '');
-    const uuid = user.uuid || '';
-    return media.bids.some((bid) => {
-      const bidder = bid.userId;
-      if (!bidder) return false;
-      if (typeof bidder === 'string') {
-        return bidder === uid || bidder === uuid;
-      }
-      return (
-        String(bidder._id || '') === uid ||
-        String(bidder.uuid || '') === uuid
-      );
-    });
-  }, [media?.bids, user]);
+  const userHasTipped = viewerHasTipped(media, user);
 
   const displayTags = useMemo(() => {
     if (rankedTags.length > 0) return rankedTags;
@@ -345,10 +331,12 @@ export default function TuneProfileScreen() {
             ...prev,
             globalMediaAggregate: (prev.globalMediaAggregate ?? 0) + tipPence,
             tags: res.media?.tags?.length ? res.media.tags : prev.tags,
+            viewerTipped: true,
             bids: [
               ...(prev.bids ?? []),
               {
                 amount: tipPence,
+                status: 'active',
                 userId: {
                   _id: user._id || user.id,
                   uuid: user.uuid,
@@ -674,10 +662,14 @@ export default function TuneProfileScreen() {
                 <Text style={styles.shareBtnText}>{sharing ? 'Preparing…' : 'Share'}</Text>
               </Pressable>
               <Pressable
-                style={styles.heartBtn}
+                style={[styles.heartBtn, userHasTipped && styles.heartBtnTipped]}
                 onPress={() => openTipSheet()}
-                accessibilityLabel="Send a tip">
-                <Ionicons name="heart" size={20} color={colors.tipHeart} />
+                accessibilityLabel={userHasTipped ? 'You tipped this. Send another tip' : 'Send a tip'}>
+                <Ionicons
+                  name="heart"
+                  size={20}
+                  color={userHasTipped ? colors.tipHeartTipped : colors.tipHeart}
+                />
               </Pressable>
             </View>
 
@@ -1227,6 +1219,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tipHeartBg,
     borderWidth: 1,
     borderColor: colors.tipHeartBorder,
+  },
+  heartBtnTipped: {
+    backgroundColor: colors.tipHeartTippedBg,
+    borderColor: colors.tipHeartTippedBorder,
   },
   section: {
     width: '100%',

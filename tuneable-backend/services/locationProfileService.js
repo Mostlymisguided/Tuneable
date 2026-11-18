@@ -13,6 +13,7 @@ const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
 const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 const Collective = require('../models/Collective');
 const { venuesAtPlaceQuery, serializeVenueForPlace } = require('../utils/collectiveVenue');
 
@@ -318,7 +319,7 @@ async function rankMatchedMediaByPeriod(matchedMedia, startDate) {
 /**
  * Place profile: origin-scoped media ranked by tip aggregate.
  */
-async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped', authenticated = false } = {}) {
+async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod = 'all-time', sortBy = 'most-tipped', authenticated = false, viewerUserId = null } = {}) {
   const placeId = normalizePlaceId(rawPlaceId);
   if (!placeId) {
     const err = new Error('Place not found');
@@ -371,12 +372,15 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
     loadBidsByMediaId(pageIds),
     sumConfirmedTuneBytesByMediaId(pageIds),
   ]);
-  const media = pageSlice.map((m) => ({
-    ...m,
-    ...enrichMediaWithPlayability(m, { authenticated }),
-    bids: bidsByMediaId.get(m._id.toString()) || [],
-    tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, m._id),
-  }));
+  const media = await stampViewerTipped(
+    pageSlice.map((m) => ({
+      ...m,
+      ...enrichMediaWithPlayability(m, { authenticated }),
+      bids: bidsByMediaId.get(m._id.toString()) || [],
+      tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, m._id),
+    })),
+    viewerUserId
+  );
 
   return {
     place,

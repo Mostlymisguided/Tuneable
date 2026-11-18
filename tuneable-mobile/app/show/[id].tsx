@@ -287,6 +287,7 @@ export default function PodcastShowScreen() {
         episodeId(e) === tid
           ? {
               ...e,
+              viewerTipped: true,
               globalMediaAggregate: (e.globalMediaAggregate ?? 0) + tipPence,
             }
           : e

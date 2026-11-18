@@ -50,6 +50,8 @@ import EntertainingLoader from '../components/EntertainingLoader';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
+import TipHeartButton from '../components/TipHeartButton';
+import { viewerHasTipped } from '../utils/viewerTipped';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import ProfileWaveform from '../components/ProfileWaveform';
 import { requireAuthToPlay } from '../utils/playAuth';
@@ -2440,20 +2442,13 @@ const PodcastEpisodeProfile: React.FC = () => {
                     <ChevronDown className={`h-4 w-4 transition-transform ${showEpisodeInfo ? 'rotate-180' : ''}`} />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={handleOpenTipModal}
+                <TipHeartButton
+                  tipped={viewerHasTipped(media, user)}
+                  loading={isPlacingGlobalBid}
                   disabled={isPlacingGlobalBid}
-                  title="Send a tip"
-                  aria-label="Send a tip"
-                  className="group flex items-center justify-center w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isPlacingGlobalBid ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Heart className="h-5 w-5 transition-transform group-hover:scale-110" />
-                  )}
-                </button>
+                  size="compact"
+                  onClick={handleOpenTipModal}
+                />
               </div>
             </div>
           </div>

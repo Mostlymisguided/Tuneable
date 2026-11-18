@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Loader } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { viewerHasTipped } from '../utils/viewerTipped';
+import TipHeartButton from './TipHeartButton';
 import MiniSupportersBar from './MiniSupportersBar';
 import TagList from './TagList';
 import BookCover from './BookCover';
@@ -37,6 +39,7 @@ export interface BookChartCardData {
   releaseYear?: number | null;
   publishedYear?: number | null;
   primaryLocation?: ResolvedLocation | null;
+  viewerTipped?: boolean;
   bids?: Array<{
     _id?: string;
     userId: {
@@ -87,6 +90,8 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
   isTipping = false,
   onTip,
 }) => {
+  const { user } = useAuth();
+  const viewerTipped = viewerHasTipped(book, user);
   const tags = Array.isArray(book.tags) ? book.tags : [];
   const mediaId = book._id || book.id || '';
   const href = mediaId ? `/book/${mediaId}` : undefined;
@@ -222,20 +227,13 @@ const BookQueueMediaCard: React.FC<BookQueueMediaCardProps> = ({
       </div>
 
       <div className="absolute right-1.5 top-1/2 -translate-y-1/2 md:static md:translate-y-0 md:flex md:items-center md:justify-center md:ml-auto flex-shrink-0 z-10">
-        <button
-          type="button"
-          onClick={(event) => onTip(book, event)}
+        <TipHeartButton
+          tipped={viewerTipped}
+          loading={isTipping}
           disabled={isTipping}
-          title="Send a tip"
-          aria-label="Send a tip"
-          className="group flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-300 hover:bg-purple-600 hover:text-white hover:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isTipping ? (
-            <Loader className="h-5 w-5 animate-spin" />
-          ) : (
-            <Heart className="h-5 w-5 md:h-6 md:w-6 transition-transform group-hover:scale-110" />
-          )}
-        </button>
+          size="chart"
+          onClick={(event) => onTip(book, event)}
+        />
       </div>
     </div>
   );

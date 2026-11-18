@@ -390,6 +390,7 @@ const Books: React.FC = () => {
           return {
             ...book,
             bids: nextBids,
+            viewerTipped: true,
             globalMediaAggregate: (book.globalMediaAggregate || 0) + tipPence,
           };
         })
@@ -400,7 +401,7 @@ const Books: React.FC = () => {
       await refreshUser();
       if (result.book) {
         setBooks((prev) =>
-          prev.map((book) => ((book._id || book.id) === bookId ? { ...book, ...result.book, bids: book.bids } : book))
+          prev.map((book) => ((book._id || book.id) === bookId ? { ...book, ...result.book, bids: book.bids, viewerTipped: true } : book))
         );
       }
     } catch (err: any) {

@@ -34,6 +34,7 @@ const {
     DEFAULT_SUPPORTERS_LIMIT,
 } = require('../utils/globalPartyChart');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 const VIRTUAL_PARTY_MEDIA_LIMIT = 250;
 // Note: Old bidCalculations utility functions are no longer used
 // All bid metric calculations are now handled by BidMetricsEngine
@@ -1119,6 +1120,8 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             return (b.totalBidValue || 0) - (a.totalBidValue || 0);
         });
 
+        const mediaWithViewerTips = await stampViewerTipped(processedMedia, userId);
+
         // ✅ **Return a cleaned response (don't overwrite `party.songs`)**
         const responseParty = {
             _id: party._id,
@@ -1141,7 +1144,7 @@ router.get('/:id/details', optionalAuthMiddleware, resolvePartyId(), async (req,
             minimumBid: party.minimumBid || 0.33, // ✅ Include minimumBid
             createdAt: party.createdAt,
             updatedAt: party.updatedAt,
-            media: processedMedia, // ✅ Return flattened, sorted media
+            media: mediaWithViewerTips, // ✅ Return flattened, sorted media
         };
 
         res.status(200).json({
@@ -3935,7 +3938,7 @@ router.get('/:partyId/media/sorted/:timePeriod', optionalAuthMiddleware, resolve
         res.json({
             timePeriod: timePeriod,
             sortBy: chartSort,
-            media: sortedMedia,
+            media: await stampViewerTipped(sortedMedia, req.user?._id),
             count: sortedMedia.length,
             periodStartDate: startDate,
             periodEndDate: now,

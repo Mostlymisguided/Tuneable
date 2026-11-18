@@ -74,6 +74,7 @@ const {
   buildMediaGearQuery,
 } = require('../services/gearService');
 const { getRelatedPlaylistsForMedia } = require('../services/relatedMediaService');
+const { stampViewerTipped } = require('../utils/viewerTipped');
 const { normalizeIsrc } = require('../utils/mediaMatchUtils');
 const { normalizeIsbn } = require('../utils/isbn');
 const { parseReleaseDate } = require('../utils/releaseDateUtils');
@@ -2040,12 +2041,17 @@ router.get('/:mediaId/related-playlists', async (req, res) => {
       authenticated: Boolean(req.user),
     });
 
+    const [relatedMedia, fansAlsoTip] = await Promise.all([
+      stampViewerTipped(playlists.relatedMedia, req.user?._id),
+      stampViewerTipped(playlists.fansAlsoTip, req.user?._id),
+    ]);
+
     res.json({
       sourceMediaId: resolvedMediaId,
       sourceTitle: playlists.source?.title || null,
       sourceTags: playlists.source?.tags || [],
-      relatedMedia: playlists.relatedMedia,
-      fansAlsoTip: playlists.fansAlsoTip,
+      relatedMedia,
+      fansAlsoTip,
     });
   } catch (error) {
     console.error('Error fetching related playlists:', error);

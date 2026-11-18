@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ListMusic, Loader2, Play, Plus, X } from 'lucide-react';
+import { ListMusic, Loader2, Play, Plus, X } from 'lucide-react';
+import TipHeartButton from './TipHeartButton';
 import { partyAPI, userAPI, type HomeListenQueueItem } from '../lib/api';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
@@ -370,14 +371,13 @@ const HomeListenSection: React.FC<Props> = ({
                   >
                     Play
                   </button>
-                  <button
-                    type="button"
+                  <TipHeartButton
+                    tipped={item.tipped}
+                    size="compact"
+                    heartClassName="h-4 w-4"
+                    title={item.tipped ? `You tipped ${item.title}. Send another tip` : `Tip ${item.title}`}
                     onClick={() => onTip(item)}
-                    className="w-10 h-10 rounded-full bg-purple-900/40 border border-purple-500/40 text-purple-200 hover:bg-purple-600 hover:text-white flex items-center justify-center"
-                    aria-label={`Tip ${item.title}`}
-                  >
-                    <Heart className="h-4 w-4" />
-                  </button>
+                  />
                   {item.queued && (
                     <button
                       type="button"
