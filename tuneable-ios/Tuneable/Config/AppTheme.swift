@@ -56,3 +56,72 @@ extension View {
         modifier(PurpleGradientBackgroundModifier())
     }
 }
+
+/// Coloured initial used when a person has not uploaded a profile photo.
+/// Palette and hash match the web and mobile apps.
+enum UserLetterAvatar {
+    static let defaultProfilePic = "https://uploads.tuneable.stream/profile-pictures/default-profile.png"
+
+    private static let palette: [(Double, Double, Double)] = [
+        (124, 58, 237),
+        (147, 51, 234),
+        (192, 38, 211),
+        (219, 39, 119),
+        (225, 29, 72),
+        (234, 88, 12),
+        (180, 83, 9),
+        (5, 150, 105),
+        (15, 118, 110),
+        (2, 132, 199),
+        (79, 70, 229),
+        (109, 40, 217),
+    ]
+
+    static func customURL(_ raw: String?) -> URL? {
+        guard let raw, !raw.isEmpty, raw != defaultProfilePic else { return nil }
+        return URL(string: raw)
+    }
+
+    private static func normalized(_ name: String?) -> String {
+        var trimmed = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasPrefix("@") {
+            trimmed.removeFirst()
+        }
+        return trimmed
+    }
+
+    static func letter(for name: String?) -> String {
+        let trimmed = normalized(name)
+        guard let first = trimmed.first else { return "?" }
+        return String(first).uppercased()
+    }
+
+    static func color(for name: String?) -> Color {
+        let key = normalized(name).lowercased()
+        guard !key.isEmpty else {
+            return Color(red: 75 / 255, green: 85 / 255, blue: 99 / 255)
+        }
+        var hash: UInt32 = 0
+        for unit in key.utf16 {
+            hash = hash &* 31 &+ UInt32(unit)
+        }
+        let item = palette[Int(hash % UInt32(palette.count))]
+        return Color(red: item.0 / 255, green: item.1 / 255, blue: item.2 / 255)
+    }
+}
+
+struct UserLetterAvatarView: View {
+    let name: String?
+
+    var body: some View {
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            ZStack {
+                Circle().fill(UserLetterAvatar.color(for: name))
+                Text(UserLetterAvatar.letter(for: name))
+                    .font(.system(size: max(CGFloat(8), side * 0.46), weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+}

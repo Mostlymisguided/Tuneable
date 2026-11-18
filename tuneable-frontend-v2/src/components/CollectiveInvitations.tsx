@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { collectiveAPI } from '../lib/api';
 import { toast } from '../utils/toast';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 
 interface CollectiveInvite {
   id: string;
@@ -78,13 +78,11 @@ const CollectiveInvitations: React.FC = () => {
               className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-800 rounded-lg border border-gray-700"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <img
-                  src={invite.collective.profilePicture || DEFAULT_PROFILE_PIC}
+                <UserAvatar
+                  name={invite.collective.name}
+                  profilePic={invite.collective.profilePicture}
                   alt=""
-                  className="h-10 w-10 rounded-full object-cover border border-white/10"
-                  onError={(event) => {
-                    event.currentTarget.src = DEFAULT_PROFILE_PIC;
-                  }}
+                  className="h-10 w-10 border border-white/10"
                 />
                 <div className="min-w-0">
                   <h4 className="text-white font-medium">

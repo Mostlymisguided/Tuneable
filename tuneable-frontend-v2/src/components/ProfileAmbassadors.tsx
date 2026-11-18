@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from './UserAvatar';
 
 export type ProfileAmbassador = {
   username: string;
@@ -32,10 +32,11 @@ const ProfileAmbassadors: React.FC<{
               to={person.uuid ? `/user/${person.uuid}` : '#'}
               className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-black/20 border border-white/10 text-sm text-white no-underline hover:border-purple-400/50"
             >
-              <img
-                src={person.profilePic || DEFAULT_PROFILE_PIC}
+              <UserAvatar
+                username={person.username}
+                profilePic={person.profilePic}
                 alt=""
-                className="h-5 w-5 rounded-full object-cover"
+                className="h-5 w-5 object-cover"
               />
               <span>{name}{extra ? ` · ${extra}` : ''}</span>
             </Link>

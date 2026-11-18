@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Send, Users, Search, X, Check, Globe } from 'lucide-react';
 import { notificationAPI, userAPI } from '../lib/api';
 import { toast } from '../utils/toast';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from './UserAvatar';
 
 interface User {
   _id: string;
@@ -315,10 +315,11 @@ const NotificationsManager: React.FC = () => {
                         key={user._id}
                         className="flex items-center bg-purple-600/20 text-purple-300 px-3 py-1 rounded-lg text-sm"
                       >
-                        <img
-                          src={user.profilePic || DEFAULT_PROFILE_PIC}
+                        <UserAvatar
+                          username={user.username}
+                          profilePic={user.profilePic}
                           alt={user.username}
-                          className="w-5 h-5 rounded-full mr-2"
+                          className="w-5 h-5 mr-2"
                         />
                         <span>{user.username}</span>
                         <button
@@ -378,10 +379,11 @@ const NotificationsManager: React.FC = () => {
                                 isSelected ? 'bg-purple-600/20' : ''
                               }`}
                             >
-                              <img
-                                src={user.profilePic || DEFAULT_PROFILE_PIC}
+                              <UserAvatar
+                                username={user.username}
+                                profilePic={user.profilePic}
                                 alt={user.username}
-                                className="w-8 h-8 rounded-full mr-3"
+                                className="w-8 h-8 mr-3"
                               />
                               <div className="flex-1 text-left">
                                 <div className="text-white font-medium">{user.username}</div>

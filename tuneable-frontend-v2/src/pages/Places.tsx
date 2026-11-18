@@ -7,7 +7,7 @@ import GlobalChartLocationHero, { type LocationQuickPick } from '../components/G
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import EntertainingLoader from '../components/EntertainingLoader';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import TagList from '../components/TagList';
 import { TuneBytesMark } from '../components/TuneBytesMark';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
@@ -71,10 +71,12 @@ function CollectiveChartCard({
       <div className="flex items-start gap-2 md:gap-4">
         <div className="relative w-12 h-12 md:w-20 md:h-20 rounded overflow-hidden flex-shrink-0">
           <Link to={href} className="block w-full h-full" tabIndex={-1} aria-hidden>
-            <img
-              src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+            <UserAvatar
+              name={collective.name}
+              profilePic={collective.profilePicture}
               alt=""
-              className="w-full h-full object-cover"
+              shape="rounded"
+              className="w-full h-full"
             />
           </Link>
           <span

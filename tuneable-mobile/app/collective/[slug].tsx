@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import { collectiveAPI, type Collective } from '@/src/api/collectives';
 import { mediaAPI } from '@/src/api/media';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { Screen } from '@/src/components/Screen';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
@@ -24,7 +24,6 @@ import { getPlaceProfileHref } from '@/src/lib/location';
 import { getCreatorDisplay, isUploadPlayable, mediaId } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { colors } from '@/src/theme/colors';
-import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
 import type { ChartMediaItem } from '@/src/types/media';
 
 export default function CollectiveProfileScreen() {
@@ -118,10 +117,9 @@ export default function CollectiveProfileScreen() {
             { paddingBottom: Math.max(24, contentPaddingBottom + 24) },
           ]}>
           <View style={styles.hero}>
-            <Image
-              source={{
-                uri: collective.profilePicture || DEFAULT_PROFILE_PIC,
-              }}
+            <UserAvatar
+              name={collective.name}
+              profilePic={collective.profilePicture}
               style={styles.profilePic}
             />
             {displayType ? (

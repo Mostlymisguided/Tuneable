@@ -2,7 +2,6 @@ import { useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
 import { Screen } from '@/src/components/Screen';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -28,7 +28,6 @@ import { canResizeOnDevice, prepareProfilePhoto } from '@/src/lib/profileImage';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import {
-  DEFAULT_PROFILE_PIC,
   hasCustomProfilePic,
   type ResolvedLocation,
   type User,
@@ -114,8 +113,7 @@ export default function EditProfileScreen() {
 
   const picBusy = uploadingPic || removingPic;
   const busy = saving || picBusy;
-  const displayedPic =
-    previewPic || user?.profilePic || DEFAULT_PROFILE_PIC;
+  const displayedPic = previewPic !== null ? previewPic : user?.profilePic;
   const canRemovePic = hasCustomProfilePic(previewPic || user?.profilePic);
 
   const usernameHint = useMemo(() => {
@@ -204,7 +202,7 @@ export default function EditProfileScreen() {
   const onRemovePhoto = () => {
     Alert.alert(
       'Remove photo?',
-      'Your profile will use the default avatar.',
+      'Your profile will show your initial instead.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -216,8 +214,9 @@ export default function EditProfileScreen() {
               setError(null);
               try {
                 await authAPI.removeProfilePic();
-                setPreviewPic(DEFAULT_PROFILE_PIC);
+                setPreviewPic('');
                 await refreshUser();
+                setPreviewPic(null);
                 showToast('Profile picture removed');
               } catch (err) {
                 showToast(
@@ -327,7 +326,11 @@ export default function EditProfileScreen() {
                 disabled={busy}
                 accessibilityRole="button"
                 accessibilityLabel="Change profile picture">
-                <Image source={{ uri: displayedPic }} style={styles.avatar} />
+                <UserAvatar
+                  username={username || user?.username}
+                  profilePic={displayedPic}
+                  style={styles.avatar}
+                />
                 <View style={styles.cameraBadge}>
                   {picBusy ? (
                     <ActivityIndicator size="small" color="#fff" />

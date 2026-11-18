@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { X, Loader2, Search, Users, CheckCircle } from 'lucide-react';
 import { collectiveAPI, userAPI } from '../lib/api';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 
 interface CollectiveLinkModalProps {
   isOpen: boolean;
@@ -195,13 +195,11 @@ const CollectiveLinkModal: React.FC<CollectiveLinkModalProps> = ({ isOpen, onClo
                         onClick={() => handleCollectiveClick(collective)}
                         className={`w-full flex items-center space-x-3 px-4 py-3 bg-black/20 border rounded-lg transition-all hover:bg-black/30 ${roleColor} text-left`}
                       >
-                        <img
-                          src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                        <UserAvatar
+                          name={collective.name}
+                          profilePic={collective.profilePicture}
                           alt={collective.name}
-                          className="h-12 w-12 rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                          }}
+                          className="h-12 w-12"
                         />
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">
@@ -258,13 +256,11 @@ const CollectiveLinkModal: React.FC<CollectiveLinkModalProps> = ({ isOpen, onClo
                           isMember ? 'border-green-500/30' : 'border-gray-500/30'
                         } text-left`}
                       >
-                        <img
-                          src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                        <UserAvatar
+                          name={collective.name}
+                          profilePic={collective.profilePicture}
                           alt={collective.name}
-                          className="h-12 w-12 rounded-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                          }}
+                          className="h-12 w-12"
                         />
                         <div className="flex-1">
                           <div className="flex items-center space-x-2">

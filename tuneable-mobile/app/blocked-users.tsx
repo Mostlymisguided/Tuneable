@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -12,13 +11,13 @@ import {
 } from 'react-native';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { userAPI, type BlockedUser } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
-import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
 
 export default function BlockedUsersScreen() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -111,8 +110,9 @@ export default function BlockedUsersScreen() {
                 onPress={() => router.push(`/user/${item.id}`)}
                 accessibilityRole="button"
                 accessibilityLabel={`Open @${item.username ?? 'user'}`}>
-                <Image
-                  source={{ uri: item.profilePic || DEFAULT_PROFILE_PIC }}
+                <UserAvatar
+                  username={item.username}
+                  profilePic={item.profilePic}
                   style={styles.avatar}
                 />
                 <Text style={styles.username} numberOfLines={1}>

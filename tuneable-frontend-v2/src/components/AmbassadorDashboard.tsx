@@ -6,7 +6,7 @@ import { toast } from '../utils/toast';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import { getPlaceProfilePath } from '../utils/locationHelpers';
 import { getUserProfileUrl } from '../utils/profileNavigation';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from './UserAvatar';
 import type { AmbassadorAssignmentSummary, AmbassadorSummary } from '../types';
 
 type Tab = 'overview' | 'beats' | 'people';
@@ -250,10 +250,11 @@ const AmbassadorDashboard: React.FC<{
                   const scene = beatLabel(person);
                   return (
                     <li key={person._id || person.uuid || person.username} className="flex items-center gap-3 bg-gray-900 rounded-lg px-4 py-3">
-                      <img
-                        src={person.profilePic || DEFAULT_PROFILE_PIC}
+                      <UserAvatar
+                        username={person.username}
+                        profilePic={person.profilePic}
                         alt=""
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-10 w-10 object-cover"
                       />
                       <div className="min-w-0 flex-1">
                         <Link to={getUserProfileUrl(person)} className="text-white font-medium hover:text-purple-300">

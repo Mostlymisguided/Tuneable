@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getUserProfileUrl } from '../utils/profileNavigation';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import ReportModal from '../components/ReportModal';
 import DeleteCollectiveSection from '../components/DeleteCollectiveSection';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
@@ -629,28 +629,16 @@ useEffect(() => {
 
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
-              {collective.profilePicture ? (
-                <img
-                  src={collective.profilePicture}
-                  alt={`${collective.name} profile picture`}
-                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditCollective() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                  style={{ width: '200px', height: '200px' }}
-                  onClick={handleProfilePictureClick}
-                  title={canEditCollective() ? 'Click to change profile picture' : ''}
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                  }}
-                />
-              ) : (
-                <img
-                  src={DEFAULT_PROFILE_PIC}
-                  alt={`${collective.name} profile picture`}
-                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditCollective() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                  style={{ width: '200px', height: '200px' }}
-                  onClick={handleProfilePictureClick}
-                  title={canEditCollective() ? 'Click to upload profile picture' : ''}
-                />
-              )}
+              <UserAvatar
+                name={collective.name}
+                profilePic={collective.profilePicture}
+                alt={`${collective.name} profile picture`}
+                shape="rounded"
+                className={`shadow-xl border-2 border-purple-500/30 ${canEditCollective() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                style={{ width: '200px', height: '200px' }}
+                onClick={handleProfilePictureClick}
+                title={canEditCollective() ? (collective.profilePicture ? 'Click to change profile picture' : 'Click to upload profile picture') : ''}
+              />
               {isUploadingProfilePicture && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
@@ -949,13 +937,11 @@ useEffect(() => {
                         {memberUser ? (
                           <Link to={getUserProfileUrl(memberUser)}>
                             <div className="flex items-center space-x-4">
-                              <img
-                                src={memberUser.profilePic || DEFAULT_PROFILE_PIC}
+                              <UserAvatar
+                                username={memberUser.username || 'Member'}
+                                profilePic={memberUser.profilePic}
                                 alt={memberUser.username || 'Member'}
-                                className="w-12 h-12 rounded-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                }}
+                                className="w-12 h-12 object-cover"
                               />
                               <div className="flex-1 min-w-0">
                                 <h4 className="text-white font-medium truncate">
@@ -970,10 +956,10 @@ useEffect(() => {
                           </Link>
                         ) : (
                           <div className="flex items-center space-x-4">
-                            <img
-                              src={DEFAULT_PROFILE_PIC}
+                            <UserAvatar
+                              username="Member"
                               alt="Member"
-                              className="w-12 h-12 rounded-full object-cover"
+                              className="w-12 h-12 object-cover"
                             />
                             <div className="flex-1 min-w-0">
                               <h4 className="text-white font-medium truncate">Member</h4>
@@ -1618,13 +1604,11 @@ const CollectiveInviteModal: React.FC<CollectiveInviteModalProps> = ({
               
               {selectedUser && (
                 <div className="mt-2 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg flex items-center space-x-3">
-                  <img
-                    src={selectedUser.profilePic || DEFAULT_PROFILE_PIC}
+                  <UserAvatar
+                    username={selectedUser.username}
+                    profilePic={selectedUser.profilePic}
                     alt={selectedUser.artistName || selectedUser.username}
-                    className="h-10 w-10 rounded-full"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                    }}
+                    className="h-10 w-10"
                   />
                   <div className="flex-1">
                     <div className="text-white font-medium">
@@ -1658,13 +1642,11 @@ const CollectiveInviteModal: React.FC<CollectiveInviteModalProps> = ({
                       }}
                       className="w-full px-4 py-2 text-left hover:bg-gray-600 flex items-center space-x-3 border-b border-gray-600 last:border-b-0"
                     >
-                      <img
-                        src={user.profilePic || DEFAULT_PROFILE_PIC}
+                      <UserAvatar
+                        username={user.username}
+                        profilePic={user.profilePic}
                         alt={user.artistName || user.username}
-                        className="h-8 w-8 rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                        }}
+                        className="h-8 w-8"
                       />
                       <div className="flex-1">
                         <div className="text-white">

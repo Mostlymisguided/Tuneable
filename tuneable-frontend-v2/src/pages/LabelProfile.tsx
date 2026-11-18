@@ -8,7 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds } from '../utils/currency';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getUserProfileUrl } from '../utils/profileNavigation';
-import { DEFAULT_PROFILE_PIC, COUNTRIES } from '../constants';
+import { COUNTRIES } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import ReportModal from '../components/ReportModal';
 import LabelTeamTable, { type LabelTeamMember } from '../components/labels/LabelTeamTable';
 import InviteMemberModal from '../components/labels/InviteMemberModal';
@@ -569,28 +570,16 @@ const LabelProfile: React.FC = () => {
 
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
-              {label.profilePicture ? (
-                <img
-                  src={label.profilePicture}
-                  alt={`${label.name} profile picture`}
-                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                  style={{ width: '200px', height: '200px' }}
-                  onClick={handleProfilePictureClick}
-                  title={canEditLabel() ? 'Click to change profile picture' : ''}
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                  }}
-                />
-              ) : (
-                <img
-                  src={DEFAULT_PROFILE_PIC}
-                  alt={`${label.name} profile picture`}
-                  className={`rounded-lg shadow-xl object-cover border-2 border-purple-500/30 ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                  style={{ width: '200px', height: '200px' }}
-                  onClick={handleProfilePictureClick}
-                  title={canEditLabel() ? 'Click to upload profile picture' : ''}
-                />
-              )}
+              <UserAvatar
+                name={label.name}
+                profilePic={label.profilePicture}
+                alt={`${label.name} profile picture`}
+                shape="rounded"
+                className={`shadow-xl border-2 border-purple-500/30 ${canEditLabel() ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                style={{ width: '200px', height: '200px' }}
+                onClick={handleProfilePictureClick}
+                title={canEditLabel() ? (label.profilePicture ? 'Click to change profile picture' : 'Click to upload profile picture') : ''}
+              />
               {isUploadingProfilePicture && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
@@ -902,10 +891,11 @@ const LabelProfile: React.FC = () => {
                       className="card bg-black/20 rounded-lg p-4 hover:bg-black/30 transition-colors"
                     >
                       <div className="flex items-center space-x-4">
-                        <img
-                          src={artist.profilePic}
+                        <UserAvatar
+                          username={artist.username}
+                          profilePic={artist.profilePic}
                           alt={artist.username}
-                          className="w-12 h-12 rounded-full object-cover"
+                          className="w-12 h-12 object-cover"
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="text-white font-medium truncate">

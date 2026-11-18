@@ -13,7 +13,7 @@ import CollectiveCreateModal from '../components/CollectiveCreateModal';
 import { useAuth } from '../contexts/AuthContext';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import { usePageMeta } from '../seo/usePageMeta';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import ProfileAmbassadors, { type ProfileAmbassador } from '../components/ProfileAmbassadors';
 
 interface PlaceEntity {
@@ -263,10 +263,11 @@ const LocationProfile: React.FC = () => {
                           to={`/collective/${venue.slug}`}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-100 text-xs font-medium hover:bg-amber-500/25 hover:border-amber-400/50 transition-colors no-underline"
                         >
-                          <img
-                            src={venue.profilePicture || DEFAULT_PROFILE_PIC}
+                          <UserAvatar
+                            name={venue.name}
+                            profilePic={venue.profilePicture}
                             alt=""
-                            className="h-4 w-4 rounded-full object-cover"
+                            className="h-4 w-4"
                           />
                           {venue.name}
                           {collectiveTypeLabel(venue.type) ? (

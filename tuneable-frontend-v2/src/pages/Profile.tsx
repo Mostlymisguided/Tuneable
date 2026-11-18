@@ -4,7 +4,7 @@ import { toast } from '../utils/toast';
 import { prepareProfileImage } from '../utils/profileImage';
 import { penceToPounds } from '../utils/currency';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { formatLocation, type ResolvedLocation } from '../utils/locationHelpers';
 import { 
@@ -214,13 +214,11 @@ const Profile: React.FC = () => {
                 className="w-48 h-48 rounded-full overflow-hidden bg-white flex items-center justify-center cursor-pointer shadow-xl"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <img
-                  src={profile.profilePic || DEFAULT_PROFILE_PIC}
+                <UserAvatar
+                  username={profile.username}
+                  profilePic={profile.profilePic}
                   alt="Profile"
                   className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                  }}
                 />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center rounded-full">

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, User } from 'lucide-react';
 import { userAPI } from '../lib/api';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from './UserAvatar';
 
 export type ArtistRelation = ',' | '&' | 'and' | 'with' | 'ft.' | 'feat.' | 'vs.' | 'x' | 'X';
 
@@ -208,13 +208,11 @@ const MultiArtistInput: React.FC<MultiArtistInputProps> = ({
                       className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-800 text-left text-sm"
                       onClick={() => handleSelectArtist(index, result)}
                     >
-                      <img
-                        src={result.profilePic || DEFAULT_PROFILE_PIC}
+                      <UserAvatar
+                        username={result.username}
+                        profilePic={result.profilePic}
                         alt={result.username}
-                        className="h-8 w-8 rounded-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                        }}
+                        className="h-8 w-8 object-cover"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-white truncate">

@@ -18,7 +18,8 @@ import { EMPTY_AI_USAGE, cleanAiTools, type AiUsage } from '../data/aiTools';
 import { AUDIO_FILE_ACCEPT, getAudioUploadRejection, titleFromAudioFileName } from '../lib/audioUpload';
 import { roundBpm } from '../utils/bpm';
 import { formatLinkedProfileLabel } from '../utils/linkedArtist';
-import { DEFAULT_PROFILE_PIC, FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
+import { FOUNDING_CREATOR_CAP, FOUNDING_UPLOAD_QUOTA_MB } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 
 // Helper functions to convert between MM:SS format and seconds
 const secondsToMMSS = (seconds: number): string => {
@@ -1175,13 +1176,11 @@ const CreatorUpload: React.FC = () => {
                             onClick={() => handleSelectArtist(creator)}
                             className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
                           >
-                            <img
-                              src={creator.profilePic || DEFAULT_PROFILE_PIC}
+                            <UserAvatar
+                              username={creator.username}
+                              profilePic={creator.profilePic}
                               alt={creator.username}
-                              className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-                              onError={(e) => {
-                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                              }}
+                              className="h-8 w-8 object-cover flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">{creator.artistName || creator.username}</div>
@@ -1627,21 +1626,13 @@ const CreatorUpload: React.FC = () => {
                               index === selectedLabelIndex ? 'bg-gray-700' : ''
                             }`}
                           >
-                            {label.profilePicture ? (
-                              <img
-                                src={label.profilePicture}
-                                alt={label.name}
-                                className="h-8 w-8 rounded object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = '';
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                            ) : (
-                              <div className="h-8 w-8 rounded bg-gray-700 flex items-center justify-center">
-                                <Building className="h-4 w-4 text-gray-400" />
-                              </div>
-                            )}
+                            <UserAvatar
+                              name={label.name}
+                              profilePic={label.profilePicture}
+                              alt={label.name}
+                              shape="rounded"
+                              className="h-8 w-8"
+                            />
                             <div className="flex-1">
                               <div className="text-white font-medium">{label.name}</div>
                               {label.description && (

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, UserPlus, Search, Mail, Loader2 } from 'lucide-react';
 import { toast } from '../../utils/toast';
 import { labelAPI, userAPI } from '../../lib/api';
-import { DEFAULT_PROFILE_PIC } from '../../constants';
+import UserAvatar from '../UserAvatar';
 
 interface InviteMemberModalProps {
   isOpen: boolean;
@@ -208,13 +208,11 @@ const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
               
               {selectedUser && (
                 <div className="mt-2 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg flex items-center space-x-3">
-                  <img
-                    src={selectedUser.profilePic || DEFAULT_PROFILE_PIC}
+                  <UserAvatar
+                    username={selectedUser.username}
+                    profilePic={selectedUser.profilePic}
                     alt={selectedUser.artistName || selectedUser.username}
-                    className="h-10 w-10 rounded-full"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                    }}
+                    className="h-10 w-10"
                   />
                   <div className="flex-1">
                     <div className="text-white font-medium">
@@ -248,13 +246,11 @@ const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                       }}
                       className="w-full px-4 py-2 text-left hover:bg-gray-600 flex items-center space-x-3 border-b border-gray-600 last:border-b-0"
                     >
-                      <img
-                        src={user.profilePic || DEFAULT_PROFILE_PIC}
+                      <UserAvatar
+                        username={user.username}
+                        profilePic={user.profilePic}
                         alt={user.artistName || user.username}
-                        className="h-8 w-8 rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                        }}
+                        className="h-8 w-8"
                       />
                       <div className="flex-1">
                         <div className="text-white">

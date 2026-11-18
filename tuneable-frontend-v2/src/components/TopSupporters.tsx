@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, TrendingUp } from 'lucide-react';
-import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import UserAvatar from './UserAvatar';
 
 interface Bid {
   userId: {
@@ -80,13 +80,11 @@ const TopSupporters: React.FC<TopSupportersProps> = ({ bids, maxDisplay = 10, us
             
             {/* Profile Picture */}
             <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
-              <img
-                src={supporter.user.profilePic || DEFAULT_PROFILE_PIC}
+              <UserAvatar
+                username={supporter.user.username}
+                profilePic={supporter.user.profilePic}
                 alt={supporter.user.username}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                }}
               />
             </div>
             

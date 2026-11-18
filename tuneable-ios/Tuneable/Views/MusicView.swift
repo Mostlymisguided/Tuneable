@@ -590,8 +590,7 @@ struct TopSupportersRow: View {
     }
 
     private var avatarURL: URL? {
-        guard let s = user.profilePic, !s.isEmpty else { return nil }
-        return URL(string: s)
+        UserLetterAvatar.customURL(user.profilePic)
     }
 
     var body: some View {
@@ -614,6 +613,8 @@ struct TopSupportersRow: View {
                 AsyncImage(url: url) { phase in
                     if case .success(let img) = phase {
                         img.resizable().aspectRatio(contentMode: .fill)
+                    } else if case .failure = phase {
+                        UserLetterAvatarView(name: user.username)
                     } else {
                         Circle().fill(Color.white.opacity(0.2))
                     }
@@ -621,10 +622,8 @@ struct TopSupportersRow: View {
                 .frame(width: 36, height: 36)
                 .clipShape(Circle())
             } else {
-                Circle()
-                    .fill(Color.white.opacity(0.2))
+                UserLetterAvatarView(name: user.username)
                     .frame(width: 36, height: 36)
-                    .overlay(Text(String((user.username ?? "?").prefix(1))).font(.caption).foregroundStyle(AppTheme.textSecondary))
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(user.username ?? "Unknown")
@@ -800,16 +799,16 @@ struct GlobalPartyMediaRow: View {
                         HStack(spacing: 6) {
                             ForEach(Array(supportersForBar.prefix(5).enumerated()), id: \.offset) { _, entry in
                                 HStack(spacing: 4) {
-                                    if let urlString = entry.user.profilePic, !urlString.isEmpty, let url = URL(string: urlString) {
+                                    if let url = UserLetterAvatar.customURL(entry.user.profilePic) {
                                         AsyncImage(url: url) { p in
                                             if case .success(let img) = p { img.resizable().aspectRatio(contentMode: .fill) }
+                                            else if case .failure = p { UserLetterAvatarView(name: entry.user.username) }
                                             else { Circle().fill(Color.white.opacity(0.2)) }
                                         }
                                         .frame(width: 20, height: 20)
                                         .clipShape(Circle())
                                     } else {
-                                        Circle()
-                                            .fill(Color.white.opacity(0.2))
+                                        UserLetterAvatarView(name: entry.user.username)
                                             .frame(width: 20, height: 20)
                                     }
                                     Text(entry.user.username ?? "")

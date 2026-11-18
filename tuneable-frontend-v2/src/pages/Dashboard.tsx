@@ -7,12 +7,12 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from '../utils/toast';
 import {
-  DEFAULT_PROFILE_PIC,
   ARTIST_INVITE_AFFILIATE_PERCENT,
   ARTIST_TIP_SHARE_TODAY_PERCENT,
   FOUNDING_CREATOR_CAP,
   FOUNDING_UPLOAD_QUOTA_MB,
 } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import type { AmbassadorSummary, FoundingCreatorsStatus } from '../types';
 import AmbassadorDashboard from '../components/AmbassadorDashboard';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
@@ -1572,13 +1572,12 @@ Join here: ${inviteLink}`.trim();
                                           <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-3">
-                                                <img 
-                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                  alt={label.name} 
-                                                  className="h-10 w-10 rounded object-cover"
-                                                  onError={(e) => {
-                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                  }}
+                                                <UserAvatar
+                                                  name={label.name}
+                                                  profilePic={label.profilePicture}
+                                                  alt={label.name}
+                                                  shape="rounded"
+                                                  className="h-10 w-10"
                                                 />
                                                 <Link
                                                   to={`/label/${label.slug}`}
@@ -1740,13 +1739,12 @@ Join here: ${inviteLink}`.trim();
                                           <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-3">
-                                                <img 
-                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                  alt={label.name} 
-                                                  className="h-10 w-10 rounded object-cover"
-                                                  onError={(e) => {
-                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                  }}
+                                                <UserAvatar
+                                                  name={label.name}
+                                                  profilePic={label.profilePicture}
+                                                  alt={label.name}
+                                                  shape="rounded"
+                                                  className="h-10 w-10"
                                                 />
                                                 <Link
                                                   to={`/label/${label.slug}`}
@@ -1909,13 +1907,12 @@ Join here: ${inviteLink}`.trim();
                                           <tr key={label._id} className="hover:bg-gray-800/50 transition-colors">
                                             <td className="px-4 py-3">
                                               <div className="flex items-center gap-3">
-                                                <img 
-                                                  src={label.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                  alt={label.name} 
-                                                  className="h-10 w-10 rounded object-cover"
-                                                  onError={(e) => {
-                                                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                  }}
+                                                <UserAvatar
+                                                  name={label.name}
+                                                  profilePic={label.profilePicture}
+                                                  alt={label.name}
+                                                  shape="rounded"
+                                                  className="h-10 w-10"
                                                 />
                                                 <Link
                                                   to={`/label/${label.slug}`}
@@ -2232,13 +2229,12 @@ Join here: ${inviteLink}`.trim();
                                             <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                  <img 
-                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                    alt={collective.name} 
-                                                    className="h-10 w-10 rounded object-cover"
-                                                    onError={(e) => {
-                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                    }}
+                                                  <UserAvatar
+                                                    name={collective.name}
+                                                    profilePic={collective.profilePicture}
+                                                    alt={collective.name}
+                                                    shape="rounded"
+                                                    className="h-10 w-10"
                                                   />
                                                   <Link
                                                     to={`/collective/${collective.slug}`}
@@ -2325,13 +2321,12 @@ Join here: ${inviteLink}`.trim();
                                             <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                  <img 
-                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                    alt={collective.name} 
-                                                    className="h-10 w-10 rounded object-cover"
-                                                    onError={(e) => {
-                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                    }}
+                                                  <UserAvatar
+                                                    name={collective.name}
+                                                    profilePic={collective.profilePicture}
+                                                    alt={collective.name}
+                                                    shape="rounded"
+                                                    className="h-10 w-10"
                                                   />
                                                   <Link
                                                     to={`/collective/${collective.slug}`}
@@ -2419,13 +2414,12 @@ Join here: ${inviteLink}`.trim();
                                             <tr key={collective._id} className="hover:bg-gray-800/50 transition-colors">
                                               <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                  <img 
-                                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC} 
-                                                    alt={collective.name} 
-                                                    className="h-10 w-10 rounded object-cover"
-                                                    onError={(e) => {
-                                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                                    }}
+                                                  <UserAvatar
+                                                    name={collective.name}
+                                                    profilePic={collective.profilePicture}
+                                                    alt={collective.name}
+                                                    shape="rounded"
+                                                    className="h-10 w-10"
                                                   />
                                                   <Link
                                                     to={`/collective/${collective.slug}`}
@@ -3033,13 +3027,11 @@ Join here: ${inviteLink}`.trim();
 
                   return (
                     <div key={invitedUser._id || invitedUser.id} className="flex items-center gap-3 bg-black/20 rounded px-4 py-3">
-                      <img
-                        src={invitedUser.profilePic || DEFAULT_PROFILE_PIC}
+                      <UserAvatar
+                        username={invitedUser.username}
+                        profilePic={invitedUser.profilePic}
                         alt={invitedUser.username}
-                        className="h-10 w-10 rounded-full object-cover flex-shrink-0"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                        }}
+                        className="h-10 w-10 object-cover flex-shrink-0"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="text-white font-medium">{invitedUser.username}</div>

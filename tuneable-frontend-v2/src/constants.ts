@@ -2,6 +2,7 @@
 
 export const DEFAULT_PROFILE_PIC = 'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
 
+/** True when the user uploaded a photo. The stored default URL means unset. */
 export const hasCustomProfilePic = (profilePic?: string | null) =>
   Boolean(profilePic && profilePic !== DEFAULT_PROFILE_PIC);
 

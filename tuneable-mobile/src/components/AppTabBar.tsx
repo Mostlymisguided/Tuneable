@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useSegments, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -9,6 +9,7 @@ import {
 } from '@/src/hooks/usePlayerDock';
 import { colors } from '@/src/theme/colors';
 import { hasCustomProfilePic } from '@/src/types/user';
+import { UserAvatar } from '@/src/components/UserAvatar';
 
 type TabItem = {
   href: Href;
@@ -41,10 +42,8 @@ export function AppTabBar() {
   const { showTabBar, tabBarHeight } = usePlayerDockState();
   const segments = useSegments() as string[];
   const lastTabRef = useRef<Href>('/(tabs)');
-  const [failedPic, setFailedPic] = useState<string | null>(null);
   const profilePic = user?.profilePic;
-  const showProfilePhoto =
-    hasCustomProfilePic(profilePic) && failedPic !== profilePic;
+  const showProfileAvatar = Boolean(user?.username);
 
   const routeTab = tabHrefFromSegments(segments);
   if (routeTab) lastTabRef.current = routeTab;
@@ -64,7 +63,7 @@ export function AppTabBar() {
       {TABS.map((tab) => {
         const active = activeHref === tab.href;
         const color = active ? colors.accentLight : colors.textMuted;
-        const usePhoto = tab.segment === 'profile' && showProfilePhoto;
+        const useAvatar = tab.segment === 'profile' && showProfileAvatar;
         return (
           <Pressable
             key={tab.label}
@@ -73,11 +72,10 @@ export function AppTabBar() {
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={tab.label}>
-            {usePhoto ? (
-              <Image
-                source={{ uri: profilePic }}
-                onError={() => setFailedPic(profilePic ?? null)}
-                accessibilityIgnoresInvertColors
+            {useAvatar ? (
+              <UserAvatar
+                username={user?.username}
+                profilePic={hasCustomProfilePic(profilePic) ? profilePic : null}
                 style={[
                   styles.profilePic,
                   { borderColor: active ? colors.accentLight : 'rgba(168, 85, 247, 0.45)' },

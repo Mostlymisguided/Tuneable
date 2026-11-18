@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Crown, Loader2, MapPin } from 'lucide-react';
-import { DEFAULT_PROFILE_PIC } from '../constants';
 import { mediaAPI, tagAPI, artistAPI, locationAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import {
@@ -11,6 +10,7 @@ import {
   type ResolvedLocation,
 } from '../utils/locationHelpers';
 import LocationAutocomplete from './LocationAutocomplete';
+import UserAvatar from './UserAvatar';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfileUrl } from '../utils/profileNavigation';
 
@@ -272,13 +272,11 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
                   }`}
                   title={`#${ranking.rank}`}
                 >
-                  <img
-                    src={ranking.user.profilePic || DEFAULT_PROFILE_PIC}
+                  <UserAvatar
+                    username={ranking.user.username}
+                    profilePic={ranking.user.profilePic}
                     alt=""
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                    }}
                   />
                 </div>
               );
@@ -462,13 +460,11 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
                           : `Show #${ranking.rank}`
                     }
                   >
-                    <img
-                      src={ranking.user.profilePic || DEFAULT_PROFILE_PIC}
+                    <UserAvatar
+                      username={ranking.user.username}
+                      profilePic={ranking.user.profilePic}
                       alt=""
-                      className="h-6 w-6 md:h-7 md:w-7 rounded-full object-cover flex-shrink-0"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                      }}
+                      className="h-6 w-6 md:h-7 md:w-7 object-cover flex-shrink-0"
                     />
                     {styles ? (
                       <span

@@ -52,7 +52,7 @@ import { toast } from '../utils/toast';
 import { summariseLicence } from '../components/LicencePicker';
 import { penceToPounds } from '../utils/currency';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
-import { DEFAULT_PROFILE_PIC } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import ClickableArtistDisplay from '../components/ClickableArtistDisplay';
 import TagList from '../components/TagList';
 import AdminRightsStatusSelect from '../components/AdminRightsStatusSelect';
@@ -2246,13 +2246,11 @@ const Admin: React.FC = () => {
                         <tr key={label._id} className="hover:bg-gray-700/50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <img
-                                src={label.profilePicture || DEFAULT_PROFILE_PIC}
+                              <UserAvatar
+                                name={label.name}
+                                profilePic={label.profilePicture}
                                 alt={label.name}
-                                className="h-10 w-10 rounded-full object-cover mr-3"
-                                onError={(e) => {
-                                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                }}
+                                className="h-10 w-10 mr-3"
                               />
                               <div>
                                 <div className="text-sm font-medium text-white">{label.name}</div>
@@ -2269,13 +2267,12 @@ const Admin: React.FC = () => {
                                 <div className="space-y-1">
                                   {label.owners.map((owner: any, idx: number) => (
                                     <div key={idx} className="flex items-center space-x-2">
-                                      {owner.profilePic && (
-                                        <img
-                                          src={owner.profilePic}
-                                          alt={owner.username}
-                                          className="h-6 w-6 rounded-full object-cover"
-                                        />
-                                      )}
+                                      <UserAvatar
+                                        username={owner.username}
+                                        profilePic={owner.profilePic}
+                                        alt={owner.username}
+                                        className="h-6 w-6 object-cover"
+                                      />
                                       <span>{owner.username}</span>
                                     </div>
                                   ))}
@@ -2474,13 +2471,11 @@ const Admin: React.FC = () => {
                             <tr key={collective._id} className="hover:bg-gray-700/50 transition-colors">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
-                                  <img
-                                    src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                                  <UserAvatar
+                                    name={collective.name}
+                                    profilePic={collective.profilePicture}
                                     alt={collective.name}
-                                    className="h-10 w-10 rounded-full object-cover mr-3"
-                                    onError={(e) => {
-                                      e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                                    }}
+                                    className="h-10 w-10 mr-3"
                                   />
                                   <div>
                                     <div className="text-sm font-medium text-white">{collective.name}</div>
@@ -2500,13 +2495,12 @@ const Admin: React.FC = () => {
                                     <div className="space-y-1">
                                       {collective.founders.map((founder: any, idx: number) => (
                                         <div key={idx} className="flex items-center space-x-2">
-                                          {founder.profilePic && (
-                                            <img
-                                              src={founder.profilePic}
-                                              alt={founder.username}
-                                              className="h-6 w-6 rounded-full object-cover"
-                                            />
-                                          )}
+                                          <UserAvatar
+                                            username={founder.username}
+                                            profilePic={founder.profilePic}
+                                            alt={founder.username}
+                                            className="h-6 w-6 object-cover"
+                                          />
                                           <span>{founder.username}</span>
                                         </div>
                                       ))}
@@ -3971,13 +3965,12 @@ const Admin: React.FC = () => {
                       <div key={app._id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center space-x-4">
-                            {app.profilePic && (
-                              <img
-                                src={app.profilePic}
-                                alt={app.username}
-                                className="w-16 h-16 rounded-full object-cover"
-                              />
-                            )}
+                            <UserAvatar
+                              username={app.username}
+                              profilePic={app.profilePic}
+                              alt={app.username}
+                              className="w-16 h-16 object-cover"
+                            />
                             <div>
                               <h3 className="text-xl font-bold text-white">{app.creatorProfile?.artistName}</h3>
                               <p className="text-gray-400">@{app.username} • {app.email}</p>

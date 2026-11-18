@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { Ban, Loader2 } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { userAPI, type BlockedUser } from '../lib/api';
-import { DEFAULT_PROFILE_PIC } from '../constants';
 import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import UserAvatar from './UserAvatar';
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   return (error as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback;
@@ -84,13 +84,11 @@ const BlockedUsersSection: React.FC = () => {
                 to={getUserProfileUrl(entry)}
                 className="flex items-center gap-3 min-w-0 hover:opacity-90"
               >
-                <img
-                  src={entry.profilePic || DEFAULT_PROFILE_PIC}
+                <UserAvatar
+                  username={entry.username}
+                  profilePic={entry.profilePic}
                   alt=""
-                  className="h-9 w-9 rounded-full object-cover flex-shrink-0"
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                  }}
+                  className="h-9 w-9 object-cover flex-shrink-0"
                 />
                 <span className="text-white font-medium truncate">@{entry.username ?? 'user'}</span>
               </Link>

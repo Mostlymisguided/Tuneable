@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import { Crown } from 'lucide-react';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import UserAvatar from './UserAvatar';
 import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 
 const ANONYMOUS_LABEL = 'Supporter';
@@ -167,13 +167,12 @@ const MiniSupportersBar: React.FC<MiniSupportersBarProps> = ({
           const rank = podiumRankById.get(id);
           const revealed = revealedIds.has(id);
           const avatar = (
-            <img
-              src={s.anonymous ? DEFAULT_PROFILE_PIC : s.user.profilePic || DEFAULT_PROFILE_PIC}
+            <UserAvatar
+              anonymous={Boolean(s.anonymous)}
+              username={s.anonymous ? undefined : s.user.username}
+              profilePic={s.anonymous ? undefined : s.user.profilePic}
               alt=""
-              className="h-4 w-4 md:h-6 md:w-6 rounded-full object-cover flex-shrink-0"
-              onError={(e) => {
-                e.currentTarget.src = DEFAULT_PROFILE_PIC;
-              }}
+              className="h-4 w-4 md:h-6 md:w-6 object-cover flex-shrink-0"
             />
           );
           const crown = rank ? (

@@ -15,6 +15,7 @@ import { locationAPI } from '@/src/api/locations';
 import { mediaAPI } from '@/src/api/media';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { Screen } from '@/src/components/Screen';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
@@ -275,7 +276,11 @@ export default function PlaceProfileScreen() {
                 style={styles.venueChip}
                 accessibilityRole="button"
                 accessibilityLabel={`${venue.name}, ${typeLabel}`}>
-                <Ionicons name="business-outline" size={12} color="#fbbf24" />
+                <UserAvatar
+                  name={venue.name}
+                  profilePic={venue.profilePicture}
+                  style={styles.venueAvatar}
+                />
                 <Text style={styles.venueChipText}>
                   {venue.name}
                   <Text style={styles.venueChipKind}> · {typeLabel}</Text>
@@ -638,6 +643,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
+  },
+  venueAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
   venueChipText: {
     color: '#fde68a',

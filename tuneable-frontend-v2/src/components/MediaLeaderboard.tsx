@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Trophy, ChevronDown, ChevronUp, Globe, Users, Coins, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import UserAvatar from './UserAvatar';
 
 interface User {
   _id?: string;
@@ -114,24 +114,12 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
       <div className={`flex items-center justify-between p-2 rounded-lg bg-gradient-to-r ${color}  border-opacity-30 w-fit`}>
         <div className="flex items-center space-x-2">
           {/* Profile Picture replacing icon */}
-          {user.profilePic ? (
-            <img
-              src={user.profilePic}
-              alt={user.username}
-              className="w-6 h-6 rounded-full flex-shrink-0 object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                if (placeholder) placeholder.style.display = 'flex';
-              }}
-            />
-          ) : null}
-          <div 
-            className={`w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 ${user.profilePic ? 'hidden' : 'flex'}`}
-            style={{ display: user.profilePic ? 'none' : 'flex' }}
-          >
-                        <img src={DEFAULT_PROFILE_PIC} alt="Tuneable" className="w-6 h-6" />
-          </div>
+          <UserAvatar
+            username={user.username}
+            profilePic={user.profilePic}
+            alt={user.username}
+            className="w-6 h-6 object-cover"
+          />
           
           <div className="min-w-0">
             <div className="text-xs text-gray-300 mb-0.5">{label}</div>
@@ -211,24 +199,12 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                       <div className="w-6 h-6 bg-purple-600/50 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-white font-bold text-xs">#{index + 1}</span>
                       </div>
-                      {supporter.user.profilePic ? (
-                        <img
-                          src={supporter.user.profilePic}
-                          alt={supporter.user.username}
-                          className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (placeholder) placeholder.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div 
-                        className={`w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 ${supporter.user.profilePic ? 'hidden' : 'flex'}`}
-                        style={{ display: supporter.user.profilePic ? 'none' : 'flex' }}
-                      >
-                        <img src={DEFAULT_PROFILE_PIC} alt="Tuneable" className="w-8 h-8" />
-                      </div>
+                      <UserAvatar
+                        username={supporter.user.username}
+                        profilePic={supporter.user.profilePic}
+                        alt={supporter.user.username}
+                        className="w-8 h-8 object-cover"
+                      />
                       <div className="flex-1 min-w-0">
                         <Link
                           to={getUserProfileUrl(supporter.user)}
@@ -270,24 +246,12 @@ const MediaLeaderboard: React.FC<MediaLeaderboardProps> = ({
                       <div className="w-6 h-6 bg-yellow-600/50 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-white font-bold text-xs">#{index + 1}</span>
                       </div>
-                      {bid.userId?.profilePic ? (
-                        <img
-                          src={bid.userId.profilePic}
-                          alt={bid.userId?.username || 'Unknown'}
-                          className="w-8 h-8 rounded-full flex-shrink-0 object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (placeholder) placeholder.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <div 
-                        className={`w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0 ${bid.userId?.profilePic ? 'hidden' : 'flex'}`}
-                        style={{ display: bid.userId?.profilePic ? 'none' : 'flex' }}
-                      >
-                        <img src={DEFAULT_PROFILE_PIC} alt="Tuneable" className="w-8 h-8 " />
-                      </div>
+                      <UserAvatar
+                        username={bid.userId?.username}
+                        profilePic={bid.userId?.profilePic}
+                        alt={bid.userId?.username || 'Unknown'}
+                        className="w-8 h-8 object-cover"
+                      />
                       <div className="flex-1 min-w-0">
                         <Link
                           to={getUserProfileUrl(bid.userId)}

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
-import { DEFAULT_PROFILE_PIC } from '../constants';
 import { penceToPounds } from '../utils/currency';
+import UserAvatar from './UserAvatar';
 
 interface Bid {
   userId: {
@@ -76,13 +76,11 @@ const TopBidders: React.FC<TopBiddersProps> = ({ bids, maxDisplay = 5 }) => {
           <div className="flex items-center space-x-3 flex-1 min-w-0">
             {/* Profile Picture */}
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 border-2 border-yellow-500 flex-shrink-0">
-              <img
-                src={bid.userId.profilePic || DEFAULT_PROFILE_PIC}
+              <UserAvatar
+                username={bid.userId.username}
+                profilePic={bid.userId.profilePic}
                 alt={bid.userId.username}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                }}
               />
             </div>
             

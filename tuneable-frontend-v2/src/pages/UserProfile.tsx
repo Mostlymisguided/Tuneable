@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { toast } from '../utils/toast';
 import { prepareProfileImage } from '../utils/profileImage';
 import { DEFAULT_PROFILE_PIC, DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import { 
   Coins, 
   Music, 
@@ -304,7 +305,7 @@ const UserProfile: React.FC = () => {
     title: profileName,
     description: clipText(user.creatorProfile?.bio) || `${profileName} on Tuneable. See the tunes they support.`,
     path: `/user/${encodeURIComponent(user.username)}`,
-    image: user.profilePic,
+    image: hasCustomProfilePic(user.profilePic) ? user.profilePic : undefined,
     imageAlt: profileName,
     type: 'profile',
     jsonLd: {
@@ -2006,8 +2007,8 @@ const UserProfile: React.FC = () => {
     if (!hasCustomProfilePic(user?.profilePic)) return;
 
     const confirmMessage = isOwnProfile
-      ? 'Remove your profile picture and use the default avatar? This cannot be undone.'
-      : `Remove @${user?.username}'s profile picture and use the default avatar? This cannot be undone.`;
+      ? 'Remove your profile picture? Your initial will show instead. This cannot be undone.'
+      : `Remove @${user?.username}'s profile picture? Their initial will show instead. This cannot be undone.`;
     if (!window.confirm(confirmMessage)) {
       return;
     }
@@ -2166,16 +2167,14 @@ const UserProfile: React.FC = () => {
             )}
             {/* Profile Picture */}
             <div className="flex-shrink-0 relative mb-2 md:mb-0 md:mr-4">
-              <img
-                src={user.profilePic || DEFAULT_PROFILE_PIC}
+              <UserAvatar
+                username={user.username}
+                profilePic={user.profilePic}
                 alt={`${user.username} profile`}
-                className={`rounded-full shadow-xl object-cover ${canEditProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                className={`shadow-xl object-cover ${canEditProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                 style={{ width: '200px', height: '200px' }}
                 onClick={handleProfilePicClick}
                 title={canEditProfile ? 'Click to change profile picture' : ''}
-                onError={(e) => {
-                  e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                }}
               />
               {(isUploading || isRemovingPic) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
@@ -2251,13 +2250,11 @@ const UserProfile: React.FC = () => {
                           href={`/collective/${collective.slug}`}
                           className={`flex items-center space-x-2 px-3 py-2 bg-black/20 border rounded-lg transition-all hover:bg-black/30 ${roleColor}`}
                         >
-                          <img
-                            src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                          <UserAvatar
+                            name={collective.name}
+                            profilePic={collective.profilePicture}
                             alt={collective.name}
-                            className="h-6 w-6 rounded-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                            }}
+                            className="h-6 w-6"
                           />
                           <div className="flex flex-col">
                             <span className="text-sm font-medium">{collective.name}</span>
@@ -2294,13 +2291,11 @@ const UserProfile: React.FC = () => {
                           href={`/label/${affiliation.label.slug}`}
                           className={`flex items-center space-x-2 px-3 py-2 bg-black/20 border rounded-lg transition-all hover:bg-black/30 ${roleColor}`}
                         >
-                          <img
-                            src={affiliation.label.profilePicture || DEFAULT_PROFILE_PIC}
+                          <UserAvatar
+                            name={affiliation.label.name}
+                            profilePic={affiliation.label.profilePicture}
                             alt={affiliation.label.name}
-                            className="h-6 w-6 rounded-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                            }}
+                            className="h-6 w-6"
                           />
                           <div className="flex flex-col">
                             <span className="text-sm font-medium">{affiliation.label.name}</span>
@@ -3660,13 +3655,11 @@ const UserProfile: React.FC = () => {
                 <div className="mb-6">
                   <label className="block text-white font-medium mb-3">Profile Picture</label>
                   <div className="flex items-center gap-4">
-                    <img
-                      src={user.profilePic || DEFAULT_PROFILE_PIC}
+                    <UserAvatar
+                      username={user.username}
+                      profilePic={user.profilePic}
                       alt={`${user.username} profile`}
-                      className="w-20 h-20 rounded-full object-cover shadow-lg"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                      }}
+                      className="w-20 h-20 object-cover shadow-lg"
                     />
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -3710,7 +3703,7 @@ const UserProfile: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    Large photos are resized automatically. Removing your picture restores the default avatar.
+                    Large photos are resized automatically. Removing your picture shows your initial.
                   </p>
                 </div>
                 

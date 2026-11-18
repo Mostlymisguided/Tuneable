@@ -1,7 +1,6 @@
 import { Children, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { colors } from '@/src/theme/colors';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import {
   formatLocationLabel,
@@ -25,14 +25,13 @@ import {
   championBadgePrimaryLabel,
   fallbackChampionBadges,
 } from '@/src/lib/championBadges';
-import type { ResolvedLocation } from '@/src/types/user';
-import {
-  DEFAULT_PROFILE_PIC,
-  type ChampionBadge,
-  type MediaChampionTitle,
-  type TipTagChampion,
-  type TuneBytesTagRanking,
-  type User,
+import type {
+  ChampionBadge,
+  MediaChampionTitle,
+  ResolvedLocation,
+  TipTagChampion,
+  TuneBytesTagRanking,
+  User,
 } from '@/src/types/user';
 
 const DEFAULT_BADGE_VISIBLE = 3;
@@ -167,8 +166,9 @@ export function UserProfileHero({
             style={styles.avatarWrap}
             accessibilityRole="button"
             accessibilityLabel="Edit profile picture">
-            <Image
-              source={{ uri: user.profilePic || DEFAULT_PROFILE_PIC }}
+            <UserAvatar
+              username={user.username}
+              profilePic={user.profilePic}
               style={styles.avatar}
             />
             <View style={styles.cameraBadge}>
@@ -176,8 +176,9 @@ export function UserProfileHero({
             </View>
           </Pressable>
         ) : (
-          <Image
-            source={{ uri: user.profilePic || DEFAULT_PROFILE_PIC }}
+          <UserAvatar
+            username={user.username}
+            profilePic={user.profilePic}
             style={styles.avatar}
           />
         )}

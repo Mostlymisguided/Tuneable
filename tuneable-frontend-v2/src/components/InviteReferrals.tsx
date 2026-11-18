@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { Users, Copy, CheckCircle, Gift, MapPin, Calendar, Plus, Edit2, Trash2, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { authAPI } from '../lib/api';
-import { DEFAULT_PROFILE_PIC, ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP } from '../constants';
+import { ARTIST_INVITE_AFFILIATE_PERCENT, FOUNDING_CREATOR_CAP } from '../constants';
 import type { AmbassadorSummary, InviteCode, Referral, ReferralsResponse } from '../types';
 import AmbassadorProgramCard from './AmbassadorProgramCard';
+import UserAvatar from './UserAvatar';
 import { useAuth } from '../contexts/AuthContext';
 
 const InviteReferrals: React.FC = () => {
@@ -462,13 +463,11 @@ const InviteReferrals: React.FC = () => {
                     <div className="flex items-center space-x-4 flex-1 min-w-0">
                       {/* Profile Picture */}
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500 flex-shrink-0">
-                        <img
-                          src={referral.profilePic || DEFAULT_PROFILE_PIC}
+                        <UserAvatar
+                          username={referral.username}
+                          profilePic={referral.profilePic}
                           alt={referral.username}
                           className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                          }}
                         />
                       </div>
                       

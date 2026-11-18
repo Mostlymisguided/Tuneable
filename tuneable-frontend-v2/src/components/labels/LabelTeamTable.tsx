@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Users } from 'lucide-react';
-import { DEFAULT_PROFILE_PIC } from '../../constants';
+import UserAvatar from '../UserAvatar';
 
 export interface LabelTeamMember {
   _id?: string;
@@ -125,14 +125,14 @@ const getUserData = (member: LabelTeamMember) => {
     return {
       id: member.userId || member._id,
       username: member.username || 'Unknown user',
-      profilePic: member.profilePic || DEFAULT_PROFILE_PIC,
+      profilePic: member.profilePic,
     };
   }
 
   return {
     id: member.userId._id || member.userId.uuid || member._id,
     username: member.userId.username || member.username || 'Unknown user',
-    profilePic: member.userId.profilePic || member.profilePic || DEFAULT_PROFILE_PIC,
+    profilePic: member.userId.profilePic || member.profilePic,
   };
 };
 
@@ -263,13 +263,11 @@ const LabelTeamTable: React.FC<LabelTeamTableProps> = ({
               <tr key={user.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={user.profilePic || DEFAULT_PROFILE_PIC}
+                    <UserAvatar
+                      username={user.username}
+                      profilePic={user.profilePic}
                       alt={user.username || 'Team member'}
-                      className="h-10 w-10 rounded-full object-cover border border-white/10"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                      }}
+                      className="h-10 w-10 object-cover border border-white/10"
                     />
                     <div>
                       <div className="text-sm font-medium text-white">{user.username}</div>

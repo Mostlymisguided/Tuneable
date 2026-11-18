@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import {
-  DEFAULT_PROFILE_PIC,
   DEFAULT_COVER_ART,
 } from '../constants';
+import UserAvatar from '../components/UserAvatar';
 import { 
   Music, 
   User, 
@@ -3068,13 +3068,11 @@ const TuneProfile: React.FC = () => {
                     
                     return (
                       <div key={index} className="flex items-center space-x-4 p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 hover:border-purple-500/40 transition-all">
-                        <img
-                          src={collectiveProfilePicture || DEFAULT_PROFILE_PIC}
+                        <UserAvatar
+                          name={collectiveName}
+                          profilePic={collectiveProfilePicture}
                           alt={collectiveName}
-                          className="h-12 w-12 rounded-full object-cover flex-shrink-0"
-                          onError={(e) => {
-                            e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                          }}
+                          className="h-12 w-12 flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           {collectiveSlug ? (
@@ -3150,13 +3148,11 @@ const TuneProfile: React.FC = () => {
               comments.map((comment) => (
                 <div key={comment._id} className="bg-black/20 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
-                    <img
-                      src={comment.userId.profilePic || DEFAULT_PROFILE_PIC}
+                    <UserAvatar
+                      username={comment.userId.username}
+                      profilePic={comment.userId.profilePic}
                       alt={comment.userId.username}
-                      className="w-10 h-10 rounded-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                      }}
+                      className="w-10 h-10 object-cover"
                     />
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
@@ -3308,13 +3304,11 @@ const TuneProfile: React.FC = () => {
                             }}
                             className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
                           >
-                            <img
-                              src={creator.profilePic || DEFAULT_PROFILE_PIC}
+                            <UserAvatar
+                              username={creator.username}
+                              profilePic={creator.profilePic}
                               alt={creator.username}
-                              className="h-8 w-8 rounded-full object-cover flex-shrink-0"
-                              onError={(e) => {
-                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                              }}
+                              className="h-8 w-8 object-cover flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">{creator.artistName || creator.username}</div>
@@ -3374,13 +3368,12 @@ const TuneProfile: React.FC = () => {
                           }}
                           className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
                         >
-                          <img
-                            src={collective.profilePicture || DEFAULT_PROFILE_PIC}
+                          <UserAvatar
+                            name={collective.name}
+                            profilePic={collective.profilePicture}
                             alt={collective.name}
-                            className="h-8 w-8 rounded object-cover flex-shrink-0"
-                            onError={(e) => {
-                              e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                            }}
+                            shape="rounded"
+                            className="h-8 w-8 flex-shrink-0"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{collective.name}</div>
@@ -3756,13 +3749,12 @@ const TuneProfile: React.FC = () => {
                             }}
                             className="w-full px-4 py-3 text-left hover:bg-gray-700 text-white flex items-center gap-3 transition-colors"
                           >
-                            <img
-                              src={label.profilePicture || DEFAULT_PROFILE_PIC}
+                            <UserAvatar
+                              name={label.name}
+                              profilePic={label.profilePicture}
                               alt={label.name}
-                              className="h-8 w-8 rounded object-cover flex-shrink-0"
-                              onError={(e) => {
-                                e.currentTarget.src = DEFAULT_PROFILE_PIC;
-                              }}
+                              shape="rounded"
+                              className="h-8 w-8 flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">{label.name}</div>

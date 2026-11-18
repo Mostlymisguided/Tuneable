@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { CoverRail, type CoverRailItem } from '@/src/components/CoverRail';
 import { DashboardPrompts } from '@/src/components/DashboardPrompts';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
@@ -51,7 +51,6 @@ import {
   type ChartMediaItem,
 } from '@/src/types/media';
 import {
-  DEFAULT_PROFILE_PIC,
   type ChampionBadge,
   type UserStats,
 } from '@/src/types/user';
@@ -233,8 +232,9 @@ export default function HomeScreen() {
               onPress={() => router.push('/(tabs)/profile')}
               accessibilityRole="button"
               accessibilityLabel="Open profile">
-              <Image
-                source={{ uri: user?.profilePic || DEFAULT_PROFILE_PIC }}
+              <UserAvatar
+                username={user?.username}
+                profilePic={user?.profilePic}
                 style={styles.avatar}
               />
             </Pressable>

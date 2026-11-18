@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors } from '@/src/theme/colors';
+import { UserAvatar } from '@/src/components/UserAvatar';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import type { ChartMediaItem } from '@/src/types/media';
-import { DEFAULT_PROFILE_PIC } from '@/src/types/user';
 import { useBlockedUsersStore } from '@/src/stores/blockedUsersStore';
 
 type Bid = NonNullable<ChartMediaItem['bids']>[number];
@@ -161,8 +161,10 @@ export function MiniSupportersBar({
             <View
               key={s.id}
               style={[styles.stackItem, { zIndex: stackVisible.length - index, marginLeft: index === 0 ? 0 : -6 }]}>
-              <Image
-                source={{ uri: s.profilePic || DEFAULT_PROFILE_PIC }}
+              <UserAvatar
+                anonymous={Boolean(s.anonymous)}
+                username={s.anonymous ? undefined : s.username}
+                profilePic={s.anonymous ? undefined : s.profilePic}
                 style={styles.stackAvatar}
               />
               {rank ? (
@@ -197,8 +199,10 @@ export function MiniSupportersBar({
         const rank = podiumRankById.get(s.id);
         const revealed = revealedIds.has(s.id);
         const avatar = (
-          <Image
-            source={{ uri: s.profilePic || DEFAULT_PROFILE_PIC }}
+          <UserAvatar
+            anonymous={Boolean(s.anonymous)}
+            username={s.anonymous ? undefined : s.username}
+            profilePic={s.anonymous ? undefined : s.profilePic}
             style={styles.avatar}
           />
         );
