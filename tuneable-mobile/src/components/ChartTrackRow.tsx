@@ -196,17 +196,6 @@ export function ChartTrackRow({
   }
 
   const metaParts: Array<{ key: string; node: ReactNode }> = [];
-  if (durationLabel) {
-    metaParts.push({
-      key: 'duration',
-      node: (
-        <View style={styles.durationRow}>
-          <Ionicons name="time-outline" size={11} color={colors.textMuted} />
-          <Text style={styles.metaStat}>{durationLabel}</Text>
-        </View>
-      ),
-    });
-  }
   if (bpm != null) {
     const bpmHref = getTagProfileHref(String(bpm));
     metaParts.push({
@@ -222,21 +211,7 @@ export function ChartTrackRow({
       ),
     });
   }
-  if (releaseYear != null) {
-    const yearHref = getTagProfileHref(String(releaseYear));
-    metaParts.push({
-      key: 'year',
-      node: (
-        <Pressable
-          onPress={() => router.push(yearHref as Href)}
-          hitSlop={4}
-          accessibilityRole="link"
-          accessibilityLabel={`Open year ${releaseYear}`}>
-          <Text style={styles.metaStat}>{releaseYear}</Text>
-        </Pressable>
-      ),
-    });
-  }
+  const yearHref = releaseYear != null ? getTagProfileHref(String(releaseYear)) : null;
   metaParts.push({
     key: 'country',
     node: countryHref ? (
@@ -264,11 +239,16 @@ export function ChartTrackRow({
         {coverArt}
 
         <View style={styles.richMeta}>
-          <Pressable onPress={onOpen}>
-            <View style={styles.titleRow}>
+          <View style={styles.titleRow}>
+            <Pressable style={styles.titleCluster} onPress={onOpen}>
               <Text style={styles.richTitle} numberOfLines={1}>
                 {item.title || 'Untitled'}
               </Text>
+              {durationLabel ? (
+                <Text style={styles.besideStat}>{durationLabel}</Text>
+              ) : null}
+            </Pressable>
+            {metaParts.length > 0 ? (
               <View style={styles.metaStats}>
                 {metaParts.map((part, index) => (
                   <View key={part.key} style={styles.metaPart}>
@@ -277,17 +257,33 @@ export function ChartTrackRow({
                   </View>
                 ))}
               </View>
-            </View>
-          </Pressable>
+            ) : null}
+          </View>
           <View style={styles.artistRow}>
-            <Pressable style={styles.artistPress} onPress={onOpen}>
-              <Text style={styles.artist} numberOfLines={1}>
-                {getCreatorDisplay(item)}
-              </Text>
+            <View style={styles.artistPress}>
+              <View style={styles.identityLine}>
+                <Pressable style={styles.artistNamePress} onPress={onOpen}>
+                  <Text style={styles.artistName} numberOfLines={1}>
+                    {getCreatorDisplay(item)}
+                  </Text>
+                </Pressable>
+                {releaseYear != null && yearHref ? (
+                  <>
+                    <Text style={styles.metaDot}>·</Text>
+                    <Pressable
+                      onPress={() => router.push(yearHref as Href)}
+                      hitSlop={4}
+                      accessibilityRole="link"
+                      accessibilityLabel={`Open year ${releaseYear}`}>
+                      <Text style={styles.besideStat}>{releaseYear}</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
               {showHint ? (
                 <Text style={styles.hint}>Catalog only — awaiting playback rights</Text>
               ) : null}
-            </Pressable>
+            </View>
             {typeof item.tuneBytesEarned === 'number' ? (
               <TuneBytesAmount value={item.tuneBytesEarned} reference={referenceTuneBytes} />
             ) : null}
@@ -466,18 +462,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  titleCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   richTitle: {
-    flex: 1,
+    flexShrink: 1,
     minWidth: 0,
     color: colors.text,
     fontSize: 14,
     fontWeight: '600',
+  },
+  besideStat: {
+    flexShrink: 0,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
   },
   metaStats: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     flexShrink: 0,
+    marginLeft: 'auto',
   },
   metaPart: {
     flexDirection: 'row',
@@ -494,11 +504,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
   },
-  durationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
   artistRow: {
     marginTop: 2,
     flexDirection: 'row',
@@ -508,6 +513,20 @@ const styles = StyleSheet.create({
   artistPress: {
     flex: 1,
     minWidth: 0,
+  },
+  identityLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 0,
+  },
+  artistNamePress: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  artistName: {
+    color: colors.textSecondary,
+    fontSize: 13,
   },
   tuneBytesRow: {
     flexDirection: 'row',
