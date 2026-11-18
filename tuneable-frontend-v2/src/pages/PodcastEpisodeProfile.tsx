@@ -205,7 +205,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const { mediaId } = useParams<{ mediaId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
 
   // Sanitize HTML description for safe rendering
   const sanitizeDescription = (html: string): string => {
@@ -1640,12 +1640,35 @@ const PodcastEpisodeProfile: React.FC = () => {
     setIsPlacingGlobalBid(true);
 
     try {
-      await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags);
-      
+      const result = await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
+      const tipPence = Math.round(bidAmount * 100);
+      const viewerId = (user as { _id?: string; id?: string })._id || (user as { id?: string }).id || '';
+      setMedia((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tags: result.media?.tags?.length ? result.media.tags : prev.tags,
+          globalMediaAggregate: (prev.globalMediaAggregate ?? 0) + tipPence,
+          tipCount: (prev.tipCount ?? prev.bids?.length ?? 0) + 1,
+          bids: [
+            ...(prev.bids ?? []),
+            {
+              _id: `tip-${Date.now()}`,
+              amount: tipPence,
+              createdAt: new Date().toISOString(),
+              userId: {
+                _id: viewerId,
+                uuid: user.uuid || '',
+                username: user.username || '',
+                profilePic: user.profilePic,
+              },
+            },
+          ],
+        };
+      });
+      void mediaAPI.getCopyAccess(mediaId).then(setCopyAccess).catch(() => undefined);
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
-      
-      // Refresh media data to show updated metrics
-      await fetchMediaProfile();
       
     } catch (err: any) {
       console.error('Error placing global tip:', err);

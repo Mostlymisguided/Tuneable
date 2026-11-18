@@ -105,7 +105,7 @@ function isHttpCover(url?: string | null): url is string {
 const PodcastSeriesProfile: React.FC = () => {
   const { seriesId } = useParams<{ seriesId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   
   const [series, setSeries] = useState<PodcastSeries | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
@@ -587,18 +587,24 @@ const PodcastSeriesProfile: React.FC = () => {
     setIsPlacingBid(true);
     try {
       const episodeId = selectedEpisode._id;
-      await mediaAPI.placeGlobalBid(episodeId, tipAmount, undefined, tags);
-      
+      const result = await mediaAPI.placeGlobalBid(episodeId, tipAmount, undefined, tags);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
+      const tipPence = Math.round(tipAmount * 100);
+      setEpisodes((prev) =>
+        prev.map((episode) =>
+          episode._id === episodeId
+            ? { ...episode, globalMediaAggregate: (episode.globalMediaAggregate || 0) + tipPence }
+            : episode
+        )
+      );
+      setStats((prev) =>
+        prev
+          ? { ...prev, totalTips: (prev.totalTips || 0) + tipPence }
+          : prev
+      );
       toast.success(`Tip of £${tipAmount.toFixed(2)} placed successfully!`);
       setShowBidConfirmationModal(false);
       setSelectedEpisode(null);
-      
-      // Refresh series data
-      await fetchSeriesInfo();
-      await fetchEpisodes();
-      
-      // Refresh user balance
-      window.location.reload();
     } catch (error: any) {
       console.error('Error placing bid:', error);
       toast.error(error.response?.data?.error || 'Failed to place tip');

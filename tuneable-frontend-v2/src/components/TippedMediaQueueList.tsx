@@ -128,7 +128,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   onPlayableOnlyChange,
 }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
     useWebPlayerStore();
   const internalPref = usePlayableOnly('chart');
@@ -289,10 +289,11 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
 
     setIsPlacingTip(true);
     try {
-      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
+      const result = await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
       toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${itemToTip.title}"!`);
       setItemToTip(null);
-      await onTipPlaced?.();
+      void onTipPlaced?.();
     } catch (err: any) {
       console.error('Error placing tip:', err);
       toast.error(err.response?.data?.error || 'Failed to place tip');

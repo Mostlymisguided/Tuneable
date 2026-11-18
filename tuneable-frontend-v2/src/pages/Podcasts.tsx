@@ -215,7 +215,7 @@ function getTimeRangeStartDate(range: string): Date | null {
 const Podcasts: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, token, handleOAuthCallback, refreshUser } = useAuth();
+  const { user, token, handleOAuthCallback, refreshUser, updateBalance } = useAuth();
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -1140,17 +1140,22 @@ const Podcasts: React.FC = () => {
         toast.error('Episode ID not found');
         return;
       }
-      await mediaAPI.placeGlobalBid(episodeId, tipAmount, undefined, tags);
-      
+      const result = await mediaAPI.placeGlobalBid(episodeId, tipAmount, undefined, tags);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
+      const tipPence = Math.round(tipAmount * 100);
+      setEpisodes((prev) =>
+        prev.map((episode) => {
+          const id = episode._id || episode.id;
+          if (id !== episodeId) return episode;
+          return {
+            ...episode,
+            globalMediaAggregate: (episode.globalMediaAggregate || 0) + tipPence,
+          };
+        })
+      );
       toast.success(`Tip of £${tipAmount.toFixed(2)} placed successfully!`);
       setShowBidConfirmationModal(false);
       setSelectedEpisode(null);
-      
-      // Refresh chart
-      fetchChart();
-      
-      // Refresh user balance
-      window.location.reload(); // Simple refresh for now
     } catch (error: any) {
       console.error('Error placing bid:', error);
       toast.error(error.response?.data?.error || 'Failed to place tip');

@@ -736,12 +736,14 @@ Join here: ${inviteLink}`.trim();
     if (!mediaId) return;
     setIsPlacingLibraryTip(true);
     try {
-      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
+      const result = await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
       toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
       setLibraryItemToTip(null);
-      const data = await userAPI.getTuneLibrary();
-      setTuneLibrary(data.library || []);
       setQueueRefresh((current) => current + 1);
+      void userAPI.getTuneLibrary()
+        .then((data) => setTuneLibrary(data.library || []))
+        .catch((error) => console.error('Failed to refresh tune library:', error));
     } catch (error: any) {
       console.error('Error placing bid:', error);
       toast.error(error.response?.data?.error || 'Failed to place tip');

@@ -3624,12 +3624,13 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Media not found' });
     }
 
+    let tipChipsAdded = false;
     if (media && Array.isArray(tags) && tags.length > 0) {
       const applied = applyTipChipsToMedia(media, tags);
       if (applied.didAddTag || applied.didAddElement) {
         media.tags = applied.tags;
         media.elements = applied.elements;
-        await media.save();
+        tipChipsAdded = true;
         if (applied.didAddElement) {
           console.log(
             `✅ Merged tip elements into media: "${media.title}" → [${applied.elements.join(', ')}]`
@@ -3685,23 +3686,15 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       ...require('../utils/locationUtils').buildBidLocationSnapshot(user, currentLocation),
     });
 
-    // Snapshot podium before the new bid (for champion title steal notifications)
-    let oldMediaChampions = null;
-    try {
-      const { getMediaChampions } = require('../services/mediaChampionsService');
-      oldMediaChampions = await getMediaChampions(media._id, { limit: 3 });
-    } catch (error) {
-      console.error('Failed to snapshot old media champions:', error);
-    }
-
     await bid.save();
 
     // Hybrid: only tips that include tags create £-backed claims (no auto-back).
+    // One ranking query covers both the response and the "agree" suggestions.
     let rankedTags = [];
     let suggestedAgreeTags = [];
+    const mediaTagClaimService = require('../services/mediaTagClaimService');
     if (Array.isArray(tags) && tags.length > 0) {
       try {
-        const mediaTagClaimService = require('../services/mediaTagClaimService');
         await mediaTagClaimService.incrementClaimsForTags({
           userId,
           mediaId: media._id,
@@ -3710,18 +3703,17 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
           bidId: bid._id,
           source: 'tip',
         });
-        rankedTags = await mediaTagClaimService.getRankedTagsForMedia(media._id, { limit: 12 });
       } catch (claimError) {
         console.error('Failed to record tip tag claims:', claimError);
       }
-    } else {
-      try {
-        const mediaTagClaimService = require('../services/mediaTagClaimService');
-        suggestedAgreeTags = await mediaTagClaimService.getTopTagsForAgree(media._id, 5);
-        rankedTags = await mediaTagClaimService.getRankedTagsForMedia(media._id, { limit: 12 });
-      } catch (claimError) {
-        console.error('Failed to load suggested agree tags:', claimError);
+    }
+    try {
+      rankedTags = await mediaTagClaimService.getRankedTagsForMedia(media._id, { limit: 12 });
+      if (!(Array.isArray(tags) && tags.length > 0)) {
+        suggestedAgreeTags = rankedTags.slice(0, 5).map((row) => row.tag).filter(Boolean);
       }
+    } catch (claimError) {
+      console.error('Failed to load ranked tags for tip:', claimError);
     }
 
     // ✅ OPTIMIZED: TuneBytes will be calculated async after response (non-blocking)
@@ -3786,67 +3778,47 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
     const previousTopBidderId = media.globalMediaBidTopUser;
     const wasNewTopBid = bidAmountPence > previousTopBidAmount; // Compare pence to pence
 
-    // Capture PRE balances BEFORE updating media and user
+    // Capture PRE balances before the wallet debit. The ledger write itself
+    // waits until after the response: it reloads user and media and sums every
+    // active bid on the platform, which the tipper does not need to wait for.
     const userBalancePre = user.balance;
     const mediaAggregatePre = media.globalMediaAggregate || 0;
-    
-    // Calculate user aggregate PRE (sum of all active bids BEFORE this one)
-    const userAggregatePre = await Bid.sumActiveAmount({
-      userId,
-      excludeBidId: bid._id
-    });
 
-    // Update media's bid arrays (BidMetricsEngine will handle aggregates)
-    media.bids = media.bids || [];
-    media.bids.push(bid._id);
-    
-    // Update top bid if this is higher
-    if (wasNewTopBid) {
-      media.globalMediaBidTop = bidAmountPence; // Use pence
-      media.globalMediaBidTopUser = userId;
+    const mediaUpdate = { $push: { bids: bid._id } };
+    const mediaSet = {};
+    if (tipChipsAdded) {
+      mediaSet.tags = media.tags;
+      mediaSet.elements = media.elements;
     }
-    
-    // Note: media.bids array already contains this bid (added above)
-    // No need to maintain separate globalBids array - bidScope field on Bid model is sufficient
-    await media.save();
+    if (wasNewTopBid) {
+      media.globalMediaBidTop = bidAmountPence;
+      media.globalMediaBidTopUser = userId;
+      mediaSet.globalMediaBidTop = bidAmountPence;
+      mediaSet.globalMediaBidTopUser = userId;
+    }
+    if (Object.keys(mediaSet).length > 0) {
+      mediaUpdate.$set = mediaSet;
+    }
+    await Media.updateOne({ _id: media._id }, mediaUpdate);
 
-    // Create ledger entry FIRST (before balance update) to capture accurate PRE balances
-    try {
-      const tuneableLedgerService = require('../services/tuneableLedgerService');
-      await tuneableLedgerService.createTipEntry({
-        userId,
-        mediaId: media._id,
-        partyId: globalParty._id,
-        bidId: bid._id,
-        amount: bidAmountPence,
-        userBalancePre,
-        userAggregatePre,
-        mediaAggregatePre,
-        userTuneBytesPre: null,  // Will be null initially (calculated async)
-        userTuneBytesPost: null, // Will be null initially (calculated async)
-        referenceTransactionId: bid._id,
-        metadata: {
-          bidScope: 'global',
-          isNewMedia: isNewGlobalPartyMedia,
-          platform: 'global-bid',
-          tunebytesCalculatedAsync: true // Flag for audit
-        }
+    if (tipChipsAdded && Array.isArray(media.tags) && media.tags.length > 0) {
+      const tagsForParties = media.tags.slice();
+      const contentType = media.contentType;
+      const contentForm = media.contentForm;
+      setImmediate(() => {
+        const isMusic = Array.isArray(contentType)
+          ? contentType.includes('music')
+          : contentType === 'music';
+        const podcastForms = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
+        const isPodcast = Array.isArray(contentForm)
+          ? contentForm.some((form) => podcastForms.includes(form))
+          : podcastForms.includes(contentForm);
+        if (!isMusic || isPodcast) return;
+        const tagPartyService = require('../services/tagPartyService');
+        tagPartyService.checkAndCreateTagParties(tagsForParties).catch((error) => {
+          console.error('Error creating tag parties after tip:', error);
+        });
       });
-      console.log(`✅ Ledger entry created for global bid ${bid._id}`);
-    } catch (error) {
-      console.error('❌ Failed to create ledger entry for global bid:', bid._id);
-      console.error('Ledger error details:', {
-        userId,
-        mediaId: media._id,
-        bidId: bid._id,
-        amount: bidAmountPence,
-        userBalancePre,
-        userAggregatePre,
-        mediaAggregatePre,
-        error: error.message,
-        stack: error.stack
-      });
-      // Don't fail the bid if ledger entry fails - log and continue
     }
 
     // Send notifications (async, don't block response)
@@ -3880,8 +3852,63 @@ router.post('/:mediaId/global-bid', authMiddleware, async (req, res) => {
       console.error('Error setting up notifications:', error);
     }
 
-    // Atomic debit after the ledger snapshot. A lost race refunds the bid.
+    // Atomic debit. A lost race refunds the bid.
     await persistWalletSpend(user, bidAmountPence, bid);
+
+    const ledgerSnapshot = {
+      userId,
+      mediaId: media._id,
+      partyId: globalParty._id,
+      bidId: bid._id,
+      amount: bidAmountPence,
+      userBalancePre,
+      mediaAggregatePre,
+      isNewGlobalPartyMedia,
+    };
+    setImmediate(() => {
+      Bid.sumActiveAmount({
+        userId: ledgerSnapshot.userId,
+        excludeBidId: ledgerSnapshot.bidId,
+      })
+        .then((userAggregatePre) => {
+          const tuneableLedgerService = require('../services/tuneableLedgerService');
+          return tuneableLedgerService.createTipEntry({
+            userId: ledgerSnapshot.userId,
+            mediaId: ledgerSnapshot.mediaId,
+            partyId: ledgerSnapshot.partyId,
+            bidId: ledgerSnapshot.bidId,
+            amount: ledgerSnapshot.amount,
+            userBalancePre: ledgerSnapshot.userBalancePre,
+            userAggregatePre,
+            mediaAggregatePre: ledgerSnapshot.mediaAggregatePre,
+            userTuneBytesPre: null,
+            userTuneBytesPost: null,
+            referenceTransactionId: ledgerSnapshot.bidId,
+            metadata: {
+              bidScope: 'global',
+              isNewMedia: ledgerSnapshot.isNewGlobalPartyMedia,
+              platform: 'global-bid',
+              tunebytesCalculatedAsync: true,
+            },
+          });
+        })
+        .then(() => {
+          console.log(`✅ Ledger entry created for global bid ${ledgerSnapshot.bidId}`);
+        })
+        .catch((error) => {
+          console.error('❌ Failed to create ledger entry for global bid:', ledgerSnapshot.bidId);
+          console.error('Ledger error details:', {
+            userId: ledgerSnapshot.userId,
+            mediaId: ledgerSnapshot.mediaId,
+            bidId: ledgerSnapshot.bidId,
+            amount: ledgerSnapshot.amount,
+            userBalancePre: ledgerSnapshot.userBalancePre,
+            mediaAggregatePre: ledgerSnapshot.mediaAggregatePre,
+            error: error.message,
+            stack: error.stack,
+          });
+        });
+    });
 
     // Settle TuneBytes after the response path. Idempotency is enforced by the
     // TuneBytes transaction model, so retries cannot award the bid twice.

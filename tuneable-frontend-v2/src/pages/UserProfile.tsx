@@ -1317,19 +1317,19 @@ const UserProfile: React.FC = () => {
   };
 
   // Load tune library (for own profile uses /me, for other users uses their userId)
-  const loadTuneLibrary = async () => {
+  const loadTuneLibrary = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!userId) return;
     try {
-      setIsLoadingLibrary(true);
+      if (!silent) setIsLoadingLibrary(true);
       const data = isOwnProfile
         ? await userAPI.getTuneLibrary()
         : await userAPI.getTuneLibraryByUserId(userId);
       setTuneLibrary(data.library || []);
     } catch (error) {
       console.error('Failed to load tune library:', error);
-      toast.error('Failed to load tune library');
+      if (!silent) toast.error('Failed to load tune library');
     } finally {
-      setIsLoadingLibrary(false);
+      if (!silent) setIsLoadingLibrary(false);
     }
   };
 
@@ -1344,10 +1344,11 @@ const UserProfile: React.FC = () => {
     if (!mediaId) return;
     setIsPlacingLibraryTip(true);
     try {
-      await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
+      const result = await mediaAPI.placeGlobalBid(mediaId, amount, undefined, tags);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
       toast.success(`Added £${amount.toFixed(2)} tip on "${libraryItemToTip.title}"`);
       setLibraryItemToTip(null);
-      await loadTuneLibrary();
+      void loadTuneLibrary({ silent: true });
     } catch (err: any) {
       console.error('Error placing tip:', err);
       toast.error(err.response?.data?.error || 'Failed to place tip');

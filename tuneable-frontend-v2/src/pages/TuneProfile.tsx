@@ -299,7 +299,7 @@ const TuneProfile: React.FC = () => {
   const { mediaId: mediaId } = useParams<{ mediaId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
   
   const [media, setMedia] = useState<Media | null>(null);
   const [queued, setQueued] = useState(false);
@@ -1969,10 +1969,11 @@ const TuneProfile: React.FC = () => {
 
     setIsPlacingRecommendedTip(true);
     try {
-      await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
+      const result = await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
       toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${recommendedItemToTip.title}"!`);
       setRecommendedItemToTip(null);
-      await loadRelatedPlaylists();
+      void loadRelatedPlaylists();
     } catch (err: any) {
       console.error('Error placing recommended tip:', err);
       toast.error(err.response?.data?.error || 'Failed to place tip');
@@ -2040,11 +2041,36 @@ const TuneProfile: React.FC = () => {
 
     try {
       const result = await mediaAPI.placeGlobalBid(mediaId, bidAmount, undefined, tags, moment);
-      
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
+      if (result.rankedTags) setRankedTags(result.rankedTags);
+      const tipPence = Math.round(bidAmount * 100);
+      const viewerId = (user as { _id?: string; id?: string })._id || (user as { id?: string }).id || '';
+      setMedia((prev) => {
+        if (!prev) return prev;
+        return enrichMediaWithPlayability({
+          ...prev,
+          tags: result.media?.tags?.length ? result.media.tags : prev.tags,
+          ...(result.media?.elements ? { elements: result.media.elements } : {}),
+          globalMediaAggregate: (prev.globalMediaAggregate ?? 0) + tipPence,
+          tipCount: (prev.tipCount ?? prev.bids?.length ?? 0) + 1,
+          bids: [
+            ...(prev.bids ?? []),
+            {
+              _id: `tip-${Date.now()}`,
+              amount: tipPence,
+              createdAt: new Date().toISOString(),
+              userId: {
+                _id: viewerId,
+                uuid: user.uuid || '',
+                username: user.username || '',
+                profilePic: user.profilePic,
+              },
+            },
+          ],
+        });
+      });
+      void mediaAPI.getCopyAccess(mediaId).then(setCopyAccess).catch(() => undefined);
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
-      
-      // Refresh media data to show updated metrics
-      await fetchMediaProfile();
 
       // Hybrid: tip without tags → offer optional agree / claim step
       if (result?.canAgreeTopTags || (tags.length === 0 && (result?.suggestedAgreeTags?.length || media?.tags?.length))) {

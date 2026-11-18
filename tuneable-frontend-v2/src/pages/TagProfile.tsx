@@ -153,7 +153,7 @@ const TagProfile: React.FC = () => {
   const { slug: slugParam } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, refreshUser } = useAuth();
+  const { user, updateBalance } = useAuth();
   const { setCurrentEpisode, setQueue: setPodcastQueue, play: playPodcast } =
     usePodcastPlayerStore();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
@@ -387,11 +387,11 @@ const TagProfile: React.FC = () => {
     }
     setIsPlacingTip(true);
     try {
-      await mediaAPI.placeGlobalBid(id, amount, undefined, tags);
+      const result = await mediaAPI.placeGlobalBid(id, amount, undefined, tags);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
       toast.success(`Tip of £${amount.toFixed(2)} placed successfully!`);
       setTipTarget(null);
-      await refreshUser();
-      await loadProfile({ silent: true });
+      void loadProfile({ silent: true });
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'response' in err
