@@ -553,6 +553,7 @@ const PersistentPodcastPlayer: React.FC = () => {
         mediaArtist={currentEpisode?.artist || currentEpisode?.podcastTitle || currentEpisode?.podcastSeries?.title || 'Unknown show'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingTip}
+        existingTags={currentEpisode?.tags}
       />
     </>
   );

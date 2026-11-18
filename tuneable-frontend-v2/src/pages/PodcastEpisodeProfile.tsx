@@ -1581,6 +1581,7 @@ const PodcastEpisodeProfile: React.FC = () => {
       coverArt: media.coverArt,
       podcastSeries: typeof media.podcastSeries === 'object' ? media.podcastSeries : undefined,
       sources: media.sources,
+      tags: media.tags,
     };
     if (!getEpisodeAudioUrl(episode)) {
       toast.error('No playable audio for this episode');
@@ -1669,7 +1670,6 @@ const PodcastEpisodeProfile: React.FC = () => {
       });
       void mediaAPI.getCopyAccess(mediaId).then(setCopyAccess).catch(() => undefined);
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
-      
     } catch (err: any) {
       console.error('Error placing global tip:', err);
       toast.error(err.response?.data?.error || 'Failed to place tip');
@@ -3719,6 +3719,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         }
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
+        existingTags={media?.tags}
       />
 
       {/* Add Link Modal */}

@@ -22,8 +22,6 @@ interface TagClaimModalProps {
   mediaId: string;
   mediaTitle?: string;
   suggestedTags?: RankedTag[] | string[];
-  /** When true, open in "agree after tip" mode with softer copy. */
-  postTipPrompt?: boolean;
   onClaimed?: (result: {
     tags?: string[];
     elements?: string[];
@@ -45,7 +43,6 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
   mediaId,
   mediaTitle,
   suggestedTags,
-  postTipPrompt = false,
   onClaimed,
 }) => {
   const [tagInput, setTagInput] = useState('');
@@ -57,9 +54,9 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setTagInput('');
-    setTags(postTipPrompt ? ranked.slice(0, 5).map((r) => r.tag) : []);
+    setTags([]);
     setSubmitting(false);
-  }, [isOpen, mediaId, postTipPrompt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, mediaId]);
 
   if (!isOpen) return null;
 
@@ -88,19 +85,15 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
     setTags(next);
   };
 
-  const submit = async (agreeTop = false) => {
-    if (!agreeTop && tags.length === 0) {
+  const submit = async () => {
+    if (tags.length === 0) {
       toast.error('Select or add at least one tag');
       return;
     }
     setSubmitting(true);
     try {
-      const result = await mediaAPI.claimMediaTags(mediaId, {
-        ...(agreeTop ? { agreeTop: true, agreeLimit: 5 } : { tags }),
-      });
-      toast.success(
-        agreeTop ? 'Top tags backed with your tip' : 'Tags claimed with your tip'
-      );
+      const result = await mediaAPI.claimMediaTags(mediaId, { tags });
+      toast.success('Tags claimed with your tip');
       onClaimed?.({
         tags: result.tags,
         elements: result.elements,
@@ -123,9 +116,7 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <Tag className="h-5 w-5 text-purple-400" />
-            <h3 className="text-lg font-semibold text-white">
-              {postTipPrompt ? 'Back your tip with tags?' : 'Tag this tune'}
-            </h3>
+            <h3 className="text-lg font-semibold text-white">Tag this tune</h3>
           </div>
           <button
             type="button"
@@ -141,7 +132,7 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
           <p className="text-white font-medium mb-2">{mediaTitle}</p>
         ) : null}
         <p className="text-sm text-gray-400 mb-4">
-          Your tip only stakes £ behind tags you choose — nothing is auto-applied.
+          Tap a tag to agree. Your tip only backs tags you choose.
         </p>
 
         {ranked.length > 0 ? (
@@ -234,30 +225,20 @@ const TagClaimModal: React.FC<TagClaimModalProps> = ({
         <div className="flex flex-col gap-2">
           <button
             type="button"
-            onClick={() => void submit(false)}
+            onClick={() => void submit()}
             disabled={submitting || tags.length === 0}
             className="w-full py-2.5 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Add Tags
           </button>
-          {ranked.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => void submit(true)}
-              disabled={submitting}
-              className="w-full py-2 text-purple-300 hover:text-purple-200 text-sm font-medium"
-            >
-              Agree with top tags
-            </button>
-          ) : null}
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
             className="w-full py-2 text-gray-400 hover:text-white text-sm"
           >
-            {postTipPrompt ? 'Skip for now' : 'Cancel'}
+            Cancel
           </button>
         </div>
       </div>

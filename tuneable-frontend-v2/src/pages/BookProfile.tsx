@@ -200,6 +200,7 @@ const BookProfile: React.FC = () => {
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={tipping}
         isNonPlayable
+        existingTags={book.tags}
       />
     </div>
   );

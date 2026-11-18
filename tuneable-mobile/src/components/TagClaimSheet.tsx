@@ -95,18 +95,16 @@ export function TagClaimSheet({
     });
   };
 
-  const submit = async (agreeTop = false) => {
+  const submit = async () => {
     if (!mediaId) return;
-    if (!agreeTop && tags.length === 0) {
+    if (tags.length === 0) {
       setError('Add or select at least one tag');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      const result = await mediaAPI.claimTags(mediaId, {
-        ...(agreeTop ? { agreeTop: true, agreeLimit: 5 } : { tags }),
-      });
+      const result = await mediaAPI.claimTags(mediaId, { tags });
       onClaimed?.({
         tags: result.tags,
         elements: result.elements,
@@ -165,12 +163,12 @@ export function TagClaimSheet({
               </Text>
             ) : null}
             <Text style={styles.copy}>
-              Your tip stakes £ behind tags you claim. Nothing is auto-backed.
+              Tap a tag to agree. Your tip only backs tags you choose.
             </Text>
 
             {ranked.length > 0 ? (
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Back existing tags</Text>
+                <Text style={styles.sectionLabel}>Existing tags</Text>
                 <View style={styles.chips}>
                   {ranked.map((item) => {
                     const selected = tags.some(
@@ -252,7 +250,7 @@ export function TagClaimSheet({
 
             <Pressable
               style={[styles.confirm, submitting && styles.confirmDisabled]}
-              onPress={() => void submit(false)}
+              onPress={() => void submit()}
               disabled={submitting || tags.length === 0}>
               {submitting ? (
                 <ActivityIndicator color="#fff" />
@@ -260,15 +258,6 @@ export function TagClaimSheet({
                 <Text style={styles.confirmText}>Add Tags</Text>
               )}
             </Pressable>
-
-            {ranked.length > 0 ? (
-              <Pressable
-                style={styles.secondary}
-                onPress={() => void submit(true)}
-                disabled={submitting}>
-                <Text style={styles.secondaryText}>Agree with top tags</Text>
-              </Pressable>
-            ) : null}
 
             <Pressable style={styles.cancel} onPress={onClose} disabled={submitting}>
               <Text style={styles.cancelText}>Cancel</Text>
@@ -416,16 +405,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
-  },
-  secondary: {
-    marginTop: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  secondaryText: {
-    color: colors.accentLight,
-    fontWeight: '600',
-    fontSize: 14,
   },
   cancel: {
     marginTop: 4,

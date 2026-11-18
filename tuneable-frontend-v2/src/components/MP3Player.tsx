@@ -38,6 +38,7 @@ interface PlayerMedia {
   totalBidValue: number;
   sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
   minimumBid?: number;
+  tags?: string[];
 }
 
 interface MP3PlayerProps {
@@ -780,6 +781,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         mediaArtist={media.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingTip}
+        existingTags={media.tags}
       />
     </div>
   );

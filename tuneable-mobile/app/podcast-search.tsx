@@ -321,11 +321,8 @@ export default function PodcastSearchScreen() {
         throw new Error('Could not resolve this episode after import.');
       }
 
-      const mergedTags = Array.from(
-        new Set([...(mediaItem.tags || []), ...tags].filter(Boolean))
-      );
       const res = await mediaAPI.placeGlobalBid(id, amountPounds, {
-        tags: mergedTags,
+        tags,
       });
       if (typeof res.updatedBalance === 'number') {
         updateBalance(res.updatedBalance);
@@ -571,7 +568,6 @@ export default function PodcastSearchScreen() {
         subtitle={tipTarget ? seriesTitle(tipTarget) : undefined}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={defaultTip}
-        initialTags={tipTarget?.tags}
         tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={addAndTip}

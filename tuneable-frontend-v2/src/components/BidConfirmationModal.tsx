@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Music, Tag, AlertCircle, Loader2, MapPin, Minus, Plus, Navigation } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from '../utils/toast';
@@ -9,7 +9,8 @@ import type { User } from '../contexts/AuthContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { isGeolocationSupported } from '../utils/currentLocationCache';
-import { appendTipChips, isKnownElement } from '../utils/elementNormalizer';
+import { appendTipChips, isKnownElement, normalizeTipChipForDisplay } from '../utils/elementNormalizer';
+import { tagsMatch } from '../utils/tagNormalizer';
 import TipStatChips from './TipStatChips';
 import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
 import { HOW_MONEY_WORKS_PATH } from '../constants';
@@ -56,6 +57,8 @@ interface BidConfirmationModalProps {
   viewerIsChampion?: boolean;
   /** Tags pre-selected when the modal opens (e.g. the tag page the tip came from). */
   initialTags?: string[];
+  /** Existing media tags. Shown unselected so the tipper can agree with them. */
+  existingTags?: string[] | null;
 }
 
 const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
@@ -76,9 +79,12 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   viewerAggregate = 0,
   viewerIsChampion = false,
   initialTags,
+  existingTags,
   waveformPeaks,
   durationSeconds,
 }) => {
+  const [submitting, setSubmitting] = useState(false);
+  const sawLoading = useRef(false);
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [amountInput, setAmountInput] = useState('');
@@ -187,6 +193,17 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     }
   }, [isOpen, bidAmount]);
 
+  const existingTagList = useMemo(() => {
+    const out: string[] = [];
+    for (const raw of existingTags || []) {
+      const chip = normalizeTipChipForDisplay(String(raw || ''));
+      if (!chip || out.some((item) => tagsMatch(item, chip))) continue;
+      out.push(chip);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [existingTags]);
+
   // Pre-select chips on open (e.g. tipping from a tag profile page)
   const initialTagsKey = (initialTags || []).join(',');
   useEffect(() => {
@@ -225,6 +242,18 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     setTags(tags.filter(tag => tag !== tagToRemove));
   };
 
+  const toggleExistingTag = (tag: string) => {
+    if (tags.some((item) => tagsMatch(item, tag))) {
+      setTags(tags.filter((item) => !tagsMatch(item, tag)));
+      return;
+    }
+    setTags(appendTipChips(tags, [tag]));
+  };
+
+  const customTags = tags.filter(
+    (tag) => !existingTagList.some((existing) => tagsMatch(existing, tag))
+  );
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -232,8 +261,24 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) {
+      setSubmitting(false);
+      sawLoading.current = false;
+      return;
+    }
+    if (isLoading) sawLoading.current = true;
+    else if (sawLoading.current) {
+      setSubmitting(false);
+      sawLoading.current = false;
+    }
+  }, [isOpen, isLoading]);
+
   const handleSubmit = () => {
-    if (!isAmountValid) return;
+    if (submitting || isLoading || !isAmountValid) return;
+    // Lock before the parent flips isLoading. A second click in that gap
+    // used to place the tip again and earn TuneBytes again.
+    setSubmitting(true);
     const moment = markOpen && scannedPeaks && momentDuration
       ? {
           timestampSeconds: Math.round(markRatio * momentDuration * 10) / 10,
@@ -500,8 +545,31 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             </label>
           </div>
           <p className="text-xs text-gray-400 mb-2">
-            Your tip only backs tags you add. Skip to choose later — nothing is auto-applied.
+            Optional. Tap an existing tag to back it with this tip, or add your own.
           </p>
+
+          {existingTagList.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {existingTagList.map((tag) => {
+                const selected = tags.some((item) => tagsMatch(item, tag));
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleExistingTag(tag)}
+                    disabled={isLoading}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      selected
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           
           <div className="flex space-x-2 mb-2">
             <input
@@ -526,9 +594,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             Press Enter to add
           </p>
 
-          {tags.length > 0 && (
+          {customTags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {tags.map((tag, index) => {
+              {customTags.map((tag, index) => {
                 const asElement = isKnownElement(tag);
                 return (
                   <span
@@ -606,9 +674,9 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             type="button"
             onClick={handleSubmit}
             className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            disabled={isLoading || hasInsufficientFunds || !isAmountValid}
+            disabled={submitting || isLoading || hasInsufficientFunds || !isAmountValid}
           >
-            {isLoading ? (
+            {submitting || isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>

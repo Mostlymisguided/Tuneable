@@ -386,6 +386,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         waveformPeaks={itemToTip?.waveformPeaks}
         durationSeconds={itemToTip?.duration}
         initialTags={defaultTipTags}
+        existingTags={itemToTip?.tags}
         user={user}
       />
     </>

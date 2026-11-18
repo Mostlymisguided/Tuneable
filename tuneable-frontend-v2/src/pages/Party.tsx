@@ -3872,6 +3872,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           userBalance={confirmationUserBalance}
           waveformPeaks={(pendingMedia as any)?.waveformPeaks || (pendingMedia as any)?.mediaId?.waveformPeaks}
           durationSeconds={(pendingMedia as any)?.duration || (pendingMedia as any)?.mediaId?.duration}
+          existingTags={collectItemTags(pendingMedia)}
         />
       )}
 

@@ -24,6 +24,7 @@ interface PlayerMedia {
   rightsCleared?: boolean;
   rightsStatus?: 'cleared' | 'pending' | 'permitted' | 'disputed';
   contentForm?: string | string[];
+  tags?: string[];
 }
 
 function mediaKey(media: PlayerMedia | null | undefined): string {

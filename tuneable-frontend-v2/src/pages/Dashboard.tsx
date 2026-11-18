@@ -55,6 +55,7 @@ interface SearchResult {
   globalMediaAggregateAvg?: number | null;
   globalMediaAggregateTop?: number | null;
   globalMediaAggregateTopUser?: string | { _id?: string };
+  tags?: string[];
 }
 
 const Dashboard: React.FC = () => {
@@ -624,6 +625,7 @@ Join here: ${inviteLink}`.trim();
           bids: [],
           addedBy: null,
           totalBidValue: libItem.globalMediaAggregate,
+          tags: libItem.tags,
           ...playerPlayabilityFields(libItem),
         }))
         .filter((media) => isMediaPlayable(media)) as any[];
@@ -3146,6 +3148,7 @@ Join here: ${inviteLink}`.trim();
         mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingLibraryTip}
+        existingTags={libraryItemToTip?.tags}
       />
 
       <BidConfirmationModal
@@ -3175,6 +3178,7 @@ Join here: ${inviteLink}`.trim();
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isAddingTune}
         user={user}
+        existingTags={pendingAddTuneResult?.tags}
       />
 
       <EmailInviteModal

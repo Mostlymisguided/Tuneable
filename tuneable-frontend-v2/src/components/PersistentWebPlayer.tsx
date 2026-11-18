@@ -913,6 +913,7 @@ const PersistentWebPlayer: React.FC = () => {
         mediaArtist={currentMedia?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingTip}
+        existingTags={currentMedia?.tags}
       />
     </>
   );

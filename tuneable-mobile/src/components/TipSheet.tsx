@@ -130,6 +130,7 @@ export function TipSheet({
   const [enablingLocation, setEnablingLocation] = useState(false);
   const pendingWalletNav = useRef(false);
   const walletNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submitLock = useRef(false);
   const pendingSuccessMessage = useRef<string | null>(null);
   const successToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -346,18 +347,24 @@ export function TipSheet({
   };
 
   const submit = async () => {
-    setError(null);
-    if (amount < effectiveMinTip) {
-      setError(`Minimum tip is £${effectiveMinTip.toFixed(2)}`);
-      return;
-    }
-    const neededPence = Math.round(amount * 100);
-    if (neededPence > liveBalancePence) {
-      sendToWalletTopUp();
-      return;
-    }
+    if (submitLock.current || submitting) return;
+    submitLock.current = true;
+    try {
+      setError(null);
+      if (amount < effectiveMinTip) {
+        setError(`Minimum tip is £${effectiveMinTip.toFixed(2)}`);
+        return;
+      }
+      const neededPence = Math.round(amount * 100);
+      if (neededPence > liveBalancePence) {
+        sendToWalletTopUp();
+        return;
+      }
 
-    await executeTip();
+      await executeTip();
+    } finally {
+      submitLock.current = false;
+    }
   };
 
   const handleClose = () => {

@@ -1516,6 +1516,7 @@ const PodcastSeriesProfile: React.FC = () => {
         userBalance={user ? penceToPoundsNumber((user as any).balance) : 0}
         isLoading={isPlacingBid}
         user={user}
+        existingTags={selectedEpisode?.tags}
       />
     </div>
   );

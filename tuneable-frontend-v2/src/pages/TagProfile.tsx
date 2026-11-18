@@ -866,6 +866,7 @@ const TagProfile: React.FC = () => {
         isLoading={isPlacingTip}
         user={user}
         initialTags={[displayName]}
+        existingTags={tipTarget?.tags}
       />
     </div>
   );

@@ -451,7 +451,6 @@ const TuneProfile: React.FC = () => {
   const [isPlacingGlobalBid, setIsPlacingGlobalBid] = useState(false);
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
   const [showTagClaimModal, setShowTagClaimModal] = useState(false);
-  const [tagClaimPostTip, setTagClaimPostTip] = useState(false);
   const [rankedTags, setRankedTags] = useState<
     Array<{ tag: string; aggregate?: number; tipperCount?: number }>
   >([]);
@@ -1823,6 +1822,7 @@ const TuneProfile: React.FC = () => {
       bids: media.bids || [],
       addedBy: media.addedBy?.username || 'Unknown',
       totalBidValue: media.globalMediaAggregate || 0,
+      tags: media.tags,
       ...playerPlayabilityFields(media),
     } as any;
 
@@ -1856,6 +1856,7 @@ const TuneProfile: React.FC = () => {
     bids: [],
     addedBy: null,
     totalBidValue: item.globalMediaAggregate || 0,
+    tags: item.tags,
     ...playerPlayabilityFields(item as any),
   });
 
@@ -2071,14 +2072,6 @@ const TuneProfile: React.FC = () => {
       });
       void mediaAPI.getCopyAccess(mediaId).then(setCopyAccess).catch(() => undefined);
       toast.success(`Placed £${bidAmount.toFixed(2)} tip on "${media?.title}"!`);
-
-      // Hybrid: tip without tags → offer optional agree / claim step
-      if (result?.canAgreeTopTags || (tags.length === 0 && (result?.suggestedAgreeTags?.length || media?.tags?.length))) {
-        if (result?.rankedTags) setRankedTags(result.rankedTags);
-        setTagClaimPostTip(true);
-        setShowTagClaimModal(true);
-      }
-      
     } catch (err: any) {
       console.error('Error placing global tip:', err);
       toast.error(err.response?.data?.error || 'Failed to place tip');
@@ -2842,10 +2835,7 @@ const TuneProfile: React.FC = () => {
                 }) ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      setTagClaimPostTip(false);
-                      setShowTagClaimModal(true);
-                    }}
+                    onClick={() => setShowTagClaimModal(true)}
                     className="px-3 py-2 bg-gray-900/80 hover:bg-gray-800/80 text-white font-semibold rounded-lg border border-purple-500/50 transition-all flex items-center gap-2 text-sm"
                   >
                     <Tag className="h-4 w-4" />
@@ -4163,18 +4153,15 @@ const TuneProfile: React.FC = () => {
         userBalance={penceToPoundsNumber((user as any)?.balance)}
         isLoading={isPlacingGlobalBid}
         isNonPlayable={media ? !isMediaPlayable(media) : false}
+        existingTags={media?.tags}
       />
 
       {mediaId ? (
         <TagClaimModal
           isOpen={showTagClaimModal}
-          onClose={() => {
-            setShowTagClaimModal(false);
-            setTagClaimPostTip(false);
-          }}
+          onClose={() => setShowTagClaimModal(false)}
           mediaId={mediaId}
           mediaTitle={media?.title}
-          postTipPrompt={tagClaimPostTip}
           suggestedTags={
             rankedTags.length
               ? rankedTags
@@ -4216,6 +4203,7 @@ const TuneProfile: React.FC = () => {
         isNonPlayable={
           recommendedItemToTip ? !isRecommendedPlayable(recommendedItemToTip) : false
         }
+        existingTags={recommendedItemToTip?.tags}
       />
 
       {/* Add Link Modal */}

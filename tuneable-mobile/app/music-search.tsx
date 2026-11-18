@@ -248,9 +248,6 @@ export default function MusicSearchScreen() {
     setAddingId(id);
     setError(null);
     try {
-      const mergedTags = Array.from(
-        new Set([...(item.tags || []), ...tags].filter(Boolean))
-      );
       const res = await partyAPI.addMediaToParty(GLOBAL_PARTY_ID, {
         url,
         title: item.title || 'Unknown',
@@ -260,7 +257,7 @@ export default function MusicSearchScreen() {
         duration: item.duration,
         coverArt: item.coverArt,
         category: item.category || 'Music',
-        tags: mergedTags.length ? mergedTags : undefined,
+        tags: tags.length ? tags : undefined,
         externalIds,
         album: item.album ?? null,
         releaseDate: item.releaseDate ?? null,
@@ -526,7 +523,7 @@ export default function MusicSearchScreen() {
         }
         balancePence={user?.balance ?? 0}
         defaultTipPounds={defaultTip}
-        initialTags={tipTarget?.tags}
+        tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={addAndTip}
       />

@@ -944,6 +944,7 @@ const SearchPage: React.FC = () => {
         isLoading={isSubmittingBid}
         party={party}
         user={user}
+        existingTags={pendingMedia?.tags}
       />
 
       <MediaValidationModal

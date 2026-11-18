@@ -1378,6 +1378,7 @@ const UserProfile: React.FC = () => {
           bids: [],
           addedBy: null,
           totalBidValue: libItem.globalMediaAggregate,
+          tags: libItem.tags,
           sourceType: 'library',
           ...playerPlayabilityFields(libItem),
         }))
@@ -4811,6 +4812,7 @@ const UserProfile: React.FC = () => {
         mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((currentUser as any)?.balance)}
         isLoading={isPlacingLibraryTip}
+        existingTags={libraryItemToTip?.tags}
       />
 
       <BidConfirmationModal
@@ -4844,6 +4846,7 @@ const UserProfile: React.FC = () => {
         userBalance={penceToPoundsNumber((currentUser as any)?.balance)}
         isLoading={isAddingTune}
         user={currentUser}
+        existingTags={pendingAddTuneResult?.tags}
       />
     </div>
   );

@@ -844,13 +844,11 @@ export default function TuneProfileScreen() {
             defaultTipPounds={defaultTip}
             initialAmountPounds={tipInitial}
             tipMedia={media}
-            mediaId={mediaId(media) || id}
             onClose={() => {
               setTipOpen(false);
               setTipInitial(null);
             }}
             onConfirm={onConfirmTip}
-            onTagClaimed={() => void load(true)}
           />
           <TagClaimSheet
             visible={tagClaimOpen}

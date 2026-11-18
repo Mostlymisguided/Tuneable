@@ -740,6 +740,7 @@ const Books: React.FC = () => {
         isLoading={isTipping}
         user={user}
         isNonPlayable
+        existingTags={selectedBook?.tags}
       />
     </div>
   );
