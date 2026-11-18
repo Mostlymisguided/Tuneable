@@ -277,6 +277,100 @@ bidSchema.post('save', function(doc) {
     });
 });
 
+function activeContribution(status, amount) {
+    if (status !== 'active') return { pence: 0, bids: 0 };
+    return { pence: Number(amount) || 0, bids: 1 };
+}
+
+function updateTouchesPodium(update) {
+    if (!update || typeof update !== 'object') return false;
+    if (Array.isArray(update)) return true;
+    const keys = ['status', 'amount'];
+    const has = (obj) => obj && keys.some((key) => Object.prototype.hasOwnProperty.call(obj, key));
+    return has(update) || has(update.$set) || has(update.$inc);
+}
+
+async function syncPodiumFromPrevious(query, prev) {
+    if (!prev?._id || !prev.mediaId) return;
+    const now = await query.model.findById(prev._id).select('userId mediaId status amount').lean();
+    const before = activeContribution(prev.status, prev.amount);
+    const after = now ? activeContribution(now.status, now.amount) : { pence: 0, bids: 0 };
+    const { syncMediaPodium } = require('../services/championPodiumService');
+    await syncMediaPodium(now?.mediaId || prev.mediaId, {
+        userId: now?.userId || prev.userId,
+        deltaPence: after.pence - before.pence,
+        deltaBids: after.bids - before.bids,
+    });
+}
+
+// Champion titles are derived from active tip totals. Record podium changes
+// before bid.save() returns so the activity feed can show them immediately.
+bidSchema.pre('save', async function recordPodiumBaseline() {
+    if (this.isNew) {
+        const next = activeContribution(this.status, this.amount);
+        this.$locals.podiumDeltaPence = next.pence;
+        this.$locals.podiumDeltaBids = next.bids;
+        return;
+    }
+    if (!this.isModified('status') && !this.isModified('amount')) {
+        this.$locals.podiumSkip = true;
+        return;
+    }
+    const prev = await this.constructor.findById(this._id).select('status amount').lean();
+    const before = prev ? activeContribution(prev.status, prev.amount) : { pence: 0, bids: 0 };
+    const next = activeContribution(this.status, this.amount);
+    this.$locals.podiumDeltaPence = next.pence - before.pence;
+    this.$locals.podiumDeltaBids = next.bids - before.bids;
+});
+
+bidSchema.post('save', async function syncPodiumAfterSave() {
+    if (this.$locals?.podiumSkip || !this.mediaId) return;
+    try {
+        const { syncMediaPodium } = require('../services/championPodiumService');
+        await syncMediaPodium(this.mediaId, {
+            userId: this.userId,
+            deltaPence: this.$locals?.podiumDeltaPence || 0,
+            deltaBids: this.$locals?.podiumDeltaBids || 0,
+        });
+    } catch (error) {
+        console.error('Error syncing champion podium after bid save:', error);
+    }
+});
+
+bidSchema.pre('findOneAndUpdate', async function recordPodiumQueryBaseline() {
+    if (!updateTouchesPodium(this.getUpdate())) {
+        this._podiumSkip = true;
+        return;
+    }
+    this._podiumPrev = await this.model.findOne(this.getFilter()).select('userId mediaId status amount').lean();
+});
+
+bidSchema.post('findOneAndUpdate', async function syncPodiumAfterFindUpdate() {
+    if (this._podiumSkip) return;
+    try {
+        await syncPodiumFromPrevious(this, this._podiumPrev);
+    } catch (error) {
+        console.error('Error syncing champion podium after bid update:', error);
+    }
+});
+
+bidSchema.pre('updateOne', async function recordPodiumUpdateBaseline() {
+    if (!updateTouchesPodium(this.getUpdate())) {
+        this._podiumSkip = true;
+        return;
+    }
+    this._podiumPrev = await this.model.findOne(this.getFilter()).select('userId mediaId status amount').lean();
+});
+
+bidSchema.post('updateOne', async function syncPodiumAfterUpdate() {
+    if (this._podiumSkip) return;
+    try {
+        await syncPodiumFromPrevious(this, this._podiumPrev);
+    } catch (error) {
+        console.error('Error syncing champion podium after bid update:', error);
+    }
+});
+
 // Update metrics after bid is removed
 bidSchema.post('remove', function(doc) {
     const bidData = {

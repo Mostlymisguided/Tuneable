@@ -2944,7 +2944,7 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
     
     // Fetch bids with populated media and party details
     const bids = await Bid.find(query)
-      .populate('mediaId', 'title artist coverArt duration uuid _id tags')
+      .populate('mediaId', 'title artist coverArt duration uuid _id tags contentForm')
       .populate('partyId', 'name partyCode uuid _id type')
       .sort(sort)
       .skip(skip)
@@ -3058,6 +3058,21 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
       error: 'Error fetching tip history', 
       details: error.message 
     });
+  }
+});
+
+// Champion title changes on a tune's global top 3
+// @route   GET /api/users/me/champion-podium
+// @desc    Earned and lost tune champion titles for the activity feed
+// @access  Private
+router.get('/me/champion-podium', authMiddleware, async (req, res) => {
+  try {
+    const { listForUser } = require('../services/championPodiumService');
+    const events = await listForUser(req.user._id, req.query.limit);
+    res.json({ events });
+  } catch (error) {
+    console.error('Error fetching champion podium events:', error);
+    res.status(500).json({ error: 'Error fetching champion podium events' });
   }
 });
 
@@ -5769,7 +5784,7 @@ router.get('/:userId/tunebytes/history', authMiddleware, async (req, res) => {
       userId: targetUser._id,
       status: 'confirmed'
     })
-    .populate('mediaId', 'title artist coverArt')
+    .populate('mediaId', 'title artist coverArt uuid contentForm')
     .populate('bidId', 'amount createdAt')
     .sort({ createdAt: -1 })
     .skip(parseInt(offset))

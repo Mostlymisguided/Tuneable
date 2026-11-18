@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { router, useFocusEffect, type Href } from 'expo-router';
@@ -19,6 +18,7 @@ import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard'
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LibraryImportCards } from '@/src/components/LibraryImportCards';
 import { HomeListenQueue } from '@/src/components/HomeListenQueue';
+import { RecentActivityFeed } from '@/src/components/RecentActivityFeed';
 import { partyAPI } from '@/src/api/party';
 import { userAPI } from '@/src/api/user';
 import { showToast } from '@/src/stores/toastStore';
@@ -53,7 +53,6 @@ import {
 import {
   DEFAULT_PROFILE_PIC,
   type ChampionBadge,
-  type UserLibraryItem,
   type UserStats,
 } from '@/src/types/user';
 
@@ -84,13 +83,11 @@ export default function HomeScreen() {
   const canUpload = canUploadMedia(user);
 
   const [rising, setRising] = useState<ChartMediaItem[]>([]);
-  const [library, setLibrary] = useState<UserLibraryItem[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [libraryLoading, setLibraryLoading] = useState(true);
   const [queueRevision, setQueueRevision] = useState(0);
+  const [activityRevision, setActivityRevision] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,7 +134,6 @@ export default function HomeScreen() {
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
-      setLibraryLoading(true);
       setError(null);
       const userId = user?.uuid || user?.id;
 
@@ -170,21 +166,11 @@ export default function HomeScreen() {
         }
       })();
 
-      const libraryLoad = (async () => {
-        try {
-          const libraryRes = await userAPI
-            .getTuneLibrary()
-            .catch(() => ({ library: [], total: 0 }));
-          setLibrary(libraryRes.library ?? []);
-        } finally {
-          setLibraryLoading(false);
-        }
-      })();
-
       try {
-        await Promise.all([shell, libraryLoad]);
+        await shell;
       } finally {
         setRefreshing(false);
+        setActivityRevision((current) => current + 1);
       }
     },
     [user?.id, user?.uuid]
@@ -215,15 +201,6 @@ export default function HomeScreen() {
     }
   };
 
-  const openSearch = () => {
-    const q = searchQuery.trim();
-    if (q) {
-      router.push({ pathname: '/music-search', params: { q } });
-      return;
-    }
-    router.push('/music-search');
-  };
-
   const onLocationPress = () => {
     if (placeHref) {
       router.push(placeHref);
@@ -233,7 +210,7 @@ export default function HomeScreen() {
   };
 
   const avgTipPence = stats?.averageBidAmount ?? 0;
-  const totalTips = stats?.totalBids ?? library.length;
+  const totalTips = stats?.totalBids ?? 0;
 
   return (
     <Screen>
@@ -317,15 +294,6 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               ) : null}
-            </Pressable>
-            <Pressable
-              style={styles.walletChip}
-              onPress={() => router.push('/wallet')}
-              accessibilityLabel="Open wallet">
-              <Text style={styles.walletChipValue}>
-                {formatPoundsFromPence(user?.balance)}
-              </Text>
-              <Text style={styles.walletChipLabel}>Wallet</Text>
             </Pressable>
           </View>
 
@@ -414,26 +382,6 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.searchRow}>
-            <View style={styles.searchField}>
-              <Ionicons name="search" size={18} color={colors.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search title or artist"
-                placeholderTextColor={colors.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                onSubmitEditing={openSearch}
-              />
-            </View>
-            <Pressable style={styles.searchBtn} onPress={openSearch}>
-              <Text style={styles.searchBtnText}>Search</Text>
-            </Pressable>
-          </View>
-
           <LibraryImportCards showUpload={canUpload} />
 
           <View style={styles.statsRow}>
@@ -454,7 +402,7 @@ export default function HomeScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {loading && rising.length === 0 && library.length === 0 ? (
+          {loading && rising.length === 0 ? (
             <ActivityIndicator
               color={colors.accentLight}
               style={styles.loader}
@@ -463,12 +411,23 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.librarySection}>
+          <RecentActivityFeed
+            userId={user?.uuid || user?.id}
+            revision={activityRevision}
+            balancePence={user?.balance}
+            defaultTipPounds={user?.preferences?.defaultTip ?? 1}
+            onBalanceUpdate={(balance) => {
+              updateBalance(balance);
+              setActivityRevision((current) => current + 1);
+            }}
+          />
           <HomeListenQueue
             revision={queueRevision}
-            library={library}
-            libraryLoading={libraryLoading}
             user={user}
-            onBalanceUpdate={updateBalance}
+            onBalanceUpdate={(balance) => {
+              updateBalance(balance);
+              setActivityRevision((current) => current + 1);
+            }}
           />
         </View>
 
@@ -636,28 +595,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
-  walletChip: {
-    alignItems: 'flex-end',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(126, 34, 206, 0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.4)',
-  },
-  walletChipValue: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  walletChipLabel: {
-    marginTop: 1,
-    color: colors.accentLight,
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -719,40 +656,6 @@ const styles = StyleSheet.create({
   catalogChipText: {
     color: colors.text,
     fontSize: 13,
-    fontWeight: '700',
-  },
-  searchRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  searchField: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 15,
-  },
-  searchBtn: {
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  searchBtnText: {
-    color: '#fff',
-    fontSize: 15,
     fontWeight: '700',
   },
   statsRow: {

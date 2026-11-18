@@ -12,7 +12,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { mediaAPI } from '@/src/api/media';
 import { userAPI } from '@/src/api/user';
 import { TipSheet } from '@/src/components/TipSheet';
-import { UserLibrarySection } from '@/src/components/UserLibrarySection';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { isUploadPlayable, mediaId } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
@@ -20,14 +19,12 @@ import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
 import type { HomeListenQueueItem } from '@/src/types/homeQueue';
-import type { User, UserLibraryItem } from '@/src/types/user';
+import type { User } from '@/src/types/user';
 
-type FilterKey = 'unheard' | 'heard' | 'tipped';
+type FilterKey = 'unheard' | 'heard';
 
 type Props = {
   revision: number;
-  library: UserLibraryItem[];
-  libraryLoading?: boolean;
   user: User | null;
   onBalanceUpdate?: (balancePence: number) => void;
 };
@@ -54,8 +51,6 @@ function toChartItem(item: HomeListenQueueItem): ChartMediaItem {
 
 export function HomeListenQueue({
   revision,
-  library,
-  libraryLoading = false,
   user,
   onBalanceUpdate,
 }: Props) {
@@ -127,7 +122,6 @@ export function HomeListenQueue({
   const filters: { key: FilterKey; label: string; count: number }[] = [
     { key: 'unheard', label: 'Unheard', count: counts.unheard },
     { key: 'heard', label: 'Heard', count: counts.heard },
-    { key: 'tipped', label: 'Tipped', count: library.length },
   ];
 
   return (
@@ -150,43 +144,14 @@ export function HomeListenQueue({
         })}
       </View>
 
-      {filter !== 'tipped' && activeItems.length > 0 ? (
+      {activeItems.length > 0 ? (
         <Pressable style={styles.playAll} onPress={() => playItems(activeItems, activeItems[0])}>
           <Ionicons name="play" size={14} color="#fff" />
           <Text style={styles.playAllText}>Play</Text>
         </Pressable>
       ) : null}
 
-      {filter === 'tipped' ? (
-        <View>
-        <Pressable
-          style={styles.libraryLink}
-          onPress={() => router.push('/(tabs)/profile')}
-          accessibilityRole="button">
-          <Text style={styles.libraryLinkText}>Full library</Text>
-        </Pressable>
-        <UserLibrarySection
-          items={library}
-          user={user}
-          referenceTuneBytes
-          loading={libraryLoading}
-          onBalanceUpdate={onBalanceUpdate}
-          hideHeader
-          title="Tipped"
-          actionLabel="Library"
-          onAction={() => router.push('/(tabs)/profile')}
-          showTime={false}
-          showBpm={false}
-          sortBy="recent"
-          previewLimit={10}
-          searchHint="Filters your tipped tunes."
-          emptyTitle="No tipped tunes yet"
-          emptyBody="Search a track and send a tip — it lands here and on the charts."
-          emptyActionLabel="Add your first tip"
-          onEmptyAction={() => router.push('/music-search')}
-        />
-        </View>
-      ) : loading && activeItems.length === 0 ? (
+      {loading && activeItems.length === 0 ? (
         <ActivityIndicator color={colors.accentLight} style={styles.loader} />
       ) : activeItems.length === 0 ? (
         <View style={styles.empty}>
@@ -317,15 +282,6 @@ const styles = StyleSheet.create({
   },
   playAllText: {
     color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  libraryLink: {
-    alignSelf: 'flex-end',
-    marginBottom: 8,
-  },
-  libraryLinkText: {
-    color: colors.accentLight,
     fontWeight: '700',
     fontSize: 13,
   },

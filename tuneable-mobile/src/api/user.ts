@@ -28,6 +28,65 @@ export type SpotifyImportAccess = {
   } | null;
 };
 
+export type ActivityMediaRef = {
+  _id?: string;
+  uuid?: string | null;
+  title?: string;
+  artist?: unknown;
+  coverArt?: string | null;
+  contentForm?: string[];
+};
+
+export type TipHistoryResponse = {
+  tips?: Array<{
+    _id: string;
+    amount?: number;
+    status?: string;
+    createdAt?: string;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string | null;
+    media?: ActivityMediaRef | null;
+  }>;
+};
+
+export type ListeningHistoryResponse = {
+  history?: Array<{
+    _id: string;
+    lastPlayedAt?: string;
+    qualifiedAt?: string | null;
+    countedAsPlay?: boolean;
+    media?: ActivityMediaRef | null;
+  }>;
+};
+
+export type ChampionPodiumEventsResponse = {
+  events?: Array<{
+    _id: string;
+    kind: 'earned' | 'lost';
+    rank: number;
+    previousRank?: number | null;
+    nextRank?: number | null;
+    occurredAt?: string;
+    regainPence?: number | null;
+    media?: ActivityMediaRef | null;
+  }>;
+};
+
+export type TuneBytesHistoryResponse = {
+  transactions?: Array<{
+    _id: string;
+    tuneBytesEarned?: number;
+    createdAt?: string;
+    updatedAt?: string;
+    mediaTitle?: string;
+    mediaArtist?: string;
+    mediaCoverArt?: string | null;
+    media_uuid?: string | null;
+    mediaId?: ActivityMediaRef | string | null;
+  }>;
+};
+
 export type AmbassadorSummary = {
   status: 'none' | 'active' | 'paused' | 'revoked';
   note?: string | null;
@@ -64,6 +123,38 @@ export const userAPI = {
 
   getHomeListenQueue: async (): Promise<HomeListenQueueResponse> => {
     const response = await api.get<HomeListenQueueResponse>('/users/me/home-queue');
+    return response.data;
+  },
+
+  getTipHistory: async (limit = 20): Promise<TipHistoryResponse> => {
+    const response = await api.get<TipHistoryResponse>('/users/me/tip-history', {
+      params: { limit, sortBy: 'createdAt', sortOrder: 'desc' },
+    });
+    return response.data;
+  },
+
+  getListeningHistory: async (limit = 40): Promise<ListeningHistoryResponse> => {
+    const response = await api.get<ListeningHistoryResponse>('/users/me/listening-history', {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  getTuneBytesHistory: async (
+    userId: string,
+    limit = 20
+  ): Promise<TuneBytesHistoryResponse> => {
+    const response = await api.get<TuneBytesHistoryResponse>(
+      `/users/${encodeURIComponent(userId)}/tunebytes/history`,
+      { params: { limit, offset: 0 } }
+    );
+    return response.data;
+  },
+
+  getChampionPodiumEvents: async (limit = 20): Promise<ChampionPodiumEventsResponse> => {
+    const response = await api.get<ChampionPodiumEventsResponse>('/users/me/champion-podium', {
+      params: { limit },
+    });
     return response.data;
   },
 
