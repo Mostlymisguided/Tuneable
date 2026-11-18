@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -8,19 +8,17 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
 import { router } from 'expo-router';
 import { useAuth } from '@/src/auth/AuthContext';
-import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
+import { TipAmountPicker, MAX_TIP_POUNDS } from '@/src/components/TipAmountPicker';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
-import { LEGAL_URLS } from '@/src/components/LegalLinks';
-import { mediaAPI } from '@/src/api/media';
 import {
   canRequestLocationPermission,
   getCurrentLocationStatus,
@@ -67,7 +65,6 @@ export type TipMediaLike = {
   minimumBid?: number | null;
 } | null;
 
-const TIP_KEYBOARD_ACCESSORY_ID = 'tip-sheet-keyboard-done';
 /** Slide-out of the native modal. Android does not fire Modal onDismiss. */
 const TIP_SHEET_DISMISS_MS = 420;
 
@@ -92,25 +89,11 @@ type Props = {
   initialAmountPounds?: number | null;
   /** Media used to resolve Min / Avg / Champion shortcuts. */
   tipMedia?: TipMediaLike;
-  /** Explicit media id for post-tip tag claims (falls back to tipMedia ids). */
-  mediaId?: string | null;
-  /** Tags pre-selected when the sheet opens. */
+  /** Tags pre-selected when the sheet opens (for example the tag page the tip came from). */
   initialTags?: string[];
   minTip?: number;
   onClose: () => void;
-  onConfirm: (
-    amountPounds: number,
-    tags: string[]
-  ) => Promise<
-    | {
-        canAgreeTopTags?: boolean;
-        suggestedAgreeTags?: string[];
-        media?: { _id?: string; uuid?: string };
-      }
-    | void
-  >;
-  /** Called after optional agree-with-top-tags step (or skip). */
-  onTagClaimed?: () => void;
+  onConfirm: (amountPounds: number, tags: string[]) => Promise<unknown>;
 };
 
 function roundPounds(n: number): number {
@@ -125,25 +108,20 @@ export function TipSheet({
   defaultTipPounds = 1.11,
   initialAmountPounds = null,
   tipMedia = null,
-  mediaId = null,
   initialTags,
   minTip = 0.01,
   onClose,
   onConfirm,
-  onTagClaimed,
 }: Props) {
   const { user } = useAuth();
+  const { height: windowHeight } = useWindowDimensions();
+  const [headerHeight, setHeaderHeight] = useState(0);
   const liveBalancePence = user?.balance ?? balancePence;
   const [amount, setAmount] = useState(defaultTipPounds);
-  const [amountText, setAmountText] = useState(defaultTipPounds.toFixed(2));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [phase, setPhase] = useState<'tip' | 'agree'>('tip');
-  const [agreeTags, setAgreeTags] = useState<string[]>([]);
-  const [selectedAgree, setSelectedAgree] = useState<string[]>([]);
-  const [claimMediaId, setClaimMediaId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState(getTipCurrentLocation);
   const [locationStatus, setLocationStatus] = useState<CurrentLocationStatus>(
     getCurrentLocationStatus
@@ -209,12 +187,6 @@ export function TipSheet({
     walletNavTimer.current = setTimeout(flushWalletNav, 320);
   };
 
-  const resolvedMediaId = useMemo(() => {
-    if (mediaId) return mediaId;
-    if (!tipMedia) return null;
-    return tipMedia._id || tipMedia.id || tipMedia.uuid || null;
-  }, [mediaId, tipMedia]);
-
   const tipStats = useMemo(
     () => resolveTipStatInputs(tipMedia, user),
     [tipMedia, user]
@@ -239,6 +211,17 @@ export function TipSheet({
       }),
     [effectiveMinTip, tipStats]
   );
+
+  const existingTags = useMemo(() => {
+    const out: string[] = [];
+    for (const raw of tipMedia?.tags || []) {
+      const chip = normalizeTipChipForDisplay(String(raw || ''));
+      if (!chip || out.some((item) => item.toLowerCase() === chip.toLowerCase())) continue;
+      out.push(chip);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [tipMedia]);
 
   const homeLocation = user?.homeLocation || null;
   const homeLabel = formatLocationLabel(homeLocation);
@@ -271,19 +254,17 @@ export function TipSheet({
   const initialTagsKey = (initialTags || []).join(',');
   useEffect(() => {
     if (!visible) return;
-    const start = Math.max(
-      effectiveMinTip,
-      initialAmountPounds ?? defaultTipPounds ?? 1.11
+    const start = Math.min(
+      MAX_TIP_POUNDS,
+      Math.max(
+        effectiveMinTip,
+        roundPounds(initialAmountPounds ?? defaultTipPounds ?? 1.11)
+      )
     );
     setAmount(start);
-    setAmountText(start.toFixed(2));
     setError(null);
     setSubmitting(false);
     setTagInput('');
-    setPhase('tip');
-    setAgreeTags([]);
-    setSelectedAgree([]);
-    setClaimMediaId(null);
     setTags(appendTipChips([], initialTags || []));
   }, [
     visible,
@@ -297,28 +278,18 @@ export function TipSheet({
     if (success) {
       queueSuccessToast(tipSuccessMessage(amount, title, success.tagCount));
     }
-    setPhase('tip');
-    setAgreeTags([]);
-    setSelectedAgree([]);
-    setClaimMediaId(null);
     setTags([]);
     setTagInput('');
     onClose();
   };
 
-  const applyAmount = (next: number) => {
-    const safe = Math.max(effectiveMinTip, roundPounds(next));
+  const applyAmount = useCallback((next: number) => {
+    const safe = Math.min(
+      MAX_TIP_POUNDS,
+      Math.max(effectiveMinTip, roundPounds(next))
+    );
     setAmount(safe);
-    setAmountText(safe.toFixed(2));
-  };
-
-  const onChangeText = (text: string) => {
-    setAmountText(text);
-    const parsed = Number.parseFloat(text);
-    if (!Number.isNaN(parsed) && parsed >= 0) {
-      setAmount(roundPounds(parsed));
-    }
-  };
+  }, [effectiveMinTip]);
 
   const handleAddTag = () => {
     const input = tagInput.trim();
@@ -328,6 +299,14 @@ export function TipSheet({
     if (next.length === tags.length) return;
     setTags(next);
     setTagInput('');
+  };
+
+  const toggleExistingTag = (tag: string) => {
+    setTags((prev) =>
+      prev.some((item) => item.toLowerCase() === tag.toLowerCase())
+        ? prev.filter((item) => item.toLowerCase() !== tag.toLowerCase())
+        : appendTipChips(prev, [tag])
+    );
   };
 
   const handleEnableCurrentLocation = async () => {
@@ -353,84 +332,14 @@ export function TipSheet({
   const executeTip = async () => {
     setSubmitting(true);
     try {
-      const result = await onConfirm(amount, tags);
-      const mid =
-        result?.media?._id || result?.media?.uuid || resolvedMediaId;
-      const suggested =
-        result?.suggestedAgreeTags?.filter(Boolean) ||
-        (tipMedia?.tags || []).filter(Boolean);
-      const uniqueSuggested = suggested
-        .map((tag) => normalizeTipChipForDisplay(tag))
-        .filter(Boolean)
-        .filter(
-          (chip, index, arr) =>
-            arr.findIndex((c) => c.toLowerCase() === chip.toLowerCase()) ===
-            index
-        )
-        .slice(0, 5);
-
-      const shouldOfferAgree =
-        tags.length === 0 &&
-        Boolean(mid) &&
-        uniqueSuggested.length > 0 &&
-        (result?.canAgreeTopTags !== false);
-
-      if (shouldOfferAgree && mid) {
-        setClaimMediaId(mid);
-        setAgreeTags(uniqueSuggested);
-        setSelectedAgree(uniqueSuggested);
-        setPhase('agree');
-        setError(null);
-      } else {
-        finishAndClose({ tagCount: tags.length });
-      }
+      await onConfirm(amount, tags);
+      finishAndClose({ tagCount: tags.length });
     } catch (err) {
       if (isInsufficientBalanceError(err)) {
         sendToWalletTopUp();
         return;
       }
       setError(getApiErrorMessage(err, 'Tip failed'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const toggleAgreeTag = (tag: string) => {
-    setSelectedAgree((prev) =>
-      prev.some((t) => t.toLowerCase() === tag.toLowerCase())
-        ? prev.filter((t) => t.toLowerCase() !== tag.toLowerCase())
-        : [...prev, tag].slice(0, 5)
-    );
-  };
-
-  const submitAgree = async () => {
-    if (!claimMediaId) {
-      finishAndClose({ tagCount: 0 });
-      return;
-    }
-    if (selectedAgree.length === 0) {
-      finishAndClose({ tagCount: 0 });
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await mediaAPI.claimTags(claimMediaId, { tags: selectedAgree });
-      onTagClaimed?.();
-      finishAndClose({ tagCount: selectedAgree.length });
-    } catch (err) {
-      if (axios.isAxiosError(err)) {
-        const msg =
-          (err.response?.data as { error?: string; message?: string } | undefined)
-            ?.error ||
-          (err.response?.data as { message?: string } | undefined)?.message ||
-          err.message;
-        setError(msg || 'Could not back tags');
-      } else if (err instanceof Error && err.message) {
-        setError(err.message);
-      } else {
-        setError('Could not back tags');
-      }
     } finally {
       setSubmitting(false);
     }
@@ -453,13 +362,13 @@ export function TipSheet({
 
   const handleClose = () => {
     if (submitting) return;
-    // Closing the tag step still means the tip already went through.
-    if (phase === 'agree') {
-      finishAndClose({ tagCount: 0 });
-      return;
-    }
     finishAndClose();
   };
+
+  const scrollMaxHeight = Math.max(
+    160,
+    windowHeight * 0.92 - (headerHeight || windowHeight * 0.5)
+  );
 
   const currentStatusLabel =
     currentLabel ||
@@ -495,64 +404,12 @@ export function TipSheet({
           }}
         />
         <View style={styles.sheet}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.sheetContent}>
-            {phase === 'agree' ? (
-              <>
-                <Text style={styles.heading}>Tip placed</Text>
-                <Text style={styles.title} numberOfLines={2}>
-                  {title}
-                </Text>
-                <Text style={styles.agreeCopy}>
-                  Back your tip with community tags? Your £ only supports tags
-                  you choose — nothing is auto-applied.
-                </Text>
-                <View style={styles.tagChips}>
-                  {agreeTags.map((tag) => {
-                    const selected = selectedAgree.some(
-                      (t) => t.toLowerCase() === tag.toLowerCase()
-                    );
-                    return (
-                      <Pressable
-                        key={tag}
-                        onPress={() => toggleAgreeTag(tag)}
-                        disabled={submitting}
-                        style={[
-                          styles.tagChip,
-                          styles.tagChipTag,
-                          selected && styles.agreeChipSelected,
-                        ]}>
-                        <Text style={styles.tagChipText}>#{tag}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {error ? <Text style={styles.error}>{error}</Text> : null}
-                <Pressable
-                  style={[styles.confirm, submitting && styles.confirmDisabled]}
-                  onPress={() => void submitAgree()}
-                  disabled={submitting || selectedAgree.length === 0}>
-                  {submitting ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.confirmText}>
-                      Back tip with {selectedAgree.length} tag
-                      {selectedAgree.length === 1 ? '' : 's'}
-                    </Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  style={styles.cancel}
-                  onPress={() => finishAndClose({ tagCount: 0 })}
-                  disabled={submitting}>
-                  <Text style={styles.cancelText}>Skip for now</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
+          <View
+            style={styles.pickerBlock}
+            onLayout={(event) => {
+              const next = Math.round(event.nativeEvent.layout.height);
+              setHeaderHeight((prev) => (prev === next ? prev : next));
+            }}>
             <Text style={styles.heading}>Confirm Your Tip</Text>
             <Text style={styles.title} numberOfLines={2}>
               {title}
@@ -566,32 +423,13 @@ export function TipSheet({
               Balance {formatPoundsFromPence(liveBalancePence)}
             </Text>
 
-            <View style={styles.amountRow}>
-              <Pressable
-                style={styles.stepBtn}
-                onPress={() => applyAmount(amount - 0.01)}
-                disabled={submitting || amount <= effectiveMinTip}>
-                <Text style={styles.stepText}>−</Text>
-              </Pressable>
-              <View style={styles.amountField}>
-                <Text style={styles.currency}>£</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="decimal-pad"
-                  value={amountText}
-                  onChangeText={onChangeText}
-                  editable={!submitting}
-                  selectTextOnFocus
-                  inputAccessoryViewID={TIP_KEYBOARD_ACCESSORY_ID}
-                />
-              </View>
-              <Pressable
-                style={styles.stepBtn}
-                onPress={() => applyAmount(amount + 0.01)}
-                disabled={submitting}>
-                <Text style={styles.stepText}>+</Text>
-              </Pressable>
-            </View>
+            {visible ? (
+              <TipAmountPicker
+                value={amount}
+                onChange={applyAmount}
+                disabled={submitting}
+              />
+            ) : null}
 
             <View style={styles.chipRow}>
               {tipChips.map((chip) => {
@@ -624,7 +462,13 @@ export function TipSheet({
                 );
               })}
             </View>
-
+          </View>
+          <ScrollView
+            style={{ maxHeight: scrollMaxHeight }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.sheetContent}>
             {user ? (
               <View
                 style={[
@@ -663,12 +507,6 @@ export function TipSheet({
                     </Text>
                   </View>
                 )}
-
-                {currentLocation && homeLabel && !samePlace ? (
-                  <Text style={styles.influenceHint}>
-                    This tip will influence charts in both places.
-                  </Text>
-                ) : null}
 
                 {currentLocation && !homeLabel ? (
                   <Text style={styles.influenceHint}>
@@ -736,9 +574,33 @@ export function TipSheet({
                 <Ionicons name="pricetag-outline" size={16} color={colors.accentLight} />
                 <Text style={styles.tagsTitle}>Add Tags & Elements (Optional)</Text>
               </View>
-              <Text style={styles.tagsHint}>
-                Optional — your tip only backs tags you add. Skip to choose later.
-              </Text>
+              {existingTags.length > 0 ? (
+                <View style={styles.tagChips}>
+                  {existingTags.map((tag) => {
+                    const selected = tags.some(
+                      (item) => item.toLowerCase() === tag.toLowerCase()
+                    );
+                    return (
+                      <Pressable
+                        key={tag}
+                        onPress={() => toggleExistingTag(tag)}
+                        disabled={submitting}
+                        style={[
+                          styles.tagChip,
+                          selected ? styles.tagChipTag : styles.tagChipIdle,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.tagChipText,
+                            !selected && styles.tagChipTextIdle,
+                          ]}>
+                          #{tag}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
               <View style={styles.tagInputRow}>
                 <TextInput
                   style={styles.tagInput}
@@ -761,9 +623,19 @@ export function TipSheet({
                   <Text style={styles.addTagBtnText}>Add</Text>
                 </Pressable>
               </View>
-              {tags.length > 0 ? (
+              {tags.some(
+                (tag) =>
+                  !existingTags.some((existing) => existing.toLowerCase() === tag.toLowerCase())
+              ) ? (
                 <View style={styles.tagChips}>
-                  {tags.map((tag) => {
+                  {tags
+                    .filter(
+                      (tag) =>
+                        !existingTags.some(
+                          (existing) => existing.toLowerCase() === tag.toLowerCase()
+                        )
+                    )
+                    .map((tag) => {
                     const asElement = isKnownElement(tag);
                     return (
                       <View
@@ -793,17 +665,6 @@ export function TipSheet({
               <WelcomeCreditClaimCard compact />
             ) : null}
 
-            <Text style={styles.splitHint}>
-              80% of this tip goes to the artist.{' '}
-              <Text
-                style={styles.splitLink}
-                onPress={() => {
-                  void Linking.openURL(LEGAL_URLS.aboutHowMoneyWorks);
-                }}>
-                How we split money
-              </Text>
-            </Text>
-
             <Pressable
               style={[styles.confirm, submitting && styles.confirmDisabled]}
               onPress={() => void submit()}
@@ -823,12 +684,9 @@ export function TipSheet({
               disabled={submitting}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
-              </>
-            )}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-      <KeyboardDoneAccessory nativeID={TIP_KEYBOARD_ACCESSORY_ID} />
     </Modal>
   );
 }
@@ -847,9 +705,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: colors.cardBorder,
   },
-  sheetContent: {
+  pickerBlock: {
     paddingHorizontal: 20,
     paddingTop: 18,
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
     paddingBottom: 28,
   },
   heading: {
@@ -873,51 +735,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     color: colors.textMuted,
     fontSize: 13,
-  },
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  stepBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepText: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: '500',
-    lineHeight: 32,
-  },
-  amountField: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 52,
-  },
-  currency: {
-    color: colors.textSecondary,
-    fontSize: 20,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  input: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '700',
-    paddingVertical: 0,
   },
   chipRow: {
     flexDirection: 'row',
@@ -1035,12 +852,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  tagsHint: {
-    marginTop: 6,
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-  },
   tagInputRow: {
     marginTop: 10,
     flexDirection: 'row',
@@ -1087,30 +898,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderRadius: 999,
+    borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   tagChipTag: {
     backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  tagChipIdle: {
+    backgroundColor: 'transparent',
+    borderColor: colors.cardBorder,
   },
   tagChipElement: {
     backgroundColor: '#0d9488',
-  },
-  agreeCopy: {
-    marginTop: 10,
-    marginBottom: 4,
-    color: colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  agreeChipSelected: {
-    borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#0d9488',
   },
   tagChipText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  tagChipTextIdle: {
+    color: colors.text,
   },
   tagChipRemove: {
     color: 'rgba(255,255,255,0.85)',
@@ -1122,18 +932,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: '#fca5a5',
     fontSize: 14,
-  },
-  splitHint: {
-    marginTop: 14,
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  splitLink: {
-    color: colors.accentLight,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
   },
   confirm: {
     marginTop: 18,
