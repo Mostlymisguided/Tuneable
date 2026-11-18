@@ -13,7 +13,7 @@ import { appendTipChips, isKnownElement, normalizeTipChipForDisplay } from '../u
 import { tagsMatch } from '../utils/tagNormalizer';
 import TipStatChips from './TipStatChips';
 import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
-import { HOW_MONEY_WORKS_PATH } from '../constants';
+import { TipAmountWheel, useCoarsePointer } from './TipAmountWheel';
 import WaveformBars, { waveformPeaksOf, type TipMoment } from './WaveformBars';
 
 type ProgressStep = 'placing' | 'processing' | 'updating' | null;
@@ -96,6 +96,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const scannedPeaks = waveformPeaksOf(waveformPeaks);
   const momentDuration = typeof durationSeconds === 'number' && durationSeconds > 0 ? durationSeconds : 0;
   const [isEnablingCurrentLocation, setIsEnablingCurrentLocation] = useState(false);
+  const coarsePointer = useCoarsePointer();
   const { user: authUser } = useAuth();
   const liveBalancePounds =
     typeof authUser?.balance === 'number' ? authUser.balance / 100 : userBalance;
@@ -340,40 +341,49 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
         <div className="mb-4 p-4 bg-purple-900/30 rounded-lg border border-purple-600">
           <span className="text-sm text-gray-300">Your {actionLabel} Amount</span>
 
-          <div className="mt-3 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => adjustAmount(-0.01)}
-              disabled={isLoading || effectiveAmount <= minTip}
-              aria-label="Decrease tip"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-
-            <div className="flex items-center">
-              <span className="text-2xl font-bold text-purple-400">£</span>
-              <input
-                type="number"
-                step="0.01"
-                min={minTip}
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                disabled={isLoading}
-                className="w-24 bg-transparent text-2xl font-bold text-purple-400 text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => adjustAmount(0.01)}
+          {coarsePointer ? (
+            <TipAmountWheel
+              value={effectiveAmount}
+              min={minTip}
               disabled={isLoading}
-              aria-label="Increase tip"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
+              onChange={setAmountTo}
+            />
+          ) : (
+            <div className="mt-3 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => adjustAmount(-0.01)}
+                disabled={isLoading || effectiveAmount <= minTip}
+                aria-label="Decrease tip"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+
+              <div className="flex items-center">
+                <span className="text-2xl font-bold text-purple-400">£</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={minTip}
+                  value={amountInput}
+                  onChange={(e) => setAmountInput(e.target.value)}
+                  disabled={isLoading}
+                  className="w-24 bg-transparent text-2xl font-bold text-purple-400 text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => adjustAmount(0.01)}
+                disabled={isLoading}
+                aria-label="Increase tip"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           {/* Tip stat shortcuts */}
           <TipStatChips
@@ -392,17 +402,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               Minimum {actionLabelLower} is £{minTip.toFixed(2)}
             </p>
           )}
-
-          <p className="mt-3 text-xs text-purple-200/90 text-center">
-            80% of this {actionLabelLower} goes to the artist.{' '}
-            <Link
-              to={HOW_MONEY_WORKS_PATH}
-              onClick={onClose}
-              className="underline hover:text-white"
-            >
-              How we split money
-            </Link>
-          </p>
         </div>
 
         {/* Insufficient Funds Warning */}
@@ -448,12 +447,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
                       </span>
                     </p>
                   </div>
-                )}
-
-                {currentLocation && homeLabel && !samePlace && (
-                  <p className="text-xs text-gray-400 mt-2">
-                    This tip will influence charts in both places.
-                  </p>
                 )}
 
                 {currentLocation && !homeLabel && (
@@ -544,9 +537,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               Add Tags & Elements (Optional)
             </label>
           </div>
-          <p className="text-xs text-gray-400 mb-2">
-            Optional. Tap an existing tag to back it with this tip, or add your own.
-          </p>
 
           {existingTagList.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
