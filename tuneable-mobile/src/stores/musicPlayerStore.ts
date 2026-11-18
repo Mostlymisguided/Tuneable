@@ -424,7 +424,10 @@ export const useMusicPlayerStore = create<MusicPlayerState>((set, get) => ({
 
   seek: async (positionMs) => {
     if (!sound) return;
-    await sound.setPositionAsync(Math.max(0, positionMs));
+    const cap = get().durationMs;
+    const next = Math.max(0, cap > 0 ? Math.min(positionMs, cap) : positionMs);
+    set({ positionMs: next });
+    await sound.setPositionAsync(next);
   },
 
   clear: async () => {

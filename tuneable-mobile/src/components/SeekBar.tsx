@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   LayoutChangeEvent,
   PanResponder,
@@ -13,18 +13,38 @@ type Props = {
   positionMs: number;
   durationMs: number;
   onSeek: (positionMs: number) => void;
+  /** Fired when a drag starts and ends so a parent scroller can lock. */
+  onScrubbingChange?: (scrubbing: boolean) => void;
 };
 
-export function SeekBar({ positionMs, durationMs, onSeek }: Props) {
+const THUMB = 16;
+/** Hide the held position once playback reports something this close. */
+const SEEK_SETTLE_MS = 600;
+/** Safety net if a seek never reports back. */
+const SEEK_SETTLE_TIMEOUT_MS = 1200;
+
+export function SeekBar({
+  positionMs,
+  durationMs,
+  onSeek,
+  onScrubbingChange,
+}: Props) {
   const [trackWidth, setTrackWidth] = useState(1);
-  const [dragging, setDragging] = useState(false);
-  const [dragMs, setDragMs] = useState(0);
+  const [dragMs, setDragMs] = useState<number | null>(null);
+  const [pinnedMs, setPinnedMs] = useState<number | null>(null);
+
   const widthRef = useRef(1);
   const durationRef = useRef(durationMs);
+  const onSeekRef = useRef(onSeek);
+  const onScrubbingChangeRef = useRef(onScrubbingChange);
+  const grantXRef = useRef(0);
+
   durationRef.current = durationMs;
   widthRef.current = trackWidth;
+  onSeekRef.current = onSeek;
+  onScrubbingChangeRef.current = onScrubbingChange;
 
-  const displayMs = dragging ? dragMs : positionMs;
+  const displayMs = dragMs ?? pinnedMs ?? positionMs;
   const safeDuration = durationMs > 0 ? durationMs : 1;
   const ratio = Math.max(0, Math.min(1, displayMs / safeDuration));
 
@@ -34,26 +54,57 @@ export function SeekBar({ positionMs, durationMs, onSeek }: Props) {
     return r * (durationRef.current || 0);
   };
 
+  useEffect(() => {
+    if (pinnedMs == null) return;
+    const timer = setTimeout(() => setPinnedMs(null), SEEK_SETTLE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pinnedMs]);
+
+  useEffect(() => {
+    if (pinnedMs == null || dragMs != null) return;
+    if (Math.abs(positionMs - pinnedMs) <= SEEK_SETTLE_MS) {
+      setPinnedMs(null);
+    }
+  }, [pinnedMs, dragMs, positionMs]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      // The now-playing screen is a ScrollView. Letting it take the touch
+      // cancels the drag and the thumb snaps back to the playhead.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: (evt) => {
-        const next = msFromX(evt.nativeEvent.locationX);
-        setDragging(true);
-        setDragMs(next);
+        // locationX is only trustworthy at grant, and only because the
+        // fill/thumb ignore touches so the target is the track itself.
+        // Move events report locationX against whichever child is under
+        // the finger, which makes the thumb jump. Track the finger with
+        // the grant position plus the gesture translation instead.
+        const x = evt.nativeEvent.locationX;
+        grantXRef.current = x;
+        onScrubbingChangeRef.current?.(true);
+        setPinnedMs(null);
+        setDragMs(msFromX(x));
       },
-      onPanResponderMove: (evt) => {
-        setDragMs(msFromX(evt.nativeEvent.locationX));
+      onPanResponderMove: (_evt, gesture) => {
+        setDragMs(msFromX(grantXRef.current + gesture.dx));
       },
-      onPanResponderRelease: (evt) => {
-        const next = msFromX(evt.nativeEvent.locationX);
-        setDragging(false);
-        setDragMs(next);
-        onSeek(next);
+      onPanResponderRelease: (_evt, gesture) => {
+        const next = msFromX(grantXRef.current + gesture.dx);
+        setDragMs(null);
+        setPinnedMs(next);
+        onScrubbingChangeRef.current?.(false);
+        onSeekRef.current(next);
       },
-      onPanResponderTerminate: () => {
-        setDragging(false);
+      onPanResponderTerminate: (_evt, gesture) => {
+        const next = msFromX(grantXRef.current + gesture.dx);
+        setDragMs(null);
+        setPinnedMs(next);
+        onScrubbingChangeRef.current?.(false);
+        onSeekRef.current(next);
       },
     })
   ).current;
@@ -68,10 +119,21 @@ export function SeekBar({ positionMs, durationMs, onSeek }: Props) {
       <View
         style={styles.trackHit}
         onLayout={onLayout}
+        collapsable={false}
+        hitSlop={{ top: 14, bottom: 14 }}
         {...panResponder.panHandlers}>
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${ratio * 100}%` }]} />
-          <View style={[styles.thumb, { left: `${ratio * 100}%` }]} />
+        <View pointerEvents="none" style={styles.track}>
+          <View
+            pointerEvents="none"
+            style={[styles.fill, { width: `${ratio * 100}%` }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[
+              styles.thumb,
+              { transform: [{ translateX: ratio * trackWidth - THUMB / 2 }] },
+            ]}
+          />
         </View>
       </View>
       <View style={styles.times}>
@@ -87,7 +149,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   trackHit: {
-    height: 28,
+    height: 36,
     justifyContent: 'center',
   },
   track: {
@@ -103,17 +165,17 @@ const styles = StyleSheet.create({
   },
   thumb: {
     position: 'absolute',
+    left: 0,
     top: -6,
-    marginLeft: -8,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
     backgroundColor: '#fff',
   },
   times: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
+    marginTop: 2,
   },
   time: {
     color: colors.textMuted,

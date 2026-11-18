@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -35,7 +35,9 @@ import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
 export default function NowPlayingScreen() {
   const { user, updateBalance } = useAuth();
   const [tipOpen, setTipOpen] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
   const [champions, setChampions] = useState<MediaChampion[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
   const track = useCurrentTrack();
   const episode = useCurrentEpisode();
 
@@ -154,6 +156,10 @@ export default function NowPlayingScreen() {
   const onSeek = (ms: number) => {
     void (active === 'podcast' ? podcast.seek(ms) : music.seek(ms));
   };
+  const onScrubbingChange = (activeScrub: boolean) => {
+    scrollRef.current?.setNativeProps({ scrollEnabled: !activeScrub });
+    setScrubbing(activeScrub);
+  };
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
     const id = podcastId || tuneId;
@@ -201,6 +207,8 @@ export default function NowPlayingScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
+        scrollEnabled={!scrubbing}
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}>
         <Image source={{ uri: coverUri }} style={styles.cover} />
@@ -231,6 +239,7 @@ export default function NowPlayingScreen() {
             positionMs={positionMs}
             durationMs={durationMs}
             onSeek={onSeek}
+            onScrubbingChange={onScrubbingChange}
           />
         </View>
 
