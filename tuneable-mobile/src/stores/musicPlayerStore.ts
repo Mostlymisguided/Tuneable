@@ -1,6 +1,7 @@
 import { Audio, type AVPlaybackStatus } from 'expo-av';
 import { create } from 'zustand';
 import type { ChartMediaItem } from '@/src/types/media';
+import { ensurePlaybackAudioSession } from '@/src/lib/playbackAudio';
 import {
   MUSIC_NO_PLAYABLE,
   MUSIC_UNPLAYABLE_SKIP,
@@ -45,7 +46,6 @@ type MusicPlayerState = {
 };
 
 let sound: Audio.Sound | null = null;
-let audioModeReady = false;
 /** User intent. Status callbacks must not flip this back to playing after pause. */
 let wantsPlay = false;
 /** Item the current sound was loaded for. Status must not publish a different track. */
@@ -57,15 +57,7 @@ let skipAfterFailureInFlight = false;
 let skipNoticeShown = false;
 
 async function ensureAudioMode() {
-  if (audioModeReady) return;
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    staysActiveInBackground: true,
-    shouldDuckAndroid: true,
-    playThroughEarpieceAndroid: false,
-  });
-  audioModeReady = true;
+  await ensurePlaybackAudioSession();
   ensureNowPlayingRemoteHandlers();
 }
 
@@ -261,20 +253,26 @@ async function loadAndPlay(item: ChartMediaItem, session = startPlaybackSession(
     const player = created.sound;
     sound = player;
     loadedItem = item;
+    await player.playAsync();
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      await player.pauseAsync().catch(() => {});
+      return;
+    }
+    const status = await player.getStatusAsync();
+    const positionMs = status.isLoaded ? status.positionMillis ?? 0 : 0;
+    const durationMs = status.isLoaded
+      ? status.durationMillis ?? getStore().durationMs
+      : getStore().durationMs;
     setNowPlaying({
       title: item.title,
       artist: getCreatorDisplay(item),
       artworkUrl: item.coverArt,
-      durationMs: getStore().durationMs,
-      positionMs: 0,
+      durationMs,
+      positionMs,
       playbackRate: 1,
       isPlaying: true,
       mode: 'music',
     });
-    await player.playAsync();
-    if (!isPlaybackSession(session) || !wantsPlay) {
-      await player.pauseAsync().catch(() => {});
-    }
   } catch (err) {
     if (!isPlaybackSession(session) || !wantsPlay) return;
     const message = err instanceof Error ? err.message : 'Failed to load audio';

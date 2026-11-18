@@ -6,6 +6,7 @@ import {
   PODCAST_UNPLAYABLE_SKIP,
 } from '@/src/lib/playbackMessages';
 import {
+  ensurePlaybackAudioSession,
   nextPlaybackSpeed,
   PODCAST_SKIP_BACK_MS,
   PODCAST_SKIP_FORWARD_MS,
@@ -61,7 +62,6 @@ type PodcastPlayerState = {
 };
 
 let sound: Audio.Sound | null = null;
-let audioModeReady = false;
 let wantsPlay = false;
 let loadedItem: PodcastEpisode | null = null;
 let consecutiveLoadFailures = 0;
@@ -69,15 +69,7 @@ let skipAfterFailureInFlight = false;
 let skipNoticeShown = false;
 
 async function ensureAudioMode() {
-  if (audioModeReady) return;
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    staysActiveInBackground: true,
-    shouldDuckAndroid: true,
-    playThroughEarpieceAndroid: false,
-  });
-  audioModeReady = true;
+  await ensurePlaybackAudioSession();
   ensureNowPlayingRemoteHandlers();
 }
 
@@ -292,20 +284,26 @@ async function loadAndPlay(item: PodcastEpisode, session = startPlaybackSession(
       await unloadSound();
       return;
     }
+    await player.playAsync();
+    if (!isPlaybackSession(session) || !wantsPlay) {
+      await player.pauseAsync().catch(() => {});
+      return;
+    }
+    const status = await player.getStatusAsync();
+    const positionMs = status.isLoaded ? status.positionMillis ?? 0 : 0;
+    const durationMs = status.isLoaded
+      ? status.durationMillis ?? getStore().durationMs
+      : getStore().durationMs;
     setNowPlaying({
       title: item.title,
       artist: seriesTitle(item),
       artworkUrl: episodeCoverArt(item),
-      durationMs: getStore().durationMs,
-      positionMs: 0,
+      durationMs,
+      positionMs,
       playbackRate: getStore().playbackRate,
       isPlaying: true,
       mode: 'podcast',
     });
-    await player.playAsync();
-    if (!isPlaybackSession(session) || !wantsPlay) {
-      await player.pauseAsync().catch(() => {});
-    }
   } catch (err) {
     if (!isPlaybackSession(session) || !wantsPlay) return;
     const message = err instanceof Error ? err.message : 'Failed to load audio';

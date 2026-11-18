@@ -1,5 +1,27 @@
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
+
 export const PODCAST_SKIP_BACK_MS = 15_000;
 export const PODCAST_SKIP_FORWARD_MS = 30_000;
+
+let playbackSessionReady = false;
+
+/**
+ * Exclusive playback. iOS only puts an app on the lock screen and in Control
+ * Center when its audio session does not mix with other apps.
+ */
+export async function ensurePlaybackAudioSession() {
+  if (playbackSessionReady) return;
+  await Audio.setAudioModeAsync({
+    allowsRecordingIOS: false,
+    playsInSilentModeIOS: true,
+    staysActiveInBackground: true,
+    interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+    interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+    shouldDuckAndroid: false,
+    playThroughEarpieceAndroid: false,
+  });
+  playbackSessionReady = true;
+}
 
 export const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 1.75, 2] as const;
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];

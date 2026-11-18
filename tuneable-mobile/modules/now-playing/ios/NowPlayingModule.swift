@@ -44,12 +44,14 @@ public class NowPlayingModule: Module {
         info[MPMediaItemPropertyPlaybackDuration] = duration
         info[MPNowPlayingInfoPropertyPlaybackRate] = playbackRate
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        self.publishPlaybackState(isPlaying: playbackRate > 0)
       }
     }
 
     Function("clear") {
       DispatchQueue.main.async {
         self.artworkURLString = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
       }
     }
@@ -66,11 +68,17 @@ public class NowPlayingModule: Module {
     info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = params.playbackRate
     info[MPNowPlayingInfoPropertyMediaType] = MPNowPlayingInfoMediaType.audio.rawValue
     MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    publishPlaybackState(isPlaying: params.isPlaying)
+  }
+
+  private func publishPlaybackState(isPlaying: Bool) {
+    MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
   }
 
   private func setupRemoteCommandsIfNeeded() {
     guard !remoteCommandsReady else { return }
     remoteCommandsReady = true
+    UIApplication.shared.beginReceivingRemoteControlEvents()
     let center = MPRemoteCommandCenter.shared()
 
     center.playCommand.addTarget { [weak self] _ in
