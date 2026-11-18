@@ -36,6 +36,8 @@ const Notifications: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [processingInvite, setProcessingInvite] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const seenNotificationIds = useRef<Set<string>>(new Set());
+  const userSocketId = user?._id || user?.uuid || null;
 
   // Get API base URL for Socket.IO connection
   const getSocketIOUrl = () => {
@@ -48,7 +50,10 @@ const Notifications: React.FC = () => {
     setIsLoading(true);
     try {
       const response = await notificationAPI.getNotifications(pageNum, 20, false);
-      const newNotifications = response.notifications || [];
+      const newNotifications: Notification[] = response.notifications || [];
+      newNotifications.forEach((item) => {
+        if (item._id) seenNotificationIds.current.add(item._id);
+      });
       
       if (append) {
         setNotifications(prev => [...prev, ...newNotifications]);
@@ -67,7 +72,7 @@ const Notifications: React.FC = () => {
 
   // Set up Socket.IO connection
   useEffect(() => {
-    if (!user?._id && !user?.uuid) return;
+    if (!userSocketId) return;
 
     const socketUrl = getSocketIOUrl();
     const token = localStorage.getItem('token');
@@ -77,8 +82,9 @@ const Notifications: React.FC = () => {
       return;
     }
     
+    let socket: Socket;
     try {
-      socketRef.current = io(socketUrl, {
+      socket = io(socketUrl, {
         transports: ['websocket', 'polling'],
         withCredentials: true,
         auth: {
@@ -89,54 +95,62 @@ const Notifications: React.FC = () => {
         reconnectionAttempts: 5,
         timeout: 5000
       });
+      socketRef.current = socket;
 
-      socketRef.current.on('connect', () => {
+      socket.on('connect', () => {
         console.log('Socket.IO connected');
-        // Authenticate with JWT token
-        socketRef.current?.emit('authenticate', { token });
+        socket.emit('authenticate', { token });
       });
 
-      socketRef.current.on('connect_error', (error) => {
+      socket.on('connect_error', (error) => {
         console.warn('Socket.IO connection error (non-critical):', error.message);
         // Silently fail - notifications will work via polling
       });
 
-      socketRef.current.on('disconnect', (reason) => {
+      socket.on('disconnect', (reason) => {
         console.log('Socket.IO disconnected:', reason);
       });
 
-      socketRef.current.on('notification', (notification: Notification) => {
+      socket.on('notification', (notification: Notification) => {
         console.log('New notification received:', notification);
-        setNotifications(prev => [notification, ...prev]);
+        const id = notification?._id;
+        if (id && seenNotificationIds.current.has(id)) return;
+        if (id) seenNotificationIds.current.add(id);
+        setNotifications(prev => {
+          if (id && prev.some((item) => item._id === id)) return prev;
+          return [notification, ...prev];
+        });
         setUnreadCount(prev => prev + 1);
       });
 
-      socketRef.current.on('unread-count', (data: { count: number }) => {
+      socket.on('unread-count', (data: { count: number }) => {
         setUnreadCount(data.count);
       });
 
-      socketRef.current.on('error', (error) => {
+      socket.on('error', (error) => {
         console.warn('Socket.IO error (non-critical):', error);
       });
     } catch (error) {
       console.warn('Socket.IO initialization failed (non-critical):', error);
       // Continue without Socket.IO - notifications will work via polling
+      return;
     }
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
+      socket.io.reconnection(false);
+      socket.disconnect();
+      if (socketRef.current === socket) {
         socketRef.current = null;
       }
     };
-  }, [user]);
+  }, [userSocketId]);
 
   // Initial load
   useEffect(() => {
-    if (user) {
+    if (userSocketId) {
       fetchNotifications(1, false);
     }
-  }, [user]);
+  }, [userSocketId]);
 
   // Handle mark as read
   const handleMarkAsRead = async (notificationId: string) => {
