@@ -393,7 +393,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     maxWidth: '48%',
   },
   triggerCompact: {

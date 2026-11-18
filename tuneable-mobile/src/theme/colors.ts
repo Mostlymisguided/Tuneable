@@ -1,9 +1,9 @@
-/** Tuneable brand palette — matches web / native iOS gradient. */
+/** Tuneable brand palette — darker wash matching the web screenshots. */
 export const colors = {
-  gradientStart: '#1A1A2E',
-  gradientMid: '#4A2C81',
-  gradientEnd: '#3A1C71',
-  background: '#1A1A2E',
+  gradientStart: '#14122A',
+  gradientMid: '#302252',
+  gradientEnd: '#261848',
+  background: '#14122A',
   text: '#E5E7EB',
   textSecondary: 'rgba(229, 231, 235, 0.85)',
   textMuted: 'rgba(229, 231, 235, 0.65)',
@@ -17,10 +17,12 @@ export const colors = {
   tipHeartTipped: '#fb7185',
   tipHeartTippedBg: 'rgba(136, 19, 55, 0.55)',
   tipHeartTippedBorder: 'rgba(251, 113, 133, 0.75)',
-  card: 'rgba(255, 255, 255, 0.08)',
-  cardBorder: 'rgba(255, 255, 255, 0.15)',
+  /** Web queue cards are `bg-gray-900/50` — a dark veil, not a white wash. */
+  card: 'rgba(17, 24, 39, 0.5)',
+  cardBorder: 'rgba(255, 255, 255, 0.12)',
   danger: '#ef4444',
   success: '#22c55e',
-  inputBg: 'rgba(255, 255, 255, 0.1)',
-  tabBar: '#1A1A2E',
+  /** Web search fields read as gray-800. */
+  inputBg: 'rgba(31, 41, 55, 0.92)',
+  tabBar: '#14122A',
 };

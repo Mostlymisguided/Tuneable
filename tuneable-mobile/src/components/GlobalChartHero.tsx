@@ -302,7 +302,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   chipActive: {
     backgroundColor: '#7e22ce',
