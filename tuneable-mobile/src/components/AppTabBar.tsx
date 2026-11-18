@@ -1,12 +1,14 @@
-import { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useSegments, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/src/auth/AuthContext';
 import {
   TAB_BAR_BASE_HEIGHT,
   usePlayerDockState,
 } from '@/src/hooks/usePlayerDock';
 import { colors } from '@/src/theme/colors';
+import { hasCustomProfilePic } from '@/src/types/user';
 
 type TabItem = {
   href: Href;
@@ -35,9 +37,14 @@ function tabHrefFromSegments(segments: string[]): Href | null {
  * Hidden on auth, onboarding, and Now Playing.
  */
 export function AppTabBar() {
+  const { user } = useAuth();
   const { showTabBar, tabBarHeight } = usePlayerDockState();
   const segments = useSegments() as string[];
   const lastTabRef = useRef<Href>('/(tabs)');
+  const [failedPic, setFailedPic] = useState<string | null>(null);
+  const profilePic = user?.profilePic;
+  const showProfilePhoto =
+    hasCustomProfilePic(profilePic) && failedPic !== profilePic;
 
   const routeTab = tabHrefFromSegments(segments);
   if (routeTab) lastTabRef.current = routeTab;
@@ -57,6 +64,7 @@ export function AppTabBar() {
       {TABS.map((tab) => {
         const active = activeHref === tab.href;
         const color = active ? colors.accentLight : colors.textMuted;
+        const usePhoto = tab.segment === 'profile' && showProfilePhoto;
         return (
           <Pressable
             key={tab.label}
@@ -65,8 +73,22 @@ export function AppTabBar() {
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={tab.label}>
-            <Ionicons name={tab.icon} size={24} color={color} />
-            <Text style={[styles.label, { color }]}>{tab.label}</Text>
+            {usePhoto ? (
+              <Image
+                source={{ uri: profilePic }}
+                onError={() => setFailedPic(profilePic ?? null)}
+                accessibilityIgnoresInvertColors
+                style={[
+                  styles.profilePic,
+                  { borderColor: active ? colors.accentLight : 'rgba(168, 85, 247, 0.45)' },
+                ]}
+              />
+            ) : (
+              <>
+                <Ionicons name={tab.icon} size={24} color={color} />
+                <Text style={[styles.label, { color }]}>{tab.label}</Text>
+              </>
+            )}
           </Pressable>
         );
       })}
@@ -97,5 +119,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '500',
+  },
+  profilePic: {
+    width: 30,
+    height: 30,
+    marginTop: 4,
+    borderRadius: 15,
+    borderWidth: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
 });
