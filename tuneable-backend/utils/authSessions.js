@@ -146,10 +146,12 @@ async function redeemExchangeCode(code) {
   });
   if (!session?.heldRefreshToken) return { ok: false };
   const refreshToken = session.heldRefreshToken;
-  session.heldRefreshToken = null;
-  session.exchangeCodeHash = null;
-  session.exchangeExpiresAt = null;
-  await session.save();
+  // Unset, do not write null. Null collides on the unique exchange-code index
+  // and then blocks every email and Apple login.
+  await AuthSession.updateOne(
+    { _id: session._id },
+    { $unset: { heldRefreshToken: '', exchangeCodeHash: '', exchangeExpiresAt: '' } }
+  );
   const user = await activeUser(session.userId);
   if (!user) return { ok: false };
   return {

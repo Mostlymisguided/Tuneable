@@ -31,6 +31,9 @@ jest.mock('../models/AuthSession', () => {
 
   function applyUpdate(doc, update) {
     if (update?.$set) Object.assign(doc, update.$set);
+    if (update?.$unset) {
+      for (const key of Object.keys(update.$unset)) delete doc[key];
+    }
     return doc;
   }
 
@@ -111,6 +114,14 @@ describe('auth sessions', () => {
     expect(access.exp - access.iat).toBe(60 * 60);
     expect(issued.refreshToken).toEqual(expect.any(String));
     expect(await isAccessSessionActive(access.sid)).toBe(true);
+    expect(global.__authSessionStore[0].exchangeCodeHash).toBeUndefined();
+  });
+
+  it('issues a second password session without an exchange code', async () => {
+    await issueAuthSession(user);
+    await issueAuthSession(user);
+    expect(global.__authSessionStore).toHaveLength(2);
+    expect(global.__authSessionStore.every((doc) => doc.exchangeCodeHash == null)).toBe(true);
   });
 
   it('rotates the refresh token and keeps the device signed in', async () => {
