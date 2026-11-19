@@ -79,9 +79,6 @@ export function ChartSortPanel({ sort, onChange, onHide, hint }: PanelProps) {
   );
 }
 
-export const CHART_ADDED_SORT_HINT =
-  'Newest and oldest are when the tune was added to Tuneable.';
-
 export const CHART_LIBRARY_SORT_HINT =
   'Newest and oldest are when this library last tipped the tune.';
 

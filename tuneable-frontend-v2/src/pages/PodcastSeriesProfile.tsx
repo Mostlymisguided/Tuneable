@@ -1219,7 +1219,7 @@ const PodcastSeriesProfile: React.FC = () => {
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
               >
-                <option value="mostTipped">Most Tipped</option>
+                <option value="mostTipped">Most Tips</option>
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
                 <option value="duration">Longest</option>

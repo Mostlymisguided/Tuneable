@@ -11,7 +11,7 @@ const mapboxGeocoding = require('./mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
-const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+const { normalizeChartSort, sortChartItems, chartReleaseDate } = require('../utils/chartSort');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 const { stampViewerTipped } = require('../utils/viewerTipped');
 const Collective = require('../models/Collective');
@@ -360,6 +360,7 @@ async function getLocationProfile(rawPlaceId, { page = 1, limit = 50, timePeriod
 
   const ordered = sortChartItems(ranked, chartSort, {
     getDate: (item) => item.createdAt || item.uploadedAt,
+    getReleaseDate: (item) => chartReleaseDate(item),
     getTip: (item) => item.timePeriodBidValue ?? item.globalMediaAggregate ?? 0,
   });
 

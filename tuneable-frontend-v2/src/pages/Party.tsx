@@ -28,9 +28,8 @@ import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
 import {
   ChartSortPanel,
   ChartSortTrigger,
-  CHART_ADDED_SORT_HINT,
 } from '../components/ChartSortControl';
-import { sortChartItems, type ChartSortKey } from '../utils/chartSort';
+import { chartReleaseDate, sortChartItems, type ChartSortKey } from '../utils/chartSort';
 import { DEFAULT_COVER_ART } from '../constants';
 import { penceToPoundsNumber, penceToPounds } from '../utils/currency';
 import { resolveTipStatInputs } from '../utils/tipStats';
@@ -1847,6 +1846,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           ? mediaItem.createdAt || mediaItem.uploadedAt || item.createdAt || item.queuedAt
           : item.queuedAt || mediaItem.createdAt || item.createdAt;
       },
+      ...(isGlobalParty
+        ? { getReleaseDate: (item: any) => chartReleaseDate(item) }
+        : {}),
       getTip: (item: any) => {
         const mediaItem = item.mediaId || item;
         if (typeof item.timePeriodBidValue === 'number') return item.timePeriodBidValue;
@@ -3106,7 +3108,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         onHide={() => setShowSortPanel(false)}
                         hint={
                           isGlobalParty
-                            ? CHART_ADDED_SORT_HINT
+                            ? undefined
                             : 'Newest and oldest are when the tune was added to this party.'
                         }
                       />

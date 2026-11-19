@@ -1,5 +1,5 @@
 export const CHART_SORT_OPTIONS = [
-  { key: 'most-tipped', label: 'Most Tipped' },
+  { key: 'most-tipped', label: 'Most Tips' },
   { key: 'most-tunebytes', label: 'Most TuneBytes' },
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },
@@ -16,7 +16,7 @@ export function normalizeChartSort(sortBy?: string | null): ChartSortKey {
 
 export function chartSortLabel(sortBy?: string | null): string {
   const key = normalizeChartSort(sortBy);
-  return CHART_SORT_OPTIONS.find((option) => option.key === key)?.label ?? 'Most Tipped';
+  return CHART_SORT_OPTIONS.find((option) => option.key === key)?.label ?? 'Most Tips';
 }
 
 function dateMs(value: unknown): number {
@@ -28,6 +28,44 @@ function dateMs(value: unknown): number {
 export function defaultChartDate(item: Record<string, unknown> | null | undefined): unknown {
   if (!item) return null;
   return item.createdAt || item.uploadedAt || item.queuedAt || item.lastBidAt || null;
+}
+
+type ReleaseDateSource = {
+  releaseDate?: unknown;
+  releaseYear?: unknown;
+  media?: ReleaseDateSource | null;
+  mediaId?: ReleaseDateSource | string | null;
+};
+
+function chartMediaLayers(item: ReleaseDateSource | null | undefined): ReleaseDateSource[] {
+  if (!item) return [];
+  const layers = [item];
+  if (item.media && typeof item.media === 'object') layers.push(item.media);
+  if (item.mediaId && typeof item.mediaId === 'object') layers.push(item.mediaId);
+  return layers;
+}
+
+function releaseYearDate(year: unknown): Date | null {
+  const numeric = typeof year === 'number'
+    ? year
+    : typeof year === 'string' && /^\d{4}$/.test(year)
+      ? Number(year)
+      : NaN;
+  if (!Number.isInteger(numeric) || numeric < 1900 || numeric > 2100) return null;
+  return new Date(Date.UTC(numeric, 0, 1));
+}
+
+/** Full release date, then a year-only release. Undated tunes sort last. */
+export function chartReleaseDate(item: ReleaseDateSource | null | undefined): unknown {
+  const layers = chartMediaLayers(item);
+  for (const media of layers) {
+    if (media.releaseDate) return media.releaseDate;
+  }
+  for (const media of layers) {
+    const yearDate = releaseYearDate(media.releaseYear);
+    if (yearDate) return yearDate;
+  }
+  return null;
 }
 
 export function defaultChartTip(item: Record<string, unknown> | null | undefined): number {
@@ -61,6 +99,7 @@ export function sortChartItems<T>(
   sortBy: string | null | undefined,
   accessors?: {
     getDate?: (item: T) => unknown;
+    getReleaseDate?: (item: T) => unknown;
     getTip?: (item: T) => number;
     getTuneBytes?: (item: T) => number;
   }
@@ -68,6 +107,7 @@ export function sortChartItems<T>(
   const key = normalizeChartSort(sortBy);
   const getDate =
     accessors?.getDate ?? ((item: T) => defaultChartDate(item as Record<string, unknown>));
+  const getReleaseDate = accessors?.getReleaseDate;
   const getTip =
     accessors?.getTip ?? ((item: T) => defaultChartTip(item as Record<string, unknown>));
   const getTuneBytes =
@@ -78,25 +118,27 @@ export function sortChartItems<T>(
     const tipB = getTip(b) || 0;
     const tuneBytesA = getTuneBytes(a) || 0;
     const tuneBytesB = getTuneBytes(b) || 0;
-    const dateA = dateMs(getDate(a));
-    const dateB = dateMs(getDate(b));
+    const addedA = dateMs(getDate(a));
+    const addedB = dateMs(getDate(b));
+    const releaseA = getReleaseDate ? dateMs(getReleaseDate(a)) : addedA;
+    const releaseB = getReleaseDate ? dateMs(getReleaseDate(b)) : addedB;
 
     if (key === 'newest' || key === 'oldest') {
-      if (dateA !== dateB) {
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return key === 'newest' ? dateB - dateA : dateA - dateB;
+      if (releaseA !== releaseB) {
+        if (!releaseA) return 1;
+        if (!releaseB) return -1;
+        return key === 'newest' ? releaseB - releaseA : releaseA - releaseB;
       }
       return tipB - tipA;
     }
 
     if (key === 'most-tunebytes') {
       if (tuneBytesA !== tuneBytesB) return tuneBytesB - tuneBytesA;
-      return dateB - dateA;
+      return addedB - addedA;
     }
 
     if (tipA !== tipB) return tipB - tipA;
-    return dateB - dateA;
+    return addedB - addedA;
   });
 }
 
@@ -107,8 +149,8 @@ export function toPodcastChartSort(sortBy: string | null | undefined): string {
   return 'globalMediaAggregate';
 }
 
-export const CHART_ADDED_SORT_HINT =
-  'Newest and oldest are when the tune was added to Tuneable.';
+export const CHART_BOOK_SORT_HINT =
+  'Newest and oldest are when the book was added to Tuneable.';
 
 export const CHART_LIBRARY_SORT_HINT =
   'Newest and oldest are when this library last tipped the tune.';

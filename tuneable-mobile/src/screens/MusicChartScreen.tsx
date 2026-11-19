@@ -32,7 +32,7 @@ import {
 } from '@/src/lib/chartFilters';
 import { buildChartRankMap } from '@/src/lib/playableFilterPref';
 import {
-  CHART_ADDED_SORT_HINT,
+  chartReleaseDate,
   sortChartItems,
   type ChartSortKey,
 } from '@/src/lib/chartSort';
@@ -156,6 +156,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
     () =>
       sortChartItems(filterChartMedia(media, filterState), chartSort, {
         getTip: (item) => getChartTipPence(item, period),
+        getReleaseDate: (item) => chartReleaseDate(item),
       }),
     [media, filterState, chartSort, period]
   );
@@ -290,7 +291,6 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
               onSortChange={setChartSort}
               showSortPanel={showSortPanel}
               onToggleSortPanel={() => setShowSortPanel((open) => !open)}
-              sortHint={CHART_ADDED_SORT_HINT}
               showBpmPanel={showBpmPanel}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}
               onToggleTimePanel={() => setShowTimePanel((open) => !open)}

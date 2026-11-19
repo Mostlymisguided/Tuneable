@@ -100,7 +100,7 @@ export interface PodcastSeriesStats {
 }
 
 export const PODCAST_SHOW_SORT_OPTIONS = [
-  { key: 'mostTipped', label: 'Most tipped' },
+  { key: 'mostTipped', label: 'Most Tips' },
   { key: 'mostTuneBytes', label: 'Most TuneBytes' },
   { key: 'newest', label: 'Newest' },
   { key: 'oldest', label: 'Oldest' },

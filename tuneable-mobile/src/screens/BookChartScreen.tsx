@@ -25,7 +25,7 @@ import {
 } from '@/src/lib/chartFilters';
 import type { ChartMediaKind } from '@/src/lib/chartKind';
 import {
-  CHART_ADDED_SORT_HINT,
+  CHART_BOOK_SORT_HINT,
   sortChartItems,
   type ChartSortKey,
 } from '@/src/lib/chartSort';
@@ -253,7 +253,7 @@ export function BookChartScreen({ onChartKindChange }: Props) {
               onSortChange={setChartSort}
               showSortPanel={showSortPanel}
               onToggleSortPanel={() => setShowSortPanel((open) => !open)}
-              sortHint={CHART_ADDED_SORT_HINT}
+              sortHint={CHART_BOOK_SORT_HINT}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}
               onToggleTimePanel={() => setShowTimePanel((open) => !open)}
               onClearFilters={() => {

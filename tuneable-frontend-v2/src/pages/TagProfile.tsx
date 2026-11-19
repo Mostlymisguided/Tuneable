@@ -14,7 +14,6 @@ import TippedMediaQueueList, { type TippedQueueItem } from '../components/Tipped
 import {
   ChartSortPanel,
   ChartSortTrigger,
-  CHART_ADDED_SORT_HINT,
   CHART_PODCAST_SORT_HINT,
 } from '../components/ChartSortControl';
 import {
@@ -714,7 +713,7 @@ const TagProfile: React.FC = () => {
               sort={chartSort}
               onChange={setChartSort}
               onHide={() => setShowSortPanel(false)}
-              hint={isPodcast ? CHART_PODCAST_SORT_HINT : CHART_ADDED_SORT_HINT}
+              hint={isPodcast ? CHART_PODCAST_SORT_HINT : undefined}
             />
           )}
 

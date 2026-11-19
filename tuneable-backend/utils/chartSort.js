@@ -18,6 +18,37 @@ function defaultChartDate(item) {
   return item.createdAt || item.uploadedAt || item.queuedAt || null;
 }
 
+function chartMediaLayers(item) {
+  if (!item || typeof item !== 'object') return [];
+  const layers = [item];
+  if (item.media && typeof item.media === 'object') layers.push(item.media);
+  if (item.mediaId && typeof item.mediaId === 'object') layers.push(item.mediaId);
+  return layers;
+}
+
+function releaseYearDate(year) {
+  const numeric = typeof year === 'number'
+    ? year
+    : typeof year === 'string' && /^\d{4}$/.test(year)
+      ? Number(year)
+      : NaN;
+  if (!Number.isInteger(numeric) || numeric < 1900 || numeric > 2100) return null;
+  return new Date(Date.UTC(numeric, 0, 1));
+}
+
+/** Full release date, then a year-only release, for newest/oldest tune charts. */
+function chartReleaseDate(item) {
+  const layers = chartMediaLayers(item);
+  for (const media of layers) {
+    if (media.releaseDate) return media.releaseDate;
+  }
+  for (const media of layers) {
+    const yearDate = releaseYearDate(media.releaseYear);
+    if (yearDate) return yearDate;
+  }
+  return null;
+}
+
 function defaultChartTip(item) {
   if (!item || typeof item !== 'object') return 0;
   if (typeof item.timePeriodBidValue === 'number') return item.timePeriodBidValue;
@@ -39,32 +70,36 @@ function compareChartItems(
   sortBy,
   getDate = defaultChartDate,
   getTip = defaultChartTip,
-  getTuneBytes = defaultChartTuneBytes
+  getTuneBytes = defaultChartTuneBytes,
+  getReleaseDate = null
 ) {
   const key = normalizeChartSort(sortBy);
   const tipA = getTip(a) || 0;
   const tipB = getTip(b) || 0;
   const tuneBytesA = getTuneBytes(a) || 0;
   const tuneBytesB = getTuneBytes(b) || 0;
-  const dateA = dateMs(getDate(a));
-  const dateB = dateMs(getDate(b));
+  const addedA = dateMs(getDate(a));
+  const addedB = dateMs(getDate(b));
+  const useRelease = typeof getReleaseDate === 'function';
+  const releaseA = useRelease ? dateMs(getReleaseDate(a)) : addedA;
+  const releaseB = useRelease ? dateMs(getReleaseDate(b)) : addedB;
 
   if (key === 'newest' || key === 'oldest') {
-    if (dateA !== dateB) {
-      if (!dateA) return 1;
-      if (!dateB) return -1;
-      return key === 'newest' ? dateB - dateA : dateA - dateB;
+    if (releaseA !== releaseB) {
+      if (!releaseA) return 1;
+      if (!releaseB) return -1;
+      return key === 'newest' ? releaseB - releaseA : releaseA - releaseB;
     }
     return tipB - tipA;
   }
 
   if (key === 'most-tunebytes') {
     if (tuneBytesA !== tuneBytesB) return tuneBytesB - tuneBytesA;
-    return dateB - dateA;
+    return addedB - addedA;
   }
 
   if (tipA !== tipB) return tipB - tipA;
-  return dateB - dateA;
+  return addedB - addedA;
 }
 
 function sortChartItems(items, sortBy, accessors = {}) {
@@ -72,13 +107,25 @@ function sortChartItems(items, sortBy, accessors = {}) {
   const getDate = accessors.getDate || defaultChartDate;
   const getTip = accessors.getTip || defaultChartTip;
   const getTuneBytes = accessors.getTuneBytes || defaultChartTuneBytes;
-  return list.sort((a, b) => compareChartItems(a, b, sortBy, getDate, getTip, getTuneBytes));
+  const getReleaseDate = accessors.getReleaseDate || null;
+  return list.sort((a, b) => compareChartItems(
+    a,
+    b,
+    sortBy,
+    getDate,
+    getTip,
+    getTuneBytes,
+    getReleaseDate
+  ));
 }
 
 function mediaChartMongoSort(sortBy) {
   const key = normalizeChartSort(sortBy);
-  if (key === 'newest') return { createdAt: -1, uploadedAt: -1, globalMediaAggregate: -1 };
-  if (key === 'oldest') return { createdAt: 1, uploadedAt: 1, globalMediaAggregate: -1 };
+  // Newest and oldest follow the release. Year-only and missing dates are
+  // ordered by the chart query, which folds releaseYear into the same key and
+  // keeps undated tunes last. Tip tie-breaks stay on createdAt.
+  if (key === 'newest') return { releaseDate: -1, releaseYear: -1, globalMediaAggregate: -1 };
+  if (key === 'oldest') return { releaseDate: 1, releaseYear: 1, globalMediaAggregate: -1 };
   if (key === 'most-tunebytes') return { tuneBytesEarned: -1, createdAt: -1, _id: 1 };
   // Newest tips win ties. Without createdAt, Mongo returns an arbitrary slice
   // of the many tunes that share the minimum tip, and those tunes vanish from
@@ -91,6 +138,7 @@ module.exports = {
   normalizeChartSort,
   dateMs,
   defaultChartDate,
+  chartReleaseDate,
   defaultChartTip,
   defaultChartTuneBytes,
   compareChartItems,

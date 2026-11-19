@@ -26,8 +26,8 @@ import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 import { buildChartRankMap } from '@/src/lib/playableFilterPref';
 import { collectiveTypeLabel } from '@/src/lib/collectiveTypes';
 import {
-  CHART_ADDED_SORT_HINT,
   CHART_SORT_OPTIONS,
+  chartReleaseDate,
   chartSortLabel,
   sortChartItems,
   type ChartSortKey,
@@ -134,6 +134,7 @@ export default function PlaceProfileScreen() {
     () =>
       sortChartItems(media, chartSort, {
         getDate: (item) => item.createdAt || item.queuedAt,
+        getReleaseDate: (item) => chartReleaseDate(item),
       }),
     [media, chartSort]
   );
@@ -395,7 +396,6 @@ export default function PlaceProfileScreen() {
               );
             })}
           </View>
-          <Text style={styles.sortHint}>{CHART_ADDED_SORT_HINT}</Text>
         </View>
       ) : null}
 
@@ -675,13 +675,6 @@ const styles = StyleSheet.create({
   },
   sortTrigger: {
     paddingHorizontal: 8,
-  },
-  sortHint: {
-    marginTop: 8,
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    textAlign: 'center',
   },
   sectionTitle: {
     color: colors.text,

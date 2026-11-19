@@ -24,9 +24,9 @@ import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { formatArtist, isUploadPlayable, mediaId } from '@/src/lib/media';
 import {
-  CHART_ADDED_SORT_HINT,
   CHART_PODCAST_SORT_HINT,
   CHART_SORT_OPTIONS,
+  chartReleaseDate,
   chartSortLabel,
   sortChartItems,
   type ChartSortKey,
@@ -234,6 +234,7 @@ export default function TagProfileScreen() {
           isPodcast
             ? item.releaseDate || item.createdAt
             : item.createdAt || item.queuedAt,
+        ...(isPodcast ? {} : { getReleaseDate: (item: ChartMediaItem) => chartReleaseDate(item) }),
       }),
     [media, chartSort, isPodcast]
   );
@@ -529,9 +530,7 @@ export default function TagProfileScreen() {
               );
             })}
           </View>
-          <Text style={styles.sortHint}>
-            {isPodcast ? CHART_PODCAST_SORT_HINT : CHART_ADDED_SORT_HINT}
-          </Text>
+          {isPodcast ? <Text style={styles.sortHint}>{CHART_PODCAST_SORT_HINT}</Text> : null}
         </View>
       ) : null}
 

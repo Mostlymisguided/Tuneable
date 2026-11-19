@@ -13,7 +13,7 @@ const { loadBidsByMediaId } = require('./relatedMediaService');
 const { stampViewerTipped } = require('../utils/viewerTipped');
 const { getPeriodStartDate } = require('../utils/globalPartyChart');
 const { enrichMediaWithPlayability } = require('../utils/mediaPlayability');
-const { normalizeChartSort, sortChartItems } = require('../utils/chartSort');
+const { normalizeChartSort, sortChartItems, chartReleaseDate } = require('../utils/chartSort');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 const PODCAST_FORMS = ['podcast', 'podcastseries', 'episode', 'podcastepisode'];
@@ -735,6 +735,9 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
       contentScope === 'podcast'
         ? item.releaseDate || item.createdAt || item.uploadedAt
         : item.createdAt || item.uploadedAt,
+    getReleaseDate: contentScope === 'music'
+      ? (item) => chartReleaseDate(item)
+      : undefined,
     getTip: (item) => item.timePeriodBidValue ?? item.globalMediaAggregate ?? 0,
   });
 

@@ -13,7 +13,7 @@ const {
   playableHostedMusicMongoFilter,
   normalizeSources,
 } = require('./mediaPlayability');
-const { normalizeChartSort, mediaChartMongoSort, sortChartItems } = require('./chartSort');
+const { normalizeChartSort, mediaChartMongoSort, sortChartItems, chartReleaseDate } = require('./chartSort');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('./mediaTuneBytes');
 const { stampViewerTipped } = require('./viewerTipped');
 const {
@@ -221,9 +221,63 @@ async function fetchViewerRecentTippedMedia({
   );
 }
 
+const MISSING_RELEASE_NEWEST = new Date(0);
+const MISSING_RELEASE_OLDEST = new Date('9999-12-31T00:00:00.000Z');
+
+/**
+ * Page of media ids ordered by release date. Year-only releases use 1 January
+ * of that year. Tunes with neither date sort last in both directions.
+ */
+async function mediaIdsByReleaseSort(filter, sortBy, skip, limit) {
+  const oldest = sortBy === 'oldest';
+  const rows = await Media.aggregate([
+    { $match: filter },
+    {
+      $addFields: {
+        _releaseSort: {
+          $ifNull: [
+            '$releaseDate',
+            {
+              $cond: [
+                {
+                  $and: [
+                    { $gte: ['$releaseYear', 1900] },
+                    { $lte: ['$releaseYear', 2100] },
+                  ],
+                },
+                { $dateFromParts: { year: '$releaseYear', month: 1, day: 1 } },
+                oldest ? MISSING_RELEASE_OLDEST : MISSING_RELEASE_NEWEST,
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $sort: {
+        _releaseSort: oldest ? 1 : -1,
+        globalMediaAggregate: -1,
+        _id: 1,
+      },
+    },
+    { $skip: skip },
+    { $limit: limit },
+    { $project: { _id: 1 } },
+  ]).allowDiskUse(true);
+  return rows.map((row) => row._id);
+}
+
+function orderDocsByIds(docs, ids) {
+  const order = new Map(ids.map((id, index) => [id.toString(), index]));
+  return docs.sort(
+    (a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0)
+  );
+}
+
 /**
  * Recent reserves and the viewer's own tips are merged into the page so they
  * stay reachable past the top-N cut. Rank that merged list by the chart sort.
+ * Newest and oldest use the release date; tip ties still use when it was added.
  */
 function sortAssembledChartRows(rows, sortBy) {
   return sortChartItems(rows, sortBy, {
@@ -231,6 +285,7 @@ function sortAssembledChartRows(rows, sortBy) {
       const media = row?.media || row;
       return media?.createdAt || media?.uploadedAt || row?.createdAt || null;
     },
+    getReleaseDate: (row) => chartReleaseDate(row),
     getTip: (row) => {
       if (typeof row?.timePeriodBidValue === 'number') return row.timePeriodBidValue;
       const media = row?.media || row;
@@ -716,12 +771,23 @@ async function fetchAllTimeGlobalChart({
   const recentLimit = reserveRecent ? Math.min(RECENT_TIPPED_RESERVE, chartLimit) : 0;
   const primaryLimit = chartLimit - recentLimit;
 
-  const mediaList = await withChartPopulate(
-    Media.find(baseFilter)
-      .sort(mediaChartMongoSort(chartSort))
-      .skip(startOffset)
-      .limit(primaryLimit)
-  );
+  let mediaList;
+  if (chartSort === 'newest' || chartSort === 'oldest') {
+    const releaseIds = await mediaIdsByReleaseSort(baseFilter, chartSort, startOffset, primaryLimit);
+    mediaList = releaseIds.length
+      ? orderDocsByIds(
+        await withChartPopulate(Media.find({ _id: { $in: releaseIds } })),
+        releaseIds
+      )
+      : [];
+  } else {
+    mediaList = await withChartPopulate(
+      Media.find(baseFilter)
+        .sort(mediaChartMongoSort(chartSort))
+        .skip(startOffset)
+        .limit(primaryLimit)
+    );
+  }
 
   if (recentLimit > 0) {
     const existingIds = mediaList.map((m) => m._id);
@@ -1037,24 +1103,38 @@ async function fetchPeriodGlobalChart({
 
   let mediaList;
   if (dateSort || useStoredGlobalAggregate) {
-    const mongoSort = dateSort
-      ? mediaChartMongoSort(chartSort)
-      : { globalMediaAggregate: -1 };
-    const fetched = await Media.find(chartTunesFilter({
+    const pageFilter = chartTunesFilter({
       playableOnly,
       extra: {
         _id: { $in: candidateIds },
         status: { $ne: 'vetoed' },
       },
-    }))
-      .select(MEDIA_CHART_SELECT)
-      .sort(mongoSort)
-      .skip(startOffset)
-      .limit(chartLimit)
-      .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
-      .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
-      .populate('addedBy', 'username profilePic uuid')
-      .lean();
+    });
+    let fetched;
+    if (dateSort) {
+      const releaseIds = await mediaIdsByReleaseSort(pageFilter, chartSort, startOffset, chartLimit);
+      fetched = releaseIds.length
+        ? orderDocsByIds(
+          await Media.find({ _id: { $in: releaseIds } })
+            .select(MEDIA_CHART_SELECT)
+            .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
+            .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
+            .populate('addedBy', 'username profilePic uuid')
+            .lean(),
+          releaseIds
+        )
+        : [];
+    } else {
+      fetched = await Media.find(pageFilter)
+        .select(MEDIA_CHART_SELECT)
+        .sort({ globalMediaAggregate: -1 })
+        .skip(startOffset)
+        .limit(chartLimit)
+        .populate('globalMediaBidTopUser', USER_PUBLIC_SELECT)
+        .populate('globalMediaAggregateTopUser', USER_PUBLIC_SELECT)
+        .populate('addedBy', 'username profilePic uuid')
+        .lean();
+    }
     mediaList = fetched.map((media) => ({
       media,
       timePeriodBidValue: useStoredGlobalAggregate
