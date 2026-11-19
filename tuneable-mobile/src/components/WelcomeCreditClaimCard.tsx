@@ -83,26 +83,25 @@ export function WelcomeCreditClaimCard({ compact = false }: Props) {
         ) : (
           <>
             <Text style={styles.title}>Claim your {amountLabel} welcome credit</Text>
-            {!compact ? (
-              <Text style={styles.body}>Promo credit — not cash. Unused amounts expire in 12 months.</Text>
-            ) : null}
-            <Pressable
-              onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
-              hitSlop={6}
-              style={styles.termsWrap}>
-              <Text style={styles.terms}>Welcome credit terms</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setAccepted((prev) => !prev)}
-              style={styles.checkRow}
-              hitSlop={6}>
-              <Ionicons
-                name={accepted ? 'checkbox' : 'square-outline'}
-                size={20}
-                color={accepted ? colors.accentLight : colors.textMuted}
-              />
-              <Text style={styles.checkLabel}>I understand this is promotional credit</Text>
-            </Pressable>
+            <View style={styles.checkRow}>
+              <Pressable onPress={() => setAccepted((prev) => !prev)} hitSlop={6}>
+                <Ionicons
+                  name={accepted ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={accepted ? colors.accentLight : colors.textMuted}
+                />
+              </Pressable>
+              <Text style={styles.checkLabel}>
+                <Text onPress={() => setAccepted((prev) => !prev)}>
+                  I understand this is promotional credit and have read{' '}
+                </Text>
+                <Text
+                  style={styles.inlineTerms}
+                  onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}>
+                  the terms
+                </Text>
+              </Text>
+            </View>
             <Pressable
               onPress={() => void handleClaim()}
               disabled={!accepted || claiming}
@@ -157,19 +156,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  termsWrap: {
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  terms: {
-    color: colors.accentLight,
-    fontSize: 13,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
   checkRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     marginTop: 6,
   },
@@ -177,6 +166,13 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.text,
     fontSize: 13,
+    lineHeight: 18,
+  },
+  inlineTerms: {
+    color: colors.accentLight,
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   ctaWrap: {
     alignSelf: 'flex-start',

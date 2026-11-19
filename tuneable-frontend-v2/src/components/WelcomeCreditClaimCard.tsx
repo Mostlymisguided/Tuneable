@@ -100,24 +100,6 @@ const WelcomeCreditClaimCard: React.FC<{ variant?: Variant }> = ({ variant = 'de
               <h3 className={`font-semibold text-white ${compact ? 'text-sm' : 'text-lg'}`}>
                 Claim your {amountLabel} welcome credit
               </h3>
-              <ul className={`text-gray-400 mt-2 space-y-1 ${compact ? 'text-xs' : 'text-sm'}`}>
-                <li>Promotional credit — not cash, and it can’t be withdrawn.</li>
-                <li>Unused credit can be revoked and expires 12 months after you claim it.</li>
-                {!compact && (
-                  <>
-                    <li>Spent tips stay on the charts. Artist earnings from welcome credit stay pending until you top up (within 90 days).</li>
-                    <li>Welcome tips: max £1.11 per tip, £3.33 / 3 songs per artist, and £1.11 per track on media you own.</li>
-                  </>
-                )}
-              </ul>
-              <p className={`mt-2 ${compact ? 'text-xs' : 'text-sm'}`}>
-                <Link
-                  to="/terms-of-service#welcome-credit"
-                  className="text-purple-400 underline hover:text-purple-300"
-                >
-                  Read the full welcome credit terms
-                </Link>
-              </p>
               <label className={`mt-3 flex items-start gap-2 text-gray-300 ${compact ? 'text-xs' : 'text-sm'}`}>
                 <input
                   type="checkbox"
@@ -125,7 +107,15 @@ const WelcomeCreditClaimCard: React.FC<{ variant?: Variant }> = ({ variant = 'de
                   onChange={(e) => setAccepted(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800 text-purple-600 focus:ring-purple-500"
                 />
-                <span>I understand this is promotional credit</span>
+                <span>
+                  I understand this is promotional credit and have read{' '}
+                  <Link
+                    to="/terms-of-service#welcome-credit"
+                    className="text-purple-400 underline hover:text-purple-300"
+                  >
+                    the terms
+                  </Link>
+                </span>
               </label>
               <button
                 type="button"
