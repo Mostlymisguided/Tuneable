@@ -1746,9 +1746,8 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   }, [party, isGlobalParty, selectedTimePeriod]);
 
   const locationQuickPicks = useMemo(() => {
-    // Server already returns ~3 countries + ~4 places; allow room for user pin
-    const maxPicks = isMobile ? 8 : 9;
-    const userPick = getCountryPickFromLocation(user?.homeLocation);
+    const maxPicks = 18;
+    const userPlaceId = getCountryPickFromLocation(user?.homeLocation)?.placeId;
     const picks: Array<{
       placeId: string;
       country: string;
@@ -1761,18 +1760,6 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       isUser: boolean;
     }> = [];
 
-    if (userPick) {
-      const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
-      picks.push({
-        ...userPick,
-        label: userPick.label || userPick.country,
-        kind: 'country',
-        featureType: 'country',
-        total: userStats?.total ?? 0,
-        isUser: true,
-      });
-    }
-
     for (const { pick, total } of topLocations) {
       if (picks.length >= maxPicks) break;
       if (picks.some((p) => p.placeId === pick.placeId)) continue;
@@ -1780,12 +1767,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         ...pick,
         label: pick.label || pick.display || pick.country,
         total,
-        isUser: false,
+        isUser: Boolean(userPlaceId && userPlaceId === pick.placeId),
       });
     }
 
     return picks;
-  }, [topLocations, user?.homeLocation, isMobile]);
+  }, [topLocations, user?.homeLocation]);
 
   // Selected tag filters derived from queueSearchTerms
   const selectedTagFilters = useMemo(() => {
@@ -2739,16 +2726,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                             ? 'bg-purple-600 text-white'
                             : 'bg-gray-700 text-gray-200 hover:bg-gray-800'
                         }`}
-                        title={
-                          loc.total > 0
-                            ? `${penceToPounds(loc.total)} in tips`
-                            : loc.isUser
-                              ? 'Your home country'
-                              : undefined
-                        }
+                        title={loc.total > 0 ? `${penceToPounds(loc.total)} in tips` : undefined}
                       >
                         {name}
-                        {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
                         {loc.total > 0 && (
                           <span className="ml-2 text-[10px] opacity-70">
                             {penceToPounds(loc.total)}

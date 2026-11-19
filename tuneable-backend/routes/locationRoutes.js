@@ -4,6 +4,7 @@ const mapboxGeocoding = require('../services/mapboxGeocodingService');
 const { applyResolvedLocation } = require('../utils/locationUtils');
 const { getLocationProfile } = require('../services/locationProfileService');
 const { getPlaceChart } = require('../services/placeChartService');
+const { computeTopLocations } = require('../utils/globalPartyChart');
 
 const router = express.Router();
 
@@ -83,12 +84,15 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
     const scope = typeof req.query.scope === 'string' ? req.query.scope : 'from';
     const limit = req.query.limit;
 
-    const chart = await getPlaceChart({
-      parentPlaceId: parentPlaceId || null,
-      scope,
-      limit,
-    });
-    res.json(chart);
+    const [chart, topLocations] = await Promise.all([
+      getPlaceChart({
+        parentPlaceId: parentPlaceId || null,
+        scope,
+        limit,
+      }),
+      computeTopLocations(),
+    ]);
+    res.json({ ...chart, topLocations });
   } catch (error) {
     console.error('Error fetching place chart:', error);
     res.status(500).json({ error: 'Failed to fetch place chart' });

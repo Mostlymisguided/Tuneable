@@ -34,6 +34,8 @@ import {
   getCountryPickFromLocation,
   locationScopeEmptyMessage,
   normalizeLocationScope,
+  quickPicksFromTopLocations,
+  type ChartTopLocation,
   type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
@@ -96,6 +98,7 @@ const Books: React.FC = () => {
   const { user, refreshUser } = useAuth();
 
   const [books, setBooks] = useState<BookChartCardData[]>([]);
+  const [serverTopLocations, setServerTopLocations] = useState<ChartTopLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<TimePeriod>(() => normalizeTimePeriod(searchParams.get('period')));
@@ -190,7 +193,10 @@ const Books: React.FC = () => {
           locationPlaceId: selectedLocation?.placeId,
           locationScope: selectedLocation?.placeId ? locationScope : undefined,
         });
-        if (!cancelled) setBooks(data.books || []);
+        if (!cancelled) {
+          setBooks(data.books || []);
+          setServerTopLocations(Array.isArray(data.topLocations) ? data.topLocations : []);
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.response?.data?.error || 'Failed to load books chart');
       } finally {
@@ -295,21 +301,23 @@ const Books: React.FC = () => {
   }, [books, period]);
 
   const locationQuickPicks = useMemo((): LocationQuickPick[] => {
-    const maxPicks = isMobile ? 5 : 6;
-    const userPick = getCountryPickFromLocation(user?.homeLocation)
-      || getCountryPickFromLocation(user?.secondaryLocation);
-    const picks: LocationQuickPick[] = [];
-    if (userPick) {
-      const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
-      picks.push({ ...userPick, total: userStats?.total ?? 0, isUser: true });
+    const home = user?.homeLocation || user?.secondaryLocation;
+    if (serverTopLocations.length > 0) {
+      return quickPicksFromTopLocations(serverTopLocations, home);
     }
+    const userPlaceId = getCountryPickFromLocation(home)?.placeId;
+    const picks: LocationQuickPick[] = [];
     for (const { pick, total } of topLocations) {
-      if (picks.length >= maxPicks) break;
+      if (picks.length >= 18) break;
       if (picks.some((pickItem) => pickItem.placeId === pick.placeId)) continue;
-      picks.push({ ...pick, total, isUser: false });
+      picks.push({
+        ...pick,
+        total,
+        isUser: Boolean(userPlaceId && userPlaceId === pick.placeId),
+      });
     }
     return picks;
-  }, [topLocations, user?.homeLocation, user?.secondaryLocation, isMobile]);
+  }, [serverTopLocations, topLocations, user?.homeLocation, user?.secondaryLocation]);
 
   const selectedBookTipStats = useMemo(
     () => resolveTipStatInputs(selectedBook, user),

@@ -64,6 +64,7 @@ export type PlaceChartResponse = {
   count: number;
   parentPlaceId: string | null;
   scope: string;
+  topLocations?: import('@/src/lib/location').ChartTopLocation[];
 };
 
 export const locationAPI = {

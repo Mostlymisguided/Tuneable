@@ -480,14 +480,14 @@ function countryMetaFromUserLocation(location) {
 }
 
 /**
- * Popular location chips: top countries + top lower-level places by tip volume.
+ * Popular location chips: countries and lower-level places by tip volume.
  * Uses denormalized bid snapshot fields when present; falls back to display parsing
  * + a small User lookup to resolve country Mapbox placeIds for older bids.
+ * Returned as one list, most tipped first, so a chart can fill about two chip rows.
  */
 async function computeTopLocations({
   startDate = null,
-  limitCountries = 3,
-  limitPlaces = 4,
+  limit = 18,
 } = {}) {
   const match = { status: 'active', bidderHomePlaceId: { $exists: true, $ne: null } };
   if (startDate) {
@@ -511,7 +511,7 @@ async function computeTopLocations({
       },
     },
     { $sort: { total: -1, count: -1 } },
-    { $limit: Math.max(limitCountries + limitPlaces, 20) * 3 },
+    { $limit: Math.max(limit, 18) * 4 },
   ]);
 
   // Enrich place rows missing country placeId (legacy snapshots)
@@ -656,7 +656,6 @@ async function computeTopLocations({
   const countries = [...countryTotals.values()]
     .filter((c) => c.placeId)
     .sort((a, b) => b.total - a.total || b.count - a.count)
-    .slice(0, limitCountries)
     .map((c) => ({
       placeId: c.placeId,
       label: c.country,
@@ -670,13 +669,11 @@ async function computeTopLocations({
     }));
 
   const countryPlaceIds = new Set(countries.map((c) => c.placeId));
-  const topPlaces = places
-    .filter((p) => !countryPlaceIds.has(p.placeId))
-    .sort((a, b) => b.total - a.total || b.count - a.count)
-    .slice(0, limitPlaces);
+  const topPlaces = places.filter((p) => !countryPlaceIds.has(p.placeId));
 
-  // Countries first, then places — keeps the chip row scannable
-  return [...countries, ...topPlaces];
+  return [...countries, ...topPlaces]
+    .sort((a, b) => b.total - a.total || b.count - a.count)
+    .slice(0, limit);
 }
 
 /**

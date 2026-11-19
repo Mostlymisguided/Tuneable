@@ -6,6 +6,7 @@ export type BookChartResponse = {
   count: number;
   timePeriod?: string;
   locationPlaceId?: string | null;
+  topLocations?: import('@/src/lib/location').ChartTopLocation[];
 };
 
 export type BookProfileResponse = {

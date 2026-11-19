@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight, MapPin, Building2, Sparkles } from 'lucide-react';
 import { locationAPI, collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import GlobalChartLocationHero, { type LocationQuickPick } from '../components/GlobalChartLocationHero';
+import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import EntertainingLoader from '../components/EntertainingLoader';
 import { collectiveTypeLabel } from '../utils/collectiveTypes';
@@ -12,9 +12,10 @@ import TagList from '../components/TagList';
 import { TuneBytesMark } from '../components/TuneBytesMark';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
 import {
-  getCountryPickFromLocation,
   getPlaceProfilePath,
   locationScopeEmptyMessage,
+  quickPicksFromTopLocations,
+  type ChartTopLocation,
   type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
@@ -144,6 +145,7 @@ const Places: React.FC = () => {
   const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [showLocationFilter, setShowLocationFilter] = useState(false);
   const [places, setPlaces] = useState<PlaceChartItem[]>([]);
+  const [topLocations, setTopLocations] = useState<ChartTopLocation[]>([]);
   const [collectives, setCollectives] = useState<CollectiveChartItem[]>([]);
   const [collectivesForPlaceId, setCollectivesForPlaceId] = useState<string | null>(null);
   const [totalCollectives, setTotalCollectives] = useState(0);
@@ -173,6 +175,7 @@ const Places: React.FC = () => {
       });
       if (seq !== loadSeq.current) return;
       setPlaces(placesRes.places ?? []);
+      setTopLocations(Array.isArray(placesRes.topLocations) ? placesRes.topLocations : []);
       setCollectives(collectivesRes.collectives ?? []);
       setTotalCollectives(collectivesRes.total ?? 0);
       setCollectivesForPlaceId(parentPlaceId);
@@ -192,11 +195,10 @@ const Places: React.FC = () => {
     void load();
   }, [load]);
 
-  const locationQuickPicks = useMemo(() => {
-    const home = getCountryPickFromLocation(user?.homeLocation);
-    if (!home) return [] as LocationQuickPick[];
-    return [{ ...home, total: 0, isUser: true }];
-  }, [user?.homeLocation]);
+  const locationQuickPicks = useMemo(
+    () => quickPicksFromTopLocations(topLocations, user?.homeLocation),
+    [topLocations, user?.homeLocation]
+  );
 
   const emptyMessage = selectedLocation?.placeId
     ? locationScopeEmptyMessage(

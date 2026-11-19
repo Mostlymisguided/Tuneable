@@ -78,6 +78,59 @@ export function countryPickToResolvedLocation(pick: CountryLocationPick): Resolv
   });
 }
 
+export interface ChartTopLocation {
+  placeId?: string | null;
+  label?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  display?: string | null;
+  kind?: string | null;
+  featureType?: string | null;
+  total?: number;
+  count?: number;
+}
+
+function chartPickKind(loc: { kind?: string | null; featureType?: string | null }): 'country' | 'place' {
+  if (loc.kind === 'place') return 'place';
+  if (loc.kind === 'country') return 'country';
+  if (loc.featureType && loc.featureType !== 'country') return 'place';
+  return 'country';
+}
+
+/** Most-tipped locations, without pinning the viewer's home country first. */
+export function quickPicksFromTopLocations(
+  locations: ChartTopLocation[] | null | undefined,
+  userHome?: ResolvedLocation | null
+): Array<CountryLocationPick & { total: number; isUser: boolean }> {
+  const userPlaceId = getCountryPickFromLocation(userHome)?.placeId;
+  const seen = new Set<string>();
+  const sorted = [...(locations ?? [])].sort(
+    (a, b) => (b.total ?? 0) - (a.total ?? 0) || (b.count ?? 0) - (a.count ?? 0)
+  );
+  const picks: Array<CountryLocationPick & { total: number; isUser: boolean }> = [];
+
+  for (const loc of sorted) {
+    const placeId = typeof loc.placeId === 'string' ? loc.placeId.trim() : '';
+    if (!placeId || seen.has(placeId)) continue;
+    seen.add(placeId);
+    const kind = chartPickKind(loc);
+    const label = (loc.label || loc.display || loc.country || '').trim() || 'Unknown';
+    picks.push({
+      placeId,
+      country: loc.country || (kind === 'country' ? label : ''),
+      countryCode: loc.countryCode || '',
+      display: loc.display || label,
+      label,
+      kind,
+      featureType: loc.featureType || kind,
+      total: loc.total ?? 0,
+      isUser: Boolean(userPlaceId && userPlaceId === placeId),
+    });
+  }
+
+  return picks;
+}
+
 /** Build a ResolvedLocation from a country or place quick-pick chip. */
 export function locationPickToResolvedLocation(pick: CountryLocationPick): ResolvedLocation {
   const kind = pick.kind || 'country';

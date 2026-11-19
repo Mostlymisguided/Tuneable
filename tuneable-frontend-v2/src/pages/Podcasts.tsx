@@ -42,6 +42,8 @@ import {
   getCountryPickFromLocation,
   locationScopeEmptyMessage,
   normalizeLocationScope,
+  quickPicksFromTopLocations,
+  type ChartTopLocation,
   type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
@@ -217,6 +219,7 @@ const Podcasts: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, token, handleOAuthCallback, refreshUser, updateBalance } = useAuth();
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
+  const [serverTopLocations, setServerTopLocations] = useState<ChartTopLocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
     category: '',
@@ -492,6 +495,7 @@ const Podcasts: React.FC = () => {
       const data = await response.json();
       const episodesList = data.episodes || [];
       setEpisodes(episodesList);
+      setServerTopLocations(Array.isArray(data.topLocations) ? data.topLocations : []);
       setAvailableFilters(data.filters || { categories: [], genres: [], tags: [] });
     } catch (error: any) {
       console.error('Error fetching chart:', error);
@@ -1415,28 +1419,25 @@ const Podcasts: React.FC = () => {
   }, [displayEpisodes, filters.timeRange]);
 
   const locationQuickPicks = useMemo((): LocationQuickPick[] => {
-    const maxPicks = isMobile ? 5 : 6;
-    const userPick = getCountryPickFromLocation(user?.homeLocation)
-      || getCountryPickFromLocation(user?.secondaryLocation);
+    const home = user?.homeLocation || user?.secondaryLocation;
+    if (serverTopLocations.length > 0) {
+      return quickPicksFromTopLocations(serverTopLocations, home);
+    }
+    const userPlaceId = getCountryPickFromLocation(home)?.placeId;
     const picks: LocationQuickPick[] = [];
 
-    if (userPick) {
-      const userStats = topLocations.find((loc) => loc.pick.placeId === userPick.placeId);
+    for (const { pick, total } of topLocations) {
+      if (picks.length >= 18) break;
+      if (picks.some((p) => p.placeId === pick.placeId)) continue;
       picks.push({
-        ...userPick,
-        total: userStats?.total ?? 0,
-        isUser: true,
+        ...pick,
+        total,
+        isUser: Boolean(userPlaceId && userPlaceId === pick.placeId),
       });
     }
 
-    for (const { pick, total } of topLocations) {
-      if (picks.length >= maxPicks) break;
-      if (picks.some((p) => p.placeId === pick.placeId)) continue;
-      picks.push({ ...pick, total, isUser: false });
-    }
-
     return picks;
-  }, [topLocations, user?.homeLocation, user?.secondaryLocation, isMobile, filters.timeRange]);
+  }, [serverTopLocations, topLocations, user?.homeLocation, user?.secondaryLocation]);
 
   // Top Tags cloud (similar to Party page)
   const topTags = useMemo(() => {

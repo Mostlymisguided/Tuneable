@@ -29,9 +29,10 @@ import {
   type ChartSortKey,
 } from '@/src/lib/chartSort';
 import {
-  computeLocationQuickPicks,
+  chartLocationQuickPicks,
   formatLocation,
   locationScopeEmptyMessage,
+  type ChartTopLocation,
   type LocationScope,
 } from '@/src/lib/location';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
@@ -66,6 +67,7 @@ export function BookChartScreen({ onChartKindChange }: Props) {
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [books, setBooks] = useState<ChartMediaItem[]>([]);
+  const [topLocations, setTopLocations] = useState<ChartTopLocation[]>([]);
   const [visibleCount, setVisibleCount] = useState(CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +95,7 @@ export function BookChartScreen({ onChartKindChange }: Props) {
           timePeriod: period,
           locationPlaceId: locationPlaceId ?? undefined,
         });
+        setTopLocations(Array.isArray(res.topLocations) ? res.topLocations : []);
         setBooks(
           (res.books ?? []).map((book) => {
             const periodTotal =
@@ -125,8 +128,8 @@ export function BookChartScreen({ onChartKindChange }: Props) {
   );
 
   const locationQuickPicks = useMemo(
-    () => computeLocationQuickPicks(books, user?.homeLocation, 5),
-    [books, user?.homeLocation]
+    () => chartLocationQuickPicks(topLocations, books, user?.homeLocation),
+    [topLocations, books, user?.homeLocation]
   );
 
   const topTags = useMemo(() => computeTopTags(books, period), [books, period]);

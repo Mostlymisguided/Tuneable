@@ -5,6 +5,7 @@ import { colors } from '@/src/theme/colors';
 import {
   LOCATION_SCOPE_OPTIONS,
   formatLocation,
+  locationPickToResolvedLocation,
   locationScopeFilterNote,
   locationScopeLabel,
   type LocationQuickPick,
@@ -152,39 +153,11 @@ export function GlobalChartHero({
       )}
       <Text style={styles.locationTitle}>{locationLabel}</Text>
 
-      {locationQuickPicks.length > 0 ? (
-        <View style={styles.chips}>
-          <LocationChip
-            label="Everywhere"
-            active={!selectedLocation?.placeId}
-            onPress={() => onLocationChange(null)}
-          />
-          {locationQuickPicks.map((loc) => {
-            const selected = selectedLocation?.placeId === loc.placeId;
-            const label = loc.isUser ? `${loc.country} (you)` : loc.country;
-            return (
-              <LocationChip
-                key={loc.placeId}
-                label={label}
-                active={selected}
-                onPress={() =>
-                  onLocationChange(
-                    selected
-                      ? null
-                      : {
-                          placeId: loc.placeId,
-                          country: loc.country,
-                          countryCode: loc.countryCode,
-                          display: loc.display,
-                          featureType: 'country',
-                        }
-                  )
-                }
-              />
-            );
-          })}
-        </View>
-      ) : null}
+      <LocationChipRow
+        picks={locationQuickPicks}
+        selectedPlaceId={selectedLocation?.placeId}
+        onSelect={onLocationChange}
+      />
 
       {showRankedBySupport ? (
         <Text style={styles.rankedNote}>Ranked by support</Text>
@@ -199,6 +172,123 @@ export function GlobalChartHero({
           )}
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+const CHIP_GAP = 8;
+const MAX_CHIP_ROWS = 2;
+const FALLBACK_CHIP_HEIGHT = 32;
+
+function countChipsThatFit(
+  widths: number[],
+  containerWidth: number,
+  maxRows: number,
+  gap: number
+): number {
+  if (containerWidth <= 0) return widths.length;
+  let rows = 1;
+  let used = 0;
+  for (let i = 0; i < widths.length; i += 1) {
+    const width = widths[i];
+    if (used === 0 || used + gap + width <= containerWidth + 0.5) {
+      used = used === 0 ? width : used + gap + width;
+      continue;
+    }
+    rows += 1;
+    if (rows > maxRows) return i;
+    used = width;
+  }
+  return widths.length;
+}
+
+function chipLabel(loc: LocationQuickPick): string {
+  return loc.label || loc.display || loc.country;
+}
+
+function LocationChipRow({
+  picks,
+  selectedPlaceId,
+  onSelect,
+}: {
+  picks: LocationQuickPick[];
+  selectedPlaceId?: string | null;
+  onSelect: (location: ResolvedLocation | null) => void;
+}) {
+  const items = [
+    {
+      key: 'everywhere',
+      label: 'Everywhere',
+      placeId: null as string | null,
+    },
+    ...picks.map((loc) => ({
+      key: loc.placeId,
+      label: chipLabel(loc),
+      placeId: loc.placeId,
+    })),
+  ];
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [chipHeight, setChipHeight] = useState(0);
+  const [chipWidths, setChipWidths] = useState<Record<string, number>>({});
+  const measured =
+    containerWidth > 0 && items.every((item) => (chipWidths[item.key] ?? 0) > 0);
+  const visibleCount = measured
+    ? countChipsThatFit(
+        items.map((item) => chipWidths[item.key]),
+        containerWidth,
+        MAX_CHIP_ROWS,
+        CHIP_GAP
+      )
+    : items.length;
+  const rowHeight = chipHeight || FALLBACK_CHIP_HEIGHT;
+
+  return (
+    <View
+      style={[
+        styles.chips,
+        {
+          maxHeight: rowHeight * MAX_CHIP_ROWS + CHIP_GAP,
+          overflow: 'hidden',
+        },
+      ]}
+      onLayout={(event) => {
+        const next = event.nativeEvent.layout.width;
+        setContainerWidth((prev) => (prev === next ? prev : next));
+      }}
+    >
+      {items.slice(0, visibleCount).map((item) => {
+        const pick = item.placeId
+          ? picks.find((loc) => loc.placeId === item.placeId)
+          : null;
+        const active = item.placeId
+          ? selectedPlaceId === item.placeId
+          : !selectedPlaceId;
+        return (
+          <View
+            key={item.key}
+            style={styles.chipMeasure}
+            onLayout={(event) => {
+              const { width, height } = event.nativeEvent.layout;
+              setChipHeight((prev) => (prev === height ? prev : height));
+              setChipWidths((prev) =>
+                prev[item.key] === width ? prev : { ...prev, [item.key]: width }
+              );
+            }}
+          >
+            <LocationChip
+              label={item.label}
+              active={active}
+              onPress={() => {
+                if (!pick || active) {
+                  onSelect(null);
+                  return;
+                }
+                onSelect(locationPickToResolvedLocation(pick));
+              }}
+            />
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -288,7 +378,11 @@ const styles = StyleSheet.create({
     color: '#f3e8ff',
     textAlign: 'center',
   },
+  chipMeasure: {
+    alignSelf: 'flex-start',
+  },
   chips: {
+    alignSelf: 'stretch',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',

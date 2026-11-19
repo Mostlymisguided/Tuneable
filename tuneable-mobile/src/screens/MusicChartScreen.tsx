@@ -36,9 +36,10 @@ import {
   type ChartSortKey,
 } from '@/src/lib/chartSort';
 import {
-  computeLocationQuickPicks,
+  chartLocationQuickPicks,
   formatLocation,
   locationScopeEmptyMessage,
+  type ChartTopLocation,
   type LocationScope,
 } from '@/src/lib/location';
 import {
@@ -81,6 +82,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showBpmPanel, setShowBpmPanel] = useState(false);
   const [media, setMedia] = useState<ChartMediaItem[]>([]);
+  const [topLocations, setTopLocations] = useState<ChartTopLocation[]>([]);
   const [serverHiddenCount, setServerHiddenCount] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
@@ -119,6 +121,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         q: debouncedSearchQuery,
       });
       setMedia(res.media ?? []);
+      setTopLocations(Array.isArray(res.topLocations) ? res.topLocations : []);
       setServerHiddenCount(
         typeof res.hiddenCount === 'number' ? res.hiddenCount : null
       );
@@ -139,8 +142,8 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   );
 
   const locationQuickPicks = useMemo(
-    () => computeLocationQuickPicks(media, user?.homeLocation, 5),
-    [media, user?.homeLocation]
+    () => chartLocationQuickPicks(topLocations, media, user?.homeLocation),
+    [topLocations, media, user?.homeLocation]
   );
 
   const topTags = useMemo(

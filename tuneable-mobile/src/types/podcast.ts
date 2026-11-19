@@ -85,6 +85,7 @@ export interface ImportSingleEpisodeResponse {
 
 export interface PodcastChartResponse {
   episodes: PodcastEpisode[];
+  topLocations?: import('@/src/lib/location').ChartTopLocation[];
   filters?: {
     categories?: string[];
     genres?: string[];

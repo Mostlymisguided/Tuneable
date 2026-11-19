@@ -48,7 +48,7 @@ function LocationQuickPickButtons({
   onLocationChange: (location: ResolvedLocation | null) => void;
 }) {
   const chipClass =
-    'rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium transition-colors';
+    'inline-flex h-8 items-center rounded-full px-4 text-xs sm:text-sm font-medium transition-colors';
 
   return (
     <>
@@ -78,16 +78,9 @@ function LocationQuickPickButtons({
                 ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
                 : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
             }`}
-            title={
-              loc.total > 0
-                ? `${penceToPounds(loc.total)} in tips`
-                : loc.isUser
-                  ? 'Your home country'
-                  : undefined
-            }
+            title={loc.total > 0 ? `${penceToPounds(loc.total)} in tips` : undefined}
           >
             {name}
-            {loc.isUser && <span className="ml-1 opacity-70">(you)</span>}
           </button>
         );
       })}
@@ -210,22 +203,20 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
         )}
       </div>
 
-      {locationQuickPicks.length > 0 && (
-        <div className="mt-4">
-          {popularLocationsLabel && (
-            <p className="text-xs text-gray-500 mb-2">
-              Popular · {popularLocationsLabel}
-            </p>
-          )}
-          <div className="flex flex-wrap justify-center gap-2">
-            <LocationQuickPickButtons
-              locationQuickPicks={locationQuickPicks}
-              selectedLocation={selectedLocation}
-              onLocationChange={handlePillChange}
-            />
-          </div>
+      <div className="mt-4">
+        {popularLocationsLabel && locationQuickPicks.length > 0 && (
+          <p className="text-xs text-gray-500 mb-2">
+            Popular · {popularLocationsLabel}
+          </p>
+        )}
+        <div className="mx-auto flex max-h-[4.75rem] max-w-3xl flex-wrap justify-center gap-2 overflow-hidden">
+          <LocationQuickPickButtons
+            locationQuickPicks={locationQuickPicks}
+            selectedLocation={selectedLocation}
+            onLocationChange={handlePillChange}
+          />
         </div>
-      )}
+      </div>
 
       {showRankedBySupport && (
         <p className="mt-3 text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-purple-300/50">

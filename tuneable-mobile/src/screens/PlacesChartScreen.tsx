@@ -18,10 +18,10 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatTuneBytes } from '@/src/lib/format';
 import {
-  getCountryPickFromLocation,
   getPlaceProfileHref,
   locationScopeEmptyMessage,
-  type LocationQuickPick,
+  quickPicksFromTopLocations,
+  type ChartTopLocation,
   type LocationScope,
 } from '@/src/lib/location';
 import { colors } from '@/src/theme/colors';
@@ -35,6 +35,7 @@ export default function PlacesScreen() {
   );
   const [locationScope, setLocationScope] = useState<LocationScope>('in');
   const [places, setPlaces] = useState<PlaceChartItem[]>([]);
+  const [topLocations, setTopLocations] = useState<ChartTopLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function PlacesScreen() {
           limit: 50,
         });
         setPlaces(res.places ?? []);
+        setTopLocations(Array.isArray(res.topLocations) ? res.topLocations : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load places');
       } finally {
@@ -69,11 +71,10 @@ export default function PlacesScreen() {
     }, [load])
   );
 
-  const locationQuickPicks = useMemo(() => {
-    const home = getCountryPickFromLocation(user?.homeLocation);
-    if (!home) return [] as LocationQuickPick[];
-    return [{ ...home, total: 0, isUser: true }];
-  }, [user?.homeLocation]);
+  const locationQuickPicks = useMemo(
+    () => quickPicksFromTopLocations(topLocations, user?.homeLocation),
+    [topLocations, user?.homeLocation]
+  );
 
   const emptyMessage = selectedLocation?.placeId
     ? locationScopeEmptyMessage(

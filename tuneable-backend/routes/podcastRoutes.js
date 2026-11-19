@@ -41,6 +41,7 @@ const {
   locationScopeIncludesTips,
   locationScopeRanksByLocalTips,
 } = require('../utils/locationScope');
+const { computeTopLocations } = require('../utils/globalPartyChart');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
 const router = express.Router();
@@ -1980,10 +1981,12 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
     ]);
 
     episodes = await stampViewerTipped(episodes || [], req.user?._id || null);
+    const topLocations = await computeTopLocations({ startDate: bidTimeStartDate });
 
     res.json({
       episodes,
       count: episodes.length,
+      topLocations,
       filters: {
         categories: categories.filter(c => c).sort(),
         genres: genres,

@@ -1505,6 +1505,17 @@ export const locationAPI = {
       count: number;
       parentPlaceId: string | null;
       scope: string;
+      topLocations?: Array<{
+        placeId?: string;
+        label?: string;
+        country?: string;
+        countryCode?: string;
+        display?: string;
+        kind?: string;
+        featureType?: string;
+        total?: number;
+        count?: number;
+      }>;
     };
   },
 
@@ -3499,6 +3510,17 @@ export const booksAPI = {
       timePeriod?: string;
       locationPlaceId?: string | null;
       locationScope?: string;
+      topLocations?: Array<{
+        placeId?: string;
+        label?: string;
+        country?: string;
+        countryCode?: string;
+        display?: string;
+        kind?: string;
+        featureType?: string;
+        total?: number;
+        count?: number;
+      }>;
     };
   },
   getBook: async (bookId: string) => {

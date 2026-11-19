@@ -23,9 +23,10 @@ import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import {
-  computeLocationQuickPicks,
+  chartLocationQuickPicks,
   formatLocation,
   locationScopeEmptyMessage,
+  type ChartTopLocation,
   type LocationScope,
 } from '@/src/lib/location';
 import {
@@ -73,6 +74,7 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
+  const [topLocations, setTopLocations] = useState<ChartTopLocation[]>([]);
   const [visibleCount, setVisibleCount] = useState(PODCAST_CHART_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,6 +107,7 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
           locationScope: locationPlaceId ? locationScope : undefined,
         });
         setEpisodes(res.episodes ?? []);
+        setTopLocations(Array.isArray(res.topLocations) ? res.topLocations : []);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : 'Failed to load podcasts'
@@ -124,8 +127,8 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
   );
 
   const locationQuickPicks = useMemo(
-    () => computeLocationQuickPicks(episodes, user?.homeLocation, 5),
-    [episodes, user?.homeLocation]
+    () => chartLocationQuickPicks(topLocations, episodes, user?.homeLocation),
+    [topLocations, episodes, user?.homeLocation]
   );
 
   const topTags = useMemo(

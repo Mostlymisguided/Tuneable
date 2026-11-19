@@ -17,6 +17,7 @@ const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const {
   getPeriodStartDate,
   loadTopSupportersByMedia,
+  computeTopLocations,
   DEFAULT_SUPPORTERS_LIMIT,
   toObjectIds,
 } = require('../utils/globalPartyChart');
@@ -308,12 +309,15 @@ router.get('/chart', optionalAuthMiddleware, async (req, res) => {
       req.user?._id || null
     );
 
+    const topLocations = await computeTopLocations({ startDate });
+
     res.json({
       books: serializedBooks,
       count: books.length,
       timePeriod,
       locationPlaceId: locationPlaceId || null,
       locationScope: locationPlaceId ? locationScope : 'in',
+      topLocations,
     });
   } catch (error) {
     console.error('Book chart failed:', error);

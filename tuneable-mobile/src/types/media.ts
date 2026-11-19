@@ -219,6 +219,7 @@ export interface SortedMediaResponse {
   count: number;
   hiddenCount?: number;
   locationFilter?: { placeId: string } | null;
+  topLocations?: import('@/src/lib/location').ChartTopLocation[];
 }
 
 export const CHART_PAGE_SIZE = 20;
