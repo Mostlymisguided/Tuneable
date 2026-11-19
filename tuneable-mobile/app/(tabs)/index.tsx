@@ -43,7 +43,6 @@ import {
   GLOBAL_PARTY_ID,
   type ChartMediaItem,
 } from '@/src/types/media';
-import { type UserStats } from '@/src/types/user';
 
 const RISING_PREVIEW_COUNT = 10;
 
@@ -55,7 +54,6 @@ export default function HomeScreen() {
   const canUpload = canUploadMedia(user);
 
   const [rising, setRising] = useState<ChartMediaItem[]>([]);
-  const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [queueRevision, setQueueRevision] = useState(0);
   const [activityRevision, setActivityRevision] = useState(0);
@@ -84,18 +82,11 @@ export default function HomeScreen() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
-      const userId = user?.uuid || user?.id;
 
       const shell = (async () => {
         try {
-          const [chartRes, profileRes] = await Promise.all([
-            partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today'),
-            userId
-              ? userAPI.getProfileById(userId).catch(() => null)
-              : Promise.resolve(null),
-          ]);
+          const chartRes = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today');
           setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
-          setStats(profileRes?.stats ?? null);
         } catch (err) {
           const message =
             err instanceof Error ? err.message : 'Failed to load home';
@@ -112,7 +103,7 @@ export default function HomeScreen() {
         setActivityRevision((current) => current + 1);
       }
     },
-    [user?.id, user?.uuid]
+    []
   );
 
   useFocusEffect(
@@ -147,9 +138,6 @@ export default function HomeScreen() {
     }
     router.push('/set-home-location');
   };
-
-  const avgTipPence = stats?.averageBidAmount ?? 0;
-  const totalTips = stats?.totalBids ?? 0;
 
   return (
     <Screen>
@@ -239,57 +227,7 @@ export default function HomeScreen() {
 
           <WelcomeCreditClaimCard />
 
-          <View style={styles.catalogLinks}>
-            <Pressable
-              style={styles.catalogChip}
-              onPress={() =>
-                router.push({ pathname: '/(tabs)/charts', params: { kind: 'music' } })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Open music"
-            >
-              <Ionicons name="musical-notes-outline" size={16} color={colors.accentLight} />
-              <Text style={styles.catalogChipText}>Music</Text>
-            </Pressable>
-            <Pressable
-              style={styles.catalogChip}
-              onPress={() =>
-                router.push({ pathname: '/(tabs)/charts', params: { kind: 'podcasts' } })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Open podcasts"
-            >
-              <Ionicons name="mic-outline" size={16} color={colors.accentLight} />
-              <Text style={styles.catalogChipText}>Podcasts</Text>
-            </Pressable>
-            <Pressable
-              style={styles.catalogChip}
-              onPress={() =>
-                router.push({ pathname: '/(tabs)/charts', params: { kind: 'books' } })
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Open books"
-            >
-              <Ionicons name="book-outline" size={16} color={colors.accentLight} />
-              <Text style={styles.catalogChipText}>Books</Text>
-            </Pressable>
-          </View>
-
           <LibraryImportCards showUpload={canUpload} />
-
-          <View style={styles.statsRow}>
-            <StatCard
-              icon="heart-outline"
-              label="Avg tip"
-              value={formatPoundsFromPence(avgTipPence)}
-            />
-            <StatCard
-              icon="musical-notes-outline"
-              label="Tips"
-              value={String(totalTips)}
-              onPress={() => router.push('/(tabs)/profile')}
-            />
-          </View>
 
           <DashboardPrompts />
 
@@ -354,40 +292,6 @@ export default function HomeScreen() {
       </ScrollView>
     </Screen>
   );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  onPress?: () => void;
-}) {
-  const inner = (
-    <>
-      <View style={styles.statTop}>
-        <Ionicons name={icon} size={16} color={colors.accentLight} />
-        <Text style={styles.statLabel}>{label}</Text>
-      </View>
-      <Text style={styles.statValue} numberOfLines={1}>
-        {value}
-      </Text>
-    </>
-  );
-
-  if (onPress) {
-    return (
-      <Pressable style={styles.statCard} onPress={onPress}>
-        {inner}
-      </Pressable>
-    );
-  }
-
-  return <View style={styles.statCard}>{inner}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -483,58 +387,6 @@ const styles = StyleSheet.create({
   bellBadgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: '800',
-  },
-  catalogLinks: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  catalogChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  catalogChipText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderColor: colors.cardBorder,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
-  },
-  statTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statValue: {
-    color: colors.text,
-    fontSize: 20,
     fontWeight: '800',
   },
   error: {
