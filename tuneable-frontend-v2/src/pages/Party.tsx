@@ -2649,7 +2649,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
               }`}
             >
               <MapPin className="h-4 w-4 text-purple-300 flex-shrink-0" />
-              {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Earth'}
+              {selectedLocation?.placeId ? formatLocation(selectedLocation) : 'Everywhere'}
               <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showLocationFilter ? 'rotate-180' : ''}`} />
             </button>
           </div>

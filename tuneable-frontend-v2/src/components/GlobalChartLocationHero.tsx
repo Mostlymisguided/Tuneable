@@ -61,7 +61,7 @@ function LocationQuickPickButtons({
             : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
         }`}
       >
-        Earth
+        Everywhere
       </button>
       {locationQuickPicks.map((loc) => {
         const selected = selectedLocation?.placeId === loc.placeId;
@@ -111,7 +111,7 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
 }) => {
   const locationLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
-    : 'Earth';
+    : 'Everywhere';
 
   useEffect(() => {
     if (!showLocationFilter) return;

@@ -46,7 +46,7 @@ export function GlobalChartHero({
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const locationLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
-    : 'Earth';
+    : 'Everywhere';
   const kindLabel = chartKindLabel(chartKind);
   const noun = contentNoun || kindLabel;
   const kindToggleable = Boolean(onChartKindChange) && chartKind !== 'places';
@@ -155,7 +155,7 @@ export function GlobalChartHero({
       {locationQuickPicks.length > 0 ? (
         <View style={styles.chips}>
           <LocationChip
-            label="Earth"
+            label="Everywhere"
             active={!selectedLocation?.placeId}
             onPress={() => onLocationChange(null)}
           />
