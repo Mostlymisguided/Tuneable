@@ -24,6 +24,7 @@ import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { usePlayableOnly } from '@/src/hooks/usePlayableOnly';
 import {
+  BPM_FILTER_ALL,
   type BpmFilterRange,
   computeTopTags,
   filterChartMedia,
@@ -76,7 +77,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
+  const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>(BPM_FILTER_ALL);
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
@@ -193,7 +194,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   const clearClientFilters = () => {
     setSelectedTagTerms([]);
     setSearchQuery('');
-    setBpmFilterRange('all');
+    setBpmFilterRange(BPM_FILTER_ALL);
   };
 
   const onPlayItem = (item: ChartMediaItem) => {

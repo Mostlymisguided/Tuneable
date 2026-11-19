@@ -2,16 +2,45 @@ import type { ChartMediaItem, TimePeriodKey } from '@/src/types/media';
 import { getChartTipPence, getCreatorDisplay } from '@/src/lib/media';
 import { getCanonicalTag } from '@/src/lib/tagNormalizer';
 
-export const BPM_FILTER_OPTIONS = [
-  { key: 'all', label: 'All', min: null, max: null },
-  { key: 'under-90', label: '<90', min: null, max: 90 },
-  { key: '90-110', label: '90–110', min: 90, max: 110 },
-  { key: '110-130', label: '110–130', min: 110, max: 130 },
-  { key: '130-150', label: '130–150', min: 130, max: 150 },
-  { key: '150-plus', label: '150+', min: 150, max: null },
-] as const;
+/** Inclusive picker bounds. The full span means the filter is off.
+ *  Keep in sync with tuneable-frontend-v2/src/utils/bpm.ts. */
+export const BPM_FILTER_MIN = 40;
+export const BPM_FILTER_MAX = 220;
 
-export type BpmFilterRange = (typeof BPM_FILTER_OPTIONS)[number]['key'];
+export type BpmFilterRange = {
+  min: number;
+  max: number;
+};
+
+export const BPM_FILTER_ALL: BpmFilterRange = {
+  min: BPM_FILTER_MIN,
+  max: BPM_FILTER_MAX,
+};
+
+export function isBpmFilterActive(range: BpmFilterRange): boolean {
+  return range.min > BPM_FILTER_MIN || range.max < BPM_FILTER_MAX;
+}
+
+export function clampBpmBound(value: number): number {
+  const rounded = Math.round(value);
+  if (!Number.isFinite(rounded)) return BPM_FILTER_MIN;
+  return Math.max(BPM_FILTER_MIN, Math.min(BPM_FILTER_MAX, rounded));
+}
+
+/** Same object when nothing changed, so callers can skip extra renders. */
+export function bpmFilterWithMin(range: BpmFilterRange, min: number): BpmFilterRange {
+  const nextMin = clampBpmBound(min);
+  const nextMax = Math.max(range.max, nextMin);
+  if (nextMin === range.min && nextMax === range.max) return range;
+  return { min: nextMin, max: nextMax };
+}
+
+export function bpmFilterWithMax(range: BpmFilterRange, max: number): BpmFilterRange {
+  const nextMax = clampBpmBound(max);
+  const nextMin = Math.min(range.min, nextMax);
+  if (nextMin === range.min && nextMax === range.max) return range;
+  return { min: nextMin, max: nextMax };
+}
 
 export type TopTagEntry = {
   tag: string;
@@ -28,7 +57,11 @@ export type ChartFilterState = {
 };
 
 export function formatBpmFilterLabel(range: BpmFilterRange): string {
-  return BPM_FILTER_OPTIONS.find((o) => o.key === range)?.label ?? 'All';
+  if (!isBpmFilterActive(range)) return 'All';
+  if (range.min === range.max) return String(range.min);
+  if (range.min <= BPM_FILTER_MIN) return `≤${range.max}`;
+  if (range.max >= BPM_FILTER_MAX) return `${range.min}+`;
+  return `${range.min}–${range.max}`;
 }
 
 export function getMediaBpm(item: ChartMediaItem): number | null {
@@ -40,14 +73,11 @@ export function mediaMatchesBpmFilter(
   item: ChartMediaItem,
   range: BpmFilterRange
 ): boolean {
-  if (range === 'all') return true;
-  const option = BPM_FILTER_OPTIONS.find((o) => o.key === range);
-  if (!option) return true;
+  if (!isBpmFilterActive(range)) return true;
   const bpm = getMediaBpm(item);
   if (bpm == null) return false;
-  if (option.min != null && bpm < option.min) return false;
-  if (option.max != null && bpm >= option.max) return false;
-  return true;
+  const rounded = Math.round(bpm);
+  return rounded >= range.min && rounded <= range.max;
 }
 
 export function computeTopTags(
@@ -144,7 +174,7 @@ export function filterChartMedia(
     });
   }
 
-  if (bpmFilterRange !== 'all') {
+  if (isBpmFilterActive(bpmFilterRange)) {
     result = result.filter((item) =>
       mediaMatchesBpmFilter(item, bpmFilterRange)
     );
@@ -157,6 +187,6 @@ export function hasActiveChartFilters(filters: ChartFilterState): boolean {
   return (
     filters.selectedTagTerms.length > 0 ||
     filters.searchQuery.trim().length > 0 ||
-    filters.bpmFilterRange !== 'all'
+    isBpmFilterActive(filters.bpmFilterRange)
   );
 }

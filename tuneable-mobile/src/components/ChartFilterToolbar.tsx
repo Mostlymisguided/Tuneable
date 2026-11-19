@@ -3,12 +3,14 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 import {
-  BPM_FILTER_OPTIONS,
+  BPM_FILTER_ALL,
   type BpmFilterRange,
   type TopTagEntry,
   formatBpmFilterLabel,
   getSelectedTagFilters,
+  isBpmFilterActive,
 } from '@/src/lib/chartFilters';
+import { BpmRangePicker } from '@/src/components/BpmRangePicker';
 import { TIME_PERIODS, type TimePeriodKey } from '@/src/types/media';
 import {
   CHART_SORT_OPTIONS,
@@ -60,7 +62,7 @@ export function ChartFilterToolbar({
   onTagTermsChange,
   searchQuery,
   onSearchQueryChange,
-  bpmFilterRange = 'all',
+  bpmFilterRange = BPM_FILTER_ALL,
   onBpmFilterChange,
   showBpm = true,
   showTime = true,
@@ -163,7 +165,7 @@ export function ChartFilterToolbar({
           <FilterTrigger
             icon="speedometer-outline"
             label={formatBpmFilterLabel(bpmFilterRange)}
-            active={showBpmPanel || bpmFilterRange !== 'all'}
+            active={showBpmPanel || isBpmFilterActive(bpmFilterRange)}
             onPress={onToggleBpmPanel ?? (() => {})}
             accessibilityLabel={`BPM, ${formatBpmFilterLabel(bpmFilterRange)}`}
           />
@@ -271,22 +273,7 @@ export function ChartFilterToolbar({
 
       {showBpm && showBpmPanel && onBpmFilterChange && onToggleBpmPanel ? (
         <FilterPanel title="Filter by BPM" onHide={onToggleBpmPanel}>
-          <View style={styles.chips}>
-            {BPM_FILTER_OPTIONS.map((option) => {
-              const active = bpmFilterRange === option.key;
-              return (
-                <Pressable
-                  key={option.key}
-                  onPress={() => onBpmFilterChange(option.key)}
-                  style={[styles.chip, active && styles.chipActive]}>
-                  <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}>
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <BpmRangePicker value={bpmFilterRange} onChange={onBpmFilterChange} />
         </FilterPanel>
       ) : null}
     </View>

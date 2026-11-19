@@ -18,6 +18,7 @@ import { booksAPI } from '@/src/api/books';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import {
+  BPM_FILTER_ALL,
   computeTopTags,
   filterChartMedia,
   hasActiveChartFilters,
@@ -75,7 +76,7 @@ export function BookChartScreen({ onChartKindChange }: Props) {
   const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
 
   const filterState = useMemo(
-    () => ({ selectedTagTerms, searchQuery, bpmFilterRange: 'all' as const }),
+    () => ({ selectedTagTerms, searchQuery, bpmFilterRange: BPM_FILTER_ALL }),
     [selectedTagTerms, searchQuery]
   );
   const filtersActive = hasActiveChartFilters(filterState);

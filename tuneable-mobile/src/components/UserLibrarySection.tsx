@@ -8,6 +8,7 @@ import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { TipSheet } from '@/src/components/TipSheet';
 import { mediaAPI } from '@/src/api/media';
 import {
+  BPM_FILTER_ALL,
   type BpmFilterRange,
   computeTopTags,
   filterChartMedia,
@@ -171,7 +172,7 @@ export function UserLibrarySection({
   );
   const [selectedTagTerms, setSelectedTagTerms] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
+  const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>(BPM_FILTER_ALL);
   const [showTagPanel, setShowTagPanel] = useState(false);
   const [showTimePanel, setShowTimePanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
@@ -252,7 +253,7 @@ export function UserLibrarySection({
   const clearClientFilters = () => {
     setSelectedTagTerms([]);
     setSearchQuery('');
-    setBpmFilterRange('all');
+    setBpmFilterRange(BPM_FILTER_ALL);
   };
 
   const playItem = (item: ChartMediaItem) => {

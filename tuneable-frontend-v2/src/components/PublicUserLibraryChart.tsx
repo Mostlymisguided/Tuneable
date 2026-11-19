@@ -30,6 +30,13 @@ import {
 import { usePlayableOnly } from '../hooks/usePlayableOnly';
 import { buildChartRankMap } from '../utils/playableFilterPref';
 import { isMediaPlayable, enrichMediaWithPlayability } from '../utils/mediaPlayability';
+import {
+  BPM_FILTER_ALL,
+  bpmMatchesFilter,
+  formatBpmFilterLabel,
+  isBpmFilterActive,
+} from '../utils/bpm';
+import { BpmRangePicker } from './BpmRangePicker';
 
 const MEDIA_PAGE_SIZE = 10;
 
@@ -40,27 +47,13 @@ const TIME_PERIOD_OPTIONS = [
   { key: 'today', label: 'Today' },
 ] as const;
 
-const BPM_FILTER_OPTIONS = [
-  { key: 'all', label: 'All', min: null, max: null },
-  { key: 'under-90', label: '<90', min: null, max: 90 },
-  { key: '90-110', label: '90–110', min: 90, max: 110 },
-  { key: '110-130', label: '110–130', min: 110, max: 130 },
-  { key: '130-150', label: '130–150', min: 130, max: 150 },
-  { key: '150-plus', label: '150+', min: 150, max: null },
-] as const;
-
 type TimePeriod = (typeof TIME_PERIOD_OPTIONS)[number]['key'];
-type BpmFilterRange = (typeof BPM_FILTER_OPTIONS)[number]['key'];
 
 function formatTimePeriodLabel(period: string): string {
   return (
     TIME_PERIOD_OPTIONS.find((p) => p.key === period)?.label ??
     period.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase())
   );
-}
-
-function formatBpmFilterLabel(range: BpmFilterRange): string {
-  return BPM_FILTER_OPTIONS.find((o) => o.key === range)?.label ?? 'All';
 }
 
 function getPeriodStart(period: TimePeriod): Date | null {
@@ -97,15 +90,8 @@ function itemInTimePeriod(item: LibraryItem, period: TimePeriod): boolean {
   return last >= startMs || first >= startMs;
 }
 
-function mediaMatchesBpmFilter(item: LibraryItem, range: BpmFilterRange): boolean {
-  if (range === 'all') return true;
-  const option = BPM_FILTER_OPTIONS.find((o) => o.key === range);
-  if (!option) return true;
-  const bpm = typeof item.bpm === 'number' && item.bpm > 0 ? item.bpm : null;
-  if (bpm == null) return false;
-  if (option.min != null && bpm < option.min) return false;
-  if (option.max != null && bpm >= option.max) return false;
-  return true;
+function libraryItemBpm(item: LibraryItem): number | null {
+  return typeof item.bpm === 'number' && item.bpm > 0 ? item.bpm : null;
 }
 
 function libraryItemPlayable(item: LibraryItem): boolean {
@@ -167,7 +153,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<TimePeriod>('all-time');
   const [chartSort, setChartSort] = useState<ChartSortKey>('most-tipped');
-  const [bpmFilterRange, setBpmFilterRange] = useState<BpmFilterRange>('all');
+  const [bpmFilterRange, setBpmFilterRange] = useState(BPM_FILTER_ALL);
   const [searchQuery, setSearchQuery] = useState('');
   const [topTagsExpanded, setTopTagsExpanded] = useState(false);
   const [visibleCount, setVisibleCount] = useState(MEDIA_PAGE_SIZE);
@@ -212,8 +198,8 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
       });
     }
 
-    if (bpmFilterRange !== 'all') {
-      list = list.filter((item) => mediaMatchesBpmFilter(item, bpmFilterRange));
+    if (isBpmFilterActive(bpmFilterRange)) {
+      list = list.filter((item) => bpmMatchesFilter(libraryItemBpm(item), bpmFilterRange));
     }
 
     if (q) {
@@ -322,7 +308,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
             type="button"
             onClick={() => setShowBpmFilter((open) => !open)}
             className={`px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-200 font-medium transition-colors text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 ${
-              showBpmFilter || bpmFilterRange !== 'all'
+              showBpmFilter || isBpmFilterActive(bpmFilterRange)
                 ? 'bg-gray-700 ring-1 ring-purple-500/50'
                 : 'bg-gray-800'
             }`}
@@ -493,22 +479,7 @@ const PublicUserLibraryChart: React.FC<PublicUserLibraryChartProps> = ({
                 Hide
               </button>
             </div>
-            <div className="flex flex-row flex-nowrap gap-1 sm:gap-2 justify-center items-center max-w-full overflow-hidden">
-              {BPM_FILTER_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => setBpmFilterRange(option.key)}
-                  className={`flex-1 min-w-0 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-md font-medium transition-colors text-xs sm:text-sm truncate ${
-                    bpmFilterRange === option.key
-                      ? 'bg-purple-700 text-white'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <BpmRangePicker value={bpmFilterRange} onChange={setBpmFilterRange} />
           </div>
         )}
       </div>
