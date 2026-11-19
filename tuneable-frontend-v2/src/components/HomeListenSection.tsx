@@ -123,10 +123,10 @@ const HomeListenSection: React.FC<Props> = ({
     const loadRising = async () => {
       try {
         setRisingLoading(true);
-        const response = await partyAPI.getMediaSortedByTime('global', 'today');
+        const response = await partyAPI.getMediaSortedByTime('global', 'this-week');
         if (!cancelled) setRising((response.media || []).slice(0, 10));
       } catch (error) {
-        console.error('Failed to load rising today:', error);
+        console.error('Failed to load rising this week:', error);
         if (!cancelled) setRising([]);
       } finally {
         if (!cancelled) setRisingLoading(false);
@@ -206,7 +206,7 @@ const HomeListenSection: React.FC<Props> = ({
     <div className="flex flex-col">
       <div className="card mb-8 order-2">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold text-white">Rising today</h2>
+          <h2 className="text-2xl font-semibold text-white">Rising this week</h2>
           <Link to="/party/global" className="text-sm text-purple-300 hover:text-white">
             Full chart
           </Link>
@@ -216,7 +216,7 @@ const HomeListenSection: React.FC<Props> = ({
             <Loader2 className="h-6 w-6 text-purple-400 animate-spin" />
           </div>
         ) : rising.length === 0 ? (
-          <p className="text-gray-400 text-sm py-4">Nothing rising yet. Be the first to tip the global chart today.</p>
+          <p className="text-gray-400 text-sm py-4">Nothing rising yet. Be the first to tip the global chart this week.</p>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-2">
             {rising.map((item, index) => {
@@ -320,7 +320,7 @@ const HomeListenSection: React.FC<Props> = ({
             {filter === 'unheard' ? (
               <>
                 <p>Nothing new.</p>
-                <p className="text-sm mt-2">Add a tune from Rising today or a tune page. A tip or a play moves it on.</p>
+                <p className="text-sm mt-2">Add a tune from Rising this week or a tune page. A tip or a play moves it on.</p>
               </>
             ) : (
               <>

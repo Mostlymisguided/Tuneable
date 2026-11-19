@@ -65,7 +65,7 @@ export default function HomeScreen() {
         title: item.title || 'Untitled',
         subtitle: getCreatorDisplay(item),
         coverArt: item.coverArt,
-        meta: formatPoundsFromPence(getChartTipPence(item, 'today')),
+        meta: formatPoundsFromPence(getChartTipPence(item, 'this-week')),
         badge: String(index + 1),
       })),
     [rising]
@@ -83,7 +83,7 @@ export default function HomeScreen() {
 
       const shell = (async () => {
         try {
-          const chartRes = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today');
+          const chartRes = await partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'this-week');
           setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
         } catch (err) {
           const message =
@@ -249,14 +249,14 @@ export default function HomeScreen() {
         </View>
 
         <CoverRail
-          title="Rising today"
+          title="Rising this week"
           actionLabel="Full chart"
           onAction={() =>
             router.push({ pathname: '/(tabs)/charts', params: { kind: 'music' } })
           }
           items={risingRail}
           emptyTitle="Nothing rising yet"
-          emptyBody="Be the first to tip the global chart today."
+          emptyBody="Be the first to tip the global chart this week."
           emptyActionLabel="Add a tune"
           onEmptyAction={() => router.push('/music-search')}
           onOpen={(item) => {

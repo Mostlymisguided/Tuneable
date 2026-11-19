@@ -210,7 +210,7 @@ export function HomeListenQueue({
           </Text>
           <Text style={styles.emptyBody}>
             {filter === 'unheard'
-              ? 'Add a tune from Rising today or search. A tip or a play moves it on.'
+              ? 'Add a tune from Rising this week or search. A tip or a play moves it on.'
               : 'A tune moves here after you listen for 30 seconds, or half the track.'}
           </Text>
           {filter === 'unheard' ? (
