@@ -5,6 +5,7 @@ import { notificationAPI, labelAPI, collectiveAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
 import { toast } from '../utils/toast';
+import NotificationArtwork from '../components/NotificationArtwork';
 import {
   isExternalNotificationLink,
   notificationDestination,
@@ -391,7 +392,10 @@ const Notifications: React.FC = () => {
           <div className="card p-8 text-center text-gray-400">Loading notifications...</div>
         ) : notifications.length === 0 ? (
           <div className="card p-8 text-center text-gray-400">
-            <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <div className="relative inline-block mb-4">
+              <Bell className="h-12 w-12 opacity-50" />
+              <span className="absolute -right-3 -top-2 text-lg" aria-hidden="true">✨</span>
+            </div>
             <p className="text-lg">No notifications yet</p>
             <p className="text-sm mt-2">You'll see notifications here when something happens</p>
           </div>
@@ -413,9 +417,10 @@ const Notifications: React.FC = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-3">
-                      <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-                        notification.isRead ? 'bg-gray-600' : 'bg-purple-500'
-                      }`} />
+                      <NotificationArtwork
+                        notification={notification}
+                        unread={!notification.isRead}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-base font-semibold text-white">
                           {notification.title}

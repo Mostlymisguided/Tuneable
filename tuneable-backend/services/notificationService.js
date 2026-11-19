@@ -132,8 +132,8 @@ const createNotification = async (params) => {
       .populate('relatedMediaId', 'title artist coverArt uuid')
       .populate('relatedPartyId', 'name uuid')
       .populate('relatedUserId', 'username profilePic uuid')
-      .populate('relatedLabelId', 'name slug uuid')
-      .populate('relatedCollectiveId', 'name slug uuid')
+      .populate('relatedLabelId', 'name slug uuid profilePicture')
+      .populate('relatedCollectiveId', 'name slug uuid profilePicture')
       .populate('relatedConversationId', 'title uuid')
       .lean();
 

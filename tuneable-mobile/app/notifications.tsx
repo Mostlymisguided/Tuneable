@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { NotificationArtworkView } from '@/src/components/NotificationArtwork';
 import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { collectiveAPI } from '@/src/api/collectives';
@@ -254,7 +255,10 @@ export default function NotificationsScreen() {
           onEndReachedThreshold={0.4}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="notifications-outline" size={28} color={colors.textMuted} />
+              <View style={styles.emptyIcon}>
+                <Ionicons name="notifications-outline" size={28} color={colors.textMuted} />
+                <Text style={styles.emptyStar}>✨</Text>
+              </View>
               <Text style={styles.emptyTitle}>No notifications yet</Text>
               <Text style={styles.emptyBody}>
                 Tips, replies, and outtips will show up here.
@@ -277,7 +281,7 @@ export default function NotificationsScreen() {
                   style={styles.rowBody}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.title}. ${item.message}`}>
-                  {!item.isRead ? <View style={styles.unreadDot} /> : <View style={styles.dotSpacer} />}
+                  <NotificationArtworkView notification={item} unread={!item.isRead} />
                   <View style={styles.rowCopy}>
                     <View style={styles.rowTop}>
                       <Text style={styles.rowTitle} numberOfLines={1}>
@@ -374,14 +378,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(147, 51, 234, 0.18)',
     borderColor: 'rgba(168, 85, 247, 0.45)',
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
-    backgroundColor: colors.accentLight,
-  },
-  dotSpacer: { width: 8 },
   rowCopy: { flex: 1, gap: 4 },
   rowTop: {
     flexDirection: 'row',
@@ -414,7 +410,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginTop: 10,
-    marginLeft: 18,
+    marginLeft: 54,
   },
   inviteBtn: {
     minWidth: 88,
@@ -438,6 +434,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
     gap: 8,
+  },
+  emptyIcon: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStar: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    fontSize: 14,
   },
   emptyTitle: {
     color: colors.text,

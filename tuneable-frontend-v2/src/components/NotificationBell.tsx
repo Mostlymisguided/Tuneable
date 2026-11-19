@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { notificationAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { io, Socket } from 'socket.io-client';
+import NotificationArtwork from './NotificationArtwork';
 import {
   isExternalNotificationLink,
   notificationDestination,
@@ -282,7 +283,7 @@ const NotificationBell: React.FC = () => {
             {isLoading ? (
               <div className="p-4 text-center text-gray-400">Loading...</div>
             ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-400">No notifications</div>
+              <div className="p-4 text-center text-gray-400">No notifications ✨</div>
             ) : (
               <div className="divide-y divide-gray-700">
                 {notifications.map((notification) => {
@@ -296,6 +297,11 @@ const NotificationBell: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
+                      <NotificationArtwork
+                        notification={notification}
+                        size="sm"
+                        unread={!notification.isRead}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">
                           {notification.title}

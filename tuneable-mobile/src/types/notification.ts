@@ -5,6 +5,11 @@ export type NotificationRef =
       slug?: string;
       uuid?: string;
       name?: string;
+      title?: string;
+      username?: string;
+      coverArt?: string | null;
+      profilePic?: string | null;
+      profilePicture?: string | null;
     }
   | null;
 
@@ -18,6 +23,8 @@ export type AppNotification = {
   isRead: boolean;
   createdAt: string;
   inviteType?: 'admin' | 'artist' | 'member' | null;
+  relatedMediaId?: NotificationRef;
+  relatedUserId?: NotificationRef;
   relatedLabelId?: NotificationRef;
   relatedCollectiveId?: NotificationRef;
 };
