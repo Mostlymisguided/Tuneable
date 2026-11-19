@@ -220,7 +220,7 @@ export default function NowPlayingScreen() {
             style={styles.titlePress}
             accessibilityRole="link"
             accessibilityLabel={`Open ${title}`}>
-            <Text style={styles.titleLink} numberOfLines={2}>
+            <Text style={styles.title} numberOfLines={2}>
               {title}
             </Text>
           </Pressable>
@@ -484,13 +484,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  titleLink: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
-    textAlign: 'center',
-    textDecorationLine: 'underline',
-  },
   subtitle: {
     marginTop: 8,
     alignSelf: 'stretch',
@@ -503,11 +496,9 @@ const styles = StyleSheet.create({
     color: colors.accentLight,
     fontSize: 16,
     textAlign: 'center',
-    textDecorationLine: 'underline',
   },
   inlineLink: {
     color: colors.accentLight,
-    textDecorationLine: 'underline',
   },
   queueHint: {
     marginTop: 10,
