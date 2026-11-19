@@ -217,7 +217,7 @@ export default function MusicSearchScreen() {
         sourceType: 'search',
         position: 'start',
       });
-      showToast(`Added ${item.title || 'tune'} to Unheard`);
+      showToast(`Added ${item.title || 'tune'} to New`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not add that tune');
     }

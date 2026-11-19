@@ -1,10 +1,9 @@
 /**
- * Personal home queue: Unheard, Heard, and Tipped.
+ * Personal home queue: New, Heard, and Tipped.
  *
- * Unheard is playback-queue order, then tips that have not had a qualified
- * play. Heard is a qualified play (30s or half the tune). Tipped is an
- * active tip. A tune can carry more than one of those flags.
- * Podcasts and books stay out of this list.
+ * New is the playback queue in add order, limited to tunes that have neither
+ * an active tip nor a qualified play. Heard is a qualified play (30s or half
+ * the tune). Tipped is an active tip. Podcasts and books stay out of this list.
  */
 
 const mongoose = require('mongoose');
@@ -86,16 +85,7 @@ function classifyHomeListenQueue({
   const unheard = [];
   const seenUnheard = new Set();
   queuedIds.forEach((id) => {
-    if (!usable(id) || heardById.has(id) || seenUnheard.has(id)) return;
-    seenUnheard.add(id);
-    unheard.push(meta(id));
-  });
-
-  const tippedOnly = [...bidById.keys()]
-    .filter((id) => usable(id) && !heardById.has(id) && !seenUnheard.has(id))
-    .sort((a, b) => timeValue(bidById.get(b)?.lastBidAt) - timeValue(bidById.get(a)?.lastBidAt));
-
-  tippedOnly.forEach((id) => {
+    if (!usable(id) || heardById.has(id) || bidById.has(id) || seenUnheard.has(id)) return;
     seenUnheard.add(id);
     unheard.push(meta(id));
   });

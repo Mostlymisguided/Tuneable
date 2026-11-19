@@ -20,7 +20,7 @@ describe('classifyHomeListenQueue', () => {
     book: { _id: 'book', contentForm: ['book'], contentType: ['written'] },
   };
 
-  it('keeps queue order, then untipped-heard tips, and hides qualified plays from Unheard', () => {
+  it('keeps queued tunes that have neither a tip nor a qualified play', () => {
     const result = classifyHomeListenQueue({
       queueEntries: [
         { mediaId: 'both', addedAt: '2026-01-01T00:00:00.000Z' },
@@ -41,14 +41,12 @@ describe('classifyHomeListenQueue', () => {
       mediaById,
     });
 
-    expect(result.unheard.map((item) => item.mediaId)).toEqual(['both', 'queued', 'tipped']);
-    expect(result.unheard[0]).toMatchObject({ queued: true, tipped: true, heard: false, userBidTotal: 111 });
-    expect(result.unheard[1]).toMatchObject({ queued: true, tipped: false });
-    expect(result.unheard[2]).toMatchObject({ queued: false, tipped: true });
+    expect(result.unheard.map((item) => item.mediaId)).toEqual(['queued']);
+    expect(result.unheard[0]).toMatchObject({ queued: true, tipped: false, heard: false });
 
     expect(result.heard.map((item) => item.mediaId)).toEqual(['heardTip', 'heard']);
     expect(result.heard[0]).toMatchObject({ tipped: true, heard: true });
-    expect(result.counts).toEqual({ unheard: 3, heard: 2, tipped: 3 });
+    expect(result.counts).toEqual({ unheard: 1, heard: 2, tipped: 3 });
   });
 
   it('caps the returned lists without shrinking the counts', () => {

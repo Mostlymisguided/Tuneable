@@ -7,7 +7,6 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from '../utils/toast';
 import { DEFAULT_COVER_ART } from '../constants';
-import { penceToPounds } from '../utils/currency';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { isMediaPlayable, normalizeSources, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
@@ -172,7 +171,7 @@ const HomeListenSection: React.FC<Props> = ({
         sourceType: 'direct',
         position: 'start',
       });
-      toast.success(`Added "${item.title || 'tune'}" to Unheard`);
+      toast.success(`Added "${item.title || 'tune'}" to New`);
       setFilter('unheard');
       await loadQueue();
     } catch (error: any) {
@@ -198,7 +197,7 @@ const HomeListenSection: React.FC<Props> = ({
   const activeItems = filter === 'heard' ? heard : unheard;
   const activeCount = filter === 'tipped' ? tippedCount : filter === 'heard' ? counts.heard : counts.unheard;
   const filters: { key: FilterKey; label: string; count: number }[] = [
-    { key: 'unheard', label: 'Unheard', count: counts.unheard },
+    { key: 'unheard', label: 'New', count: counts.unheard },
     { key: 'heard', label: 'Heard', count: counts.heard },
     { key: 'tipped', label: 'Tipped', count: tippedCount },
   ];
@@ -320,8 +319,8 @@ const HomeListenSection: React.FC<Props> = ({
             <ListMusic className="h-12 w-12 mx-auto mb-4 text-gray-500" />
             {filter === 'unheard' ? (
               <>
-                <p>Nothing waiting.</p>
-                <p className="text-sm mt-2">Add a tune from Rising today or a tune page. A tip you have not heard stays here too.</p>
+                <p>Nothing new.</p>
+                <p className="text-sm mt-2">Add a tune from Rising today or a tune page. A tip or a play moves it on.</p>
               </>
             ) : (
               <>
@@ -352,14 +351,17 @@ const HomeListenSection: React.FC<Props> = ({
                     {item.title}
                   </Link>
                   <p className="text-sm text-gray-400 truncate">{item.artist}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {item.tipped && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-900/70 text-purple-100">
-                        Tipped {penceToPounds(item.userBidTotal)}
+                  <div className="flex flex-nowrap gap-1.5 mt-1 overflow-hidden">
+                    {(item.tags || []).filter(Boolean).map((tag) => (
+                      <span
+                        key={tag}
+                        className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-100"
+                      >
+                        #{tag}
                       </span>
-                    )}
+                    ))}
                     {item.queued && filter === 'heard' && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-200">In queue</span>
+                      <span className="shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-200">In queue</span>
                     )}
                   </div>
                 </div>

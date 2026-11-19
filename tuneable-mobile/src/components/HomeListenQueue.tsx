@@ -11,8 +11,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { mediaAPI } from '@/src/api/media';
 import { userAPI } from '@/src/api/user';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
+import { TagChip } from '@/src/components/TagChip';
 import { TipSheet } from '@/src/components/TipSheet';
-import { formatPoundsFromPence } from '@/src/lib/format';
 import { isUploadPlayable, mediaId } from '@/src/lib/media';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { showToast } from '@/src/stores/toastStore';
@@ -23,6 +23,55 @@ import type { HomeListenQueueItem } from '@/src/types/homeQueue';
 import type { User } from '@/src/types/user';
 
 type FilterKey = 'unheard' | 'heard';
+
+const TAG_GAP = 4;
+const MORE_CHIP_WIDTH = 32;
+
+function chipWidth(tag: string): number {
+  return 16 + (tag.length + 1) * 6.6;
+}
+
+function tagsThatFit(tags: string[], width: number): { shown: string[]; hidden: number } {
+  const clean = tags.filter((tag) => tag.trim());
+  if (clean.length === 0) return { shown: [], hidden: 0 };
+  if (width <= 0) return { shown: clean.slice(0, 1), hidden: Math.max(0, clean.length - 1) };
+
+  let used = 0;
+  const shown: string[] = [];
+  for (let index = 0; index < clean.length; index += 1) {
+    const remainingAfter = clean.length - shown.length - 1;
+    const reserve = remainingAfter > 0 ? TAG_GAP + MORE_CHIP_WIDTH : 0;
+    const gap = shown.length ? TAG_GAP : 0;
+    const next = chipWidth(clean[index]);
+    if (shown.length > 0 && used + gap + next + reserve > width) break;
+    used += gap + Math.min(next, width);
+    shown.push(clean[index]);
+  }
+  return { shown, hidden: clean.length - shown.length };
+}
+
+function QueueTags({ tags }: { tags?: string[] }) {
+  const [width, setWidth] = useState(0);
+  const { shown, hidden } = tagsThatFit(tags || [], width);
+  if (shown.length === 0) return null;
+  return (
+    <View
+      style={styles.tagRow}
+      onLayout={(event) => {
+        const next = event.nativeEvent.layout.width;
+        setWidth((current) => (Math.abs(current - next) < 1 ? current : next));
+      }}>
+      {shown.map((tag) => (
+        <TagChip key={tag} tag={tag} style={styles.tagChip} textStyle={styles.tagText} />
+      ))}
+      {hidden > 0 ? (
+        <View style={styles.moreChip}>
+          <Text style={styles.moreChipText}>+{hidden}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 type Props = {
   revision: number;
@@ -121,7 +170,7 @@ export function HomeListenQueue({
   };
 
   const filters: { key: FilterKey; label: string; count: number }[] = [
-    { key: 'unheard', label: 'Unheard', count: counts.unheard },
+    { key: 'unheard', label: 'New', count: counts.unheard },
     { key: 'heard', label: 'Heard', count: counts.heard },
   ];
 
@@ -157,11 +206,11 @@ export function HomeListenQueue({
       ) : activeItems.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>
-            {filter === 'unheard' ? 'Nothing waiting' : 'Nothing heard yet'}
+            {filter === 'unheard' ? 'Nothing new' : 'Nothing heard yet'}
           </Text>
           <Text style={styles.emptyBody}>
             {filter === 'unheard'
-              ? 'Add a tune from Rising today or search. A tip you have not heard stays here too.'
+              ? 'Add a tune from Rising today or search. A tip or a play moves it on.'
               : 'A tune moves here after you listen for 30 seconds, or half the track.'}
           </Text>
           {filter === 'unheard' ? (
@@ -187,9 +236,7 @@ export function HomeListenQueue({
               <View style={styles.meta}>
                 <Text style={styles.track} numberOfLines={1}>{item.title}</Text>
                 <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
-                {item.tipped ? (
-                  <Text style={styles.chip}>Tipped {formatPoundsFromPence(item.userBidTotal)}</Text>
-                ) : null}
+                <QueueTags tags={item.tags} />
               </View>
               <Pressable
                 style={styles.iconBtn}
@@ -354,17 +401,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  chip: {
+  tagRow: {
     marginTop: 4,
-    alignSelf: 'flex-start',
-    color: '#e9d5ff',
-    backgroundColor: 'rgba(88, 28, 135, 0.55)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: TAG_GAP,
     overflow: 'hidden',
-    borderRadius: 999,
-    paddingHorizontal: 8,
+  },
+  tagChip: {
     paddingVertical: 2,
+  },
+  tagText: {
     fontSize: 11,
-    fontWeight: '600',
+  },
+  moreChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  moreChipText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
   },
   iconBtn: {
     width: 34,

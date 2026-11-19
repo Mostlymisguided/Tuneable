@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router, useFocusEffect, type Href } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
@@ -36,13 +36,6 @@ import {
 } from '@/src/lib/media';
 import { hasHomeLocation } from '@/src/lib/onboarding';
 import { canUploadMedia } from '@/src/lib/permissions';
-import {
-  championBadgeHref,
-  championBadgeKey,
-  championBadgeLocationLabel,
-  championBadgePrimaryLabel,
-  championBadgesFromResponse,
-} from '@/src/lib/championBadges';
 import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { useNotificationStore } from '@/src/stores/notificationStore';
 import { colors } from '@/src/theme/colors';
@@ -50,29 +43,9 @@ import {
   GLOBAL_PARTY_ID,
   type ChartMediaItem,
 } from '@/src/types/media';
-import {
-  type ChampionBadge,
-  type UserStats,
-} from '@/src/types/user';
+import { type UserStats } from '@/src/types/user';
 
 const RISING_PREVIEW_COUNT = 10;
-const HOME_BADGE_VISIBLE = 3;
-
-function badgeColors(rank: number) {
-  if (rank === 1) return { border: '#f59e0b', bg: '#fcd34d', text: '#fde68a' };
-  if (rank === 2) return { border: '#94a3b8', bg: '#cbd5e1', text: '#e2e8f0' };
-  if (rank === 3) return { border: '#b45309', bg: '#fdba74', text: '#fdba74' };
-  return { border: '#7c3aed', bg: '#a855f7', text: '#ddd6fe' };
-}
-
-type HomeBadge = {
-  key: string;
-  rank: number;
-  label: string;
-  locationLabel: string | null;
-  isPlace: boolean;
-  href: Href;
-};
 
 export default function HomeScreen() {
   const { user, updateBalance } = useAuth();
@@ -83,7 +56,6 @@ export default function HomeScreen() {
 
   const [rising, setRising] = useState<ChartMediaItem[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [championBadges, setChampionBadges] = useState<ChampionBadge[]>([]);
   const [loading, setLoading] = useState(true);
   const [queueRevision, setQueueRevision] = useState(0);
   const [activityRevision, setActivityRevision] = useState(0);
@@ -103,28 +75,6 @@ export default function HomeScreen() {
     [rising]
   );
 
-  const homeBadges = useMemo<HomeBadge[]>(
-    () =>
-      championBadges.flatMap((badge, index) => {
-        const href = championBadgeHref(badge);
-        if (!href) return [];
-        return [
-          {
-            key: championBadgeKey(badge, index),
-            rank: badge.rank,
-            label: championBadgePrimaryLabel(badge),
-            locationLabel: championBadgeLocationLabel(badge),
-            isPlace: badge.entityType === 'place',
-            href,
-          },
-        ];
-      }),
-    [championBadges]
-  );
-
-  const visibleBadges = homeBadges.slice(0, HOME_BADGE_VISIBLE);
-  const extraBadgeCount = Math.max(0, homeBadges.length - visibleBadges.length);
-
   const homeLabel = formatLocationLabel(user?.homeLocation);
   const locationSet = hasHomeLocation(user?.homeLocation);
   const placeHref = getPlaceProfileHref(user?.homeLocation?.placeId);
@@ -138,24 +88,14 @@ export default function HomeScreen() {
 
       const shell = (async () => {
         try {
-          const [chartRes, profileRes, championsRes] = await Promise.all([
+          const [chartRes, profileRes] = await Promise.all([
             partyAPI.getMediaSortedByTime(GLOBAL_PARTY_ID, 'today'),
             userId
               ? userAPI.getProfileById(userId).catch(() => null)
               : Promise.resolve(null),
-            userId
-              ? userAPI
-                  .getChampionTitles(userId, {
-                    mediaLimit: 8,
-                    checkMediaLimit: 40,
-                    badgeLimit: 8,
-                  })
-                  .catch(() => ({ tags: [], media: [], badges: [] }))
-              : Promise.resolve({ tags: [], media: [], badges: [] }),
           ]);
           setRising((chartRes.media ?? []).slice(0, RISING_PREVIEW_COUNT));
           setStats(profileRes?.stats ?? null);
-          setChampionBadges(championBadgesFromResponse(championsRes));
         } catch (err) {
           const message =
             err instanceof Error ? err.message : 'Failed to load home';
@@ -193,7 +133,7 @@ export default function HomeScreen() {
         sourceType: 'direct',
         position: 'start',
       });
-      showToast(`Added ${item.title} to Unheard`);
+      showToast(`Added ${item.title} to New`);
       setQueueRevision((current) => current + 1);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not add that tune');
@@ -298,53 +238,6 @@ export default function HomeScreen() {
           </View>
 
           <WelcomeCreditClaimCard />
-
-          {visibleBadges.length > 0 ? (
-            <View style={styles.badgeRow}>
-              {visibleBadges.map((badge) => {
-                const palette = badgeColors(badge.rank);
-                return (
-                  <Pressable
-                    key={badge.key}
-                    onPress={() => router.push(badge.href)}
-                    style={[
-                      styles.badge,
-                      {
-                        borderColor: palette.border,
-                        backgroundColor: `${palette.bg}22`,
-                      },
-                    ]}>
-                    <Ionicons
-                      name={badge.isPlace ? 'location' : 'trophy'}
-                      size={11}
-                      color={palette.border}
-                    />
-                    <Text style={styles.badgeRank}>#{badge.rank}</Text>
-                    <Text
-                      style={[styles.badgeLabel, { color: palette.text }]}
-                      numberOfLines={1}>
-                      {badge.label}
-                    </Text>
-                    {badge.locationLabel ? (
-                      <Text
-                        style={[styles.badgeLabel, { color: palette.text }]}
-                        numberOfLines={1}>
-                        {badge.locationLabel}
-                      </Text>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-              {extraBadgeCount > 0 ? (
-                <Pressable
-                  onPress={() => router.push('/(tabs)/profile')}
-                  style={styles.badgeMore}
-                  accessibilityLabel={`See ${extraBadgeCount} more badges`}>
-                  <Text style={styles.badgeMoreText}>+{extraBadgeCount}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
 
           <View style={styles.catalogLinks}>
             <Pressable
@@ -591,46 +484,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 14,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    maxWidth: '70%',
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  badgeRank: {
-    color: colors.text,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  badgeLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  badgeMore: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  badgeMoreText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
   },
   catalogLinks: {
     flexDirection: 'row',
