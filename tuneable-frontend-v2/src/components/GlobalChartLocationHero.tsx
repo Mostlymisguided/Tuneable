@@ -31,7 +31,6 @@ interface GlobalChartLocationHeroProps {
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
   popularLocationsLabel?: string;
-  showRankedBySupport?: boolean;
 }
 
 function chipLabel(loc: LocationQuickPick): string {
@@ -100,7 +99,6 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
   onLocationChange,
   locationQuickPicks,
   popularLocationsLabel,
-  showRankedBySupport = true,
 }) => {
   const locationLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
@@ -217,12 +215,6 @@ const GlobalChartLocationHero: React.FC<GlobalChartLocationHeroProps> = ({
           />
         </div>
       </div>
-
-      {showRankedBySupport && (
-        <p className="mt-3 text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase text-purple-300/50">
-          Ranked by support
-        </p>
-      )}
 
       {selectedLocation?.placeId && (
         <p className="text-xs text-purple-300 mt-3">

@@ -30,7 +30,6 @@ type Props = {
   onLocationScopeChange?: (scope: LocationScope) => void;
   onLocationChange: (location: ResolvedLocation | null) => void;
   locationQuickPicks: LocationQuickPick[];
-  showRankedBySupport?: boolean;
 };
 
 export function GlobalChartHero({
@@ -42,7 +41,6 @@ export function GlobalChartHero({
   onLocationScopeChange,
   onLocationChange,
   locationQuickPicks,
-  showRankedBySupport = true,
 }: Props) {
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const locationLabel = selectedLocation?.placeId
@@ -158,10 +156,6 @@ export function GlobalChartHero({
         selectedPlaceId={selectedLocation?.placeId}
         onSelect={onLocationChange}
       />
-
-      {showRankedBySupport ? (
-        <Text style={styles.rankedNote}>Ranked by support</Text>
-      ) : null}
 
       {selectedLocation?.placeId ? (
         <Text style={styles.filterNote}>
@@ -410,15 +404,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#fff',
-  },
-  rankedNote: {
-    marginTop: 10,
-    color: 'rgba(196, 181, 253, 0.55)',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    textAlign: 'center',
   },
   filterNote: {
     marginTop: 10,
