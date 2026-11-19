@@ -37,6 +37,15 @@ export type ActivityMediaRef = {
   contentForm?: string[];
 };
 
+export type ActivityPageInfo = {
+  page?: number;
+  limit?: number;
+  total?: number;
+  totalPages?: number;
+  offset?: number;
+  hasMore?: boolean;
+};
+
 export type TipHistoryResponse = {
   tips?: Array<{
     _id: string;
@@ -48,6 +57,7 @@ export type TipHistoryResponse = {
     mediaCoverArt?: string | null;
     media?: ActivityMediaRef | null;
   }>;
+  pagination?: ActivityPageInfo;
 };
 
 export type ListeningHistoryResponse = {
@@ -58,6 +68,7 @@ export type ListeningHistoryResponse = {
     countedAsPlay?: boolean;
     media?: ActivityMediaRef | null;
   }>;
+  pagination?: ActivityPageInfo;
 };
 
 export type ChampionPodiumEventsResponse = {
@@ -71,6 +82,7 @@ export type ChampionPodiumEventsResponse = {
     regainPence?: number | null;
     media?: ActivityMediaRef | null;
   }>;
+  hasMore?: boolean;
 };
 
 export type TuneBytesHistoryResponse = {
@@ -85,6 +97,7 @@ export type TuneBytesHistoryResponse = {
     media_uuid?: string | null;
     mediaId?: ActivityMediaRef | string | null;
   }>;
+  pagination?: ActivityPageInfo;
 };
 
 export type AmbassadorSummary = {
@@ -126,34 +139,55 @@ export const userAPI = {
     return response.data;
   },
 
-  getTipHistory: async (limit = 20): Promise<TipHistoryResponse> => {
+  getTipHistory: async (params?: {
+    limit?: number;
+    page?: number;
+    status?: string;
+  }): Promise<TipHistoryResponse> => {
     const response = await api.get<TipHistoryResponse>('/users/me/tip-history', {
-      params: { limit, sortBy: 'createdAt', sortOrder: 'desc' },
+      params: {
+        limit: params?.limit ?? 20,
+        page: params?.page ?? 1,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+        ...(params?.status ? { status: params.status } : {}),
+      },
     });
     return response.data;
   },
 
-  getListeningHistory: async (limit = 40): Promise<ListeningHistoryResponse> => {
+  getListeningHistory: async (params?: {
+    limit?: number;
+    page?: number;
+    countedAsPlay?: boolean;
+  }): Promise<ListeningHistoryResponse> => {
     const response = await api.get<ListeningHistoryResponse>('/users/me/listening-history', {
-      params: { limit },
+      params: {
+        limit: params?.limit ?? 40,
+        page: params?.page ?? 1,
+        ...(params?.countedAsPlay ? { countedAsPlay: 'true' } : {}),
+      },
     });
     return response.data;
   },
 
   getTuneBytesHistory: async (
     userId: string,
-    limit = 20
+    params?: { limit?: number; offset?: number }
   ): Promise<TuneBytesHistoryResponse> => {
     const response = await api.get<TuneBytesHistoryResponse>(
       `/users/${encodeURIComponent(userId)}/tunebytes/history`,
-      { params: { limit, offset: 0 } }
+      { params: { limit: params?.limit ?? 20, offset: params?.offset ?? 0 } }
     );
     return response.data;
   },
 
-  getChampionPodiumEvents: async (limit = 20): Promise<ChampionPodiumEventsResponse> => {
+  getChampionPodiumEvents: async (params?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<ChampionPodiumEventsResponse> => {
     const response = await api.get<ChampionPodiumEventsResponse>('/users/me/champion-podium', {
-      params: { limit },
+      params: { limit: params?.limit ?? 20, offset: params?.offset ?? 0 },
     });
     return response.data;
   },

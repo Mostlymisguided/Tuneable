@@ -2116,6 +2116,9 @@ router.get('/me/listening-history', authMiddleware, async (req, res) => {
     const query = { userId: req.user._id };
     if (status) query.status = status;
     if (sourceType) query.sourceType = sourceType;
+    if (req.query.countedAsPlay === 'true' || req.query.countedAsPlay === '1') {
+      query.countedAsPlay = true;
+    }
 
     const pageNumber = Math.max(1, parseInt(page, 10) || 1);
     const limitNumber = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
@@ -3000,7 +3003,8 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
         artist: media.artist,
         coverArt: media.coverArt,
         duration: media.duration,
-        tags: media.tags || []
+        tags: media.tags || [],
+        contentForm: media.contentForm || [],
       } : null,
       // Party details
       partyId: partyIdRaw,
@@ -3068,8 +3072,8 @@ router.get('/me/tip-history', authMiddleware, async (req, res) => {
 router.get('/me/champion-podium', authMiddleware, async (req, res) => {
   try {
     const { listForUser } = require('../services/championPodiumService');
-    const events = await listForUser(req.user._id, req.query.limit);
-    res.json({ events });
+    const page = await listForUser(req.user._id, req.query.limit, req.query.offset);
+    res.json(page);
   } catch (error) {
     console.error('Error fetching champion podium events:', error);
     res.status(500).json({ error: 'Error fetching champion podium events' });

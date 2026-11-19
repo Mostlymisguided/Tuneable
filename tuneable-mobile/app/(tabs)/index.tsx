@@ -17,7 +17,6 @@ import { DashboardPrompts } from '@/src/components/DashboardPrompts';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LibraryImportCards } from '@/src/components/LibraryImportCards';
-import { HomeListenQueue } from '@/src/components/HomeListenQueue';
 import { RecentActivityFeed } from '@/src/components/RecentActivityFeed';
 import { partyAPI } from '@/src/api/party';
 import { userAPI } from '@/src/api/user';
@@ -55,7 +54,6 @@ export default function HomeScreen() {
 
   const [rising, setRising] = useState<ChartMediaItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [queueRevision, setQueueRevision] = useState(0);
   const [activityRevision, setActivityRevision] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,8 +122,7 @@ export default function HomeScreen() {
         sourceType: 'direct',
         position: 'start',
       });
-      showToast(`Added ${item.title} to New`);
-      setQueueRevision((current) => current + 1);
+      showToast(`Added ${item.title} to your queue`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not add that tune');
     }
@@ -244,14 +241,6 @@ export default function HomeScreen() {
             revision={activityRevision}
             balancePence={user?.balance}
             defaultTipPounds={user?.preferences?.defaultTip ?? 1}
-            onBalanceUpdate={(balance) => {
-              updateBalance(balance);
-              setActivityRevision((current) => current + 1);
-            }}
-          />
-          <HomeListenQueue
-            revision={queueRevision}
-            user={user}
             onBalanceUpdate={(balance) => {
               updateBalance(balance);
               setActivityRevision((current) => current + 1);

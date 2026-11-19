@@ -147,22 +147,26 @@ async function loadTotalsForMedia(mediaIds) {
   return byMedia;
 }
 
-async function listForUser(userId, limit = 20) {
+async function listForUser(userId, limit = 20, offset = 0) {
   const objectId = asObjectId(userId);
-  if (!objectId) return [];
+  if (!objectId) return { events: [], hasMore: false };
   const size = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+  const skip = Math.max(0, parseInt(offset, 10) || 0);
   const events = await ChampionPodiumEvent.find({ userId: objectId })
-    .sort({ occurredAt: -1 })
-    .limit(size)
+    .sort({ occurredAt: -1, _id: -1 })
+    .skip(skip)
+    .limit(size + 1)
     .populate('mediaId', 'title artist coverArt uuid contentForm')
     .lean();
+  const hasMore = events.length > size;
+  if (hasMore) events.length = size;
 
   const lostMediaIds = events
     .filter((event) => event.kind === 'lost' && event.mediaId && typeof event.mediaId === 'object')
     .map((event) => event.mediaId._id);
   const standings = await loadTotalsForMedia(lostMediaIds);
 
-  return events.map((event) => {
+  const mapped = events.map((event) => {
     const media = event.mediaId && typeof event.mediaId === 'object' ? event.mediaId : null;
     const mediaKey = media ? String(media._id) : null;
     const regain = event.kind === 'lost' && media
@@ -186,6 +190,7 @@ async function listForUser(userId, limit = 20) {
       } : null,
     };
   });
+  return { events: mapped, hasMore };
 }
 
 module.exports = {
