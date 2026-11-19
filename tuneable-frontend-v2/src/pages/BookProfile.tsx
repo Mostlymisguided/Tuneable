@@ -14,6 +14,7 @@ import MediaChampions from '../components/MediaChampions';
 import { getReadElsewhereTarget } from '../utils/listenElsewhere';
 import { getTipCurrentLocation } from '../utils/currentLocationCache';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { resolveTipStatInputs } from '../utils/tipStats';
 import { usePageMeta } from '../seo/usePageMeta';
 import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 
@@ -88,6 +89,7 @@ const BookProfile: React.FC = () => {
 
   const elsewhere = book ? getReadElsewhereTarget(book) : null;
   const defaultTip = user?.preferences?.defaultTip || 1.11;
+  const tipStats = useMemo(() => resolveTipStatInputs(book, user), [book, user]);
 
   const handleConfirmTip = async (_tags: string[], amount: number) => {
     if (!book?._id) return;
@@ -195,6 +197,11 @@ const BookProfile: React.FC = () => {
         onClose={() => setShowTipModal(false)}
         onConfirm={handleConfirmTip}
         bidAmount={defaultTip}
+        avgTip={tipStats.avgTip}
+        championAggregate={tipStats.championAggregate}
+        viewerAggregate={tipStats.viewerAggregate}
+        viewerIsChampion={tipStats.viewerIsChampion}
+        viewerRank={tipStats.viewerRank}
         mediaTitle={book.title}
         mediaArtist={authors}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

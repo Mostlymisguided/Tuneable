@@ -44,6 +44,7 @@ import { formatLocationLabel } from '@/src/lib/location';
 import {
   buildTipStatChips,
   resolveTipStatInputs,
+  viewerChampionStatusLabel,
   type TipBidLike,
   type TipViewerLike,
 } from '@/src/lib/tipStats';
@@ -63,6 +64,8 @@ export type TipMediaLike = {
   partyMediaAggregateTopUser?: TipViewerLike | string | null;
   partyBids?: TipBidLike[] | null;
   minimumBid?: number | null;
+  /** Signed-in viewer's own aggregate in pence, when bids are not on this payload. */
+  viewerAggregatePence?: number | null;
 } | null;
 
 /** Slide-out of the native modal. Android does not fire Modal onDismiss. */
@@ -200,6 +203,12 @@ export function TipSheet({
         : null;
     return Math.max(0.01, fromMedia ?? minTip);
   }, [tipMedia, minTip]);
+
+  const championStatusLabel = viewerChampionStatusLabel(
+    tipStats.viewerRank,
+    tipStats.viewerIsChampion
+  );
+  const hasCurrentTip = (tipStats.viewerAggregate ?? 0) > 0;
 
   const tipChips = useMemo(
     () =>
@@ -425,6 +434,18 @@ export function TipSheet({
               <Text style={styles.subtitle} numberOfLines={1}>
                 {subtitle}
               </Text>
+            ) : null}
+            {hasCurrentTip || championStatusLabel ? (
+              <View style={styles.standing}>
+                {hasCurrentTip ? (
+                  <Text style={styles.standingText}>
+                    Your tip £{(tipStats.viewerAggregate ?? 0).toFixed(2)}
+                  </Text>
+                ) : null}
+                {championStatusLabel ? (
+                  <Text style={styles.standingChampion}>{championStatusLabel}</Text>
+                ) : null}
+              </View>
             ) : null}
             <Text style={styles.balance}>
               Balance {formatPoundsFromPence(liveBalancePence)}
@@ -736,6 +757,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: colors.textSecondary,
     fontSize: 14,
+  },
+  standing: {
+    marginTop: 8,
+    gap: 2,
+  },
+  standingText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  standingChampion: {
+    color: '#fde68a',
+    fontSize: 14,
+    fontWeight: '600',
   },
   balance: {
     marginTop: 10,

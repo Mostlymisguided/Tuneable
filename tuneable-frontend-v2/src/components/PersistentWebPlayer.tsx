@@ -909,6 +909,7 @@ const PersistentWebPlayer: React.FC = () => {
         championAggregate={currentMediaChampionTip?.championAggregate}
         viewerAggregate={currentMediaChampionTip?.viewerAggregate}
         viewerIsChampion={currentMediaChampionTip?.viewerIsChampion}
+        viewerRank={currentMediaChampionTip?.viewerRank}
         mediaTitle={currentMedia?.title || 'Unknown'}
         mediaArtist={currentMedia?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

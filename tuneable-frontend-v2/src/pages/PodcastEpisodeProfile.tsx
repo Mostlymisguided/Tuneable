@@ -3701,6 +3701,7 @@ const PodcastEpisodeProfile: React.FC = () => {
         championAggregate={mediaChampionTip?.championAggregate}
         viewerAggregate={mediaChampionTip?.viewerAggregate}
         viewerIsChampion={mediaChampionTip?.viewerIsChampion}
+        viewerRank={mediaChampionTip?.viewerRank}
         mediaTitle={media?.title || 'Unknown'}
         mediaArtist={
           seriesTitle

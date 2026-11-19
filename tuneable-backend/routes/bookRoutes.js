@@ -433,9 +433,21 @@ router.post('/:bookId/boost', authMiddleware, async (req, res) => {
     }
 
     const updatedBook = await Media.findById(bookId);
+    const serialized = serializeBook(updatedBook || book);
+    const totals = await Bid.aggregate([
+      {
+        $match: {
+          mediaId: book._id,
+          userId: new mongoose.Types.ObjectId(userId),
+          status: 'active',
+        },
+      },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    serialized.viewerAggregatePence = totals[0]?.total || bidAmountPence;
     res.json({
       message: 'Book boosted successfully!',
-      book: serializeBook(updatedBook || book),
+      book: serialized,
       updatedBalance: user.balance,
     });
   } catch (error) {
@@ -456,6 +468,19 @@ router.get('/:bookId', optionalAuthMiddleware, async (req, res) => {
     if (!book) return res.status(404).json({ error: 'Book not found' });
     await Media.ensureSlug(book);
     const [stamped] = await stampViewerTipped([serializeBook(book)], req.user?._id || null);
+    if (stamped && req.user?._id) {
+      const totals = await Bid.aggregate([
+        {
+          $match: {
+            mediaId: book._id,
+            userId: new mongoose.Types.ObjectId(req.user._id),
+            status: 'active',
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]);
+      stamped.viewerAggregatePence = totals[0]?.total || 0;
+    }
     res.json({ book: stamped });
   } catch (error) {
     console.error('Error loading book:', error);

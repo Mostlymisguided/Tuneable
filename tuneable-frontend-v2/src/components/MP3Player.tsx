@@ -777,6 +777,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         championAggregate={championTip?.championAggregate}
         viewerAggregate={championTip?.viewerAggregate}
         viewerIsChampion={championTip?.viewerIsChampion}
+        viewerRank={championTip?.viewerRank}
         mediaTitle={media.title}
         mediaArtist={media.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

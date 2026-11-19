@@ -1511,6 +1511,7 @@ const PodcastSeriesProfile: React.FC = () => {
         championAggregate={selectedEpisodeTipStats.championAggregate}
         viewerAggregate={selectedEpisodeTipStats.viewerAggregate}
         viewerIsChampion={selectedEpisodeTipStats.viewerIsChampion}
+        viewerRank={selectedEpisodeTipStats.viewerRank}
         mediaTitle={selectedEpisode?.title || ''}
         mediaArtist={series.host && series.host.length > 0 ? series.host[0].name : series.title}
         userBalance={user ? penceToPoundsNumber((user as any).balance) : 0}

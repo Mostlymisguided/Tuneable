@@ -3136,6 +3136,7 @@ Join here: ${inviteLink}`.trim();
         championAggregate={libraryChampionTip?.championAggregate}
         viewerAggregate={libraryChampionTip?.viewerAggregate}
         viewerIsChampion={libraryChampionTip?.viewerIsChampion}
+        viewerRank={libraryChampionTip?.viewerRank}
         mediaTitle={libraryItemToTip?.title || 'Unknown'}
         mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
@@ -3165,6 +3166,7 @@ Join here: ${inviteLink}`.trim();
         championAggregate={addTuneChampionTip?.championAggregate}
         viewerAggregate={addTuneChampionTip?.viewerAggregate}
         viewerIsChampion={addTuneChampionTip?.viewerIsChampion}
+        viewerRank={addTuneChampionTip?.viewerRank}
         mediaTitle={pendingAddTuneResult?.title || 'Unknown'}
         mediaArtist={pendingAddTuneResult?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

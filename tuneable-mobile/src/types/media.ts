@@ -119,6 +119,8 @@ export interface ChartMediaItem {
   };
   /** Signed-in viewer has an active tip on this media. */
   viewerTipped?: boolean;
+  /** Signed-in viewer's active tip total on this media, in pence. */
+  viewerAggregatePence?: number;
   bids?: Array<{
     _id?: string;
     amount?: number;

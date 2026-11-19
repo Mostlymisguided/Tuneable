@@ -859,6 +859,7 @@ const TagProfile: React.FC = () => {
         championAggregate={tipStats.championAggregate}
         viewerAggregate={tipStats.viewerAggregate}
         viewerIsChampion={tipStats.viewerIsChampion}
+        viewerRank={tipStats.viewerRank}
         mediaTitle={tipTarget?.title || ''}
         mediaArtist={
           tipTarget?.podcastSeries?.title || tipTarget?.podcastTitle || 'Podcast'

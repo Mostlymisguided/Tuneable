@@ -4801,6 +4801,7 @@ const UserProfile: React.FC = () => {
         championAggregate={libraryChampionTip?.championAggregate}
         viewerAggregate={libraryChampionTip?.viewerAggregate}
         viewerIsChampion={libraryChampionTip?.viewerIsChampion}
+        viewerRank={libraryChampionTip?.viewerRank}
         mediaTitle={libraryItemToTip?.title || 'Unknown'}
         mediaArtist={libraryItemToTip?.artist || 'Unknown Artist'}
         userBalance={penceToPoundsNumber((currentUser as any)?.balance)}
@@ -4828,6 +4829,7 @@ const UserProfile: React.FC = () => {
         championAggregate={addTuneChampionTip?.championAggregate}
         viewerAggregate={addTuneChampionTip?.viewerAggregate}
         viewerIsChampion={addTuneChampionTip?.viewerIsChampion}
+        viewerRank={addTuneChampionTip?.viewerRank}
         mediaTitle={pendingAddTuneResult?.title || 'Unknown'}
         mediaArtist={
           Array.isArray(pendingAddTuneResult?.artist)

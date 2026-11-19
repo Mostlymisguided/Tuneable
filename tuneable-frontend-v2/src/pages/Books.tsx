@@ -735,6 +735,7 @@ const Books: React.FC = () => {
         championAggregate={selectedBookTipStats.championAggregate}
         viewerAggregate={selectedBookTipStats.viewerAggregate}
         viewerIsChampion={selectedBookTipStats.viewerIsChampion}
+        viewerRank={selectedBookTipStats.viewerRank}
         mediaTitle={selectedBook?.title || ''}
         mediaArtist={selectedBook ? bookAuthorLine(selectedBook) : ''}
         userBalance={user ? penceToPoundsNumber(user.balance) : 0}

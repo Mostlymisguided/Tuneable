@@ -378,6 +378,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         championAggregate={tipStats.championAggregate}
         viewerAggregate={tipStats.viewerAggregate}
         viewerIsChampion={tipStats.viewerIsChampion}
+        viewerRank={tipStats.viewerRank}
         mediaTitle={itemToTip?.title || 'Unknown'}
         mediaArtist={itemToTip ? getCreatorDisplay(itemToTip) : undefined}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

@@ -227,7 +227,14 @@ export function HomeListenQueue({
         subtitle={tipTarget?.artist}
         balancePence={user?.balance ?? 0}
         defaultTipPounds={user?.preferences?.defaultTip ?? 1}
-        tipMedia={tipTarget ? { tags: tipTarget.tags } : null}
+        tipMedia={
+          tipTarget
+            ? {
+                tags: tipTarget.tags,
+                viewerAggregatePence: tipTarget.userBidTotal || 0,
+              }
+            : null
+        }
         onClose={() => setTipTarget(null)}
         onConfirm={confirmTip}
       />

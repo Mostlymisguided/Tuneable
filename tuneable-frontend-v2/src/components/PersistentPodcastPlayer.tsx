@@ -549,6 +549,7 @@ const PersistentPodcastPlayer: React.FC = () => {
         championAggregate={championTip?.championAggregate}
         viewerAggregate={championTip?.viewerAggregate}
         viewerIsChampion={championTip?.viewerIsChampion}
+        viewerRank={championTip?.viewerRank}
         mediaTitle={currentEpisode?.title || 'Unknown'}
         mediaArtist={currentEpisode?.artist || currentEpisode?.podcastTitle || currentEpisode?.podcastSeries?.title || 'Unknown show'}
         userBalance={penceToPoundsNumber((user as any)?.balance)}

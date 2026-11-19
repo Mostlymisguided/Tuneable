@@ -2014,6 +2014,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
         championAggregate: undefined as number | undefined,
         viewerAggregate: undefined as number | undefined,
         viewerIsChampion: false,
+        viewerRank: null as number | null,
       };
     }
     const resolved = resolveTipStatInputs(pendingMedia, user);
@@ -2031,6 +2032,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       championAggregate: resolved.championAggregate,
       viewerAggregate: resolved.viewerAggregate,
       viewerIsChampion: resolved.viewerIsChampion,
+      viewerRank: resolved.viewerRank,
     };
   }, [pendingMedia, isInlineBid, calculateAverageBid, user]);
 
@@ -3863,6 +3865,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           championAggregate={confirmationTipStats.championAggregate}
           viewerAggregate={confirmationTipStats.viewerAggregate}
           viewerIsChampion={confirmationTipStats.viewerIsChampion}
+          viewerRank={confirmationTipStats.viewerRank}
           mediaTitle={pendingMedia?.title || 'Unknown'}
           mediaArtist={Array.isArray(pendingMedia?.artist) 
             ? pendingMedia.artist[0]?.name || pendingMedia.artist[0] || 'Unknown Artist'

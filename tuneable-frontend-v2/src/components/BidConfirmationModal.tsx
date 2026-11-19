@@ -12,6 +12,7 @@ import { isGeolocationSupported } from '../utils/currentLocationCache';
 import { appendTipChips, isKnownElement, normalizeTipChipForDisplay } from '../utils/elementNormalizer';
 import { tagsMatch } from '../utils/tagNormalizer';
 import TipStatChips from './TipStatChips';
+import { viewerChampionStatusLabel } from '../utils/tipStats';
 import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
 import { TipAmountWheel, useCoarsePointer } from './TipAmountWheel';
 import WaveformBars, { waveformPeaksOf, type TipMoment } from './WaveformBars';
@@ -51,10 +52,12 @@ interface BidConfirmationModalProps {
   avgTip?: number;
   /** #1 tipper aggregate on this media (pounds). Enables the Champion shortcut. */
   championAggregate?: number;
-  /** Current user's aggregate on this media (pounds). Used to compute gap to #1. */
+  /** Current user's aggregate on this media (pounds). Shown when they have already tipped. */
   viewerAggregate?: number;
   /** True when the current user already holds #1. */
   viewerIsChampion?: boolean;
+  /** 1-based standing on this media. Used for champion #2 / #3 and "not a champion". */
+  viewerRank?: number | null;
   /** Tags pre-selected when the modal opens (e.g. the tag page the tip came from). */
   initialTags?: string[];
   /** Existing media tags. Shown unselected so the tipper can agree with them. */
@@ -78,6 +81,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   championAggregate,
   viewerAggregate = 0,
   viewerIsChampion = false,
+  viewerRank = null,
   initialTags,
   existingTags,
   waveformPeaks,
@@ -301,6 +305,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   if (!isOpen) return null;
 
   const hasInsufficientFunds = effectiveAmount > liveBalancePounds;
+  const championStatusLabel = viewerChampionStatusLabel(viewerRank, viewerIsChampion);
   const actionLabel = 'Tip';
   const actionLabelLower = 'tip';
 
@@ -334,6 +339,19 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
             <p className="text-amber-300/90 text-xs mt-2">
               This track is not playable yet. Your tip still adds support for this listing.
             </p>
+          )}
+          {(viewerAggregate > 0 || championStatusLabel) && (
+            <div className="mt-2 pt-2 border-t border-gray-600/80 space-y-0.5">
+              {viewerAggregate > 0 && (
+                <p className="text-sm text-gray-300">
+                  Your tip{' '}
+                  <span className="font-semibold text-white">£{viewerAggregate.toFixed(2)}</span>
+                </p>
+              )}
+              {championStatusLabel && (
+                <p className="text-sm font-medium text-amber-200">{championStatusLabel}</p>
+              )}
+            </div>
           )}
         </div>
 

@@ -18,7 +18,34 @@ export type ChampionTipContext = {
   viewerAggregate: number;
   /** True when the viewer currently holds #1 */
   viewerIsChampion: boolean;
+  /** 1-based standing among known tippers. Null when the viewer has no tip in this set. */
+  viewerRank: number | null;
 };
+
+/** Top three tippers hold a champion title. */
+const CHAMPION_PODIUM_SIZE = 3;
+
+function firstPositivePence(...values: Array<number | null | undefined>): number {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
+}
+
+/**
+ * Standing line for the confirm-tip modal.
+ * Null when this payload cannot place the viewer (no tip, or only the #1 total is known and it is not theirs).
+ */
+export function viewerChampionStatusLabel(
+  viewerRank: number | null | undefined,
+  viewerIsChampion = false
+): string | null {
+  const rank = viewerIsChampion ? 1 : viewerRank;
+  if (typeof rank !== 'number' || !Number.isFinite(rank) || rank < 1) return null;
+  if (rank === 1) return "You're the champion";
+  if (rank <= CHAMPION_PODIUM_SIZE) return `Champion #${rank}`;
+  return 'Not a champion';
+}
 
 export type TipStatChip =
   | { kind: 'set'; label: string; value: number; title: string }
@@ -94,14 +121,17 @@ export function computeChampionTipContext(
       return b.bidCount - a.bidCount;
     });
     const champion = ranked[0];
-    const viewerAgg = ranked.find((row) => keysOverlap(row.keys, viewerKeys));
+    const viewerIndex = ranked.findIndex((row) => keysOverlap(row.keys, viewerKeys));
+    const viewerAgg = viewerIndex >= 0 ? ranked[viewerIndex] : undefined;
     const viewerAggregatePence = viewerAgg?.totalPence ?? 0;
-    const viewerIsChampion = Boolean(viewerAgg && keysOverlap(champion.keys, viewerAgg.keys));
+    const viewerRank = viewerIndex >= 0 ? viewerIndex + 1 : null;
+    const viewerIsChampion = viewerRank === 1;
 
     return {
       championAggregate: champion.totalPence / 100,
       viewerAggregate: viewerAggregatePence / 100,
       viewerIsChampion,
+      viewerRank,
     };
   }
 
@@ -119,6 +149,7 @@ export function computeChampionTipContext(
     championAggregate: fallbackPence / 100,
     viewerAggregate: viewerIsChampion ? fallbackPence / 100 : 0,
     viewerIsChampion,
+    viewerRank: viewerIsChampion ? 1 : null,
   };
 }
 
@@ -157,6 +188,11 @@ export function resolveTipStatInputs(
     partyMediaAggregateTop?: number | null;
     partyMediaAggregateTopUser?: TipViewerLike | string | null;
     partyBids?: TipBidLike[] | null;
+    /**
+     * Signed-in viewer's own aggregate in pence.
+     * Used when the payload has no usable bid rows (book profile, home queue).
+     */
+    viewerAggregatePence?: number | null;
   } | null | undefined,
   viewer?: TipViewerLike
 ): {
@@ -164,9 +200,10 @@ export function resolveTipStatInputs(
   championAggregate?: number;
   viewerAggregate?: number;
   viewerIsChampion: boolean;
+  viewerRank: number | null;
 } {
   if (!media) {
-    return { viewerIsChampion: false };
+    return { viewerIsChampion: false, viewerRank: null };
   }
 
   const bids = Array.isArray(media.bids) && media.bids.length > 0
@@ -206,11 +243,18 @@ export function resolveTipStatInputs(
     }
   }
 
+  const explicitViewerPence = firstPositivePence(media.viewerAggregatePence);
+  let viewerAggregate = champion?.viewerAggregate ?? 0;
+  if (explicitViewerPence > 0) {
+    viewerAggregate = Math.round((explicitViewerPence / 100) * 100) / 100;
+  }
+
   return {
     avgTip,
     championAggregate: champion?.championAggregate,
-    viewerAggregate: champion?.viewerAggregate,
+    viewerAggregate: viewerAggregate > 0 ? viewerAggregate : champion?.viewerAggregate,
     viewerIsChampion: champion?.viewerIsChampion ?? false,
+    viewerRank: champion?.viewerRank ?? null,
   };
 }
 

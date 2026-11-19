@@ -4140,6 +4140,7 @@ const TuneProfile: React.FC = () => {
         championAggregate={mediaChampionTip?.championAggregate}
         viewerAggregate={mediaChampionTip?.viewerAggregate}
         viewerIsChampion={mediaChampionTip?.viewerIsChampion}
+        viewerRank={mediaChampionTip?.viewerRank}
         mediaTitle={media?.title || 'Unknown'}
         mediaArtist={media?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
@@ -4188,6 +4189,7 @@ const TuneProfile: React.FC = () => {
         championAggregate={recommendedTipStats.championAggregate}
         viewerAggregate={recommendedTipStats.viewerAggregate}
         viewerIsChampion={recommendedTipStats.viewerIsChampion}
+        viewerRank={recommendedTipStats.viewerRank}
         mediaTitle={recommendedItemToTip?.title || 'Unknown'}
         mediaArtist={recommendedItemToTip?.artist}
         userBalance={penceToPoundsNumber((user as any)?.balance)}
