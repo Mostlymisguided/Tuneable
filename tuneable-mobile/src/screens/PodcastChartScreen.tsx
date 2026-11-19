@@ -11,10 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, router } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
-import {
-  ADD_NEW_MEDIA_CTA,
-  ChartFilterToolbar,
-} from '@/src/components/ChartFilterToolbar';
+import { AddMediaPrompt } from '@/src/components/AddMediaPrompt';
+import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -272,16 +270,12 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
             />
 
             {searchQuery.trim() && filteredEpisodes.length > 0 ? (
-              <Pressable
+              <AddMediaPrompt
                 onPress={() => {
                   const q = searchQuery.trim();
                   router.push({ pathname: '/podcast-search', params: { q } });
                 }}
-                style={styles.addMediaInline}
-                accessibilityRole="button"
-                accessibilityLabel={ADD_NEW_MEDIA_CTA}>
-                <Text style={styles.addMediaText}>{ADD_NEW_MEDIA_CTA}</Text>
-              </Pressable>
+              />
             ) : null}
 
             {playableCount > 0 ? (
@@ -304,16 +298,12 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
         ListEmptyComponent={
           !loading ? (
             searchQuery.trim() && filteredEpisodes.length === 0 ? (
-              <Pressable
+              <AddMediaPrompt
                 onPress={() => {
                   const q = searchQuery.trim();
                   router.push({ pathname: '/podcast-search', params: { q } });
                 }}
-                style={styles.addMediaBtn}
-                accessibilityRole="button"
-                accessibilityLabel={ADD_NEW_MEDIA_CTA}>
-                <Text style={styles.addMediaText}>{ADD_NEW_MEDIA_CTA}</Text>
-              </Pressable>
+              />
             ) : (
               <Text style={styles.empty}>{emptyMessage}</Text>
             )
@@ -390,25 +380,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
-  },
-  addMediaBtn: {
-    alignSelf: 'center',
-    marginTop: 32,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  addMediaInline: {
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  addMediaText: {
-    color: '#c4b5fd',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   showMoreBtn: {
     alignSelf: 'center',

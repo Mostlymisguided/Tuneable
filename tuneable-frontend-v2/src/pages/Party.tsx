@@ -25,6 +25,7 @@ import { Play, CheckCircle, X, Music, Users, Clock, Coins, Loader2, Tag, Minus, 
 import MediaChampions from '../components/MediaChampions';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import GlobalChartLocationHero from '../components/GlobalChartLocationHero';
+import AddMediaPrompt from '../components/AddMediaPrompt';
 import {
   ChartSortPanel,
   ChartSortTrigger,
@@ -3589,19 +3590,12 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
 
                 {!showVetoed && !showSortedLoader && searchQuery.trim() && displayMedia.length === 0 && (
                   <div className="text-center py-12">
-                    <button
-                      type="button"
+                    <AddMediaPrompt
+                      loading={isSearchingNewMedia}
                       onClick={() => {
                         void handleAddMediaSearch();
                       }}
-                      disabled={isSearchingNewMedia}
-                      className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
-                    >
-                      {isSearchingNewMedia ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : null}
-                      Can't find it? Add New Media
-                    </button>
+                    />
                   </div>
                 )}
                 {!showVetoed && getPartyMedia().length === 0 && !(searchQuery.trim() && displayMedia.length === 0) && (

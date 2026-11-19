@@ -27,6 +27,7 @@ import {
   Upload,
   Crown
 } from 'lucide-react';
+import AddMediaPrompt from '../components/AddMediaPrompt';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { requireAuthToPlay } from '../utils/playAuth';
@@ -1958,23 +1959,18 @@ const Podcasts: React.FC = () => {
               </button>
             </div>
             {searchQuery.trim() && !showSearchResults && (
-              <div className="mt-2 text-center space-y-2">
+              <div className="mt-3 flex flex-col items-center gap-2">
                 {displayEpisodes.length > 0 && (
                   <p className="text-xs text-purple-300">
                     {displayEpisodes.length} episode{displayEpisodes.length !== 1 ? 's' : ''} in chart match
                   </p>
                 )}
-                <button
-                  type="button"
+                <AddMediaPrompt
+                  loading={isSearching}
                   onClick={() => {
                     void handleSearch();
                   }}
-                  disabled={isSearching}
-                  className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
-                >
-                  {isSearching ? <Loader className="h-4 w-4 animate-spin" /> : null}
-                  Can&apos;t find it? Add New Media
-                </button>
+                />
               </div>
             )}
 
@@ -2209,7 +2205,7 @@ const Podcasts: React.FC = () => {
             <div className="text-center py-16">
               <p className="text-gray-400">Nothing in this chart matches.</p>
               <p className="text-gray-500 text-sm mt-2">
-                Use Add New Media above to search Apple, Podcast Index, and Taddy.
+                Use Add Media above to search Apple, Podcast Index, and Taddy.
               </p>
             </div>
           ) : (

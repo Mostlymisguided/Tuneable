@@ -11,10 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
-import {
-  ADD_NEW_MEDIA_CTA,
-  ChartFilterToolbar,
-} from '@/src/components/ChartFilterToolbar';
+import { AddMediaPrompt } from '@/src/components/AddMediaPrompt';
+import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -324,16 +322,12 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
         ListEmptyComponent={
           !loading ? (
             searchQuery.trim() && matchingMedia.length === 0 ? (
-              <Pressable
+              <AddMediaPrompt
                 onPress={() => {
                   const q = searchQuery.trim();
                   router.push({ pathname: '/music-search', params: { q } });
                 }}
-                style={styles.addMediaBtn}
-                accessibilityRole="button"
-                accessibilityLabel={ADD_NEW_MEDIA_CTA}>
-                <Text style={styles.addMediaText}>{ADD_NEW_MEDIA_CTA}</Text>
-              </Pressable>
+              />
             ) : playableOnly && noPlayableWithCatalog ? (
               <View style={styles.emptyWrap}>
                 <Text style={styles.empty}>{emptyMessage}</Text>
@@ -420,18 +414,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textSecondary,
     marginTop: 32,
-  },
-  addMediaBtn: {
-    alignSelf: 'center',
-    marginTop: 32,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  addMediaText: {
-    color: '#c4b5fd',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   emptyWrap: {
     alignItems: 'center',

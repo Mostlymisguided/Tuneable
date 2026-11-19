@@ -22,8 +22,6 @@ import {
   chartSortLabel,
   type ChartSortKey,
 } from '@/src/lib/chartSort';
-export const ADD_NEW_MEDIA_CTA = "Can't find it? Add New Media";
-
 type PeriodOption = { key: string; label: string };
 
 type Props = {

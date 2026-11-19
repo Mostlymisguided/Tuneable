@@ -18,6 +18,7 @@ import { toast } from '../utils/toast';
 import { booksAPI, locationAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import BidConfirmationModal from '../components/BidConfirmationModal';
+import AddMediaPrompt from '../components/AddMediaPrompt';
 import BookQueueMediaCard, { bookAuthorLine, type BookChartCardData } from '../components/BookQueueMediaCard';
 import {
   ChartSortPanel,
@@ -672,16 +673,12 @@ const Books: React.FC = () => {
         ) : filteredBooks.length === 0 ? (
           searchQuery.trim() ? (
             <div className="text-center py-20">
-              <button
-                type="button"
+              <AddMediaPrompt
                 onClick={() => {
                   const q = searchQuery.trim();
                   navigate(`/books/search?q=${encodeURIComponent(q)}`);
                 }}
-                className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white transition-colors"
-              >
-                Can&apos;t find it? Add New Media
-              </button>
+              />
             </div>
           ) : (
           <div className="text-center py-20">
