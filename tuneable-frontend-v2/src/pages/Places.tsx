@@ -10,6 +10,7 @@ import { collectiveTypeLabel } from '../utils/collectiveTypes';
 import UserAvatar from '../components/UserAvatar';
 import TagList from '../components/TagList';
 import { TuneBytesMark } from '../components/TuneBytesMark';
+import { FlagRankBadge } from '../components/FlagRankBadge';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
 import {
   getPlaceProfilePath,
@@ -19,6 +20,7 @@ import {
   type LocationScope,
   type ResolvedLocation,
 } from '../utils/locationHelpers';
+import { countryNameForPlace } from '../utils/flagDesign';
 
 type PlaceChartItem = {
   placeId: string;
@@ -301,9 +303,11 @@ const Places: React.FC = () => {
                   to={path}
                   className="flex items-center gap-3 sm:gap-4 bg-black/20 border border-white/10 hover:border-purple-400/50 rounded-xl px-3 py-3 no-underline text-white transition-colors"
                 >
-                  <span className="w-8 h-8 rounded-full bg-purple-700/60 text-sm font-bold flex items-center justify-center flex-shrink-0">
-                    {index + 1}
-                  </span>
+                  <FlagRankBadge
+                    rank={index + 1}
+                    countryCode={place.countryCode}
+                    countryName={countryNameForPlace(place)}
+                  />
                   <MapPin className="h-4 w-4 text-purple-300 flex-shrink-0 hidden sm:block" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{place.name}</div>

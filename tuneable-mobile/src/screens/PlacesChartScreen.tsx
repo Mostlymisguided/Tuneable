@@ -25,6 +25,8 @@ import {
   type LocationScope,
 } from '@/src/lib/location';
 import { colors } from '@/src/theme/colors';
+import { FlagRankBadge } from '@/src/components/FlagRankBadge';
+import { countryNameForPlace } from '@/src/lib/flagDesign';
 import type { ResolvedLocation } from '@/src/types/user';
 
 export default function PlacesScreen() {
@@ -174,9 +176,11 @@ function PlaceChartRow({
       style={styles.row}
       accessibilityRole="button"
       accessibilityLabel={`${place.name}, ${formatTuneBytes(tuneBytesValue)} TuneBytes`}>
-      <View style={styles.rankCircle}>
-        <Text style={[styles.rank, rank >= 100 && styles.rankSmall]}>{rank}</Text>
-      </View>
+      <FlagRankBadge
+        rank={rank}
+        countryCode={place.countryCode}
+        countryName={countryNameForPlace(place)}
+      />
       <View style={styles.meta}>
         <Text style={styles.name} numberOfLines={1}>
           {place.name}
@@ -226,22 +230,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.cardBorder,
-  },
-  rankCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(126, 34, 206, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rank: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  rankSmall: {
-    fontSize: 11,
   },
   meta: {
     flex: 1,
