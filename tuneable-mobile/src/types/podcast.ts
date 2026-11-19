@@ -27,6 +27,24 @@ export interface PodcastEpisodeBid {
 
 export type PodcastCatalogSource = 'local' | 'taddy' | 'apple' | 'podcastindex';
 
+export type CatalogShowSource = 'apple' | 'taddy' | 'podcastindex';
+
+export interface CatalogShow {
+  key: string;
+  title: string;
+  author: string;
+  description: string;
+  image: string | null;
+  categories: string[];
+  language: string;
+  rssUrl: string;
+  sources: CatalogShowSource[];
+  appleId?: string;
+  iTunesId?: string;
+  taddyUuid?: string;
+  podcastIndexId?: string;
+}
+
 export interface PodcastEpisode {
   _id?: string;
   id?: string;

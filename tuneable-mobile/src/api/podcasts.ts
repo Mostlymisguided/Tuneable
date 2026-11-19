@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  CatalogShowSource,
   CreateOrFindSeriesResponse,
   ImportSingleEpisodeResponse,
   PodcastCatalogSource,
@@ -109,6 +110,29 @@ export const podcastsAPI = {
           q: query,
           max: params?.max ?? 25,
           page: params?.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  searchCatalogPodcasts: async (
+    source: CatalogShowSource,
+    query: string,
+    params?: { max?: number }
+  ): Promise<{ podcasts?: Array<Record<string, unknown>> }> => {
+    const path =
+      source === 'apple'
+        ? '/podcasts/discovery/apple/search-podcasts'
+        : source === 'taddy'
+          ? '/podcasts/discovery/taddy/search-podcasts'
+          : '/podcasts/discovery/podcastindex/search-podcasts';
+    const response = await api.get<{ podcasts?: Array<Record<string, unknown>> }>(
+      path,
+      {
+        params: {
+          q: query,
+          max: params?.max ?? 12,
         },
       }
     );

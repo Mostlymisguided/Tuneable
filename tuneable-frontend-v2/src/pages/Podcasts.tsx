@@ -50,6 +50,7 @@ import {
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { clarifyOAuthErrorMessage, isSpotifyAllowlistOAuthFailure } from '../utils/oauthErrorMessage';
 import { buildSpotifyRequestAccessPath } from '../utils/authHelpers';
+import { DEFAULT_COVER_ART } from '../constants';
 
 type SpotifyPodcastResolveStatus = 'rss_matched' | 'unresolved' | 'in_library';
 
@@ -185,6 +186,94 @@ function episodeMatchesLiveQuery(episode: PodcastEpisode, query: string): boolea
   return title.includes(q) || series.includes(q) || tags.includes(q);
 }
 
+type CatalogShowSource = 'apple' | 'taddy' | 'podcastindex';
+
+interface CatalogShow {
+  key: string;
+  title: string;
+  author: string;
+  description: string;
+  image: string | null;
+  categories: string[];
+  language: string;
+  rssUrl: string;
+  sources: CatalogShowSource[];
+  appleId?: string;
+  iTunesId?: string;
+  taddyUuid?: string;
+  podcastIndexId?: string;
+}
+
+const CATALOG_SOURCE_LABEL: Record<CatalogShowSource, string> = {
+  apple: 'Apple',
+  taddy: 'Taddy',
+  podcastindex: 'Podcast Index',
+};
+
+function catalogSourceLabel(sources: CatalogShowSource[]): string {
+  return sources.map((source) => CATALOG_SOURCE_LABEL[source]).join(' · ');
+}
+
+function normalizeCatalogShow(raw: any, source: CatalogShowSource): CatalogShow | null {
+  const title = String(raw?.title || '').trim();
+  if (!title) return null;
+  const author = String(raw?.author || '').trim();
+  const externalId = raw?.iTunesId ?? raw?.appleId ?? raw?.podcastIndexId ?? raw?.taddyUuid ?? title;
+  const appleId = raw?.iTunesId ?? raw?.appleId;
+  return {
+    key: `${source}:${externalId}`,
+    title,
+    author,
+    description: String(raw?.description || ''),
+    image: raw?.image || null,
+    categories: Array.isArray(raw?.categories) ? raw.categories.map((item: unknown) => String(item)) : [],
+    language: typeof raw?.language === 'string' ? raw.language : 'en',
+    rssUrl: typeof raw?.rssUrl === 'string' ? raw.rssUrl : '',
+    sources: [source],
+    appleId: appleId != null ? String(appleId) : undefined,
+    iTunesId: appleId != null ? String(appleId) : undefined,
+    taddyUuid: raw?.taddyUuid ? String(raw.taddyUuid) : undefined,
+    podcastIndexId: raw?.podcastIndexId != null ? String(raw.podcastIndexId) : undefined,
+  };
+}
+
+function mergeCatalogShows(shows: CatalogShow[]): CatalogShow[] {
+  const merged = new Map<string, CatalogShow>();
+  for (const show of shows) {
+    const key = `${show.title}|${show.author}`.toLowerCase().replace(/\s+/g, ' ').trim();
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...show, sources: [...show.sources] });
+      continue;
+    }
+    existing.sources = Array.from(new Set([...existing.sources, ...show.sources]));
+    existing.rssUrl = existing.rssUrl || show.rssUrl;
+    existing.image = existing.image || show.image;
+    existing.description = existing.description || show.description;
+    existing.appleId = existing.appleId || show.appleId;
+    existing.iTunesId = existing.iTunesId || show.iTunesId;
+    existing.taddyUuid = existing.taddyUuid || show.taddyUuid;
+    existing.podcastIndexId = existing.podcastIndexId || show.podcastIndexId;
+    if (!existing.categories.length) existing.categories = show.categories;
+  }
+  return Array.from(merged.values()).slice(0, 12);
+}
+
+async function readCatalogShows(
+  settled: PromiseSettledResult<Response>,
+  source: CatalogShowSource
+): Promise<CatalogShow[]> {
+  if (settled.status !== 'fulfilled' || !settled.value.ok) return [];
+  try {
+    const data = await settled.value.json();
+    return (data.podcasts || [])
+      .map((podcast: any) => normalizeCatalogShow(podcast, source))
+      .filter((show: CatalogShow | null): show is CatalogShow => Boolean(show));
+  } catch {
+    return [];
+  }
+}
+
 const TIME_RANGE_OPTIONS = [
   { key: 'all', label: 'All Time' },
   { key: 'year', label: 'This Year' },
@@ -252,6 +341,8 @@ const Podcasts: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [searchResults, setSearchResults] = useState<PodcastEpisode[]>([]);
+  const [catalogShows, setCatalogShows] = useState<CatalogShow[]>([]);
+  const [addingShowKey, setAddingShowKey] = useState<string | null>(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showImportSection, setShowImportSection] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
@@ -466,6 +557,7 @@ const Podcasts: React.FC = () => {
     if (!searchQuery.trim()) {
       setShowSearchResults(false);
       setSearchResults([]);
+      setCatalogShows([]);
     }
   }, [searchQuery]);
 
@@ -534,6 +626,7 @@ const Podcasts: React.FC = () => {
 
     setIsSearching(true);
     setShowSearchResults(true);
+    setCatalogShows([]);
     setSearchOffset(0);
     setTaddyPage(1);
     setHasMoreTaddy(false);
@@ -576,10 +669,17 @@ const Podcasts: React.FC = () => {
       appleParams.append('q', searchQuery);
       appleParams.append('max', '50');
 
-      const [localResponse, taddyResponse, appleResponse] = await Promise.allSettled([
+      const showParams = new URLSearchParams();
+      showParams.append('q', searchQuery.trim());
+      showParams.append('max', '12');
+
+      const [localResponse, taddyResponse, appleResponse, appleShowsRes, taddyShowsRes, indexShowsRes] = await Promise.allSettled([
         fetch(`${backendUrl}/api/podcasts/search-episodes?${localParams}`),
         fetch(`${backendUrl}/api/podcasts/discovery/taddy/search-episodes?${taddyParams}`),
-        fetch(`${backendUrl}/api/podcasts/discovery/apple/search-episodes?${appleParams}`)
+        fetch(`${backendUrl}/api/podcasts/discovery/apple/search-episodes?${appleParams}`),
+        fetch(`${backendUrl}/api/podcasts/discovery/apple/search-podcasts?${showParams}`),
+        fetch(`${backendUrl}/api/podcasts/discovery/taddy/search-podcasts?${showParams}`),
+        fetch(`${backendUrl}/api/podcasts/discovery/podcastindex/search-podcasts?${showParams}`)
       ]);
 
       if (localResponse.status === 'fulfilled' && localResponse.value.ok) {
@@ -623,22 +723,90 @@ const Podcasts: React.FC = () => {
       }
 
       setSearchResults(allResults);
+      const mergedShows = mergeCatalogShows(
+        (await Promise.all([
+          readCatalogShows(appleShowsRes, 'apple'),
+          readCatalogShows(taddyShowsRes, 'taddy'),
+          readCatalogShows(indexShowsRes, 'podcastindex'),
+        ])).flat()
+      );
+      setCatalogShows(mergedShows);
 
-      if (allResults.length === 0) {
-        toast.info('No episodes found. Try a different search term.');
+      if (allResults.length === 0 && mergedShows.length === 0) {
+        toast.info('No podcasts found. Try a different search term.');
+      } else if (mergedShows.length > 0 && allResults.length === 0) {
+        toast.success(`Found ${mergedShows.length} podcast${mergedShows.length === 1 ? '' : 's'} you can add`);
       } else {
         const sourceCounts = allResults.reduce((acc, ep) => {
           acc[ep.source || 'unknown'] = (acc[ep.source || 'unknown'] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
         const sources = Object.entries(sourceCounts).map(([source, count]) => `${source} (${count})`).join(', ');
-        toast.success(`Found ${allResults.length} episodes from: ${sources}`);
+        const showNote = mergedShows.length
+          ? ` and ${mergedShows.length} podcast${mergedShows.length === 1 ? '' : 's'}`
+          : '';
+        toast.success(`Found ${allResults.length} episodes${showNote} from: ${sources}`);
       }
     } catch (error: any) {
       console.error('Error searching:', error);
-      toast.error('Failed to search podcast episodes');
+      toast.error('Failed to search podcasts');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleAddCatalogShow = async (show: CatalogShow) => {
+    if (!user) {
+      toast.info('Please log in to add podcasts');
+      navigate('/login');
+      return;
+    }
+
+    setAddingShowKey(show.key);
+    try {
+      const token = localStorage.getItem('token');
+      const language = /^[a-z]{2}$/i.test(show.language) ? show.language : 'en';
+      const response = await fetch(
+        `${backendBase()}/api/podcasts/discovery/create-or-find-series`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            seriesData: {
+              title: show.title,
+              description: show.description,
+              author: show.author,
+              image: show.image,
+              categories: show.categories,
+              language,
+              rssUrl: show.rssUrl || undefined,
+              taddyUuid: show.taddyUuid,
+              podcastIndexId: show.podcastIndexId,
+              iTunesId: show.iTunesId,
+              appleId: show.appleId,
+            },
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add podcast');
+      }
+      if (!data.series?._id) {
+        throw new Error('Podcast was created without an id');
+      }
+
+      toast.success(`Added ${data.series.title || show.title}`);
+      navigate(`/podcast/${data.series._id}`);
+    } catch (error: any) {
+      console.error('Error adding podcast:', error);
+      toast.error(error.message || 'Failed to add podcast');
+    } finally {
+      setAddingShowKey(null);
     }
   };
 
@@ -1767,7 +1935,10 @@ const Podcasts: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.preventDefault();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void handleSearch();
+                  }
                 }}
                 placeholder="Filter by title, series, or tag"
                 className="flex-1 py-2.5 pl-2 pr-3 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm sm:text-base"
@@ -1786,10 +1957,25 @@ const Podcasts: React.FC = () => {
                 Import
               </button>
             </div>
-            {searchQuery.trim() && !showSearchResults && displayEpisodes.length > 0 && (
-              <p className="text-xs text-purple-300 mt-2 text-center">
-                {displayEpisodes.length} episode{displayEpisodes.length !== 1 ? 's' : ''} in chart match
-              </p>
+            {searchQuery.trim() && !showSearchResults && (
+              <div className="mt-2 text-center space-y-2">
+                {displayEpisodes.length > 0 && (
+                  <p className="text-xs text-purple-300">
+                    {displayEpisodes.length} episode{displayEpisodes.length !== 1 ? 's' : ''} in chart match
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSearch();
+                  }}
+                  disabled={isSearching}
+                  className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
+                >
+                  {isSearching ? <Loader className="h-4 w-4 animate-spin" /> : null}
+                  Can&apos;t find it? Add New Media
+                </button>
+              </div>
             )}
 
             {showImportSection ? (
@@ -1948,9 +2134,9 @@ const Podcasts: React.FC = () => {
               </div>
             ) : null}
 
-              {showSearchResults && searchResults.length > 0 && (
+              {showSearchResults && (searchResults.length > 0 || catalogShows.length > 0) && (
                 <button
-                  onClick={() => { setShowSearchResults(false); setSearchQuery(''); setSearchResults([]); }}
+                  onClick={() => { setShowSearchResults(false); setSearchQuery(''); setSearchResults([]); setCatalogShows([]); }}
                   className="mt-4 text-sm text-purple-400 hover:text-purple-300"
                 >
                   ← Back to Chart
@@ -1962,6 +2148,45 @@ const Podcasts: React.FC = () => {
         {/* Episode queue */}
         {showSearchResults && (
           <p className="text-center text-sm text-purple-300 mb-3">Search results</p>
+        )}
+
+        {showSearchResults && catalogShows.length > 0 && !isSearching && (
+          <div className="mb-6">
+            <p className="text-sm font-medium text-white mb-1">Podcasts you can add</p>
+            <p className="text-xs text-gray-400 mb-3">
+              These shows are from Apple, Podcast Index, and Taddy, including ones that are not in Tuneable yet.
+            </p>
+            <div className="space-y-2">
+              {catalogShows.map((show) => (
+                <div
+                  key={show.key}
+                  className="flex items-center gap-3 rounded-xl bg-gray-900/50 border border-white/10 p-3"
+                >
+                  <img
+                    src={show.image || DEFAULT_COVER_ART}
+                    alt=""
+                    className="h-14 w-14 rounded object-cover flex-shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-white font-medium truncate">{show.title}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {show.author || 'Unknown host'} · {catalogSourceLabel(show.sources)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleAddCatalogShow(show);
+                    }}
+                    disabled={addingShowKey === show.key}
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg text-sm font-medium flex-shrink-0"
+                  >
+                    {addingShowKey === show.key ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {isLoading || isSearching ? (
@@ -1976,19 +2201,16 @@ const Podcasts: React.FC = () => {
             }
           />
         ) : displayEpisodes.length === 0 ? (
-          searchQuery.trim() && !showSearchResults ? (
-            <div className="text-center py-20">
-              <button
-                type="button"
-                onClick={() => {
-                  void handleSearch();
-                }}
-                disabled={isSearching}
-                className="mx-auto flex items-center justify-center gap-2 text-sm font-semibold text-purple-300 hover:text-white disabled:text-gray-500 transition-colors"
-              >
-                {isSearching ? <Loader className="h-4 w-4 animate-spin" /> : null}
-                Can't find it? Add New Media
-              </button>
+          showSearchResults && catalogShows.length > 0 ? (
+            <p className="text-center text-gray-500 text-sm py-6">
+              No matching episodes yet. Add a podcast above to bring it into Tuneable.
+            </p>
+          ) : searchQuery.trim() && !showSearchResults ? (
+            <div className="text-center py-16">
+              <p className="text-gray-400">Nothing in this chart matches.</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Use Add New Media above to search Apple, Podcast Index, and Taddy.
+              </p>
             </div>
           ) : (
           <div className="text-center py-20">

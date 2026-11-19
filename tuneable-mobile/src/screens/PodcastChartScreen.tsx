@@ -221,6 +221,8 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
       <FlatList
         data={visibleEpisodes}
         keyExtractor={(item, index) => episodeId(item) || String(index)}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Math.max(96, contentPaddingBottom + 24) },
@@ -268,6 +270,19 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
               hasActiveFilters={filtersActive}
               searchPlaceholder="Title, series, or tag…"
             />
+
+            {searchQuery.trim() && filteredEpisodes.length > 0 ? (
+              <Pressable
+                onPress={() => {
+                  const q = searchQuery.trim();
+                  router.push({ pathname: '/podcast-search', params: { q } });
+                }}
+                style={styles.addMediaInline}
+                accessibilityRole="button"
+                accessibilityLabel={ADD_NEW_MEDIA_CTA}>
+                <Text style={styles.addMediaText}>{ADD_NEW_MEDIA_CTA}</Text>
+              </Pressable>
+            ) : null}
 
             {playableCount > 0 ? (
               <Pressable
@@ -380,6 +395,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 32,
     paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  addMediaInline: {
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 6,
     paddingHorizontal: 12,
   },
   addMediaText: {

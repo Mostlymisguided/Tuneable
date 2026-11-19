@@ -13,6 +13,11 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import {
+  KeyboardDoneAccessory,
+  KeyboardHideButton,
+  useHideKeyboardAccessory,
+} from '@/src/components/KeyboardDoneAccessory';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { podcastsAPI } from '@/src/api/podcasts';
@@ -26,17 +31,26 @@ import { episodeId, seriesTitle } from '@/src/lib/podcast';
 import {
   buildEpisodeImportPayload,
   buildSeriesCreatePayload,
+  catalogShowSourceLabel,
   importedEpisodeFromSearch,
   isExternalSearchEpisode,
   localSeriesId,
   markSearchEpisode,
+  mergeCatalogShows,
+  normalizeCatalogShow,
   podcastSearchCover,
   podcastSearchDedupeKey,
   podcastSearchEpisodeId,
   podcastSearchSourceLabel,
+  seriesDataFromCatalogShow,
 } from '@/src/lib/podcastSearch';
 import { colors } from '@/src/theme/colors';
-import type { PodcastEpisode } from '@/src/types/podcast';
+import {
+  DEFAULT_PODCAST_COVER,
+  type CatalogShow,
+  type CatalogShowSource,
+  type PodcastEpisode,
+} from '@/src/types/podcast';
 
 type FilterKey = 'all' | 'library' | 'catalog';
 
@@ -91,6 +105,8 @@ export default function PodcastSearchScreen() {
   const queryRef = useRef(query);
   queryRef.current = query;
   const [results, setResults] = useState<PodcastEpisode[]>([]);
+  const [shows, setShows] = useState<CatalogShow[]>([]);
+  const [addingShowKey, setAddingShowKey] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(Boolean(qParam?.trim()));
   const [loading, setLoading] = useState(Boolean(qParam?.trim()));
   const [loadingMore, setLoadingMore] = useState(false);
@@ -104,6 +120,7 @@ export default function PodcastSearchScreen() {
   const [localOffset, setLocalOffset] = useState(0);
   const [hasMoreTaddy, setHasMoreTaddy] = useState(false);
   const [taddyPage, setTaddyPage] = useState(1);
+  const keyboard = useHideKeyboardAccessory();
 
   const defaultTip = useMemo(
     () => user?.preferences?.defaultTip ?? 1.11,
@@ -125,6 +142,7 @@ export default function PodcastSearchScreen() {
     [results]
   );
   const catalogCount = results.length - libraryCount;
+  const visibleShows = filter === 'library' ? [] : shows;
 
   const performSearch = useCallback(async (rawQuery?: string) => {
     const q = (rawQuery ?? queryRef.current).trim();
@@ -137,16 +155,21 @@ export default function PodcastSearchScreen() {
     setError(null);
     setStatusNote(null);
     setResults([]);
+    setShows([]);
     setFilter('all');
     setHasMoreLocal(false);
     setHasMoreTaddy(false);
     setLocalOffset(0);
     setTaddyPage(1);
     try {
-      const [local, taddy, apple] = await Promise.all([
+      const catalogSources: CatalogShowSource[] = ['apple', 'podcastindex', 'taddy'];
+      const [local, taddy, apple, ...catalogBatches] = await Promise.all([
         settled(podcastsAPI.searchEpisodes(q, { limit: 50, offset: 0 })),
         settled(podcastsAPI.searchTaddyEpisodes(q, { max: 25, page: 1 })),
         settled(podcastsAPI.searchAppleEpisodes(q, { max: 50 })),
+        ...catalogSources.map((source) =>
+          settled(podcastsAPI.searchCatalogPodcasts(source, q, { max: 12 }))
+        ),
       ]);
 
       const items: PodcastEpisode[] = [];
@@ -172,13 +195,28 @@ export default function PodcastSearchScreen() {
 
       const merged = mergeUnique([], items);
       setResults(merged);
+      const catalogShows = mergeCatalogShows(
+        catalogBatches.flatMap((batch, index) => {
+          if (!batch.ok) return [];
+          const source = catalogSources[index];
+          return (batch.value.podcasts ?? [])
+            .map((podcast) => normalizeCatalogShow(podcast, source))
+            .filter((show): show is CatalogShow => Boolean(show));
+        })
+      );
+      setShows(catalogShows);
 
       const localHits = merged.filter((ep) => !isExternalSearchEpisode(ep)).length;
       const catalogHits = merged.length - localHits;
-      if (merged.length > 0) {
+      if (merged.length > 0 || catalogShows.length > 0) {
         const parts = [];
+        if (catalogShows.length) {
+          parts.push(
+            `${catalogShows.length} podcast${catalogShows.length === 1 ? '' : 's'}`
+          );
+        }
         if (localHits) parts.push(`${localHits} in Tuneable`);
-        if (catalogHits) parts.push(`${catalogHits} from catalogs`);
+        if (catalogHits) parts.push(`${catalogHits} episodes from catalogs`);
         setStatusNote(`Found ${parts.join(' · ')}`);
       } else if (!local.ok && !taddy.ok && !apple.ok) {
         setError('Search failed. Try again in a moment.');
@@ -272,6 +310,28 @@ export default function PodcastSearchScreen() {
       setError(getApiErrorMessage(err, 'Could not open episode'));
     } finally {
       setOpeningKey(null);
+    }
+  };
+
+  const addShow = async (show: CatalogShow) => {
+    if (!user) {
+      Alert.alert('Log in to add podcasts', 'Sign in, then add this show to Tuneable.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log in', onPress: () => router.push('/login') },
+      ]);
+      return;
+    }
+    setAddingShowKey(show.key);
+    setError(null);
+    try {
+      const res = await podcastsAPI.createOrFindSeries(seriesDataFromCatalogShow(show));
+      const id = res.series?._id;
+      if (!id) throw new Error('Could not add this podcast.');
+      router.push(`/show/${id}`);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not add podcast'));
+    } finally {
+      setAddingShowKey(null);
     }
   };
 
@@ -375,8 +435,12 @@ export default function PodcastSearchScreen() {
             autoFocus
             returnKeyType="search"
             onSubmitEditing={() => void performSearch()}
+            inputAccessoryViewID={keyboard.nativeID}
+            onFocus={keyboard.onFocus}
+            onBlur={keyboard.onBlur}
             editable={!busy}
           />
+          <KeyboardHideButton visible={keyboard.focused} />
         </View>
         <Pressable
           style={[styles.searchBtn, busy && styles.disabled]}
@@ -389,6 +453,12 @@ export default function PodcastSearchScreen() {
           )}
         </Pressable>
       </View>
+      <KeyboardDoneAccessory
+        nativeID={keyboard.nativeID}
+        icon="chevron-down"
+        label="Hide"
+        accessibilityLabel="Hide keyboard"
+      />
 
       {statusNote ? <Text style={styles.status}>{statusNote}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -423,6 +493,49 @@ export default function PodcastSearchScreen() {
 
       <FlatList
         data={filteredResults}
+        ListHeaderComponent={
+          visibleShows.length > 0 ? (
+            <View style={styles.showsBlock}>
+              <Text style={styles.showsHeading}>Podcasts you can add</Text>
+              <Text style={styles.showsHint}>
+                Shows from Apple, Podcast Index, and Taddy, including ones that are not in Tuneable yet.
+              </Text>
+              {visibleShows.map((show) => {
+                const adding = addingShowKey === show.key;
+                return (
+                  <View key={show.key} style={styles.showRowCard}>
+                    <Image
+                      source={{ uri: show.image || DEFAULT_PODCAST_COVER }}
+                      style={styles.showCover}
+                    />
+                    <View style={styles.showMeta}>
+                      <Text style={styles.showName} numberOfLines={2}>
+                        {show.title}
+                      </Text>
+                      <Text style={styles.showAuthor} numberOfLines={1}>
+                        {show.author || 'Unknown host'} · {catalogShowSourceLabel(show.sources)}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={[styles.addShowBtn, adding && styles.disabled]}
+                      disabled={adding}
+                      onPress={() => void addShow(show)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add ${show.title}`}>
+                      {adding ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={styles.addShowText}>Add</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null
+        }
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         keyExtractor={(item, index) =>
           podcastSearchEpisodeId(item) || String(index)
         }
@@ -443,7 +556,9 @@ export default function PodcastSearchScreen() {
               <Text style={styles.emptyTitle}>
                 {filter !== 'all' && results.length > 0
                   ? `No ${filter} matches`
-                  : 'No episodes found'}
+                  : visibleShows.length > 0
+                    ? 'No matching episodes'
+                    : 'No podcasts found'}
               </Text>
               <Text style={styles.empty}>
                 {filter !== 'all' && results.length > 0
@@ -605,6 +720,63 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: '800',
+  },
+  showsBlock: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  showsHeading: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  showsHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  showRowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(17, 24, 39, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  showCover: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: '#1f2937',
+  },
+  showMeta: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  showName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  showAuthor: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  addShowBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.accent,
+    minWidth: 64,
+    alignItems: 'center',
+  },
+  addShowText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   searchRow: {
     flexDirection: 'row',
