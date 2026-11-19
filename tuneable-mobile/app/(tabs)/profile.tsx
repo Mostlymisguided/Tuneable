@@ -122,6 +122,8 @@ export default function ProfileScreen() {
       <FlatList
         data={[{ key: 'library' }]}
         keyExtractor={(item) => item.key}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Math.max(24, contentPaddingBottom) },

@@ -252,6 +252,8 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
       <FlatList
         data={visibleMedia}
         keyExtractor={(item, index) => mediaId(item) || String(index)}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Math.max(96, contentPaddingBottom + 24) },

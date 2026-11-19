@@ -213,6 +213,8 @@ export function BookChartScreen({ onChartKindChange }: Props) {
       <FlatList
         data={visibleBooks}
         keyExtractor={(item, index) => mediaId(item) || String(index)}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Math.max(96, contentPaddingBottom + 24) },

@@ -14,6 +14,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { EditMediaButton } from '@/src/components/EditMediaButton';
+import {
+  KeyboardDoneAccessory,
+  KeyboardHideButton,
+  useHideKeyboardAccessory,
+} from '@/src/components/KeyboardDoneAccessory';
 import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
@@ -81,6 +86,7 @@ export default function PodcastShowScreen() {
   const [tipTarget, setTipTarget] = useState<PodcastEpisode | null>(null);
   const [sortBy, setSortBy] = useState<PodcastShowSortKey>('mostTipped');
   const [searchInput, setSearchInput] = useState('');
+  const keyboard = useHideKeyboardAccessory();
   const [searchQuery, setSearchQuery] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -550,8 +556,12 @@ export default function PodcastShowScreen() {
                   autoCorrect={false}
                   returnKeyType="search"
                   clearButtonMode="while-editing"
+                  inputAccessoryViewID={keyboard.nativeID}
+                  onFocus={keyboard.onFocus}
+                  onBlur={keyboard.onBlur}
                   accessibilityLabel="Search this show’s catalogue"
                 />
+                <KeyboardHideButton visible={keyboard.focused} />
                 {searchInput.length > 0 ? (
                   <Pressable
                     onPress={() => setSearchInput('')}
@@ -566,6 +576,12 @@ export default function PodcastShowScreen() {
                   </Pressable>
                 ) : null}
               </View>
+              <KeyboardDoneAccessory
+                nativeID={keyboard.nativeID}
+                icon="chevron-down"
+                label="Hide"
+                accessibilityLabel="Hide keyboard"
+              />
               {searchQuery && (loadingEpisodes || episodes.length > 0) ? (
                 <Text style={styles.searchMeta}>
                   {loadingEpisodes && episodes.length === 0

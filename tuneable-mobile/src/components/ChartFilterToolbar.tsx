@@ -11,6 +11,11 @@ import {
   isBpmFilterActive,
 } from '@/src/lib/chartFilters';
 import { BpmRangePicker } from '@/src/components/BpmRangePicker';
+import {
+  KeyboardDoneAccessory,
+  KeyboardHideButton,
+  useHideKeyboardAccessory,
+} from '@/src/components/KeyboardDoneAccessory';
 import { TIME_PERIODS, type TimePeriodKey } from '@/src/types/media';
 import {
   CHART_SORT_OPTIONS,
@@ -86,6 +91,7 @@ export function ChartFilterToolbar({
   onPlayableOnlyChange,
   showPlayable = false,
 }: Props) {
+  const keyboard = useHideKeyboardAccessory();
   const selectedTags = getSelectedTagFilters(selectedTagTerms);
   const topTagsPreview = topTags.slice(0, 8);
   const periodLabel =
@@ -122,9 +128,19 @@ export function ChartFilterToolbar({
             clearButtonMode="while-editing"
             returnKeyType="search"
             blurOnSubmit
+            inputAccessoryViewID={keyboard.nativeID}
+            onFocus={keyboard.onFocus}
+            onBlur={keyboard.onBlur}
             accessibilityLabel={searchPlaceholder}
           />
+          <KeyboardHideButton visible={keyboard.focused} />
         </View>
+        <KeyboardDoneAccessory
+          nativeID={keyboard.nativeID}
+          icon="chevron-down"
+          label="Hide"
+          accessibilityLabel="Hide keyboard"
+        />
         {searchHint ? <Text style={styles.searchHint}>{searchHint}</Text> : null}
       </View>
 

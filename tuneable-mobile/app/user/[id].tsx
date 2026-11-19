@@ -197,6 +197,8 @@ export default function PublicUserProfileScreen() {
         </View>
       ) : user ? (
         <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

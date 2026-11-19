@@ -13,6 +13,11 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import {
+  KeyboardDoneAccessory,
+  KeyboardHideButton,
+  useHideKeyboardAccessory,
+} from '@/src/components/KeyboardDoneAccessory';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
@@ -96,6 +101,7 @@ export default function MusicSearchScreen() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const keyboard = useHideKeyboardAccessory();
 
   const defaultTip = useMemo(
     () => user?.preferences?.defaultTip ?? 1,
@@ -318,8 +324,12 @@ export default function MusicSearchScreen() {
             autoFocus
             returnKeyType="search"
             onSubmitEditing={() => void performSearch()}
+            inputAccessoryViewID={keyboard.nativeID}
+            onFocus={keyboard.onFocus}
+            onBlur={keyboard.onBlur}
             editable={!busy}
           />
+          <KeyboardHideButton visible={keyboard.focused} />
         </View>
         <Pressable
           style={[styles.searchBtn, busy && styles.disabled]}
@@ -332,6 +342,12 @@ export default function MusicSearchScreen() {
           )}
         </Pressable>
       </View>
+      <KeyboardDoneAccessory
+        nativeID={keyboard.nativeID}
+        icon="chevron-down"
+        label="Hide"
+        accessibilityLabel="Hide keyboard"
+      />
 
       {statusNote ? <Text style={styles.status}>{statusNote}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -367,6 +383,8 @@ export default function MusicSearchScreen() {
       <FlatList
         data={filteredResults}
         keyExtractor={(item, index) => searchResultId(item) || String(index)}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.list,
           { paddingBottom: Math.max(24, contentPaddingBottom) },
