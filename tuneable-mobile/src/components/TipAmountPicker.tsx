@@ -30,11 +30,42 @@ function withPads(length: number): WheelItem[] {
   return items;
 }
 
+/** Odd so the pence column has a middle copy to rest in. Outer copies are the loop buffer. */
+const LOOP_REPEATS = 9;
+
+function mod(value: number, count: number): number {
+  return ((value % count) + count) % count;
+}
+
+/** Move a scroll offset by whole cycles until it sits in [min, max). */
+function shiftOffsetInto(offset: number, min: number, max: number, cycle: number): number {
+  if (cycle <= 0) return offset;
+  let next = offset;
+  let guard = 0;
+  while (next < min && guard < LOOP_REPEATS) {
+    next += cycle;
+    guard += 1;
+  }
+  guard = 0;
+  while (next >= max && guard < LOOP_REPEATS) {
+    next -= cycle;
+    guard += 1;
+  }
+  return next;
+}
+
+function withRepeatedPads(length: number, repeats: number): WheelItem[] {
+  const items: WheelItem[] = [null, null];
+  for (let n = 0; n < length * repeats; n += 1) items.push(n % length);
+  items.push(null, null);
+  return items;
+}
+
 const POUND_ITEMS = withPads(MAX_TIP_POUNDS + 1);
-const PENCE_ITEMS = withPads(100);
+const PENCE_ITEMS = withRepeatedPads(100, LOOP_REPEATS);
 
 function keyOf(item: WheelItem, index: number): string {
-  return item == null ? `pad-${index}` : `v-${item}`;
+  return item == null ? `pad-${index}` : `v-${index}`;
 }
 
 const renderPounds: ListRenderItem<WheelItem> = ({ item }) => (
@@ -66,6 +97,8 @@ type WheelProps = {
   renderItem: ListRenderItem<WheelItem>;
   onSelect: (value: number) => void;
   disabled?: boolean;
+  /** Repeat the values so the column rolls from the last item back to the first. */
+  loop?: boolean;
   accessibilityLabel: string;
 };
 
@@ -77,12 +110,14 @@ function Wheel({
   renderItem,
   onSelect,
   disabled,
+  loop = false,
   accessibilityLabel,
 }: WheelProps) {
+  const loopBase = loop ? count * Math.floor(LOOP_REPEATS / 2) : 0;
   const listRef = useRef<FlatList<WheelItem>>(null);
   const selectedRef = useRef(selected);
   const lastEmitted = useRef(selected);
-  const offsetRef = useRef(selected * ITEM_HEIGHT);
+  const offsetRef = useRef((loopBase + selected) * ITEM_HEIGHT);
   const dragging = useRef(false);
   const snapping = useRef(false);
   const animateChanges = useRef(false);
@@ -97,8 +132,8 @@ function Wheel({
   };
 
   const scrollToValue = (index: number, animated: boolean) => {
-    const clamped = Math.max(0, Math.min(count - 1, index));
-    const offset = clamped * ITEM_HEIGHT;
+    const value = loop ? mod(index, count) : Math.max(0, Math.min(count - 1, index));
+    const offset = (loop ? loopBase + value : value) * ITEM_HEIGHT;
     snapping.current = true;
     if (snapTimer.current) clearTimeout(snapTimer.current);
     listRef.current?.scrollToOffset({ offset, animated });
@@ -114,8 +149,9 @@ function Wheel({
   const settle = (offsetY: number) => {
     if (snapping.current) return;
     dragging.current = false;
-    const index = Math.max(0, Math.min(count - 1, Math.round(offsetY / ITEM_HEIGHT)));
-    const aligned = index * ITEM_HEIGHT;
+    const raw = Math.round(offsetY / ITEM_HEIGHT);
+    const index = loop ? mod(raw, count) : Math.max(0, Math.min(count - 1, raw));
+    const aligned = (loop ? loopBase + index : index) * ITEM_HEIGHT;
     if (index !== selectedRef.current) {
       lastEmitted.current = index;
       onSelect(index);
@@ -157,7 +193,23 @@ function Wheel({
   }, [selected]);
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = event.nativeEvent.contentOffset.y;
+    let y = event.nativeEvent.contentOffset.y;
+    if (loop && !snapping.current) {
+      const cycle = count * ITEM_HEIGHT;
+      const folded = shiftOffsetInto(y, cycle, cycle * (LOOP_REPEATS - 1), cycle);
+      if (Math.abs(folded - y) > 0.5) {
+        y = folded;
+        snapping.current = true;
+        offsetRef.current = y;
+        listRef.current?.scrollToOffset({ offset: y, animated: false });
+        if (snapTimer.current) clearTimeout(snapTimer.current);
+        snapTimer.current = setTimeout(() => {
+          snapping.current = false;
+          if (!dragging.current) settle(offsetRef.current);
+        }, 80);
+        return;
+      }
+    }
     const moved = Math.abs(y - offsetRef.current) > 0.5;
     offsetRef.current = y;
     if (dragging.current || snapping.current || !moved) return;
@@ -203,7 +255,7 @@ function Wheel({
       renderItem={renderItem}
       style={{ width, height: PICKER_HEIGHT }}
       getItemLayout={getItemLayout}
-      initialScrollIndex={Math.min(selected, data.length - 1)}
+      initialScrollIndex={Math.min(loopBase + selected, data.length - 1)}
       snapToInterval={ITEM_HEIGHT}
       snapToAlignment="start"
       decelerationRate="fast"
@@ -213,9 +265,9 @@ function Wheel({
       bounces={false}
       overScrollMode="never"
       removeClippedSubviews={false}
-      initialNumToRender={11}
-      maxToRenderPerBatch={16}
-      windowSize={7}
+      initialNumToRender={loop ? 31 : 11}
+      maxToRenderPerBatch={loop ? 48 : 16}
+      windowSize={loop ? 15 : 7}
       scrollEventThrottle={16}
       accessibilityLabel={accessibilityLabel}
       onScroll={onScroll}
@@ -223,6 +275,12 @@ function Wheel({
       onScrollEndDrag={onScrollEndDrag}
       onMomentumScrollEnd={onMomentumScrollEnd}
       onScrollToIndexFailed={(info) => {
+        if (loop) {
+          const offset = info.index * ITEM_HEIGHT;
+          offsetRef.current = offset;
+          listRef.current?.scrollToOffset({ offset, animated: false });
+          return;
+        }
         scrollToValue(info.index, false);
       }}
     />
@@ -290,6 +348,7 @@ function TipAmountPickerInner({ value, onChange, disabled }: Props) {
           onSelect={selectPence}
           disabled={disabled}
           accessibilityLabel="Pence"
+          loop
         />
         <View style={styles.side} />
       </View>

@@ -8,6 +8,29 @@ const VIEW_HEIGHT = ITEM_HEIGHT * (PAD * 2 + 1);
 
 const POUND_COUNT = MAX_TIP_POUNDS + 1;
 const PENCE_COUNT = 100;
+/** Odd so the pence column has a middle copy to rest in. Outer copies are the loop buffer. */
+const LOOP_REPEATS = 9;
+
+function mod(value: number, count: number): number {
+  return ((value % count) + count) % count;
+}
+
+/** Move a scroll offset by whole cycles until it sits in [min, max). */
+function shiftOffsetInto(offset: number, min: number, max: number, cycle: number): number {
+  if (cycle <= 0) return offset;
+  let next = offset;
+  let guard = 0;
+  while (next < min && guard < LOOP_REPEATS) {
+    next += cycle;
+    guard += 1;
+  }
+  guard = 0;
+  while (next >= max && guard < LOOP_REPEATS) {
+    next -= cycle;
+    guard += 1;
+  }
+  return next;
+}
 
 function formatPounds(value: number): string {
   return String(value);
@@ -43,6 +66,8 @@ type ColumnProps = {
   widthClass: string;
   label: string;
   disabled?: boolean;
+  /** Repeat the values so the column rolls from the last item back to the first. */
+  loop?: boolean;
 };
 
 function AmountColumn({
@@ -54,6 +79,7 @@ function AmountColumn({
   widthClass,
   label,
   disabled,
+  loop = false,
 }: ColumnProps) {
   const ref = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(selected);
@@ -63,6 +89,11 @@ function AmountColumn({
   const onSelectRef = useRef(onSelect);
   selectedRef.current = selected;
   onSelectRef.current = onSelect;
+
+  const repeats = loop ? LOOP_REPEATS : 1;
+  const loopBase = loop ? count * Math.floor(LOOP_REPEATS / 2) : 0;
+  const itemCount = count * repeats;
+  const cycle = count * ITEM_HEIGHT;
 
   const jumpTo = (index: number) => {
     const el = ref.current;
@@ -74,14 +105,38 @@ function AmountColumn({
     }, 60);
   };
 
+  // Keep a long drag or trackpad scroll off the real ends. Shifting by a whole
+  // cycle shows the same numbers, so the column can keep rolling.
+  const holdAwayFromEnds = (el: HTMLDivElement) => {
+    if (!loop) return;
+    const next = shiftOffsetInto(el.scrollTop, cycle, cycle * (LOOP_REPEATS - 1), cycle);
+    if (Math.abs(next - el.scrollTop) <= 1) return;
+    programmatic.current = true;
+    el.scrollTop = next;
+    programmatic.current = false;
+  };
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const top = selected * ITEM_HEIGHT;
-    if (lastEmitted.current === selected && Math.abs(el.scrollTop - top) <= 1) return;
+    if (!loop) {
+      const top = selected * ITEM_HEIGHT;
+      if (lastEmitted.current === selected && Math.abs(el.scrollTop - top) <= 1) return;
+      lastEmitted.current = selected;
+      jumpTo(selected);
+      return;
+    }
+    const shown = mod(Math.round(el.scrollTop / ITEM_HEIGHT), count);
+    // A one-step wrap already scrolled onto the repeated neighbour. Keep that
+    // row. scrollTop 0 is the initial position, which has no room above it.
+    if (shown === selected && el.scrollTop > ITEM_HEIGHT) {
+      lastEmitted.current = selected;
+      holdAwayFromEnds(el);
+      return;
+    }
     lastEmitted.current = selected;
-    jumpTo(selected);
-  }, [selected]);
+    jumpTo(loopBase + selected);
+  }, [count, loop, loopBase, selected]);
 
   useEffect(() => {
     const el = ref.current;
@@ -89,8 +144,11 @@ function AmountColumn({
 
     const settle = () => {
       if (programmatic.current) return;
-      const index = Math.max(0, Math.min(count - 1, Math.round(el.scrollTop / ITEM_HEIGHT)));
-      const top = index * ITEM_HEIGHT;
+      const maxIndex = itemCount - 1;
+      const index = Math.max(0, Math.min(maxIndex, Math.round(el.scrollTop / ITEM_HEIGHT)));
+      const value = loop ? mod(index, count) : index;
+      // Looping columns always rest in the middle copy, on the same numbers.
+      const top = (loop ? loopBase + value : index) * ITEM_HEIGHT;
       if (Math.abs(el.scrollTop - top) > 1) {
         programmatic.current = true;
         el.scrollTop = top;
@@ -98,14 +156,15 @@ function AmountColumn({
           programmatic.current = false;
         }, 60);
       }
-      if (index !== selectedRef.current) {
-        lastEmitted.current = index;
-        onSelectRef.current(index);
+      if (value !== selectedRef.current) {
+        lastEmitted.current = value;
+        onSelectRef.current(value);
       }
     };
 
     const onScroll = () => {
       if (programmatic.current) return;
+      holdAwayFromEnds(el);
       if (settleTimer.current) window.clearTimeout(settleTimer.current);
       settleTimer.current = window.setTimeout(settle, 90);
     };
@@ -122,21 +181,31 @@ function AmountColumn({
       el.removeEventListener('scrollend', onScrollEnd);
       if (settleTimer.current) window.clearTimeout(settleTimer.current);
     };
-  }, [count]);
+  }, [count, itemCount, loop, loopBase]);
 
   const nudge = (delta: number) => {
-    const next = Math.max(0, Math.min(count - 1, selectedRef.current + delta));
+    const next = loop
+      ? mod(selectedRef.current + delta, count)
+      : Math.max(0, Math.min(count - 1, selectedRef.current + delta));
     if (next === selectedRef.current) return;
     lastEmitted.current = next;
+    const el = ref.current;
+    if (loop && el) {
+      programmatic.current = true;
+      el.scrollTop += delta * ITEM_HEIGHT;
+      programmatic.current = false;
+      holdAwayFromEnds(el);
+    }
     onSelectRef.current(next);
   };
 
   const items = useMemo(() => {
     const nodes = [];
-    for (let value = 0; value < count; value += 1) {
+    for (let index = 0; index < itemCount; index += 1) {
+      const value = loop ? index % count : index;
       nodes.push(
         <div
-          key={value}
+          key={index}
           className={`flex snap-center items-center text-xl font-semibold tabular-nums text-white ${
             align === 'right' ? 'justify-end pr-1' : 'justify-start pl-1'
           }`}
@@ -147,7 +216,7 @@ function AmountColumn({
       );
     }
     return nodes;
-  }, [align, count, format]);
+  }, [align, count, format, itemCount, loop]);
 
   return (
     <div
@@ -239,6 +308,7 @@ export function TipAmountWheel({ value, min = 0.01, disabled, onChange }: Props)
           widthClass="w-12"
           label="Pence"
           disabled={disabled}
+          loop
         />
       </div>
     </div>
