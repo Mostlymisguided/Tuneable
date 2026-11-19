@@ -204,6 +204,133 @@ export function getCreatorDisplay(
   return 'Unknown artist';
 }
 
+export type CreatorLinkPart = {
+  text: string;
+  /** Profile route when this name can be opened. Separators stay null. */
+  href: string | null;
+};
+
+type CreatorCredit = {
+  name: string;
+  userId?: unknown;
+  collectiveId?: unknown;
+  relationToNext?: string | null;
+};
+
+const OBJECT_ID = /^[a-f\d]{24}$/i;
+
+function creatorCredits(value: unknown): CreatorCredit[] {
+  if (!Array.isArray(value)) return [];
+  const credits: CreatorCredit[] = [];
+  for (const entry of value) {
+    if (!entry) continue;
+    if (typeof entry === 'string') {
+      const name = entry.trim();
+      if (name && !isPlaceholderCreatorLabel(name)) credits.push({ name });
+      continue;
+    }
+    if (typeof entry !== 'object') continue;
+    const record = entry as {
+      name?: string;
+      userId?: unknown;
+      collectiveId?: unknown;
+      relationToNext?: string | null;
+    };
+    const name = record.name?.trim() || '';
+    if (!name || isPlaceholderCreatorLabel(name)) continue;
+    credits.push({
+      name,
+      userId: record.userId,
+      collectiveId: record.collectiveId,
+      relationToNext: record.relationToNext,
+    });
+  }
+  return credits;
+}
+
+function userProfileHref(userId: unknown): string | null {
+  if (!userId) return null;
+  if (typeof userId === 'string') {
+    const id = userId.trim();
+    return id ? `/user/${encodeURIComponent(id)}` : null;
+  }
+  if (typeof userId === 'object') {
+    const user = userId as {
+      username?: string;
+      uuid?: string;
+      _id?: string;
+      id?: string;
+    };
+    const id = user.username || user.uuid || user._id || user.id;
+    return id ? `/user/${encodeURIComponent(String(id))}` : null;
+  }
+  return null;
+}
+
+function collectiveProfileHref(collectiveId: unknown): string | null {
+  if (!collectiveId) return null;
+  if (typeof collectiveId === 'string') {
+    const id = collectiveId.trim();
+    if (!id || OBJECT_ID.test(id)) return null;
+    return `/collective/${encodeURIComponent(id)}`;
+  }
+  if (typeof collectiveId === 'object') {
+    const slug = (collectiveId as { slug?: string }).slug?.trim();
+    return slug ? `/collective/${encodeURIComponent(slug)}` : null;
+  }
+  return null;
+}
+
+function creditHref(credit: CreatorCredit): string | null {
+  return userProfileHref(credit.userId) || collectiveProfileHref(credit.collectiveId);
+}
+
+function relationBetween(relation?: string | null): string {
+  if (!relation || relation === '&') return ' & ';
+  if (relation === ',') return ', ';
+  return ` ${relation.trim()} `;
+}
+
+/**
+ * Artist / host / author names with a profile route when one exists.
+ * Returns null when nothing in the line can be opened, so callers keep the plain label.
+ */
+export function creatorLinkParts(
+  media: ChartMediaItem | null | undefined
+): CreatorLinkPart[] | null {
+  if (!media) return null;
+
+  const fromArtists = creatorCredits(media.artists);
+  let primary = fromArtists.length ? fromArtists : creatorCredits(media.artist);
+  let extra = creatorCredits(media.featuring);
+  if (!primary.length) {
+    primary = creatorCredits(media.host);
+    extra = [];
+  }
+  if (!primary.length) {
+    primary = creatorCredits(media.author);
+    extra = [];
+  }
+  if (!primary.length) return null;
+
+  const parts: CreatorLinkPart[] = [];
+  primary.forEach((credit, index) => {
+    parts.push({ text: credit.name, href: creditHref(credit) });
+    if (index < primary.length - 1) {
+      parts.push({ text: relationBetween(credit.relationToNext), href: null });
+    }
+  });
+  if (extra.length) {
+    parts.push({ text: ' ft. ', href: null });
+    extra.forEach((credit, index) => {
+      parts.push({ text: credit.name, href: creditHref(credit) });
+      if (index < extra.length - 1) parts.push({ text: ', ', href: null });
+    });
+  }
+
+  return parts.some((part) => part.href) ? parts : null;
+}
+
 /** Tip value shown/sorted for chart rows — period tips when not all-time. */
 export function getChartTipPence(
   item: ChartMediaItem,

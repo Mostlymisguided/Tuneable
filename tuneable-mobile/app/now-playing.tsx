@@ -9,14 +9,14 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { SeekBar } from '@/src/components/SeekBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
-import { getCreatorDisplay, mediaId } from '@/src/lib/media';
+import { creatorLinkParts, getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { shownPlayback, usePlaybackOwner } from '@/src/lib/nowPlaying';
 import { formatPlaybackSpeed } from '@/src/lib/playbackAudio';
 import { episodeId, seriesId, seriesTitle } from '@/src/lib/podcast';
@@ -29,7 +29,7 @@ import {
   usePodcastPlayerStore,
 } from '@/src/stores/podcastPlayerStore';
 import { colors } from '@/src/theme/colors';
-import { DEFAULT_COVER_ART, type MediaChampion } from '@/src/types/media';
+import { DEFAULT_COVER_ART, type ChartMediaItem, type MediaChampion } from '@/src/types/media';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
 
 export default function NowPlayingScreen() {
@@ -213,20 +213,40 @@ export default function NowPlayingScreen() {
         showsVerticalScrollIndicator={false}>
         <Image source={{ uri: coverUri }} style={styles.cover} />
 
-        <Text style={styles.title} numberOfLines={2}>
-          {title}
-        </Text>
-        {active === 'podcast' && showHref ? (
-          <Pressable onPress={onOpenShow} hitSlop={8} accessibilityRole="link">
-            <Text style={styles.subtitleLink} numberOfLines={1}>
-              {subtitle}
+        {profileHref ? (
+          <Pressable
+            onPress={() => router.push(profileHref)}
+            hitSlop={8}
+            style={styles.titlePress}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${title}`}>
+            <Text style={styles.titleLink} numberOfLines={2}>
+              {title}
             </Text>
           </Pressable>
         ) : (
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
+          <Text style={styles.title} numberOfLines={2}>
+            {title}
           </Text>
         )}
+        {active === 'podcast' && showHref ? (
+          <Pressable
+            onPress={onOpenShow}
+            hitSlop={8}
+            style={styles.titlePress}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${subtitle}`}>
+            <Text style={styles.subtitleLink} numberOfLines={2}>
+              {subtitle}
+            </Text>
+          </Pressable>
+        ) : active === 'music' && track ? (
+          <CreatorLine track={track} fallback={subtitle} />
+        ) : subtitle ? (
+          <Text style={styles.subtitle} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
 
         {queueLen > 1 ? (
           <Text style={styles.queueHint}>
@@ -361,6 +381,43 @@ export default function NowPlayingScreen() {
   );
 }
 
+function CreatorLine({
+  track,
+  fallback,
+}: {
+  track: ChartMediaItem;
+  fallback: string;
+}) {
+  const parts = creatorLinkParts(track);
+  if (!parts) {
+    return (
+      <Text style={styles.subtitle} numberOfLines={2}>
+        {fallback}
+      </Text>
+    );
+  }
+
+  return (
+    <Text style={styles.subtitle} numberOfLines={2}>
+      {parts.map((part, index) =>
+        part.href ? (
+          <Text
+            key={`${part.text}-${index}`}
+            style={styles.inlineLink}
+            onPress={() => router.push(part.href as Href)}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${part.text}`}
+            suppressHighlighting>
+            {part.text}
+          </Text>
+        ) : (
+          <Text key={`${part.text}-${index}`}>{part.text}</Text>
+        )
+      )}
+    </Text>
+  );
+}
+
 function SkipChip({
   label,
   accessibilityLabel,
@@ -418,14 +475,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     marginBottom: 28,
   },
+  titlePress: {
+    alignSelf: 'stretch',
+  },
   title: {
     color: colors.text,
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
   },
+  titleLink: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
   subtitle: {
     marginTop: 8,
+    alignSelf: 'stretch',
     color: colors.textSecondary,
     fontSize: 16,
     textAlign: 'center',
@@ -435,6 +503,10 @@ const styles = StyleSheet.create({
     color: colors.accentLight,
     fontSize: 16,
     textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+  inlineLink: {
+    color: colors.accentLight,
     textDecorationLine: 'underline',
   },
   queueHint: {
