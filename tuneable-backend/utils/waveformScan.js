@@ -50,7 +50,9 @@ function peaksFromWav(buffer) {
     offset = start + size + (size % 2);
   }
   if (dataOffset < 0 || channels < 1) return null;
-  if (audioFormat !== 1 || (bitsPerSample !== 16 && bitsPerSample !== 8)) return null;
+  const pcm = audioFormat === 1 && (bitsPerSample === 8 || bitsPerSample === 16 || bitsPerSample === 24);
+  const float32 = audioFormat === 3 && bitsPerSample === 32;
+  if (!pcm && !float32) return null;
   const bytesPerSample = bitsPerSample / 8;
   const frameSize = bytesPerSample * channels;
   const frames = Math.floor(Math.min(dataSize, buffer.length - dataOffset) / frameSize);
@@ -60,8 +62,14 @@ function peaksFromWav(buffer) {
     const at = dataOffset + (i * frameSize);
     if (bitsPerSample === 16) {
       samples[i] = buffer.readInt16LE(at) / 32768;
-    } else {
+    } else if (bitsPerSample === 8) {
       samples[i] = (buffer[at] - 128) / 128;
+    } else if (bitsPerSample === 24) {
+      const unsigned = buffer[at] | (buffer[at + 1] << 8) | (buffer[at + 2] << 16);
+      const signed = unsigned & 0x800000 ? unsigned - 0x1000000 : unsigned;
+      samples[i] = signed / 8388608;
+    } else {
+      samples[i] = buffer.readFloatLE(at);
     }
   }
   return peaksFromChannel(samples);
