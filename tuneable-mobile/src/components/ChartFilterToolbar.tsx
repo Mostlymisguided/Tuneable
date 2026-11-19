@@ -142,10 +142,10 @@ export function ChartFilterToolbar({
           <>
             <FilterTrigger
               icon="time-outline"
-              label="Time"
+              label={periodLabel ?? 'Time'}
               active={showTimePanel}
-              detail={periodLabel}
               onPress={onToggleTimePanel}
+              accessibilityLabel={`Time period, ${periodLabel ?? 'Time'}`}
             />
             {onSortChange && onToggleSortPanel ? (
               <FilterTrigger
@@ -162,10 +162,10 @@ export function ChartFilterToolbar({
         {showBpm ? (
           <FilterTrigger
             icon="speedometer-outline"
-            label="BPM"
+            label={formatBpmFilterLabel(bpmFilterRange)}
             active={showBpmPanel || bpmFilterRange !== 'all'}
-            detail={formatBpmFilterLabel(bpmFilterRange)}
             onPress={onToggleBpmPanel ?? (() => {})}
+            accessibilityLabel={`BPM, ${formatBpmFilterLabel(bpmFilterRange)}`}
           />
         ) : null}
         {showPlayable && onPlayableOnlyChange ? (

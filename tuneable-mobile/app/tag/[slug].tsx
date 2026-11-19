@@ -431,14 +431,15 @@ export default function TagProfileScreen() {
               setShowSortPanel(false);
               setShowTimePanel((open) => !open);
             }}
+            accessibilityRole="button"
+            accessibilityLabel={`Time period, ${formatTimePeriodLabel(period)}`}
             style={[
               styles.timeTrigger,
               (showTimePanel || period !== 'all-time') && styles.timeTriggerActive,
             ]}>
             <Ionicons name="time-outline" size={14} color={colors.accentLight} />
-            <Text style={styles.timeTriggerLabel}>Time</Text>
-            <Text style={styles.timeTriggerDetail} numberOfLines={1}>
-              ({formatTimePeriodLabel(period)})
+            <Text style={styles.timeTriggerLabel} numberOfLines={1}>
+              {formatTimePeriodLabel(period)}
             </Text>
           </Pressable>
           <Pressable
@@ -880,10 +881,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 12,
     fontWeight: '600',
-  },
-  timeTriggerDetail: {
-    color: '#c4b5fd',
-    fontSize: 11,
   },
   timePanel: {
     marginBottom: 10,

@@ -2950,8 +2950,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         }`}
                       >
                         <Clock className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        Time
-                        <span className="text-xs text-purple-300 font-normal">
+                        <span className="sm:hidden">{formatTimePeriodLabel(selectedTimePeriod)}</span>
+                        <span className="hidden sm:inline">Time</span>
+                        <span className="hidden sm:inline text-xs text-purple-300 font-normal">
                           ({formatTimePeriodLabel(selectedTimePeriod)})
                         </span>
                       </button>
@@ -2968,8 +2969,9 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
                         }`}
                       >
                         <Gauge className="h-4 w-4 text-purple-400 flex-shrink-0" />
-                        BPM
-                        <span className="text-xs text-purple-300 font-normal">
+                        <span className="sm:hidden">{formatBpmFilterLabel(bpmFilterRange)}</span>
+                        <span className="hidden sm:inline">BPM</span>
+                        <span className="hidden sm:inline text-xs text-purple-300 font-normal">
                           ({formatBpmFilterLabel(bpmFilterRange)})
                         </span>
                       </button>
