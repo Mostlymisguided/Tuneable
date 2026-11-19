@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { UserAvatar } from '@/src/components/UserAvatar';
 import { userAPI, type BlockedUser } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -80,7 +81,7 @@ export default function BlockedUsersScreen() {
       </Text>
 
       {loading ? (
-        <ActivityIndicator color={colors.accentLight} style={{ marginTop: 32 }} />
+        <ArtworkLoader style={{ marginTop: 32 }} />
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>

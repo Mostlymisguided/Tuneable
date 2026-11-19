@@ -13,10 +13,12 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
+import { RememberCover } from '@/src/lib/coverMemory';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
@@ -430,10 +432,7 @@ export default function PodcastSearchScreen() {
         ]}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator
-              color={colors.accentLight}
-              style={{ marginTop: 40 }}
-            />
+            <ArtworkLoader style={{ marginTop: 40 }} />
           ) : hasSearched ? (
             <View style={styles.emptyBlock}>
               <Ionicons
@@ -485,6 +484,7 @@ export default function PodcastSearchScreen() {
           const showName = seriesTitle(item);
           return (
             <View style={styles.card}>
+              <RememberCover uri={podcastSearchCover(item)} />
               <Pressable
                 onPress={() => void openEpisode(item)}
                 disabled={Boolean(openingKey)}

@@ -12,6 +12,7 @@ import {
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { authAPI } from '@/src/api/auth';
 import { userAPI } from '@/src/api/user';
@@ -204,7 +205,7 @@ export default function OnboardingScreen() {
   if (authLoading) {
     return (
       <Screen style={styles.center}>
-        <ActivityIndicator color={colors.accentLight} size="large" />
+        <ArtworkLoader />
       </Screen>
     );
   }

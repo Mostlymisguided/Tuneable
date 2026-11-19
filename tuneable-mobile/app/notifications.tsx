@@ -11,6 +11,7 @@ import {
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { collectiveAPI } from '@/src/api/collectives';
 import { labelAPI } from '@/src/api/labels';
 import { notificationAPI } from '@/src/api/notifications';
@@ -226,7 +227,7 @@ export default function NotificationsScreen() {
       </View>
 
       {loading && items.length === 0 ? (
-        <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+        <ArtworkLoader style={styles.loader} />
       ) : error && items.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.error}>{error}</Text>

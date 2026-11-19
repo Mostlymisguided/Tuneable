@@ -1,4 +1,5 @@
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { Redirect } from 'expo-router';
 import { WelcomeLanding } from '@/src/components/WelcomeLanding';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -18,7 +19,7 @@ export default function Index() {
           justifyContent: 'center',
           backgroundColor: colors.background,
         }}>
-        <ActivityIndicator color={colors.accentLight} size="large" />
+        <ArtworkLoader />
       </View>
     );
   }

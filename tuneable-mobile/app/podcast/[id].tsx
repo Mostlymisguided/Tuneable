@@ -19,6 +19,7 @@ import {
   type Href,
 } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { EditMediaButton } from '@/src/components/EditMediaButton';
@@ -45,6 +46,7 @@ import {
 import { mediaId } from '@/src/lib/media';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { shareStoryCard } from '@/src/lib/shareStoryCard';
+import { useNotedCover } from '@/src/lib/coverMemory';
 import {
   buildTipStatChips,
   resolveTipStatInputs,
@@ -186,6 +188,7 @@ export default function PodcastEpisodeProfileScreen() {
       ? media.podcastSeries?.coverArt
       : undefined) ||
     DEFAULT_PODCAST_COVER;
+  useNotedCover(coverUri);
 
   const heroMetadata = useMemo(() => {
     if (!media) return [] as string[];
@@ -401,10 +404,7 @@ export default function PodcastEpisodeProfileScreen() {
       </View>
 
       {loading && !media ? (
-        <ActivityIndicator
-          color={colors.accentLight}
-          style={{ marginTop: 48 }}
-        />
+        <ArtworkLoader style={{ marginTop: 48 }} />
       ) : error && !media ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>

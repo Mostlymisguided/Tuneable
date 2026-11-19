@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { locationAPI } from '@/src/api/locations';
 import { mediaAPI } from '@/src/api/media';
@@ -420,7 +420,7 @@ export default function PlaceProfileScreen() {
       </View>
 
       {loading && media.length === 0 && !error ? (
-        <ActivityIndicator color={colors.accentLight} style={{ marginTop: 48 }} />
+        <ArtworkLoader style={{ marginTop: 48 }} />
       ) : error && media.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>

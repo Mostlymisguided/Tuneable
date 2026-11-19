@@ -2,12 +2,13 @@ import { Stack, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider, useAuth } from '@/src/auth/AuthContext';
 import { WelcomeLanding } from '@/src/components/WelcomeLanding';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { AppTabBar } from '@/src/components/AppTabBar';
 import { AppToast } from '@/src/components/AppToast';
 import { PlayerDock } from '@/src/components/PlayerDock';
@@ -112,7 +113,7 @@ function RootNavigator() {
           justifyContent: 'center',
           backgroundColor: colors.background,
         }}>
-        <ActivityIndicator color={colors.accentLight} size="large" />
+        <ArtworkLoader />
       </View>
     );
   }

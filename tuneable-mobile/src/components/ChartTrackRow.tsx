@@ -25,6 +25,7 @@ import {
 } from '@/src/lib/location';
 import { getCreatorDisplay, isUploadPlayable, isWrittenMedia } from '@/src/lib/media';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
+import { promoteCoverArt, useNotedCover } from '@/src/lib/coverMemory';
 
 const COLLAPSED_TAG_COUNT = 2;
 
@@ -113,6 +114,18 @@ export function ChartTrackRow({
   const coverSource = written
     ? bookCoverSource(coverFailed ? null : item.coverArt)
     : { uri: coverFailed ? DEFAULT_COVER_ART : item.coverArt || DEFAULT_COVER_ART };
+  const notedCover =
+    coverSource &&
+    typeof coverSource === 'object' &&
+    'uri' in coverSource &&
+    typeof coverSource.uri === 'string'
+      ? coverSource.uri
+      : null;
+  useNotedCover(notedCover);
+  const open = () => {
+    promoteCoverArt(notedCover);
+    onOpen();
+  };
 
   const coverArt = (
     <Pressable
@@ -167,7 +180,7 @@ export function ChartTrackRow({
     return (
       <View style={[styles.row, !playable && styles.rowMuted]}>
         {coverArt}
-        <Pressable style={styles.meta} onPress={onOpen}>
+        <Pressable style={styles.meta} onPress={open}>
           <Text style={styles.title} numberOfLines={1}>
             {item.title || 'Untitled'}
           </Text>
@@ -240,7 +253,7 @@ export function ChartTrackRow({
 
         <View style={styles.richMeta}>
           <View style={styles.titleRow}>
-            <Pressable style={styles.titleCluster} onPress={onOpen}>
+            <Pressable style={styles.titleCluster} onPress={open}>
               <Text style={styles.richTitle} numberOfLines={1}>
                 {item.title || 'Untitled'}
               </Text>
@@ -262,7 +275,7 @@ export function ChartTrackRow({
           <View style={styles.artistRow}>
             <View style={styles.artistPress}>
               <View style={styles.identityLine}>
-                <Pressable style={styles.artistNamePress} onPress={onOpen}>
+                <Pressable style={styles.artistNamePress} onPress={open}>
                   <Text style={styles.artistName} numberOfLines={1}>
                     {getCreatorDisplay(item)}
                   </Text>

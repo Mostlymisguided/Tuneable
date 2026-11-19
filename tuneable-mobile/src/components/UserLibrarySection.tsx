@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
@@ -395,7 +396,7 @@ export function UserLibrarySection({
       ) : null}
 
       {showLoading ? (
-        <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+        <ArtworkLoader style={styles.loader} />
       ) : null}
 
       {playableCount > 0 ? (

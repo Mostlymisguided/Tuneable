@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
@@ -12,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { UserLibrarySection } from '@/src/components/UserLibrarySection';
 import { UserProfileHero } from '@/src/components/UserProfileHero';
 import { ReportSheet } from '@/src/components/ReportSheet';
@@ -187,7 +187,7 @@ export default function PublicUserProfileScreen() {
       </View>
 
       {loading && !user ? (
-        <ActivityIndicator color={colors.accentLight} style={{ marginTop: 48 }} />
+        <ArtworkLoader style={{ marginTop: 48 }} />
       ) : error && !user ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>

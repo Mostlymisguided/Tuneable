@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Linking,
@@ -14,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { ClaimSheet } from '@/src/components/ClaimSheet';
 import { EditMediaButton } from '@/src/components/EditMediaButton';
@@ -27,6 +27,7 @@ import { getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { colors } from '@/src/theme/colors';
 import { bookCoverSource, isBlankCoverSize } from '@/src/lib/bookCover';
+import { useNotedCover } from '@/src/lib/coverMemory';
 import { type ChartMediaItem } from '@/src/types/media';
 
 export default function BookProfileScreen() {
@@ -41,6 +42,7 @@ export default function BookProfileScreen() {
   const [claimOpen, setClaimOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
+  useNotedCover(coverFailed ? null : book?.coverArt);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -125,7 +127,7 @@ export default function BookProfileScreen() {
         </View>
 
         {loading && !book ? (
-          <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+          <ArtworkLoader style={styles.loader} />
         ) : error || !book ? (
           <Text style={styles.error}>{error || 'Book not found'}</Text>
         ) : (

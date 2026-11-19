@@ -14,6 +14,7 @@ import { mediaAPI } from '@/src/api/media';
 import { useAuth } from '@/src/auth/AuthContext';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
+import { useNotedCover } from '@/src/lib/coverMemory';
 import { DEFAULT_PODCAST_COVER } from '@/src/types/podcast';
 import { getCreatorDisplay, mediaId } from '@/src/lib/media';
 import { shownPlayback, usePlaybackOwner } from '@/src/lib/nowPlaying';
@@ -145,6 +146,7 @@ function MiniBarChrome({
   onTip: () => void;
   onOpen?: () => void;
 }) {
+  useNotedCover(coverUri);
   return (
     <View style={styles.bar}>
       <Pressable

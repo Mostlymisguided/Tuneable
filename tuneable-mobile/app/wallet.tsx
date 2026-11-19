@@ -16,6 +16,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardDoneAccessory } from '@/src/components/KeyboardDoneAccessory';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { paymentAPI } from '@/src/api/payments';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -583,7 +584,7 @@ export default function WalletScreen() {
       )}
 
       {loading && useStoreIap ? (
-        <ActivityIndicator style={{ marginTop: 16 }} color={colors.accentLight} />
+        <ArtworkLoader size="section" style={{ marginTop: 16 }} />
       ) : null}
 
       {statusMessage ? <Text style={styles.status}>{statusMessage}</Text> : null}

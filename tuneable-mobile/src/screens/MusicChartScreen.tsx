@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -11,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import {
   ADD_NEW_MEDIA_CTA,
   ChartFilterToolbar,
@@ -311,10 +311,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             {loading && media.length === 0 ? (
-              <ActivityIndicator
-                color={colors.accentLight}
-                style={styles.loader}
-              />
+              <ArtworkLoader style={styles.loader} />
             ) : null}
           </View>
         }

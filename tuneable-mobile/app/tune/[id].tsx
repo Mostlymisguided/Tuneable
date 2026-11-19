@@ -21,6 +21,7 @@ import {
   type Href,
 } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
 import { TagClaimSheet } from '@/src/components/TagClaimSheet';
@@ -44,6 +45,7 @@ import {
   mediaId,
 } from '@/src/lib/media';
 import { viewerHasTipped } from '@/src/lib/viewerTipped';
+import { useNotedCover } from '@/src/lib/coverMemory';
 import { shareStoryCard } from '@/src/lib/shareStoryCard';
 import {
   buildTipStatChips,
@@ -86,6 +88,7 @@ export default function TuneProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, updateBalance } = useAuth();
   const [media, setMedia] = useState<ChartMediaItem | null>(null);
+  useNotedCover(media?.coverArt);
   const [showSupportInPounds, setShowSupportInPounds] = useState(false);
   const [related, setRelated] = useState<RelatedMediaItem[]>([]);
   const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
@@ -410,10 +413,7 @@ export default function TuneProfileScreen() {
       </View>
 
       {loading && !media ? (
-        <ActivityIndicator
-          color={colors.accentLight}
-          style={{ marginTop: 48 }}
-        />
+        <ArtworkLoader style={{ marginTop: 48 }} />
       ) : error && !media ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>

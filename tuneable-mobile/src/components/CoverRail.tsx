@@ -2,6 +2,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART } from '@/src/types/media';
+import { promoteCoverArt, RememberCover } from '@/src/lib/coverMemory';
 
 export type CoverRailItem = {
   key: string;
@@ -67,8 +68,12 @@ export function CoverRail({
           contentContainerStyle={styles.rail}>
           {items.map((item, index) => (
             <View key={item.key} style={styles.card}>
+              <RememberCover uri={item.coverArt} />
               <Pressable
-                onPress={() => onPlay(item, index)}
+                onPress={() => {
+                  promoteCoverArt(item.coverArt);
+                  onPlay(item, index);
+                }}
                 style={styles.coverWrap}
                 accessibilityRole="button"
                 accessibilityLabel={`Play ${item.title}`}>
@@ -85,7 +90,11 @@ export function CoverRail({
                   </View>
                 ) : null}
               </Pressable>
-              <Pressable onPress={() => onOpen(item, index)}>
+              <Pressable
+                onPress={() => {
+                  promoteCoverArt(item.coverArt);
+                  onOpen(item, index);
+                }}>
                 <Text style={styles.cardTitle} numberOfLines={1}>
                   {item.title}
                 </Text>

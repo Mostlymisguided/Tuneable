@@ -13,11 +13,13 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { partyAPI } from '@/src/api/party';
 import { searchAPI } from '@/src/api/search';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
+import { RememberCover } from '@/src/lib/coverMemory';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import { showToast } from '@/src/stores/toastStore';
@@ -371,10 +373,7 @@ export default function MusicSearchScreen() {
         ]}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator
-              color={colors.accentLight}
-              style={{ marginTop: 40 }}
-            />
+            <ArtworkLoader style={{ marginTop: 40 }} />
           ) : hasSearched ? (
             <View style={styles.emptyBlock}>
               <Ionicons
@@ -453,6 +452,7 @@ export default function MusicSearchScreen() {
           const durationLabel = formatDuration(item.duration);
           return (
             <View style={styles.card}>
+              <RememberCover uri={item.coverArt} />
               <Image
                 source={{ uri: item.coverArt || DEFAULT_COVER_ART }}
                 style={styles.cover}

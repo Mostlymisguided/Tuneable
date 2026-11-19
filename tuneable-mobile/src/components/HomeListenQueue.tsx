@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { mediaAPI } from '@/src/api/media';
 import { userAPI } from '@/src/api/user';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { isUploadPlayable, mediaId } from '@/src/lib/media';
@@ -18,6 +18,7 @@ import { useMusicPlayerStore } from '@/src/stores/musicPlayerStore';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
+import { promoteCoverArt, RememberCover } from '@/src/lib/coverMemory';
 import type { HomeListenQueueItem } from '@/src/types/homeQueue';
 import type { User } from '@/src/types/user';
 
@@ -152,7 +153,7 @@ export function HomeListenQueue({
       ) : null}
 
       {loading && activeItems.length === 0 ? (
-        <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+        <ArtworkLoader size="section" style={styles.loader} />
       ) : activeItems.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>
@@ -173,8 +174,12 @@ export function HomeListenQueue({
         <View style={styles.list}>
           {activeItems.map((item) => (
             <View key={item.mediaId} style={styles.row}>
+              <RememberCover uri={item.coverArt} />
               <Pressable
-                onPress={() => router.push(`/tune/${item.mediaUuid || item.mediaId}`)}
+                onPress={() => {
+                  promoteCoverArt(item.coverArt);
+                  router.push(`/tune/${item.mediaUuid || item.mediaId}`);
+                }}
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${item.title}`}>
                 <Image source={{ uri: item.coverArt || DEFAULT_COVER_ART }} style={styles.cover} />

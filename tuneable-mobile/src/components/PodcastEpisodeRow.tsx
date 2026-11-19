@@ -18,6 +18,7 @@ import {
   seriesTitle,
 } from '@/src/lib/podcast';
 import { tagsMatch } from '@/src/lib/tagNormalizer';
+import { promoteCoverArt, useNotedCover } from '@/src/lib/coverMemory';
 
 const COLLAPSED_TAG_COUNT = 2;
 
@@ -58,9 +59,13 @@ export function PodcastEpisodeRow({
   const canExpandFooter =
     allTags.length > COLLAPSED_TAG_COUNT || supporterCount > 0;
   const cover = episodeCoverArt(episode, fallbackCoverArt);
+  useNotedCover(cover);
   const collapsedTags = allTags.slice(0, COLLAPSED_TAG_COUNT);
   const toggleFooter = () => setFooterExpanded((open) => !open);
-  const openProfile = onOpenProfile ?? onPlay;
+  const openProfile = () => {
+    promoteCoverArt(cover);
+    (onOpenProfile ?? onPlay)();
+  };
 
   return (
     <View style={[styles.richCard, !playable && styles.rowMuted]}>

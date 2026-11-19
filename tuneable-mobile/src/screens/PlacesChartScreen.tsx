@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -11,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { locationAPI, type PlaceChartItem } from '@/src/api/locations';
@@ -128,10 +128,7 @@ export default function PlacesScreen() {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             {loading && places.length === 0 ? (
-              <ActivityIndicator
-                color={colors.accentLight}
-                style={styles.loader}
-              />
+              <ArtworkLoader style={styles.loader} />
             ) : null}
           </View>
         }

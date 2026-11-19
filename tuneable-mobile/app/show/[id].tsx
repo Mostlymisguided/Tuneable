@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { EditMediaButton } from '@/src/components/EditMediaButton';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { PodcastEpisodeRow } from '@/src/components/PodcastEpisodeRow';
 import { MiniSupportersBar } from '@/src/components/MiniSupportersBar';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -27,6 +28,7 @@ import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
 import { shareStoryCard } from '@/src/lib/shareStoryCard';
+import { useNotedCover } from '@/src/lib/coverMemory';
 import {
   episodeId,
   isEpisodePlayable,
@@ -68,6 +70,7 @@ export default function PodcastShowScreen() {
   const { user, updateBalance } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const [series, setSeries] = useState<PodcastSeriesRef | null>(null);
+  useNotedCover(series?.coverArt);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [stats, setStats] = useState<PodcastSeriesStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -349,10 +352,7 @@ export default function PodcastShowScreen() {
       </View>
 
       {loading && !series ? (
-        <ActivityIndicator
-          color={colors.accentLight}
-          style={{ marginTop: 48 }}
-        />
+        <ArtworkLoader style={{ marginTop: 48 }} />
       ) : error && !series ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>
@@ -598,10 +598,7 @@ export default function PodcastShowScreen() {
                 })}
               </View>
               {loadingEpisodes && episodes.length === 0 ? (
-                <ActivityIndicator
-                  color={colors.accentLight}
-                  style={{ marginVertical: 24 }}
-                />
+                <ArtworkLoader size="section" style={{ marginVertical: 24 }} />
               ) : null}
               {error ? <Text style={styles.inlineError}>{error}</Text> : null}
             </View>

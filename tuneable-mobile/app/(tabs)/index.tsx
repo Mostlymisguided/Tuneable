@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { UserAvatar } from '@/src/components/UserAvatar';
 import { CoverRail, type CoverRailItem } from '@/src/components/CoverRail';
 import { DashboardPrompts } from '@/src/components/DashboardPrompts';
@@ -403,10 +403,7 @@ export default function HomeScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           {loading && rising.length === 0 ? (
-            <ActivityIndicator
-              color={colors.accentLight}
-              style={styles.loader}
-            />
+            <ArtworkLoader size="section" style={styles.loader} />
           ) : null}
         </View>
 

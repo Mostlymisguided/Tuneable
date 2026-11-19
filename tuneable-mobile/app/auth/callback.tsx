@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -75,7 +76,7 @@ export default function AuthCallbackScreen() {
     <Screen style={styles.center}>
       {!done && !error ? (
         <>
-          <ActivityIndicator color={colors.accentLight} size="large" />
+          <ArtworkLoader />
           <Text style={styles.text}>Finishing sign-in…</Text>
         </>
       ) : (

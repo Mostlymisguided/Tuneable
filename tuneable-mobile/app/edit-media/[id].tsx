@@ -15,6 +15,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
@@ -405,7 +406,7 @@ export default function EditMediaScreen() {
         </View>
 
         {loading && !form ? (
-          <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+          <ArtworkLoader style={styles.loader} />
         ) : error && !form ? (
           <View style={styles.centered}>
             <Text style={styles.error}>{error}</Text>

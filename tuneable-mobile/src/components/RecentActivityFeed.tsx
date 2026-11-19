@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   StyleSheet,
@@ -11,11 +10,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { mediaAPI } from '@/src/api/media';
 import { userAPI, type ActivityMediaRef } from '@/src/api/user';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { TipSheet } from '@/src/components/TipSheet';
 import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import { formatArtist } from '@/src/lib/media';
 import { colors } from '@/src/theme/colors';
 import { DEFAULT_COVER_ART, type ChartMediaItem } from '@/src/types/media';
+import { promoteCoverArt, RememberCover } from '@/src/lib/coverMemory';
 
 const PREVIEW_LIMIT = 6;
 
@@ -261,7 +262,7 @@ export function RecentActivityFeed({
     <View style={styles.wrap}>
       <Text style={styles.title}>Recent activity</Text>
       {loading && rows.length === 0 ? (
-        <ActivityIndicator color={colors.accentLight} style={styles.loader} />
+        <ArtworkLoader size="section" style={styles.loader} />
       ) : error && rows.length === 0 ? (
         <Text style={styles.emptyBody}>{error}</Text>
       ) : rows.length === 0 ? (
@@ -275,10 +276,12 @@ export function RecentActivityFeed({
             const regainPence = row.kind === 'lost' ? row.regainPence : null;
             return (
               <View key={row.id} style={styles.item}>
+                <RememberCover uri={row.coverArt} />
                 <Pressable
                   style={styles.row}
                   disabled={!row.href}
                   onPress={() => {
+                    promoteCoverArt(row.coverArt);
                     if (row.href) router.push(row.href);
                   }}
                   accessibilityRole="button"

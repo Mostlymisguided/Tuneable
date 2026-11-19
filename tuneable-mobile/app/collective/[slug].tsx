@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Linking,
   Pressable,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router';
 import { collectiveAPI, type Collective } from '@/src/api/collectives';
 import { mediaAPI } from '@/src/api/media';
@@ -102,7 +102,7 @@ export default function CollectiveProfileScreen() {
       </View>
 
       {loading && !collective ? (
-        <ActivityIndicator color={colors.accentLight} style={{ marginTop: 48 }} />
+        <ArtworkLoader style={{ marginTop: 48 }} />
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.error}>{error}</Text>

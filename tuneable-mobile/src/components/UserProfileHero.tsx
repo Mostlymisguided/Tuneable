@@ -1,6 +1,5 @@
 import { Children, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   Linking,
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { colors } from '@/src/theme/colors';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { UserAvatar } from '@/src/components/UserAvatar';
 import { formatPoundsFromPence, formatTuneBytes } from '@/src/lib/format';
 import {
@@ -333,10 +333,7 @@ export function UserProfileHero({
       ) : null}
 
       {badgesLoading && titles.length === 0 && discovery.length === 0 ? (
-        <ActivityIndicator
-          color={colors.accentLight}
-          style={styles.badgesLoading}
-        />
+        <ArtworkLoader size="section" style={styles.badgesLoading} />
       ) : null}
 
       {titles.length > 0 ? (

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Screen } from '@/src/components/Screen';
+import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
@@ -264,10 +264,7 @@ export function BookChartScreen({ onChartKindChange }: Props) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             {loading && books.length === 0 ? (
-              <ActivityIndicator
-                color={colors.accentLight}
-                style={styles.loader}
-              />
+              <ArtworkLoader style={styles.loader} />
             ) : null}
           </View>
         }
