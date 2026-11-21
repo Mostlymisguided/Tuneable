@@ -378,6 +378,10 @@ const LibraryImport: React.FC = () => {
   }, [checkConnections]);
 
   useEffect(() => {
+    void refreshUser?.();
+  }, [refreshUser]);
+
+  useEffect(() => {
     const urlToken = searchParams.get('token');
     const error = searchParams.get('error');
     const message = searchParams.get('message');
@@ -834,7 +838,8 @@ const LibraryImport: React.FC = () => {
   const playableCount = playableItems.length;
   const awaitingCount = awaitingItems.length;
 
-  const userBalance = summary?.userBalance ?? (user?.balance != null ? penceToPoundsNumber(user.balance) : 0);
+  const authBalancePounds = user?.balance != null ? penceToPoundsNumber(user.balance) : 0;
+  const userBalance = Math.max(summary?.userBalance ?? 0, authBalancePounds);
 
   const costForScope = useCallback((scope: ImportScope, mode: TipMode) => {
     const targets = scope === 'playable' ? playableItems : selectableItems;

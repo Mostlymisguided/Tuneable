@@ -58,6 +58,7 @@ import ProfileWaveform from '../components/ProfileWaveform';
 import { requireAuthToPlay } from '../utils/playAuth';
 import { canEditMedia, canDeleteMedia } from '../utils/permissionHelpers';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { roundBpm } from '../utils/bpm';
 import { bitrateToKbps, formatBitrateKbps } from '../utils/bitrate';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
@@ -206,7 +207,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const { mediaId } = useParams<{ mediaId: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, updateBalance } = useAuth();
+  const { user, updateBalance, refreshUser } = useAuth();
 
   // Sanitize HTML description for safe rendering
   const sanitizeDescription = (html: string): string => {
@@ -1608,7 +1609,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   };
 
   // Handle global bid from the Support This Episode amount field
-  const handleGlobalBid = () => {
+  const handleGlobalBid = async () => {
     if (!user) {
       toast.info('Please log in to support this episode');
       const returnUrl = getMediaProfileUrl(media || { _id: mediaId, contentForm: ['podcastepisode'] });
@@ -1621,9 +1622,12 @@ const PodcastEpisodeProfile: React.FC = () => {
       return;
     }
 
-    // Convert balance from pence to pounds for comparison
-    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-    if (balanceInPounds < parsedGlobalBidAmount) {
+    const canAfford = await ensureSpendableBalance(
+      (user as any)?.balance,
+      Math.round(parsedGlobalBidAmount * 100),
+      refreshUser
+    );
+    if (!canAfford) {
       toast.error('Insufficient balance. Please top up your wallet.');
       navigate('/wallet');
       return;

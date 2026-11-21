@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
@@ -89,6 +89,12 @@ export default function WalletScreen() {
   const [iapReady, setIapReady] = useState(false);
   const [iapError, setIapError] = useState<string | null>(null);
   const verifyChain = useRef(Promise.resolve());
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUser().catch(() => undefined);
+    }, [refreshUser])
+  );
   const inFlightTxnIds = useRef(new Set<string>());
   const settledTxnIds = useRef(new Set<string>());
 

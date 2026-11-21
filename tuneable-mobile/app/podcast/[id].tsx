@@ -31,6 +31,7 @@ import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
 import {
+  ensureSpendableBalance,
   isInsufficientBalanceError,
   openWalletForTipTopUp,
 } from '@/src/lib/tipBalance';
@@ -77,7 +78,7 @@ function seriesIdFromMedia(media: ChartMediaItem | null): string | null {
 
 export default function PodcastEpisodeProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, updateBalance } = useAuth();
+  const { user, updateBalance, refreshUser } = useAuth();
   const [media, setMedia] = useState<ChartMediaItem | null>(null);
   const [seriesEpisodes, setSeriesEpisodes] = useState<PodcastEpisode[]>([]);
   const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
@@ -331,7 +332,7 @@ export default function PodcastEpisodeProfileScreen() {
       setSupportError('Minimum tip is £0.01');
       return;
     }
-    if (Math.round(amount * 100) > (user.balance ?? 0)) {
+    if (!(await ensureSpendableBalance(user.balance ?? 0, Math.round(amount * 100), refreshUser))) {
       openWalletForTipTopUp();
       return;
     }

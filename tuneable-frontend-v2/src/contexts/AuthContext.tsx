@@ -135,7 +135,7 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<User>;
   register: (userData: RegisterData) => Promise<User>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
   updateBalance: (newBalance: number) => void;
   handleOAuthCallback: (token: string, refreshToken?: string | null) => Promise<User>;
   /** Swap in a new JWT for this session, e.g. after a password change. */
@@ -310,15 +310,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
       const response = await authAPI.getProfile();
       setUser(response.user);
       localStorage.setItem('user', JSON.stringify(response.user));
+      return response.user;
     } catch (error) {
       console.error('Failed to refresh user data:', error);
+      return null;
     }
-  };
+  }, []);
+
+  // An admin credit (or any other top-up) can land while this tab is open.
+  // Reload the wallet when the tab is focused so tips use the current balance.
+  useEffect(() => {
+    if (!token) return;
+    let timer: number | undefined;
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        void refreshUser();
+      }, 300);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.clearTimeout(timer);
+    };
+  }, [token, refreshUser]);
 
   const replaceToken = useCallback((newToken: string, refreshToken?: string | null) => {
     rememberAccessToken(newToken);
@@ -327,13 +350,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
   }, []);
 
-  const updateBalance = (newBalance: number) => {
-    if (user) {
-      const updatedUser = { ...user, balance: newBalance };
-      setUser(updatedUser);
+  const updateBalance = useCallback((newBalance: number) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updatedUser = { ...prev, balance: newBalance };
       localStorage.setItem('user', JSON.stringify(updatedUser));
-    }
-  };
+      return updatedUser;
+    });
+  }, []);
 
   const value: AuthContextType = {
     user,

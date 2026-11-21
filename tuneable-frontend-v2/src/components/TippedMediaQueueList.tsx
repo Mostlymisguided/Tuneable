@@ -12,6 +12,7 @@ import { resolveBookCoverArt } from '../utils/coverArt';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { penceToPoundsNumber } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 import { requireAuthToPlay } from '../utils/playAuth';
@@ -128,7 +129,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
   onPlayableOnlyChange,
 }) => {
   const navigate = useNavigate();
-  const { user, updateBalance } = useAuth();
+  const { user, updateBalance, refreshUser } = useAuth();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
     useWebPlayerStore();
   const internalPref = usePlayableOnly('chart');
@@ -277,8 +278,12 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
       return;
     }
 
-    const balanceInPounds = penceToPoundsNumber((user as any)?.balance);
-    if (balanceInPounds < tipAmount) {
+    const canAfford = await ensureSpendableBalance(
+      (user as any)?.balance,
+      Math.round(tipAmount * 100),
+      refreshUser
+    );
+    if (!canAfford) {
       toast.error('Insufficient balance. Please top up your wallet.');
       navigate('/wallet');
       return;

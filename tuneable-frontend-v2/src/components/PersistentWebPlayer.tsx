@@ -11,6 +11,7 @@ import { type YouTubePlayerRef } from './YouTubePlayer';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from '../utils/toast';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
@@ -78,7 +79,7 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 };
 
 const PersistentWebPlayer: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
@@ -651,7 +652,7 @@ const PersistentWebPlayer: React.FC = () => {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
     }
-    if ((user as any)?.balance < poundsToPence(amount)) {
+    if (!(await ensureSpendableBalance((user as any)?.balance, poundsToPence(amount), refreshUser))) {
       toast.error('Insufficient balance');
       return;
     }

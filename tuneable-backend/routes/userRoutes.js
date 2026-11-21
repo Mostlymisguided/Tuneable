@@ -3151,9 +3151,10 @@ router.get('/me/wallet-history', authMiddleware, async (req, res) => {
       .lean();
     
     // Calculate summary statistics
+    const { isCompletedBalanceCredit } = require('../utils/walletCredit');
     const allTransactions = await WalletTransaction.find({ userId: user._id }).lean();
     const totalTopUps = allTransactions
-      .filter(t => t.type === 'topup' && t.status === 'completed')
+      .filter(isCompletedBalanceCredit)
       .reduce((sum, t) => sum + (t.amount || 0), 0);
     const totalTransactions = allTransactions.length;
     const totalRefunds = allTransactions
@@ -5027,30 +5028,39 @@ router.post('/admin/top-up-balance', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Convert amount from pounds to pence
-    const amountPence = Math.round(amount * 100);
-    
-    // Get current balance
-    const balanceBefore = targetUser.balance || 0;
-    const balanceAfter = balanceBefore + amountPence;
+    // Convert amount from pounds to pence. $inc so a concurrent profile save
+    // cannot write an older balance back over this credit.
+    const amountPence = Math.round(Number(amount) * 100);
+    if (!Number.isFinite(amountPence) || amountPence <= 0) {
+      return res.status(400).json({ error: 'userId and valid amount (greater than 0) are required' });
+    }
 
-    // Update user balance
-    targetUser.balance = balanceAfter;
-    await targetUser.save();
+    const updatedUser = await User.findByIdAndUpdate(
+      targetUser._id,
+      { $inc: { balance: amountPence } },
+      { new: true }
+    );
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-    // Create wallet transaction record
+    const balanceAfter = updatedUser.balance || 0;
+    const balanceBefore = balanceAfter - amountPence;
+
+    // Record as a top-up (manual) so the signed-in wallet treats it as spendable
+    // credit. Older admin credits were stored as adjustments; those still count.
     const WalletTransaction = require('../models/WalletTransaction');
     const transaction = new WalletTransaction({
-      userId: targetUser._id,
-      user_uuid: targetUser.uuid,
+      userId: updatedUser._id,
+      user_uuid: updatedUser.uuid,
       amount: amountPence,
-      type: 'adjustment',
+      type: 'topup',
       status: 'completed',
       paymentMethod: 'manual',
       balanceBefore: balanceBefore,
       balanceAfter: balanceAfter,
       description: description || `Admin top-up by ${req.user.username}`,
-      username: targetUser.username,
+      username: updatedUser.username,
       metadata: {
         adminUserId: req.user._id.toString(),
         adminUsername: req.user.username,
@@ -5066,15 +5076,15 @@ router.post('/admin/top-up-balance', authMiddleware, async (req, res) => {
       const Bid = require('../models/Bid');
       
       // Calculate user aggregate (sum of all active bids)
-      const userBids = await Bid.find({ userId: targetUser._id, status: 'active' });
+      const userBids = await Bid.find({ userId: updatedUser._id, status: 'active' });
       const userAggregatePre = userBids.reduce((sum, bid) => sum + bid.amount, 0);
       
       await tuneableLedgerService.createTopUpEntry({
-        userId: targetUser._id,
+        userId: updatedUser._id,
         amount: amountPence,
         userBalancePre: balanceBefore,
         userAggregatePre: userAggregatePre,
-        userTuneBytesPre: targetUser.tuneBytes || 0,
+        userTuneBytesPre: updatedUser.tuneBytes || 0,
         referenceTransactionId: transaction._id,
         metadata: {
           adminUserId: req.user._id.toString(),
@@ -5089,21 +5099,21 @@ router.post('/admin/top-up-balance', authMiddleware, async (req, res) => {
     }
 
     // Log to console for audit
-    console.log(`✅ Admin ${req.user.username} topped up balance for ${targetUser.username}: £${amount.toFixed(2)} (${amountPence} pence). New balance: £${(balanceAfter / 100).toFixed(2)}`);
+    console.log(`✅ Admin ${req.user.username} topped up balance for ${updatedUser.username}: £${amountPence / 100} (${amountPence} pence). New balance: £${(balanceAfter / 100).toFixed(2)}`);
 
     res.json({
-      message: `Successfully topped up balance by £${amount.toFixed(2)} for ${targetUser.username}`,
+      message: `Successfully topped up balance by £${(amountPence / 100).toFixed(2)} for ${updatedUser.username}`,
       user: {
-        _id: targetUser._id,
-        username: targetUser.username,
-        balance: targetUser.balance,
-        balancePounds: (targetUser.balance / 100).toFixed(2)
+        _id: updatedUser._id,
+        username: updatedUser.username,
+        balance: balanceAfter,
+        balancePounds: (balanceAfter / 100).toFixed(2)
       },
       transaction: {
         _id: transaction._id,
         uuid: transaction.uuid,
         amount: transaction.amount,
-        amountPounds: amount.toFixed(2)
+        amountPounds: (amountPence / 100).toFixed(2)
       }
     });
   } catch (error) {

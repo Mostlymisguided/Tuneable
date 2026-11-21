@@ -117,6 +117,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
 import { resolveTipStatInputs } from '../utils/tipStats';
 import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
@@ -1038,6 +1039,7 @@ const UserProfile: React.FC = () => {
   // Load wallet history when viewing wallet history tab
   useEffect(() => {
     if (viewTab === 'wallet-history' && isOwnProfile && !isSettingsMode) {
+      void refreshUser();
       loadWalletHistory();
     }
   }, [viewTab, isOwnProfile, isSettingsMode, walletHistoryFilters]);
@@ -1198,8 +1200,7 @@ const UserProfile: React.FC = () => {
       return;
     }
 
-    // Check balance (balance is in pence, bidAmount is in pounds)
-    if ((currentUser as any)?.balance < poundsToPence(bidAmount)) {
+    if (!(await ensureSpendableBalance((currentUser as any)?.balance, poundsToPence(bidAmount), refreshUser))) {
       toast.error('Insufficient balance');
       return;
     }

@@ -8,6 +8,7 @@ import { Play, Pause, Volume2, VolumeX, X, Heart } from 'lucide-react';
 import { mediaAPI } from '../lib/api';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from '../utils/toast';
 import { claimMediaSession, clearMediaSession, updateMediaSession } from '../utils/mediaSession';
@@ -31,7 +32,7 @@ const SkipForward30Icon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const PersistentPodcastPlayer: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
@@ -312,7 +313,7 @@ const PersistentPodcastPlayer: React.FC = () => {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
     }
-    if ((user as any)?.balance < poundsToPence(amount)) {
+    if (!(await ensureSpendableBalance((user as any)?.balance, poundsToPence(amount), refreshUser))) {
       toast.error('Insufficient balance');
       return;
     }

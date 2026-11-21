@@ -53,6 +53,10 @@ const Wallet: React.FC = () => {
 
   const handledCheckoutRef = useRef(false);
 
+  useEffect(() => {
+    void refreshUser();
+  }, [refreshUser]);
+
   // Check for payment success/cancel in URL params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

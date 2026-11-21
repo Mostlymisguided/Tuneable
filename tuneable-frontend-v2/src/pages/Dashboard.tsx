@@ -16,6 +16,7 @@ import UserAvatar from '../components/UserAvatar';
 import type { AmbassadorSummary, FoundingCreatorsStatus } from '../types';
 import AmbassadorDashboard from '../components/AmbassadorDashboard';
 import { penceToPounds, penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { formatTuneBytes } from '../utils/formatTuneBytes';
 import QuotaWarningBanner from '../components/QuotaWarningBanner';
 import { showCreatorDashboard } from '../utils/permissionHelpers';
@@ -59,7 +60,7 @@ interface SearchResult {
 }
 
 const Dashboard: React.FC = () => {
-  const { user, updateBalance } = useAuth();
+  const { user, updateBalance, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
@@ -730,7 +731,7 @@ Join here: ${inviteLink}`.trim();
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
     }
-    if ((user as any)?.balance < poundsToPence(amount)) {
+    if (!(await ensureSpendableBalance((user as any)?.balance, poundsToPence(amount), refreshUser))) {
       toast.error('Insufficient balance');
       return;
     }
@@ -840,7 +841,7 @@ Join here: ${inviteLink}`.trim();
       return;
     }
     
-    if ((user as any)?.balance < poundsToPence(bidAmount)) {
+    if (!(await ensureSpendableBalance((user as any)?.balance, poundsToPence(bidAmount), refreshUser))) {
       toast.error('Insufficient balance');
       return;
     }

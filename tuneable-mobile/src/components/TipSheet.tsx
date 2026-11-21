@@ -36,6 +36,7 @@ import {
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import {
+  ensureSpendableBalance,
   isInsufficientBalanceError,
   TIP_TOP_UP_MESSAGE,
 } from '@/src/lib/tipBalance';
@@ -116,7 +117,7 @@ export function TipSheet({
   onClose,
   onConfirm,
 }: Props) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { height: windowHeight } = useWindowDimensions();
   const [headerHeight, setHeaderHeight] = useState(0);
   const liveBalancePence = user?.balance ?? balancePence;
@@ -147,6 +148,11 @@ export function TipSheet({
     }
     showToast(message);
   };
+
+  useEffect(() => {
+    if (!visible) return;
+    void refreshUser();
+  }, [visible, refreshUser]);
 
   useEffect(() => {
     return () => {
@@ -365,7 +371,8 @@ export function TipSheet({
         return;
       }
       const neededPence = Math.round(amount * 100);
-      if (neededPence > liveBalancePence) {
+      const canAfford = await ensureSpendableBalance(liveBalancePence, neededPence, refreshUser);
+      if (!canAfford) {
         sendToWalletTopUp();
         return;
       }

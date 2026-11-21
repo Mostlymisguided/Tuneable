@@ -29,7 +29,7 @@ import type {
 } from '@/src/types/user';
 
 export default function ProfileScreen() {
-  const { user, logout, updateBalance } = useAuth();
+  const { user, logout, updateBalance, refreshUser } = useAuth();
   const { contentPaddingBottom } = usePlayerDockState();
   const canUpload = canUploadMedia(user);
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -52,6 +52,7 @@ export default function ProfileScreen() {
       setError(null);
       const userId = user.uuid || user.id;
 
+      void refreshUser().catch(() => undefined);
       const profileLoad = userAPI
         .getProfileById(userId)
         .then((res) => setProfileUser(res.user))
@@ -91,7 +92,7 @@ export default function ProfileScreen() {
         setRefreshing(false);
       }
     },
-    [user?.id, user?.uuid]
+    [user?.id, user?.uuid, refreshUser]
   );
 
   const heroUser: User | null = user

@@ -101,7 +101,7 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
   const momentDuration = typeof durationSeconds === 'number' && durationSeconds > 0 ? durationSeconds : 0;
   const [isEnablingCurrentLocation, setIsEnablingCurrentLocation] = useState(false);
   const coarsePointer = useCoarsePointer();
-  const { user: authUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
   const liveBalancePounds =
     typeof authUser?.balance === 'number' ? authUser.balance / 100 : userBalance;
   // Prefer explicit prop (party tips); fall back to auth so chart influence shows everywhere
@@ -278,6 +278,11 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
       sawLoading.current = false;
     }
   }, [isOpen, isLoading]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    void refreshUser();
+  }, [isOpen, refreshUser]);
 
   const handleSubmit = () => {
     if (submitting || isLoading || !isAmountValid) return;

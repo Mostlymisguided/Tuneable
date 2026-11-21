@@ -9,6 +9,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
 import BidConfirmationModal from './BidConfirmationModal';
 import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from '../utils/toast';
 import {
@@ -46,7 +47,7 @@ interface MP3PlayerProps {
 }
 
 const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
@@ -576,7 +577,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
     }
-    if ((user as any)?.balance < poundsToPence(amount)) {
+    if (!(await ensureSpendableBalance((user as any)?.balance, poundsToPence(amount), refreshUser))) {
       toast.error('Insufficient balance');
       return;
     }

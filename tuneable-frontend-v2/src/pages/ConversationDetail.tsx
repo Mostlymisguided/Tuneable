@@ -5,10 +5,11 @@ import { toast } from '../utils/toast';
 import { conversationAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { penceToPounds, poundsToPence } from '../utils/currency';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
 
 const ConversationDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user, updateBalance } = useAuth();
+  const { user, updateBalance, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [conversation, setConversation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +86,7 @@ const ConversationDetail: React.FC = () => {
         navigate('/login');
         return;
       }
-      if (poundsToPence(pledgeAmount) > (user.balance || 0)) {
+      if (!(await ensureSpendableBalance(user.balance, poundsToPence(pledgeAmount), refreshUser))) {
         toast.error('Insufficient balance — top up your wallet');
         return;
       }

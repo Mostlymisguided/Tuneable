@@ -181,28 +181,16 @@ walletTransactionSchema.pre('save', function(next) {
 // ========================================
 
 /**
- * Get user's total top-ups (completed topup transactions only)
+ * Get user's total spendable credits (completed top-ups, including manual admin credits).
  * @param {ObjectId} userId - User ID
- * @returns {Promise<number>} Total top-ups in pence
+ * @returns {Promise<number>} Total credits in pence
  */
 walletTransactionSchema.statics.getUserTotalTopUps = async function(userId) {
-  const result = await this.aggregate([
-    {
-      $match: {
-        userId: userId,
-        type: 'topup',
-        status: 'completed'
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: '$amount' }
-      }
-    }
-  ]);
-  
-  return result.length > 0 ? result[0].total : 0;
+  const { isCompletedBalanceCredit } = require('../utils/walletCredit');
+  const rows = await this.find({ userId, status: 'completed' })
+    .select('type status paymentMethod amount balanceBefore balanceAfter')
+    .lean();
+  return rows.reduce((sum, tx) => sum + (isCompletedBalanceCredit(tx) ? (tx.amount || 0) : 0), 0);
 };
 
 /**

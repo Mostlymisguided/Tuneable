@@ -8,6 +8,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 import { authAPI } from '@/src/api/auth';
 import { userAPI } from '@/src/api/user';
 import {
@@ -46,7 +47,7 @@ interface AuthContextValue {
   }) => Promise<User>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
   applyUser: (next: User) => Promise<void>;
   updateBalance: (newBalancePence: number) => void;
   handleOAuthCallback: (token: string, refreshToken?: string | null) => Promise<User>;
@@ -239,10 +240,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshUser = useCallback(async () => {
-    const { user: fresh } = await authAPI.getProfile();
-    await applyUser(fresh);
+  const refreshUser = useCallback(async (): Promise<User | null> => {
+    try {
+      const { user: fresh } = await authAPI.getProfile();
+      await applyUser(fresh);
+      return fresh;
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+      return null;
+    }
   }, [applyUser]);
+
+  // Admin credits and other top-ups land on the account while the app stays
+  // open. Reload the wallet when the app comes back to the foreground.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !tokenRef.current) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void refreshUser();
+      }, 400);
+    });
+    return () => {
+      sub.remove();
+      if (timer) clearTimeout(timer);
+    };
+  }, [refreshUser]);
 
   const updateBalance = useCallback((newBalancePence: number) => {
     setUser((prev) => {
