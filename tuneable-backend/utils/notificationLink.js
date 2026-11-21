@@ -24,8 +24,24 @@ function defaultLinkText(link) {
   return 'Open';
 }
 
+function wholeTuneBytes(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return '0';
+  return String(Math.round(value));
+}
+
+function roundTuneBytesEarnedMessage(notification) {
+  if (notification.type !== 'tune_bytes_earned' || typeof notification.message !== 'string') return;
+  notification.message = notification.message.replace(
+    /^(You earned )(-?\d+(?:\.\d+)?)( TuneBytes\b)/,
+    (_, prefix, amount, suffix) => `${prefix}${wholeTuneBytes(amount)}${suffix}`
+  );
+}
+
 function resolveNotificationLink(notification) {
   if (!notification || typeof notification !== 'object') return notification;
+
+  roundTuneBytesEarnedMessage(notification);
 
   if (!notification.link) {
     const collective = entityToken(notification.relatedCollectiveId, ['slug', 'uuid']);
@@ -51,4 +67,5 @@ function resolveNotificationLink(notification) {
 module.exports = {
   resolveNotificationLink,
   defaultLinkText,
+  wholeTuneBytes,
 };

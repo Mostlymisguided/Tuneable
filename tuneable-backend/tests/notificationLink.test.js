@@ -1,4 +1,4 @@
-const { resolveNotificationLink } = require('../utils/notificationLink');
+const { resolveNotificationLink, wholeTuneBytes } = require('../utils/notificationLink');
 
 describe('resolveNotificationLink', () => {
   test('keeps an explicit collective invitation link', () => {
@@ -53,5 +53,17 @@ describe('resolveNotificationLink', () => {
         relatedMediaId: { uuid: 'tune-9' },
       }).link
     ).toBe('/tune/tune-9');
+  });
+
+  test('rounds TuneBytes earned notification amounts to the nearest whole number', () => {
+    expect(wholeTuneBytes(12.49)).toBe('12');
+    expect(wholeTuneBytes(12.5)).toBe('13');
+
+    const notification = resolveNotificationLink({
+      type: 'tune_bytes_earned',
+      message: 'You earned 18.62 TuneBytes for discovering "Night Shift"',
+      link: '/tune/night-shift',
+    });
+    expect(notification.message).toBe('You earned 19 TuneBytes for discovering "Night Shift"');
   });
 });
