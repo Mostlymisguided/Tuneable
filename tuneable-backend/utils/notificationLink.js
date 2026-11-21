@@ -24,6 +24,12 @@ function defaultLinkText(link) {
   return 'Open';
 }
 
+function wholeTuneBytes(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return '0';
+  return String(Math.round(value));
+}
+
 /** Stored tip amounts are integer pence. 55 formats as £0.55. */
 function formatPenceAsPounds(amountPence) {
   const pence = Number(amountPence);
@@ -50,9 +56,18 @@ function correctMislabelledTipAmount(notification) {
   if (bid._id) notification.relatedBidId = bid._id;
 }
 
+function roundTuneBytesEarnedMessage(notification) {
+  if (notification.type !== 'tune_bytes_earned' || typeof notification.message !== 'string') return;
+  notification.message = notification.message.replace(
+    /^(You earned )(-?\d+(?:\.\d+)?)( TuneBytes\b)/,
+    (_, prefix, amount, suffix) => `${prefix}${wholeTuneBytes(amount)}${suffix}`
+  );
+}
+
 function resolveNotificationLink(notification) {
   if (!notification || typeof notification !== 'object') return notification;
 
+  roundTuneBytesEarnedMessage(notification);
   correctMislabelledTipAmount(notification);
 
   if (!notification.link) {
@@ -79,5 +94,6 @@ function resolveNotificationLink(notification) {
 module.exports = {
   resolveNotificationLink,
   defaultLinkText,
+  wholeTuneBytes,
   formatPenceAsPounds,
 };
