@@ -9,7 +9,7 @@ const User = require('../models/User');
 const Media = require('../models/Media');
 const { sendNotification, sendUnreadCount } = require('../utils/socketIO');
 const { isBlockedBetween } = require('../utils/userBlocks');
-const { resolveNotificationLink, wholeTuneBytes } = require('../utils/notificationLink');
+const { resolveNotificationLink, formatPenceAsPounds } = require('../utils/notificationLink');
 
 // Types where relatedUserId is the member who caused the notification. Admin and
 // system notices also set relatedUserId, so they must stay out of this list.
@@ -189,7 +189,7 @@ const createNotification = async (params) => {
  * @param {string} bidderId - User ID of tipper
  * @param {string} mediaId - Media ID
  * @param {string} bidId - Tip ID
- * @param {number} bidAmount - Tip amount
+ * @param {number} bidAmount - Tip amount in pence
  * @param {string} mediaTitle - Media title
  */
 const notifyBidReceived = async (mediaOwnerId, bidderId, mediaId, bidId, bidAmount, mediaTitle) => {
@@ -205,7 +205,7 @@ const notifyBidReceived = async (mediaOwnerId, bidderId, mediaId, bidId, bidAmou
       userId: mediaOwnerId,
       type: 'bid_received',
       title: 'New Tip Received',
-      message: `${bidder?.username || 'Someone'} placed a £${bidAmount.toFixed(2)} tip on "${mediaTitle}"`,
+      message: `${bidder?.username || 'Someone'} placed a ${formatPenceAsPounds(bidAmount)} tip on "${mediaTitle}"`,
       link: `/tune/${mediaLinkId}`,
       linkText: 'View Media',
       relatedMediaId: mediaId,
@@ -223,7 +223,7 @@ const notifyBidReceived = async (mediaOwnerId, bidderId, mediaId, bidId, bidAmou
  * @param {string} userId - User ID who was outtipped
  * @param {string} mediaId - Media ID
  * @param {string} bidId - New top tip ID
- * @param {number} newTopBid - New top tip amount
+ * @param {number} newTopBid - New top tip amount in pence
  * @param {string} mediaTitle - Media title
  */
 const notifyOutbid = async (userId, mediaId, bidId, newTopBid, mediaTitle) => {
@@ -238,7 +238,7 @@ const notifyOutbid = async (userId, mediaId, bidId, newTopBid, mediaTitle) => {
       userId,
       type: 'bid_outbid',
       title: 'You Were Outtipped',
-      message: `Someone placed a higher tip (£${newTopBid.toFixed(2)}) on "${mediaTitle}"`,
+      message: `Someone placed a higher tip (${formatPenceAsPounds(newTopBid)}) on "${mediaTitle}"`,
       link: `/tune/${mediaLinkId}`,
       linkText: 'View Media',
       relatedMediaId: mediaId,
@@ -406,7 +406,7 @@ const notifyClaim = async (userId, status, mediaId, mediaTitle, reason = null, a
  */
 const notifyTuneBytesEarned = async (userId, amount, reason, mediaId = null, mediaTitle = null) => {
   try {
-    let message = `You earned ${wholeTuneBytes(amount)} TuneBytes`;
+    let message = `You earned ${amount.toFixed(2)} TuneBytes`;
     if (reason === 'discovery') {
       message += mediaTitle ? ` for discovering "${mediaTitle}"` : ' for discovering a tune';
     } else if (reason === 'popularity_growth') {

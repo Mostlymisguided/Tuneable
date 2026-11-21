@@ -36,6 +36,7 @@ router.get('/', authMiddleware, async (req, res) => {
       .populate('relatedLabelId', 'name slug uuid profilePicture')
       .populate('relatedCollectiveId', 'name slug uuid profilePicture')
       .populate('relatedConversationId', 'title uuid')
+      .populate('relatedBidId', 'amount')
       .lean();
     
     const total = await Notification.countDocuments(query);

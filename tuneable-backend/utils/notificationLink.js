@@ -24,24 +24,36 @@ function defaultLinkText(link) {
   return 'Open';
 }
 
-function wholeTuneBytes(amount) {
-  const value = Number(amount);
-  if (!Number.isFinite(value)) return '0';
-  return String(Math.round(value));
+/** Stored tip amounts are integer pence. 55 formats as £0.55. */
+function formatPenceAsPounds(amountPence) {
+  const pence = Number(amountPence);
+  if (!Number.isFinite(pence)) return '£0.00';
+  return `£${(pence / 100).toFixed(2)}`;
 }
 
-function roundTuneBytesEarnedMessage(notification) {
-  if (notification.type !== 'tune_bytes_earned' || typeof notification.message !== 'string') return;
-  notification.message = notification.message.replace(
-    /^(You earned )(-?\d+(?:\.\d+)?)( TuneBytes\b)/,
-    (_, prefix, amount, suffix) => `${prefix}${wholeTuneBytes(amount)}${suffix}`
-  );
+/**
+ * Older tip notifications printed the pence integer after £.
+ * When the related tip is loaded, replace that figure with pounds.
+ */
+function correctMislabelledTipAmount(notification) {
+  if (!notification) return;
+  const bid = notification.relatedBidId;
+  if (!bid || typeof bid !== 'object') return;
+
+  const amountPence = Number(bid.amount);
+  const isTipNotice = notification.type === 'bid_received' || notification.type === 'bid_outbid';
+  if (isTipNotice && Number.isFinite(amountPence) && typeof notification.message === 'string') {
+    notification.message = notification.message.replace(/£(\d+(?:\.\d+)?)/, (full, raw) => (
+      Number(raw) === amountPence ? formatPenceAsPounds(amountPence) : full
+    ));
+  }
+  if (bid._id) notification.relatedBidId = bid._id;
 }
 
 function resolveNotificationLink(notification) {
   if (!notification || typeof notification !== 'object') return notification;
 
-  roundTuneBytesEarnedMessage(notification);
+  correctMislabelledTipAmount(notification);
 
   if (!notification.link) {
     const collective = entityToken(notification.relatedCollectiveId, ['slug', 'uuid']);
@@ -67,5 +79,5 @@ function resolveNotificationLink(notification) {
 module.exports = {
   resolveNotificationLink,
   defaultLinkText,
-  wholeTuneBytes,
+  formatPenceAsPounds,
 };

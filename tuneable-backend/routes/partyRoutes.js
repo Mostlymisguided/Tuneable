@@ -2570,7 +2570,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
                         userId.toString(),
                         actualMediaId.toString(),
                         bid._id.toString(),
-                        bidAmount,
+                        bidAmountPence,
                         populatedMedia.title
                     ).catch(err => console.error('Error sending tip received notification:', err));
                 }
@@ -2581,7 +2581,7 @@ router.post('/:partyId/media/:mediaId/bid', authMiddleware, resolvePartyId(), as
                         previousTopBidderId.toString(),
                         actualMediaId.toString(),
                         bid._id.toString(),
-                        bidAmount,
+                        bidAmountPence,
                         populatedMedia.title
                     ).catch(err => console.error('Error sending outtipped notification:', err));
                 }
