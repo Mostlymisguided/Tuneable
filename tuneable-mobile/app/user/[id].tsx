@@ -213,6 +213,12 @@ export default function PublicUserProfileScreen() {
             championBadges={championBadges}
             badgesLoading={badgesLoading}
             onReportPress={() => setReportOpen(true)}
+            onBlockPress={() => {
+              if (blockedByMe) void unblock();
+              else confirmBlock();
+            }}
+            blockedByMe={blockedByMe}
+            blockBusy={blockBusy}
           />
           {blockedByMe ? (
             <View style={styles.blockedBanner}>
@@ -223,19 +229,7 @@ export default function PublicUserProfileScreen() {
                 </Text>
               </Pressable>
             </View>
-          ) : (
-            <Pressable
-              style={styles.blockBtn}
-              onPress={confirmBlock}
-              disabled={blockBusy}
-              accessibilityRole="button"
-              accessibilityLabel="Block user">
-              <Ionicons name="ban-outline" size={16} color="#fca5a5" />
-              <Text style={styles.blockBtnText}>
-                {blockBusy ? 'Working…' : 'Block user'}
-              </Text>
-            </Pressable>
-          )}
+          ) : null}
           {blockedByMe ? (
             <Text style={styles.hiddenNote}>
               Their library is hidden while they are blocked.
@@ -296,23 +290,6 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: '#fff',
-    fontWeight: '600',
-  },
-  blockBtn: {
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.35)',
-    backgroundColor: 'rgba(127, 29, 29, 0.25)',
-    paddingVertical: 12,
-  },
-  blockBtnText: {
-    color: '#fecaca',
-    fontSize: 15,
     fontWeight: '600',
   },
   blockedBanner: {

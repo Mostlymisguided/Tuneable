@@ -1,5 +1,6 @@
 import { Children, useState, type ReactNode } from 'react';
 import {
+  ActivityIndicator,
   Linking,
   Pressable,
   StyleSheet,
@@ -88,6 +89,9 @@ type Props = {
   onWalletPress?: () => void;
   onSettingsPress?: () => void;
   onReportPress?: () => void;
+  onBlockPress?: () => void;
+  blockedByMe?: boolean;
+  blockBusy?: boolean;
 };
 
 export function UserProfileHero({
@@ -101,6 +105,9 @@ export function UserProfileHero({
   onWalletPress,
   onSettingsPress,
   onReportPress,
+  onBlockPress,
+  blockedByMe = false,
+  blockBusy = false,
 }: Props) {
   const homeLabel = formatLocationLabel(user.homeLocation);
   const secondaryLabel = formatLocationLabel(user.secondaryLocation);
@@ -243,24 +250,48 @@ export function UserProfileHero({
             ) : null}
           </View>
         </View>
-        {onSettingsPress ? (
-          <Pressable
-            style={styles.gearBtn}
-            onPress={onSettingsPress}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Settings">
-            <Ionicons name="settings-outline" size={20} color={colors.text} />
-          </Pressable>
-        ) : onReportPress ? (
-          <Pressable
-            style={styles.gearBtn}
-            onPress={onReportPress}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Report user">
-            <Ionicons name="flag-outline" size={20} color={colors.text} />
-          </Pressable>
+        {onSettingsPress || onReportPress || onBlockPress ? (
+          <View style={styles.headerActions}>
+            {onReportPress ? (
+              <Pressable
+                style={styles.gearBtn}
+                onPress={onReportPress}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Report user">
+                <Ionicons name="flag-outline" size={20} color={colors.text} />
+              </Pressable>
+            ) : null}
+            {onBlockPress ? (
+              <Pressable
+                style={[styles.gearBtn, blockedByMe ? styles.unblockBtn : styles.blockBtn]}
+                onPress={onBlockPress}
+                disabled={blockBusy}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={blockedByMe ? 'Unblock user' : 'Block user'}>
+                {blockBusy ? (
+                  <ActivityIndicator size="small" color={blockedByMe ? colors.text : '#fca5a5'} />
+                ) : (
+                  <Ionicons
+                    name="ban-outline"
+                    size={18}
+                    color={blockedByMe ? colors.text : '#fca5a5'}
+                  />
+                )}
+              </Pressable>
+            ) : null}
+            {onSettingsPress ? (
+              <Pressable
+                style={styles.gearBtn}
+                onPress={onSettingsPress}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Settings">
+                <Ionicons name="settings-outline" size={20} color={colors.text} />
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
 
@@ -555,12 +586,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   gearBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  blockBtn: {
+    backgroundColor: 'rgba(127, 29, 29, 0.55)',
+  },
+  unblockBtn: {
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   statsRow: {
