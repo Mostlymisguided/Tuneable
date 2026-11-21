@@ -5,11 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
-import {
-  DEFAULT_TIP_POUNDS,
-  hasHomeLocation,
-  needsOnboarding,
-} from '@/src/lib/onboarding';
+import { hasHomeLocation, needsOnboarding } from '@/src/lib/onboarding';
 import {
   getPushPermissionSnapshot,
   requestAndRegisterPush,
@@ -122,13 +118,10 @@ export function DashboardPrompts() {
     !user.hasPushDevice &&
     !user.onboarding?.notificationsPromptSeenAt;
 
-  const currentDefaultTip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
-  const showDefaultTip =
-    !user.onboarding?.defaultTipPromptSeenAt && !dismissed.has('defaultTip');
   const showEmail = !user.emailVerified && !dismissed.has('email');
   const showPic = !hasCustomProfilePic(user.profilePic) && !dismissed.has('pic');
 
-  if (!showLocation && !showPush && !showDefaultTip && !showEmail && !showPic) return null;
+  if (!showLocation && !showPush && !showEmail && !showPic) return null;
 
   const sendVerification = async () => {
     setSendingEmail(true);
@@ -139,18 +132,6 @@ export function DashboardPrompts() {
       showToast(getApiErrorMessage(err, 'Could not send verification email.'), 'error');
     } finally {
       setSendingEmail(false);
-    }
-  };
-
-  const dismissDefaultTip = async () => {
-    setDismissed((prev) => new Set(prev).add('defaultTip'));
-    try {
-      await authAPI.updateProfile({
-        onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
-      });
-      await refreshUser();
-    } catch {
-      // Local dismiss still hides it this session
     }
   };
 
@@ -199,16 +180,6 @@ export function DashboardPrompts() {
             void allowNotifications();
           }}
           onDismiss={() => void markNotificationsSeen()}
-        />
-      ) : null}
-      {showDefaultTip ? (
-        <PromptCard
-          icon="cash-outline"
-          title="Set your default tip"
-          body={`Adding a tune to your library places a tip. Currently £${currentDefaultTip.toFixed(2)} — change it, or keep this amount.`}
-          actionLabel="Set tip"
-          onAction={() => router.push('/edit-profile')}
-          onDismiss={() => void dismissDefaultTip()}
         />
       ) : null}
       {showEmail ? (

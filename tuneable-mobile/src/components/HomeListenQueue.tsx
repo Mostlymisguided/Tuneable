@@ -273,7 +273,6 @@ export function HomeListenQueue({
         title={tipTarget?.title || 'Untitled'}
         subtitle={tipTarget?.artist}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 1}
         tipMedia={
           tipTarget
             ? {

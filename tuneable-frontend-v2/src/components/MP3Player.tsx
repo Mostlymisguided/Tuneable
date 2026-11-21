@@ -4,6 +4,7 @@ import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Heart } from 'lucide-react';
 import { mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import ClickableArtistDisplay from './ClickableArtistDisplay';
 import { resolveUploadAudioUrl } from '../utils/audioUrls';
@@ -48,6 +49,7 @@ interface MP3PlayerProps {
 
 const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   const { user, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
@@ -772,7 +774,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
         isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
-        bidAmount={Math.max(media.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
+        bidAmount={Math.max(media.minimumBid || 0.01, globalAverageTip)}
         minTip={media.minimumBid || 0.01}
         avgTip={getAverageTip()}
         championAggregate={championTip?.championAggregate}

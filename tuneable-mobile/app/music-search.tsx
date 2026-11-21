@@ -103,11 +103,6 @@ export default function MusicSearchScreen() {
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const keyboard = useHideKeyboardAccessory();
 
-  const defaultTip = useMemo(
-    () => user?.preferences?.defaultTip ?? 1,
-    [user?.preferences?.defaultTip]
-  );
-
   const filteredResults = useMemo(() => {
     if (filter === 'library') return results.filter(isLibraryResult);
     if (filter === 'catalog') return results.filter((item) => !isLibraryResult(item));
@@ -540,7 +535,6 @@ export default function MusicSearchScreen() {
           tipTarget ? formatSearchArtist(tipTarget.artist) : undefined
         }
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={defaultTip}
         tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={addAndTip}

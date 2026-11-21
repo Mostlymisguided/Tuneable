@@ -680,7 +680,6 @@ export default function TagProfileScreen() {
             : undefined
         }
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={tipTarget}
         initialTags={tagName ? [tagName] : undefined}
         onClose={() => setTipTarget(null)}

@@ -318,7 +318,6 @@ export function BookChartScreen({ onChartKindChange }: Props) {
         title={tipTarget?.title || 'Untitled'}
         subtitle={tipTarget ? getCreatorDisplay(tipTarget) : undefined}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={onConfirmTip}

@@ -223,7 +223,6 @@ export default function BookProfileScreen() {
         title={book?.title || 'Untitled'}
         subtitle={author || undefined}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={book}
         onClose={() => setTipOpen(false)}
         onConfirm={onConfirmTip}

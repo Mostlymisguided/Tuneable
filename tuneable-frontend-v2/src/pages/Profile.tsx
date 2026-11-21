@@ -53,7 +53,6 @@ const Profile: React.FC = () => {
     cellPhone: '',
     homeLocation: null as ResolvedLocation | null,
     secondaryLocation: null as ResolvedLocation | null,
-    defaultTip: 1.11
   });
 
   useEffect(() => {
@@ -73,7 +72,6 @@ const Profile: React.FC = () => {
         cellPhone: (response.user as any).cellPhone || '',
         homeLocation: response.user.homeLocation ? { ...response.user.homeLocation } : null,
         secondaryLocation: response.user.secondaryLocation ? { ...response.user.secondaryLocation } : null,
-        defaultTip: (response.user as any).preferences?.defaultTip || 1.11
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -131,7 +129,6 @@ const Profile: React.FC = () => {
         cellPhone: profile?.cellPhone || '',
         homeLocation: profile?.homeLocation ? { ...profile.homeLocation } : null,
         secondaryLocation: profile?.secondaryLocation ? { ...profile.secondaryLocation } : null,
-        defaultTip: (profile as any)?.preferences?.defaultTip || 1.11
       });
     }
     setIsEditing(!isEditing);
@@ -147,23 +144,12 @@ const Profile: React.FC = () => {
         secondaryLocation: editForm.secondaryLocation,
       };
 
-      // Update preferences separately
-      if (editForm.defaultTip !== undefined) {
-        updateData.preferences = {
-          defaultTip: editForm.defaultTip
-        };
-      }
-
       await authAPI.updateProfile(updateData);
       
       if (profile) {
         setProfile({
           ...profile,
           ...editForm,
-          preferences: {
-            ...(profile as any)?.preferences,
-            defaultTip: editForm.defaultTip
-          }
         } as any);
       }
       

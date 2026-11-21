@@ -62,7 +62,6 @@ type Props = {
   userId?: string | null;
   revision: number;
   balancePence?: number;
-  defaultTipPounds?: number;
   onBalanceUpdate?: (balancePence: number) => void;
 };
 
@@ -477,7 +476,6 @@ export function RecentActivityFeed({
   userId,
   revision,
   balancePence = 0,
-  defaultTipPounds = 1,
   onBalanceUpdate,
 }: Props) {
   const { height: windowHeight } = useWindowDimensions();
@@ -665,7 +663,6 @@ export function RecentActivityFeed({
         title={tipTarget?.title || 'Untitled'}
         subtitle={tipTarget?.artist}
         balancePence={balancePence}
-        defaultTipPounds={defaultTipPounds}
         initialAmountPounds={
           tipTarget?.regainPence ? tipTarget.regainPence / 100 : null
         }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { useSocketIOParty } from '../hooks/useSocketIOParty';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
@@ -346,6 +347,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
   const { partyId } = useParams<{ partyId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateBalance } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const navigate = useNavigate();
   const [party, setParty] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -366,12 +368,8 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
     return media?.minimumBid ?? party?.minimumBid ?? 0.01;
   };
 
-  // Helper function to get default bid amount (uses user's defaultTip preference, respects minimum)
   const getDefaultBidAmount = (media?: any): number => {
-    const minBid = getEffectiveMinimumBid(media);
-    const userDefaultTip = user?.preferences?.defaultTip || 1.11;
-    // Use the higher of minimum bid or user's default tip
-    return Math.max(minBid, userDefaultTip);
+    return Math.max(getEffectiveMinimumBid(media), globalAverageTip);
   };
   
   // Bid modal state
@@ -1047,7 +1045,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
           youtube: youtubeResults
         });
         
-        // Initialize bid amounts for results (use average bid or default tip, whichever is higher)
+        // Initialize bid amounts for results (use the tune average or the global average, whichever is higher)
         const newBidAmounts: Record<string, string> = {};
         [...databaseResults, ...youtubeResults].forEach(media => {
           const avgBid = calculateAverageBid(media);
@@ -1098,7 +1096,7 @@ const Party: React.FC<PartyProps> = ({ headerVariant = 2 }) => {
       
       setAddMediaResults({ database: databaseResults, youtube: youtubeResults });
       
-      // Initialize bid amounts for results (use average bid or default tip, whichever is higher)
+      // Initialize bid amounts for results (use the tune average or the global average, whichever is higher)
       const newBidAmounts: Record<string, string> = {};
       [...databaseResults, ...youtubeResults].forEach(media => {
         const avgBid = calculateAverageBid(media);

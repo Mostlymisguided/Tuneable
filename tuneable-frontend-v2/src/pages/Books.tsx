@@ -17,6 +17,7 @@ import {
 import { toast } from '../utils/toast';
 import { booksAPI, locationAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import AddMediaPrompt from '../components/AddMediaPrompt';
 import BookQueueMediaCard, { bookAuthorLine, type BookChartCardData } from '../components/BookQueueMediaCard';
@@ -97,6 +98,7 @@ const Books: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
 
   const [books, setBooks] = useState<BookChartCardData[]>([]);
   const [serverTopLocations, setServerTopLocations] = useState<ChartTopLocation[]>([]);
@@ -734,7 +736,7 @@ const Books: React.FC = () => {
           setSelectedBook(null);
         }}
         onConfirm={handleConfirmTip}
-        bidAmount={user?.preferences?.defaultTip || 1.11}
+        bidAmount={globalAverageTip}
         minTip={0.01}
         avgTip={selectedBookTipStats.avgTip}
         championAggregate={selectedBookTipStats.championAggregate}

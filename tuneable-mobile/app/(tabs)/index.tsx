@@ -240,7 +240,6 @@ export default function HomeScreen() {
             userId={user?.uuid || user?.id}
             revision={activityRevision}
             balancePence={user?.balance}
-            defaultTipPounds={user?.preferences?.defaultTip ?? 1}
             onBalanceUpdate={(balance) => {
               updateBalance(balance);
               setActivityRevision((current) => current + 1);

@@ -58,7 +58,6 @@ export function PlayerMiniBar() {
       ? getCreatorDisplay(tipTrack)
       : undefined;
   const tipMedia = tipEpisode ?? tipTrack ?? undefined;
-  const defaultTip = user?.preferences?.defaultTip ?? 1.11;
 
   const onConfirmTip = async (amountPounds: number, tags: string[]) => {
     const id = tipEpisode
@@ -115,7 +114,6 @@ export function PlayerMiniBar() {
           title={tipTitle}
           subtitle={tipSubtitle}
           balancePence={user.balance ?? 0}
-          defaultTipPounds={defaultTip}
           tipMedia={tipMedia}
           onClose={() => setTipOpen(false)}
           onConfirm={onConfirmTip}

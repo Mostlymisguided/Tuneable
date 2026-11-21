@@ -223,11 +223,6 @@ const userSchema = new mongoose.Schema({
   preferences: {
     theme: { type: String, default: 'light' },
     anonymousMode: { type: Boolean, default: false },
-    defaultTip: { 
-      type: Number, 
-      default: 1.11, // £1.11 default
-      min: [0.01, 'Default tip must be at least £0.01']
-    },
     favoriteTags: {
       type: [String],
       default: [],
@@ -250,7 +245,6 @@ const userSchema = new mongoose.Schema({
     },
   },
   onboarding: {
-    defaultTipPromptSeenAt: { type: Date },
     completedAt: { type: Date },
     favoriteTagsSelectedAt: { type: Date },
     importPromptSeenAt: { type: Date },

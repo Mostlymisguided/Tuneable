@@ -662,7 +662,6 @@ export default function PodcastShowScreen() {
         title={tipTarget?.title || 'Episode'}
         subtitle={tipTarget ? seriesTitle(tipTarget) : series?.title}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={user?.preferences?.defaultTip ?? 1.11}
         tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={onConfirmTip}

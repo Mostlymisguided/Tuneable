@@ -23,7 +23,7 @@ import { LocationAutocomplete } from '@/src/components/LocationAutocomplete';
 import { authAPI } from '@/src/api/auth';
 import { useAuth } from '@/src/auth/AuthContext';
 import { getApiErrorMessage } from '@/src/lib/apiError';
-import { DEFAULT_TIP_POUNDS, hasHomeLocation } from '@/src/lib/onboarding';
+import { hasHomeLocation } from '@/src/lib/onboarding';
 import { canResizeOnDevice, prepareProfilePhoto } from '@/src/lib/profileImage';
 import { showToast } from '@/src/stores/toastStore';
 import { colors } from '@/src/theme/colors';
@@ -85,9 +85,6 @@ export default function EditProfileScreen() {
   const [givenName, setGivenName] = useState(user?.givenName ?? '');
   const [familyName, setFamilyName] = useState(user?.familyName ?? '');
   const [cellPhone, setCellPhone] = useState(user?.cellPhone ?? '');
-  const [defaultTip, setDefaultTip] = useState(
-    (user?.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS).toFixed(2)
-  );
   const [homeLocation, setHomeLocation] = useState<ResolvedLocation | null>(
     user?.homeLocation ?? null
   );
@@ -241,12 +238,6 @@ export default function EditProfileScreen() {
       return;
     }
 
-    const parsedTip = parseFloat(defaultTip);
-    if (Number.isNaN(parsedTip) || parsedTip < 0.01) {
-      setError('Default tip must be at least £0.01');
-      return;
-    }
-
     setSaving(true);
     setError(null);
     try {
@@ -269,8 +260,6 @@ export default function EditProfileScreen() {
       payload.secondaryLocation = showSecondary
         ? locationPayload(secondaryLocation)
         : null;
-      payload.preferences = { defaultTip: parsedTip };
-      payload.onboarding = { defaultTipPromptSeenAt: new Date().toISOString() };
 
       await authAPI.updateProfile(payload);
       await refreshUser();
@@ -422,22 +411,6 @@ export default function EditProfileScreen() {
               placeholderTextColor={colors.textMuted}
               inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
             />
-          </Field>
-
-          <Field label="Default tip (£)">
-            <TextInput
-              style={styles.input}
-              value={defaultTip}
-              onChangeText={setDefaultTip}
-              editable={!busy}
-              keyboardType="decimal-pad"
-              placeholder={DEFAULT_TIP_POUNDS.toFixed(2)}
-              placeholderTextColor={colors.textMuted}
-              inputAccessoryViewID={NUMERIC_KEYBOARD_ACCESSORY_ID}
-            />
-            <Text style={styles.hint}>
-              Used when you add a tune to your library. Minimum £0.01.
-            </Text>
           </Field>
 
           <LocationAutocomplete

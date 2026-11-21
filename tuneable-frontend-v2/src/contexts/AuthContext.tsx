@@ -63,7 +63,6 @@ export interface User {
   preferences?: {
     theme?: string;
     anonymousMode?: boolean;
-    defaultTip?: number; // Default tip amount in pounds (e.g., 1.11 for £1.11)
     favoriteTags?: string[];
     notifications?: {
       email?: boolean;
@@ -78,7 +77,6 @@ export interface User {
     };
   };
   onboarding?: {
-    defaultTipPromptSeenAt?: string;
     completedAt?: string;
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;

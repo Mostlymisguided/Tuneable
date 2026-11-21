@@ -93,7 +93,6 @@ export default function NowPlayingScreen() {
   const showHref = showId ? (`/show/${showId}` as const) : null;
   const tipMedia =
     active === 'podcast' ? episode ?? undefined : active === 'music' ? track ?? undefined : undefined;
-  const defaultTip = user?.preferences?.defaultTip ?? 1.11;
   const championsMediaId = podcastId || tuneId;
 
   useEffect(() => {
@@ -372,7 +371,6 @@ export default function NowPlayingScreen() {
         title={title}
         subtitle={subtitle}
         balancePence={user.balance ?? 0}
-        defaultTipPounds={defaultTip}
         tipMedia={tipMedia}
         onClose={() => setTipOpen(false)}
         onConfirm={onConfirmTip}

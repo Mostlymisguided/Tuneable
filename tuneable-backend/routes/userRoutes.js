@@ -3714,15 +3714,6 @@ router.get('/me/my-media', authMiddleware, async (req, res) => {
   }
 });
 
-function markDefaultTipPromptSeen(user) {
-  if (!user.onboarding) {
-    user.onboarding = {};
-  }
-  if (!user.onboarding.defaultTipPromptSeenAt) {
-    user.onboarding.defaultTipPromptSeenAt = new Date();
-  }
-}
-
 const PROFILE_SOCIAL_KEYS = ['instagram', 'facebook', 'soundcloud', 'spotify', 'youtube', 'twitter'];
 
 function assignProfileText(user, field, value, maxLength) {
@@ -3887,24 +3878,6 @@ async function handleProfileUpdate(req, res) {
 
     const { normalizeTagForStorage, getTagMatchKey } = require('../utils/tagNormalizer');
 
-    // Handle preferences updates separately
-    if (preferences?.defaultTip !== undefined) {
-      if (!user.preferences) {
-        user.preferences = {};
-      }
-      const defaultTip = preferences.defaultTip;
-
-      if (defaultTip < 0.01) {
-        return res.status(400).json({
-          error: 'Default tip must be at least £0.01',
-          field: 'preferences.defaultTip',
-        });
-      }
-
-      user.preferences.defaultTip = defaultTip;
-      markDefaultTipPromptSeen(user);
-    }
-
     if (preferences?.favoriteTags !== undefined) {
       if (!user.preferences) {
         user.preferences = {};
@@ -3952,12 +3925,6 @@ async function handleProfileUpdate(req, res) {
       };
 
       try {
-        if (onboarding.defaultTipPromptSeenAt !== undefined) {
-          user.onboarding.defaultTipPromptSeenAt = parseOnboardingDate(
-            onboarding.defaultTipPromptSeenAt,
-            'onboarding.defaultTipPromptSeenAt'
-          );
-        }
         if (onboarding.completedAt !== undefined) {
           user.onboarding.completedAt = parseOnboardingDate(
             onboarding.completedAt,
@@ -4127,7 +4094,6 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
       tune_bytes_earned,
       email,
       anonymousMode,
-      defaultTip,
     } = req.body;
 
     // Initialize preferences if they don't exist
@@ -4154,25 +4120,12 @@ router.put('/notification-preferences', authMiddleware, async (req, res) => {
     // Update privacy settings
     if (anonymousMode !== undefined) user.preferences.anonymousMode = anonymousMode;
 
-    // Update default tip
-    if (defaultTip !== undefined) {
-      if (defaultTip < 0.01) {
-        return res.status(400).json({ 
-          error: 'Default tip must be at least £0.01',
-          field: 'defaultTip'
-        });
-      }
-      user.preferences.defaultTip = defaultTip;
-      markDefaultTipPromptSeen(user);
-    }
-
     await user.save();
 
     res.json({
       success: true,
       message: 'Notification preferences updated successfully',
       preferences: user.preferences.notifications,
-      defaultTip: user.preferences.defaultTip,
     });
   } catch (error) {
     console.error('Error updating notification preferences:', error);

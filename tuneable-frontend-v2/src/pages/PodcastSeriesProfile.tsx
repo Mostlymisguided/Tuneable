@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { mediaAPI } from '../lib/api';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import { 
@@ -106,6 +107,7 @@ const PodcastSeriesProfile: React.FC = () => {
   const { seriesId } = useParams<{ seriesId: string }>();
   const navigate = useNavigate();
   const { user, updateBalance } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   
   const [series, setSeries] = useState<PodcastSeries | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
@@ -140,7 +142,7 @@ const PodcastSeriesProfile: React.FC = () => {
   const selectedEpisodeMinTip = selectedEpisode?.minimumBid ?? 0.01;
   const selectedEpisodeDefaultTip = Math.max(
     selectedEpisodeMinTip,
-    user?.preferences?.defaultTip || 1.11
+    globalAverageTip
   );
 
   // Share state

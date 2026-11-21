@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, MapPin, Navigation, User, X, CheckCircle, Coins } from 'lucide-react';
-import { emailAPI, authAPI } from '../lib/api';
+import { Mail, MapPin, Navigation, User, X, CheckCircle } from 'lucide-react';
+import { emailAPI } from '../lib/api';
 import { toast } from '../utils/toast';
-import { hasCustomProfilePic, DEFAULT_TIP_POUNDS } from '../constants';
-import { useAuth } from '../contexts/AuthContext';
+import { hasCustomProfilePic } from '../constants';
 import { useCurrentLocation } from '../contexts/CurrentLocationContext';
 import { formatLocation } from '../utils/locationHelpers';
 import { getUserProfileUrl } from '../utils/profileNavigation';
@@ -16,12 +15,6 @@ interface User {
   username?: string;
   emailVerified?: boolean;
   profilePic?: string;
-  onboarding?: {
-    defaultTipPromptSeenAt?: string;
-  };
-  preferences?: {
-    defaultTip?: number;
-  };
   homeLocation?: {
     city?: string;
     region?: string;
@@ -51,7 +44,6 @@ interface Prompt {
 
 const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss }) => {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
   const {
     currentLocation,
     status: currentLocationStatus,
@@ -82,14 +74,6 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
   const handleAddProfilePicture = () => {
     if (user.username || user._id || user.id || user.uuid) {
       navigate(getUserProfileUrl(user, 'settings=true&tab=profile&action=uploadPic'));
-    } else {
-      toast.error('Unable to navigate to profile');
-    }
-  };
-
-  const handleSetDefaultTip = () => {
-    if (user.username || user._id || user.id || user.uuid) {
-      navigate(getUserProfileUrl(user, 'settings=true&tab=notifications'));
     } else {
       toast.error('Unable to navigate to profile');
     }
@@ -158,19 +142,6 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     });
   }
 
-  if (!user.onboarding?.defaultTipPromptSeenAt) {
-    const currentTip = user.preferences?.defaultTip ?? DEFAULT_TIP_POUNDS;
-    prompts.push({
-      id: 'defaultTip',
-      title: 'Set your default tip',
-      description: `Adding a tune to your library places a tip. Currently £${currentTip.toFixed(2)} — change it, or keep this amount.`,
-      icon: Coins,
-      action: handleSetDefaultTip,
-      actionLabel: 'Set tip',
-      priority: 2,
-    });
-  }
-
   if (!hasHomeLocation) {
     prompts.push({
       id: 'location',
@@ -212,18 +183,6 @@ const UserProfilePrompts: React.FC<UserProfilePromptsProps> = ({ user, onDismiss
     setDismissedPrompts(prev => new Set([...prev, promptId]));
     if (promptId === 'currentLocation') {
       dismissPrompt();
-    }
-    if (promptId === 'defaultTip') {
-      void (async () => {
-        try {
-          await authAPI.updateProfile({
-            onboarding: { defaultTipPromptSeenAt: new Date().toISOString() },
-          });
-          await refreshUser();
-        } catch {
-          // Local dismiss still hides it this session
-        }
-      })();
     }
     if (onDismiss) {
       onDismiss(promptId);

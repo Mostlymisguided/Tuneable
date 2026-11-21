@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpCircle, Loader2, X } from 'lucide-react';
 import { userAPI } from '../lib/api';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { toast } from '../utils/toast';
 
 type RaiseLine = {
@@ -52,19 +53,18 @@ function presetAmounts(defaultTip: number) {
 }
 
 interface BringTipsUpControlProps {
-  defaultTipPounds?: number;
   disabled?: boolean;
   onCompleted?: (balanceAfterPence: number) => void;
 }
 
 const BringTipsUpControl: React.FC<BringTipsUpControlProps> = ({
-  defaultTipPounds = 1.11,
   disabled = false,
   onCompleted,
 }) => {
-  const presets = useMemo(() => presetAmounts(defaultTipPounds), [defaultTipPounds]);
+  const globalAverageTip = useGlobalAverageTip();
+  const presets = useMemo(() => presetAmounts(globalAverageTip), [globalAverageTip]);
   const [isOpen, setIsOpen] = useState(false);
-  const [amountInput, setAmountInput] = useState(defaultTipPounds.toFixed(2));
+  const [amountInput, setAmountInput] = useState(globalAverageTip.toFixed(2));
   const [preview, setPreview] = useState<TipRaisePreview | null>(null);
   const [previewError, setPreviewError] = useState('');
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -112,7 +112,7 @@ const BringTipsUpControl: React.FC<BringTipsUpControlProps> = ({
   };
 
   const open = () => {
-    setAmountInput((defaultTipPounds || 1.11).toFixed(2));
+    setAmountInput(globalAverageTip.toFixed(2));
     setPreview(null);
     setPreviewError('');
     setIsOpen(true);

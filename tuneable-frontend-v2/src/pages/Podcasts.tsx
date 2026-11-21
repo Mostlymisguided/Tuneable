@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { mediaAPI, locationAPI, exchangeOAuthCode } from '../lib/api';
 import BidConfirmationModal from '../components/BidConfirmationModal';
 import MediaChampions from '../components/MediaChampions';
@@ -308,6 +309,7 @@ const Podcasts: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, token, handleOAuthCallback, refreshUser, updateBalance } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
   const [serverTopLocations, setServerTopLocations] = useState<ChartTopLocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -377,7 +379,7 @@ const Podcasts: React.FC = () => {
   const selectedEpisodeMinTip = selectedEpisode?.minimumBid ?? 0.01;
   const selectedEpisodeDefaultTip = Math.max(
     selectedEpisodeMinTip,
-    user?.preferences?.defaultTip || 1.11
+    globalAverageTip
   );
 
   // Share state

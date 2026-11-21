@@ -6,9 +6,6 @@ export const DEFAULT_PROFILE_PIC = 'https://uploads.tuneable.stream/profile-pict
 export const hasCustomProfilePic = (profilePic?: string | null) =>
   Boolean(profilePic && profilePic !== DEFAULT_PROFILE_PIC);
 
-/** Default tip amount in pounds for new users / fallbacks */
-export const DEFAULT_TIP_POUNDS = 1.11;
-
 /** Public page explaining the current 80/20 split and the 90/10 + DAO commitments */
 export const HOW_MONEY_WORKS_PATH = '/about#how-money-works';
 

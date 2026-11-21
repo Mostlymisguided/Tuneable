@@ -32,6 +32,7 @@ import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
+import { loadGlobalAverageTip } from '@/src/lib/globalAverageTip';
 import { formatDuration, formatPoundsFromPence, formatBpmLabel, formatTuneBytesDecimal, roundBpm } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
@@ -193,8 +194,6 @@ export default function TuneProfileScreen() {
     [id]
   );
 
-  const defaultTip = user?.preferences?.defaultTip ?? 1.11;
-
   useFocusEffect(
     useCallback(() => {
       void load();
@@ -207,8 +206,14 @@ export default function TuneProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setSupportAmount(Math.max(MIN_TIP, defaultTip));
-    }, [defaultTip])
+      let cancelled = false;
+      void loadGlobalAverageTip().then((average) => {
+        if (!cancelled) setSupportAmount(Math.max(MIN_TIP, average));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
   );
 
   const playable = isUploadPlayable(media);
@@ -841,7 +846,6 @@ export default function TuneProfileScreen() {
             title={media.title || 'Untitled'}
             subtitle={artist}
             balancePence={user.balance ?? 0}
-            defaultTipPounds={defaultTip}
             initialAmountPounds={tipInitial}
             tipMedia={media}
             onClose={() => {

@@ -37,7 +37,6 @@ export interface User {
     twitter?: string | null;
   };
   preferences?: {
-    defaultTip?: number; // pounds
     anonymousMode?: boolean;
     favoriteTags?: string[];
     notifications?: {
@@ -47,7 +46,6 @@ export interface User {
   };
   hasPushDevice?: boolean;
   onboarding?: {
-    defaultTipPromptSeenAt?: string;
     completedAt?: string;
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;

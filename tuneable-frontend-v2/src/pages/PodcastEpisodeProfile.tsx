@@ -51,6 +51,7 @@ import EntertainingLoader from '../components/EntertainingLoader';
 import ReportModal from '../components/ReportModal';
 import ClaimMediaModal, { isRightsPendingClaimable } from '../components/ClaimMediaModal';
 import { useAuth } from '../contexts/AuthContext';
+import { loadGlobalAverageTip, useGlobalAverageTip } from '../lib/globalAverageTip';
 import TipHeartButton from '../components/TipHeartButton';
 import { viewerHasTipped } from '../utils/viewerTipped';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
@@ -208,6 +209,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateBalance, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
 
   // Sanitize HTML description for safe rendering
   const sanitizeDescription = (html: string): string => {
@@ -359,14 +361,13 @@ const PodcastEpisodeProfile: React.FC = () => {
 
   const defaultTipAmount = useMemo(() => {
     if (isGlobalBidValid) return parsedGlobalBidAmount;
-    const userDefaultTip = user?.preferences?.defaultTip || 1.11;
     const bids = media?.bids || [];
     const avgBid =
       bids.length === 0
         ? 0
         : penceToPoundsNumber(bids.reduce((sum, bid) => sum + bid.amount, 0) / bids.length);
-    return Math.max(minimumBid, userDefaultTip, avgBid || 0);
-  }, [isGlobalBidValid, parsedGlobalBidAmount, user?.preferences?.defaultTip, media, minimumBid]);
+    return Math.max(minimumBid, globalAverageTip, avgBid || 0);
+  }, [isGlobalBidValid, parsedGlobalBidAmount, globalAverageTip, media, minimumBid]);
 
   useEffect(() => {
     console.log('🔍 PodcastEpisodeProfile useEffect triggered with mediaId:', mediaId);
@@ -405,15 +406,15 @@ const PodcastEpisodeProfile: React.FC = () => {
           setMinimumBid(globalParty.minimumBid);
           if (!hasInitializedBidInput && media) {
             const avgBid = calculateGlobalMediaBidAvg(media);
-            const userDefaultTip = user?.preferences?.defaultTip || 1.11;
-            const initialBid = Math.max(globalParty.minimumBid, userDefaultTip, avgBid || 0);
+            const averageTip = await loadGlobalAverageTip();
+            const initialBid = Math.max(globalParty.minimumBid, averageTip, avgBid || 0);
             setGlobalBidInput(initialBid.toFixed(2));
             setHasInitializedBidInput(true);
           }
         } else if (!hasInitializedBidInput && media) {
           const avgBid = calculateGlobalMediaBidAvg(media);
-          const userDefaultTip = user?.preferences?.defaultTip || 1.11;
-          const initialBid = Math.max(userDefaultTip, avgBid || 0);
+          const averageTip = await loadGlobalAverageTip();
+          const initialBid = Math.max(averageTip, avgBid || 0);
           setGlobalBidInput(initialBid.toFixed(2));
           setHasInitializedBidInput(true);
         }

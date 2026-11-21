@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePodcastPlayerStore, getEpisodeAudioUrl } from '../stores/podcastPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { useListeningHistoryTracker } from '../hooks/useListeningHistoryTracker';
 import { DEFAULT_COVER_ART } from '../constants';
 import { Play, Pause, Volume2, VolumeX, X, Heart } from 'lucide-react';
@@ -33,6 +34,7 @@ const SkipForward30Icon: React.FC<{ className?: string }> = ({ className }) => (
 
 const PersistentPodcastPlayer: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const isSeekingRef = useRef(false);
@@ -544,7 +546,7 @@ const PersistentPodcastPlayer: React.FC = () => {
         isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
-        bidAmount={Math.max(currentEpisode?.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
+        bidAmount={Math.max(currentEpisode?.minimumBid || 0.01, globalAverageTip)}
         minTip={currentEpisode?.minimumBid || 0.01}
         avgTip={getAverageTip()}
         championAggregate={championTip?.championAggregate}

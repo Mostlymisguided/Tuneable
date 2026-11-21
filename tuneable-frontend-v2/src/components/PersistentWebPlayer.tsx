@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { Play, Pause, Volume2, VolumeX, SkipForward, SkipBack, Heart } from 'lucide-react';
 import type { YTPlayer } from '../types/youtube';
 import { mediaAPI, partyAPI } from '../lib/api';
@@ -80,6 +81,7 @@ export const setGlobalYouTubePlayerRef = (ref: YouTubePlayerRef | null) => {
 
 const PersistentWebPlayer: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const navigate = useNavigate();
   const playerRef = useRef<HTMLDivElement>(null);
   const youtubePlayerRef = useRef<YTPlayer | null>(null);
@@ -904,7 +906,7 @@ const PersistentWebPlayer: React.FC = () => {
         isOpen={isTipModalOpen}
         onClose={() => setIsTipModalOpen(false)}
         onConfirm={handlePlaceTip}
-        bidAmount={Math.max(currentMedia?.minimumBid || 0.01, user?.preferences?.defaultTip || 1.11)}
+        bidAmount={Math.max(currentMedia?.minimumBid || 0.01, globalAverageTip)}
         minTip={currentMedia?.minimumBid || 0.01}
         avgTip={getCurrentMediaAverageTip()}
         championAggregate={currentMediaChampionTip?.championAggregate}

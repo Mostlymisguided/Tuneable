@@ -35,8 +35,8 @@ const {
   youtubeOnlyExternalIds,
 } = require('../utils/youtubeImportIdentity');
 const { unparsedSkipToImportTrack } = require('../utils/youtubePlaylistUtils');
+const { getGlobalAverageTipPounds } = require('./globalAverageTip');
 
-const DEFAULT_TIP = 1.11;
 const MIN_TIP = 0.01;
 const MAX_BATCH = 100;
 const FUZZY_CATALOG_LIMIT = 4000;
@@ -389,7 +389,7 @@ async function previewImportFromTracks(userId, source, tracks, user, extraSummar
     userBidTotals[id] = (userBidTotals[id] || 0) + (b.amount || 0);
   });
 
-  const defaultTip = user.preferences?.defaultTip || DEFAULT_TIP;
+  const defaultTip = await getGlobalAverageTipPounds();
   report({
     stage: 'loading_catalog',
     message: 'Loading Tuneable catalog…',
@@ -676,7 +676,10 @@ async function executeLibraryImport(userId, { items, defaultTip, importSource = 
     throw err;
   }
 
-  const fallbackTip = defaultTip || user.preferences?.defaultTip || DEFAULT_TIP;
+  const requestedTip = Number(defaultTip);
+  const fallbackTip = Number.isFinite(requestedTip) && requestedTip >= MIN_TIP
+    ? requestedTip
+    : await getGlobalAverageTipPounds();
 
   let totalPence = 0;
   for (const item of selected) {

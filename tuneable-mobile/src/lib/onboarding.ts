@@ -1,6 +1,5 @@
 import type { User } from '@/src/types/user';
 
-export const DEFAULT_TIP_POUNDS = 1.11;
 export const ONBOARDING_PATH = '/onboarding';
 export const DEFAULT_POST_AUTH_PATH = '/(tabs)';
 

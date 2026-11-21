@@ -122,11 +122,6 @@ export default function PodcastSearchScreen() {
   const [taddyPage, setTaddyPage] = useState(1);
   const keyboard = useHideKeyboardAccessory();
 
-  const defaultTip = useMemo(
-    () => user?.preferences?.defaultTip ?? 1.11,
-    [user?.preferences?.defaultTip]
-  );
-
   const filteredResults = useMemo(() => {
     if (filter === 'library') {
       return results.filter((item) => !isExternalSearchEpisode(item));
@@ -682,7 +677,6 @@ export default function PodcastSearchScreen() {
         title={tipTarget?.title || 'Episode'}
         subtitle={tipTarget ? seriesTitle(tipTarget) : undefined}
         balancePence={user?.balance ?? 0}
-        defaultTipPounds={defaultTip}
         tipMedia={tipTarget}
         onClose={() => setTipTarget(null)}
         onConfirm={addAndTip}

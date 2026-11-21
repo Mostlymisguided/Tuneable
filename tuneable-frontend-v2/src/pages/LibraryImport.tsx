@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { userAPI, exchangeOAuthCode } from '../lib/api';
 import { penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_PROFILE_PIC } from '../constants';
@@ -271,6 +272,7 @@ const LibraryImport: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, refreshUser, handleOAuthCallback } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
 
   const [source, setSource] = useState<ImportSource>(() => parseSource(searchParams.get('source')));
   const [step, setStep] = useState<ImportStep>('connect');
@@ -597,7 +599,7 @@ const LibraryImport: React.FC = () => {
         setSummary(data.summary || null);
         setTipAmounts({});
         setTipMode('fixed');
-        setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+        setBulkTip(String(data.summary?.defaultTip ?? globalAverageTip));
         setStep('summary');
       } catch (error: any) {
         toast.error(error?.response?.data?.error || error?.message || 'Failed to scan Rekordbox playlists');
@@ -631,7 +633,7 @@ const LibraryImport: React.FC = () => {
         setSummary(data.summary || null);
         setTipAmounts({});
         setTipMode('fixed');
-        setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+        setBulkTip(String(data.summary?.defaultTip ?? globalAverageTip));
         setStep('summary');
       } catch (error: any) {
         toast.error(error?.response?.data?.error || error?.message || 'Failed to scan YouTube link');
@@ -665,7 +667,7 @@ const LibraryImport: React.FC = () => {
         setSummary(data.summary || null);
         setTipAmounts({});
         setTipMode('fixed');
-        setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+        setBulkTip(String(data.summary?.defaultTip ?? globalAverageTip));
         setStep('summary');
       } catch (error: any) {
         toast.error(error?.response?.data?.error || error?.message || 'Failed to scan Deezer');
@@ -697,7 +699,7 @@ const LibraryImport: React.FC = () => {
       setSummary(data.summary || null);
       setTipAmounts({});
       setTipMode('fixed');
-      setBulkTip(String(data.summary?.defaultTip ?? user?.preferences?.defaultTip ?? 1.11));
+      setBulkTip(String(data.summary?.defaultTip ?? globalAverageTip));
       setStep('summary');
     } catch (error: any) {
       const message = error?.response?.data?.error || error?.message || `Failed to scan ${meta.likesLabel}`;

@@ -4,6 +4,7 @@ import { toast } from '../utils/toast';
 import { BookOpen, Coins, ExternalLink } from 'lucide-react';
 import { booksAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { penceToPounds, penceToPoundsNumber } from '../utils/currency';
 import { DEFAULT_BOOK_COVER_ART_REMOTE } from '../constants';
 import BookCover from '../components/BookCover';
@@ -29,6 +30,7 @@ const BookProfile: React.FC = () => {
   const { mediaId } = useParams();
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const [book, setBook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showTipModal, setShowTipModal] = useState(false);
@@ -88,7 +90,7 @@ const BookProfile: React.FC = () => {
   } : null);
 
   const elsewhere = book ? getReadElsewhereTarget(book) : null;
-  const defaultTip = user?.preferences?.defaultTip || 1.11;
+  const defaultTip = globalAverageTip;
   const tipStats = useMemo(() => resolveTipStatInputs(book, user), [book, user]);
 
   const handleConfirmTip = async (_tags: string[], amount: number) => {

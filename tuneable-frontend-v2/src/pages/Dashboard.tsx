@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { AudioLines, Coins, Gift, Users, Music, Plus, Minus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Search as SearchIcon, Link as LinkIcon, Upload, Building, Award, TrendingUp, Filter, Settings, Copy, Mail, Share2, Facebook, Instagram, Clock, History, ArrowRight } from 'lucide-react';
 import { userAPI, mediaAPI, searchAPI, partyAPI, emailAPI, artistEscrowAPI } from '../lib/api';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
@@ -61,6 +62,7 @@ interface SearchResult {
 
 const Dashboard: React.FC = () => {
   const { user, updateBalance, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const navigate = useNavigate();
   const location = useLocation();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
@@ -101,11 +103,6 @@ const Dashboard: React.FC = () => {
     return media?.minimumBid ?? minimumBid ?? 0.01;
   };
   
-  // Helper function to get user's default tip amount
-  const getUserDefaultTip = (): number => {
-    return user?.preferences?.defaultTip || 1.11;
-  };
-
   const libraryChampionTip = useMemo(
     () => resolveTipStatInputs(libraryItemToTip, user),
     [libraryItemToTip, user]
@@ -586,6 +583,10 @@ Join here: ${inviteLink}`.trim();
           aValue = a.tuneBytesEarned || 0;
           bValue = b.tuneBytesEarned || 0;
           break;
+        case 'userTuneBytesEarned':
+          aValue = a.userTuneBytesEarned || 0;
+          bValue = b.userTuneBytesEarned || 0;
+          break;
         case 'lastBidAt':
         default:
           aValue = new Date(a.lastBidAt).getTime();
@@ -784,11 +785,10 @@ Join here: ${inviteLink}`.trim();
         
         setAddTuneResults(results);
         
-        // Initialize bid amounts using user's default tip preference
-        const userDefaultTip = getUserDefaultTip();
+        // Initialize bid amounts from the global average tip
         const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(userDefaultTip, getEffectiveMinimumBid(media)).toFixed(2);
+          newBidAmounts[media._id || media.id || ''] = Math.max(globalAverageTip, getEffectiveMinimumBid(media)).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       } else {
@@ -805,11 +805,10 @@ Join here: ${inviteLink}`.trim();
         
         setAddTuneResults(results);
         
-        // Initialize bid amounts using user's default tip preference
-        const userDefaultTip = getUserDefaultTip();
+        // Initialize bid amounts from the global average tip
         const newBidAmounts: Record<string, string> = {};
         results.forEach((media: SearchResult) => {
-          newBidAmounts[media._id || media.id || ''] = Math.max(userDefaultTip, getEffectiveMinimumBid(media)).toFixed(2);
+          newBidAmounts[media._id || media.id || ''] = Math.max(globalAverageTip, getEffectiveMinimumBid(media)).toFixed(2);
         });
         setAddTuneBidAmounts(newBidAmounts);
       }
@@ -986,7 +985,6 @@ Join here: ${inviteLink}`.trim();
           <>
             {tuneLibrary.length > 0 && (
               <BringTipsUpControl
-                defaultTipPounds={user?.preferences?.defaultTip || 1.11}
                 onCompleted={async (balanceAfterPence) => {
                   if (typeof balanceAfterPence === 'number') updateBalance(balanceAfterPence);
                   const data = await userAPI.getTuneLibrary();
@@ -2710,8 +2708,7 @@ Join here: ${inviteLink}`.trim();
                         onClick={() => {
                           const mediaIdKey = mediaId || '';
                           const minBid = getEffectiveMinimumBid(result);
-                          const userDefaultTip = getUserDefaultTip();
-                          const defaultBid = Math.max(userDefaultTip, minBid);
+                          const defaultBid = Math.max(globalAverageTip, minBid);
                           const current = parseFloat(addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2));
                           const newAmount = Math.max(minBid, current - 0.01);
                           setAddTuneBidAmounts((prev) => ({
@@ -2730,8 +2727,7 @@ Join here: ${inviteLink}`.trim();
                         type="number"
                         value={addTuneBidAmounts[mediaId || ''] ?? (() => {
                           const minBid = getEffectiveMinimumBid(result);
-                          const userDefaultTip = getUserDefaultTip();
-                          return Math.max(userDefaultTip, minBid).toFixed(2);
+                          return Math.max(globalAverageTip, minBid).toFixed(2);
                         })()}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -2746,8 +2742,7 @@ Join here: ${inviteLink}`.trim();
                         onClick={() => {
                           const mediaIdKey = mediaId || '';
                           const minBid = getEffectiveMinimumBid(result);
-                          const userDefaultTip = getUserDefaultTip();
-                          const defaultBid = Math.max(userDefaultTip, minBid);
+                          const defaultBid = Math.max(globalAverageTip, minBid);
                           const current = parseFloat(addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2));
                           const newAmount = current + 0.01;
                           setAddTuneBidAmounts((prev) => ({
@@ -2783,8 +2778,7 @@ Join here: ${inviteLink}`.trim();
                       {(() => {
                         const mediaIdKey = mediaId || '';
                         const minBid = getEffectiveMinimumBid(result);
-                        const userDefaultTip = getUserDefaultTip();
-                        const defaultBid = Math.max(userDefaultTip, minBid);
+                        const defaultBid = Math.max(globalAverageTip, minBid);
                         const raw = addTuneBidAmounts[mediaIdKey] ?? defaultBid.toFixed(2);
                         return <TipCtaLabel amount={raw} heartClassName="h-3.5 w-3.5" />;
                       })()}
@@ -3125,7 +3119,7 @@ Join here: ${inviteLink}`.trim();
         isOpen={!!libraryItemToTip}
         onClose={() => setLibraryItemToTip(null)}
         onConfirm={handlePlaceLibraryTip}
-        bidAmount={Math.max(minimumBid, getUserDefaultTip())}
+        bidAmount={Math.max(minimumBid, globalAverageTip)}
         minTip={minimumBid}
         avgTip={
           libraryItemToTip
@@ -3154,10 +3148,10 @@ Join here: ${inviteLink}`.trim();
           }
         }}
         bidAmount={(() => {
-          if (!pendingAddTuneResult) return Math.max(minimumBid, getUserDefaultTip());
+          if (!pendingAddTuneResult) return Math.max(minimumBid, globalAverageTip);
           const mediaKey = pendingAddTuneResult._id || pendingAddTuneResult.id || '';
           const minBid = getEffectiveMinimumBid(pendingAddTuneResult);
-          const defaultBid = Math.max(getUserDefaultTip(), minBid);
+          const defaultBid = Math.max(globalAverageTip, minBid);
           const raw = addTuneBidAmounts[mediaKey] ?? defaultBid.toFixed(2);
           const parsed = parseFloat(raw);
           return Number.isFinite(parsed) ? parsed : defaultBid;

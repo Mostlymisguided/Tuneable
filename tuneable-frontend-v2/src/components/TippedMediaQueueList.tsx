@@ -5,6 +5,7 @@ import { Play } from 'lucide-react';
 import { DEFAULT_COVER_ART } from '../constants';
 import { mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { enrichMediaWithPlayability, isMediaPlayable, isWrittenMedia, playerPlayabilityFields } from '../utils/mediaPlayability';
@@ -130,6 +131,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user, updateBalance, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
     useWebPlayerStore();
   const internalPref = usePlayableOnly('chart');
@@ -272,7 +274,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     if (!user || !itemToTip) return;
 
     const tipAmount =
-      Number.isFinite(amount) && amount > 0 ? amount : user?.preferences?.defaultTip || 1.11;
+      Number.isFinite(amount) && amount > 0 ? amount : globalAverageTip;
     if (tipAmount < minimumBid) {
       toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
       return;
@@ -377,7 +379,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
         isOpen={!!itemToTip}
         onClose={() => setItemToTip(null)}
         onConfirm={handleConfirmTip}
-        bidAmount={user?.preferences?.defaultTip || 1.11}
+        bidAmount={globalAverageTip}
         minTip={minimumBid}
         avgTip={tipStats.avgTip}
         championAggregate={tipStats.championAggregate}

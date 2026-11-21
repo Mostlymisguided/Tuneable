@@ -113,6 +113,7 @@ import BlockedUsersSection from '../components/BlockedUsersSection';
 import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 import MediaChampions from '../components/MediaChampions';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore, getEpisodeAudioUrl, type PodcastPlayerEpisode } from '../stores/podcastPlayerStore';
 import SocialMediaModal from '../components/SocialMediaModal';
@@ -296,6 +297,7 @@ const UserProfile: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser, token: authToken, handleOAuthCallback, updateBalance, refreshUser } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   
   // Web player store for playing media
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, play } = useWebPlayerStore();
@@ -431,7 +433,6 @@ const UserProfile: React.FC = () => {
     email: true,
     anonymousMode: false,
     inApp: true, // Always true
-    defaultTip: 1.11 // Default tip amount in pounds
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
@@ -826,7 +827,6 @@ const UserProfile: React.FC = () => {
           email: notifPrefs.email ?? true,
           anonymousMode: prefs.anonymousMode ?? false,
           inApp: true, // Always true
-          defaultTip: prefs.defaultTip ?? 1.11
         });
       }
       
@@ -1069,9 +1069,7 @@ const UserProfile: React.FC = () => {
   };
 
   const getDefaultBidAmount = (media?: any): number => {
-    const minBid = getEffectiveMinimumBid(media);
-    const userDefaultTip = currentUser?.preferences?.defaultTip || 1.11;
-    return Math.max(minBid, userDefaultTip);
+    return Math.max(getEffectiveMinimumBid(media), globalAverageTip);
   };
 
   const calculateAverageBid = (media: any): number => {
@@ -1658,6 +1656,10 @@ const UserProfile: React.FC = () => {
           aValue = a.tuneBytesEarned || 0;
           bValue = b.tuneBytesEarned || 0;
           break;
+        case 'userTuneBytesEarned':
+          aValue = a.userTuneBytesEarned || 0;
+          bValue = b.userTuneBytesEarned || 0;
+          break;
         case 'lastBidAt':
         default:
           aValue = new Date(a.lastBidAt).getTime();
@@ -2133,7 +2135,7 @@ const UserProfile: React.FC = () => {
                 <span className="hidden sm:inline">{blockedByMe ? 'Unblock' : 'Block'}</span>
               </button>
             )}
-            
+
             {canEditProfile && !isSettingsMode && (
               <button
                 onClick={handleSettingsClick}
@@ -2907,7 +2909,6 @@ const UserProfile: React.FC = () => {
               <div className="flex items-center gap-2">
                 {getSortedLibrary().length > 0 && (
                   <BringTipsUpControl
-                    defaultTipPounds={currentUser?.preferences?.defaultTip || 1.11}
                     onCompleted={async (balanceAfterPence) => {
                       if (typeof balanceAfterPence === 'number') updateBalance(balanceAfterPence);
                       await loadTuneLibrary();
@@ -4362,33 +4363,6 @@ const UserProfile: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Default Tip Setting */}
-                <div className="space-y-4 mb-6">
-                  <h3 className="text-lg font-semibold text-white mb-3">Tip Settings</h3>
-                  
-                  <div className="p-4 bg-black/20 rounded-lg">
-                    <label htmlFor="defaultTip" className="block text-white font-medium mb-2">
-                      Default Tip Amount (£)
-                    </label>
-                    <input
-                      type="number"
-                      id="defaultTip"
-                      step="0.01"
-                      min="0.01"
-                      value={notificationPrefs.defaultTip}
-                      onChange={(e) => setNotificationPrefs({
-                        ...notificationPrefs,
-                        defaultTip: parseFloat(e.target.value) || 1.11
-                      })}
-                      className="w-full max-w-xs px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="1.11"
-                    />
-                    <p className="text-sm text-gray-400 mt-2">
-                      Default tip amount when placing bids (minimum: £0.01). Currently set to £{notificationPrefs.defaultTip.toFixed(2)}.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Save Button */}
                 <div className="flex justify-end">
                   <button
@@ -4796,7 +4770,7 @@ const UserProfile: React.FC = () => {
         isOpen={!!libraryItemToTip}
         onClose={() => setLibraryItemToTip(null)}
         onConfirm={handlePlaceLibraryTip}
-        bidAmount={currentUser?.preferences?.defaultTip || 1.11}
+        bidAmount={globalAverageTip}
         minTip={0.01}
         avgTip={libraryItemToTip ? calculateAverageBid(libraryItemToTip) || libraryChampionTip.avgTip : undefined}
         championAggregate={libraryChampionTip?.championAggregate}
@@ -4819,7 +4793,7 @@ const UserProfile: React.FC = () => {
           }
         }}
         bidAmount={(() => {
-          if (!pendingAddTuneResult) return currentUser?.preferences?.defaultTip || 1.11;
+          if (!pendingAddTuneResult) return globalAverageTip;
           const mediaKey = pendingAddTuneResult._id || pendingAddTuneResult.id || '';
           const raw = addTuneBidAmounts[mediaKey] ?? '';
           const parsed = parseFloat(raw);

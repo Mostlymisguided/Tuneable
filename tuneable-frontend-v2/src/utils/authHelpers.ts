@@ -5,7 +5,6 @@ export interface OnboardingUser {
   createdAt?: string;
   onboarding?: {
     completedAt?: string;
-    defaultTipPromptSeenAt?: string;
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;
     importSkipped?: boolean;

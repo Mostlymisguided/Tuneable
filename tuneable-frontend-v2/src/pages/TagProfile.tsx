@@ -4,6 +4,7 @@ import { toast } from '../utils/toast';
 import { Tag, Music, Mic, Coins, MapPin, Clock, Play, Sparkles } from 'lucide-react';
 import { mediaAPI, tagAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 import { DEFAULT_COVER_ART } from '../constants';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
@@ -153,6 +154,7 @@ const TagProfile: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, updateBalance } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
   const { setCurrentEpisode, setQueue: setPodcastQueue, play: playPodcast } =
     usePodcastPlayerStore();
   const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } =
@@ -276,7 +278,7 @@ const TagProfile: React.FC = () => {
 
   const episodes = media as unknown as PodcastEpisodeCardData[];
   const tipStats = useMemo(() => resolveTipStatInputs(tipTarget, user), [tipTarget, user]);
-  const defaultTip = Math.max(0.01, user?.preferences?.defaultTip ?? 1.11);
+  const defaultTip = Math.max(0.01, globalAverageTip);
 
   const handlePodcastPlay = async (episode: PodcastEpisodeCardData, e: React.MouseEvent) => {
     e.stopPropagation();

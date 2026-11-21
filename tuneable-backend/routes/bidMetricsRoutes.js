@@ -10,6 +10,21 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const bidMetricsEngine = require('../services/bidMetricsEngine');
 const { BidMetricsSchema } = require('../utils/bidMetricsSchema');
+const { getGlobalAverageTipPounds } = require('../services/globalAverageTip');
+
+/**
+ * Platform-wide average of active tips, in pounds.
+ * Public so tip sheets can seed an amount before other metrics calls.
+ */
+router.get('/global-average', async (req, res) => {
+  try {
+    const averageTipPounds = await getGlobalAverageTipPounds();
+    res.json({ averageTipPounds });
+  } catch (error) {
+    console.error('Error getting global average tip:', error);
+    res.status(500).json({ error: 'Failed to get global average tip' });
+  }
+});
 
 /**
  * Get available metrics schema

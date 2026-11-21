@@ -27,6 +27,7 @@ import { ReportHeaderButton, ReportSheet } from '@/src/components/ReportSheet';
 import { mediaAPI } from '@/src/api/media';
 import { podcastsAPI } from '@/src/api/podcasts';
 import { useAuth } from '@/src/auth/AuthContext';
+import { loadGlobalAverageTip } from '@/src/lib/globalAverageTip';
 import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatDuration, formatPoundsFromPence } from '@/src/lib/format';
@@ -159,8 +160,6 @@ export default function PodcastEpisodeProfileScreen() {
     [id, loadSeriesEpisodes]
   );
 
-  const defaultTip = user?.preferences?.defaultTip ?? 1.11;
-
   useFocusEffect(
     useCallback(() => {
       void load();
@@ -169,8 +168,14 @@ export default function PodcastEpisodeProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setSupportAmount(Math.max(MIN_TIP, defaultTip));
-    }, [defaultTip])
+      let cancelled = false;
+      void loadGlobalAverageTip().then((average) => {
+        if (!cancelled) setSupportAmount(Math.max(MIN_TIP, average));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
   );
 
   const episode = useMemo(
@@ -765,7 +770,6 @@ export default function PodcastEpisodeProfileScreen() {
             title={media.title || 'Episode'}
             subtitle={seriesName}
             balancePence={user.balance ?? 0}
-            defaultTipPounds={defaultTip}
             initialAmountPounds={tipInitial}
             tipMedia={media}
             onClose={() => {

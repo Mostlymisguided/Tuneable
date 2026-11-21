@@ -71,11 +71,9 @@ interface User {
   preferences?: {
     theme?: string;
     anonymousMode?: boolean;
-    defaultTip?: number;
     favoriteTags?: string[];
   };
   onboarding?: {
-    defaultTipPromptSeenAt?: string;
     completedAt?: string;
     favoriteTagsSelectedAt?: string;
     importPromptSeenAt?: string;
@@ -1811,7 +1809,6 @@ export const userAPI = {
     tune_bytes_earned?: boolean;
     email?: boolean;
     anonymousMode?: boolean;
-    defaultTip?: number;
   }) => {
     const response = await api.put('/users/notification-preferences', preferences);
     return response.data;

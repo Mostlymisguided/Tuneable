@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, PoundSterling, AlertCircle, Minus, Plus } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
 
 interface BidModalProps {
   isOpen: boolean;
@@ -27,20 +27,19 @@ const BidModal: React.FC<BidModalProps> = ({
 }) => {
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState('');
-  const { user } = useAuth();
+  const globalAverageTip = useGlobalAverageTip();
 
   // Initialize bid amount when modal opens
   useEffect(() => {
     if (isOpen) {
-      const userDefaultTip = user?.preferences?.defaultTip || 1.11;
-      const initialAmount = Math.max(minimumBid, userDefaultTip).toFixed(2);
+      const initialAmount = Math.max(minimumBid, globalAverageTip).toFixed(2);
       setBidAmount(initialAmount);
     } else {
       // Reset when modal closes
       setBidAmount('');
       setError('');
     }
-  }, [isOpen, minimumBid, user?.preferences?.defaultTip]);
+  }, [isOpen, minimumBid, globalAverageTip]);
 
   const adjustBidAmount = (delta: number) => {
     const current = parseFloat(bidAmount) || 0;

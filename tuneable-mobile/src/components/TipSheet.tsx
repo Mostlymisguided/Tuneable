@@ -40,6 +40,7 @@ import {
   isInsufficientBalanceError,
   TIP_TOP_UP_MESSAGE,
 } from '@/src/lib/tipBalance';
+import { loadGlobalAverageTip } from '@/src/lib/globalAverageTip';
 import { showToast } from '@/src/stores/toastStore';
 import { formatLocationLabel } from '@/src/lib/location';
 import {
@@ -88,8 +89,7 @@ type Props = {
   title: string;
   subtitle?: string;
   balancePence: number;
-  defaultTipPounds?: number;
-  /** When set, overrides default tip when the sheet opens. */
+  /** When set, overrides the global average tip when the sheet opens. */
   initialAmountPounds?: number | null;
   /** Media used to resolve Min / Avg / Champion shortcuts. */
   tipMedia?: TipMediaLike;
@@ -109,7 +109,6 @@ export function TipSheet({
   title,
   subtitle,
   balancePence,
-  defaultTipPounds = 1.11,
   initialAmountPounds = null,
   tipMedia = null,
   initialTags,
@@ -121,7 +120,7 @@ export function TipSheet({
   const { height: windowHeight } = useWindowDimensions();
   const [headerHeight, setHeaderHeight] = useState(0);
   const liveBalancePence = user?.balance ?? balancePence;
-  const [amount, setAmount] = useState(defaultTipPounds);
+  const [amount, setAmount] = useState(1.11);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
@@ -270,21 +269,28 @@ export function TipSheet({
   const initialTagsKey = (initialTags || []).join(',');
   useEffect(() => {
     if (!visible) return;
-    const start = Math.min(
-      MAX_TIP_POUNDS,
-      Math.max(
-        effectiveMinTip,
-        roundPounds(initialAmountPounds ?? defaultTipPounds ?? 1.11)
-      )
-    );
-    setAmount(start);
-    setError(null);
-    setSubmitting(false);
-    setTagInput('');
-    setTags(appendTipChips([], initialTags || []));
+    let cancelled = false;
+    void (async () => {
+      const average = initialAmountPounds == null ? await loadGlobalAverageTip() : null;
+      if (cancelled) return;
+      const start = Math.min(
+        MAX_TIP_POUNDS,
+        Math.max(
+          effectiveMinTip,
+          roundPounds(initialAmountPounds ?? average ?? 1.11)
+        )
+      );
+      setAmount(start);
+      setError(null);
+      setSubmitting(false);
+      setTagInput('');
+      setTags(appendTipChips([], initialTags || []));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [
     visible,
-    defaultTipPounds,
     initialAmountPounds,
     effectiveMinTip,
     initialTagsKey,
