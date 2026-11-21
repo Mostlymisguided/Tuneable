@@ -108,8 +108,10 @@ function libraryItemPlayable(item: LibraryItem): boolean {
 }
 
 function libraryItemToQueueShape(item: LibraryItem) {
+  const publicItem = { ...item };
+  delete publicItem.userTuneBytesEarned;
   return {
-    ...item,
+    ...publicItem,
     _id: item.mediaId,
     id: item.mediaUuid || item.mediaId,
     uuid: item.mediaUuid || item.mediaId,

@@ -8,7 +8,7 @@ import ClickableArtistDisplay from './ClickableArtistDisplay';
 import TagList from './TagList';
 import MiniSupportersBar from './MiniSupportersBar';
 import { getMediaProfileUrl } from '../utils/mediaNavigation';
-import { formatLibraryTuneBytes } from '../utils/formatTuneBytes';
+import { formatLibraryTuneBytes, formatTuneBytes } from '../utils/formatTuneBytes';
 
 export interface LibraryBid {
   userId?: {
@@ -61,6 +61,8 @@ export interface LibraryItem {
   globalUserMediaAggregate: number;
   bidCount: number;
   tuneBytesEarned: number;
+  /** Present only on the logged-in user's own library. */
+  userTuneBytesEarned?: number;
   lastBidAt: string;
   firstBidAt?: string;
   createdAt?: string | null;
@@ -128,6 +130,7 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
 
   const visibleItems =
     initialVisibleCount && !showAll ? items.slice(0, initialVisibleCount) : items;
+  const showEarned = items.some((item) => typeof item.userTuneBytesEarned === 'number');
 
   const isPodcast = (item: LibraryItem) => {
     const cf = item.contentForm;
@@ -178,12 +181,25 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
             <th
               className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
               onClick={() => onSort('tuneBytesEarned')}
+              title="TuneBytes this tune has generated"
             >
               <div className="flex items-center">
                 TuneBytes
                 {getSortIcon('tuneBytesEarned')}
               </div>
             </th>
+            {showEarned ? (
+              <th
+                className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => onSort('userTuneBytesEarned')}
+                title="TuneBytes you earned on this tune"
+              >
+                <div className="flex items-center">
+                  Earned
+                  {getSortIcon('userTuneBytesEarned')}
+                </div>
+              </th>
+            ) : null}
             <th className="px-2 md:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-14">
               &nbsp;
             </th>
@@ -262,10 +278,17 @@ const TuneLibraryTable: React.FC<TuneLibraryTableProps> = ({
                   )}
                 </td>
                 <td className="px-2 md:px-4 py-3 whitespace-nowrap">
-                  <div className="text-sm font-semibold text-yellow-400">
-                    {formatLibraryTuneBytes(item.tuneBytesEarned)}
+                  <div className="text-sm font-semibold text-yellow-400" title="TuneBytes this tune has generated">
+                    {formatTuneBytes(item.tuneBytesEarned)}
                   </div>
                 </td>
+                {showEarned ? (
+                  <td className="px-2 md:px-4 py-3 whitespace-nowrap">
+                    <div className="text-sm font-semibold text-purple-200" title="TuneBytes you earned on this tune">
+                      {formatLibraryTuneBytes(item.userTuneBytesEarned)}
+                    </div>
+                  </td>
+                ) : null}
                 <td className="px-2 md:px-4 py-3 whitespace-nowrap">
                   {showTipButton && (onTip || onQueue) ? (
                     <div className="flex items-center gap-2">

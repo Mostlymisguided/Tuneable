@@ -150,6 +150,8 @@ export interface UserLibraryItem {
   globalUserMediaAggregate?: number;
   bidCount?: number;
   tuneBytesEarned?: number;
+  /** Present only on the logged-in user's own library. */
+  userTuneBytesEarned?: number;
   supporterCount?: number;
   lastBidAt?: string;
   firstBidAt?: string;

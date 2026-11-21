@@ -79,6 +79,7 @@ function toChartMediaItem(item: UserLibraryItem): ChartMediaItem {
     partyMediaAggregate: item.globalUserMediaAggregate ?? 0,
     globalMediaAggregate: item.globalMediaAggregate ?? 0,
     tuneBytesEarned: item.tuneBytesEarned ?? 0,
+    userTuneBytesEarned: item.userTuneBytesEarned,
     supporterCount: item.supporterCount,
     lastBidAt: item.lastBidAt ?? null,
     contentForm: item.contentForm,
@@ -138,7 +139,7 @@ type Props = {
   compactHeader?: boolean;
   hideHeader?: boolean;
   loading?: boolean;
-  /** Show each tune's TuneBytes to one decimal. Own library only. */
+  /** Own library: also show the TuneBytes this user earned on each tune. */
   referenceTuneBytes?: boolean;
 };
 

@@ -29,14 +29,23 @@ import { promoteCoverArt, useNotedCover } from '@/src/lib/coverMemory';
 
 const COLLAPSED_TAG_COUNT = 2;
 
-function TuneBytesAmount({ value, reference }: { value: number; reference?: boolean }) {
-  const label = reference ? formatLibraryTuneBytes(value) : formatTuneBytesDecimal(value);
+function TuneBytesAmount({ value, earned }: { value: number; earned?: number }) {
+  const label = formatTuneBytesDecimal(value);
+  const showEarned = typeof earned === 'number';
+  const earnedLabel = showEarned ? formatLibraryTuneBytes(earned) : null;
   return (
     <View
-      style={styles.tuneBytesRow}
-      accessibilityLabel={`${label} TuneBytes`}>
-      <Ionicons name="sparkles-outline" size={12} color={colors.accentLight} />
-      <Text style={styles.tuneBytes}>{label}</Text>
+      style={styles.tuneBytesStack}
+      accessibilityLabel={
+        showEarned
+          ? `${label} TuneBytes. You earned ${earnedLabel}`
+          : `${label} TuneBytes`
+      }>
+      <View style={styles.tuneBytesRow}>
+        <Ionicons name="sparkles-outline" size={12} color={colors.accentLight} />
+        <Text style={styles.tuneBytes}>{label}</Text>
+      </View>
+      {showEarned ? <Text style={styles.tuneBytesYours}>earned {earnedLabel}</Text> : null}
     </View>
   );
 }
@@ -68,7 +77,7 @@ type Props = {
   onOpen: () => void;
   onPlay: () => void;
   onTip: () => void;
-  /** Own library: show TuneBytes to one decimal. */
+  /** Own library: also show the TuneBytes this user earned. */
   referenceTuneBytes?: boolean;
 };
 
@@ -193,7 +202,10 @@ export function ChartTrackRow({
         </Pressable>
         <View style={styles.right}>
           {typeof item.tuneBytesEarned === 'number' ? (
-            <TuneBytesAmount value={item.tuneBytesEarned} reference={referenceTuneBytes} />
+            <TuneBytesAmount
+              value={item.tuneBytesEarned}
+              earned={referenceTuneBytes ? item.userTuneBytesEarned : undefined}
+            />
           ) : null}
           <Text style={styles.tips}>{formatPoundsFromPence(displayTip)}</Text>
           <Pressable
@@ -298,7 +310,10 @@ export function ChartTrackRow({
               ) : null}
             </View>
             {typeof item.tuneBytesEarned === 'number' ? (
-              <TuneBytesAmount value={item.tuneBytesEarned} reference={referenceTuneBytes} />
+              <TuneBytesAmount
+                value={item.tuneBytesEarned}
+                earned={referenceTuneBytes ? item.userTuneBytesEarned : undefined}
+              />
             ) : null}
             <Pressable
               onPress={onTip}
@@ -541,11 +556,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
   },
+  tuneBytesStack: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
   tuneBytesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     flexShrink: 0,
+  },
+  tuneBytesYours: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontVariant: ['tabular-nums'],
   },
   tuneBytes: {
     color: colors.accentLight,

@@ -52,6 +52,8 @@ export interface ChartMediaItem {
   timePeriodBidValue?: number;
   globalMediaAggregate?: number;
   tuneBytesEarned?: number;
+  /** Own library only. Omitted from other people's libraries. */
+  userTuneBytesEarned?: number;
   supporterCount?: number;
   globalMediaAggregateTop?: number;
   globalMediaAggregateTopRank?: number;

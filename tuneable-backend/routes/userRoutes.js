@@ -247,6 +247,13 @@ const {
   PROFILE_CREDIT_ROLES,
   belongsOnCreatorLibrary,
 } = require('../utils/creatorHelpers');
+const {
+  displayedProfileTuneBytes,
+  sumTuneBytesGeneratedByOwnedMedia,
+  sumConfirmedTuneBytesByMediaId,
+  tuneBytesFor,
+  libraryTuneByteFields,
+} = require('../utils/mediaTuneBytes');
 
 const router = express.Router();
 const SECRET_KEY = require('../config/jwtSecret').getJwtSecret();
@@ -1278,7 +1285,6 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
     
     const Bid = require('../models/Bid');
     const Media = require('../models/Media');
-    const TuneBytesTransaction = require('../models/TuneBytesTransaction');
     const TOP_LIBRARY_SUPPORTERS = 8;
     
     // Active bids for this user only. Supporters on each tune are aggregated
@@ -1383,36 +1389,47 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
     }
     
     const ownerId = user._id;
+    const viewerIsOwner =
+      Boolean(viewerUserId) && String(viewerUserId) === String(ownerId);
     const viewerDiffers =
       viewerUserId && String(viewerUserId) !== String(ownerId);
-    const userIdObjId = mongoose.Types.ObjectId.isValid(ownerId)
+    const ownerObjectId = mongoose.Types.ObjectId.isValid(ownerId)
       ? new mongoose.Types.ObjectId(ownerId)
       : ownerId;
 
-    const [mediaItems, tuneBytesByMedia, supporterStats, viewerTotals] = await Promise.all([
+    const [mediaItems, tuneBytesByMedia, userTuneBytesByMedia, supporterStats, viewerTotals] = await Promise.all([
       Media.find({ _id: { $in: mediaIds } })
         .select('title artist featuring creatorDisplay host author coverArt duration waveformPeaks bpm releaseDate releaseYear primaryLocation globalMediaAggregate globalMediaAggregateTop globalMediaAggregateTopUser uuid slug _id tags contentForm contentType sources rightsStatus rightsCleared podcastSeries createdAt uploadedAt')
         .populate('podcastSeries', 'title')
         .populate('globalMediaAggregateTopUser', 'username uuid _id')
         .lean(),
-      TuneBytesTransaction.aggregate([
-        {
-          $match: {
-            userId: userIdObjId,
-            status: 'confirmed',
-            mediaId: { $in: mediaIds },
-          },
-        },
-        {
-          $group: {
-            _id: '$mediaId',
-            totalTuneBytes: { $sum: '$tuneBytesEarned' },
-          },
-        },
-      ]).catch((tuneBytesError) => {
+      // Media cards show TuneBytes the track generated from every tip, not
+      // only what this profile user earned by tipping it themselves.
+      sumConfirmedTuneBytesByMediaId(mediaIds).catch((tuneBytesError) => {
         console.error('Error fetching TuneBytes:', tuneBytesError);
-        return [];
+        return new Map();
       }),
+      // Personal earnings stay off other people's libraries.
+      viewerIsOwner
+        ? require('../models/TuneBytesTransaction').aggregate([
+            {
+              $match: {
+                userId: ownerObjectId,
+                status: 'confirmed',
+                mediaId: { $in: mediaIds },
+              },
+            },
+            {
+              $group: {
+                _id: '$mediaId',
+                totalTuneBytes: { $sum: '$tuneBytesEarned' },
+              },
+            },
+          ]).catch((tuneBytesError) => {
+            console.error('Error fetching viewer TuneBytes:', tuneBytesError);
+            return [];
+          })
+        : Promise.resolve([]),
       // Top supporters per tune, plus bid/tipper counts. Avoids loading every bid.
       Bid.aggregate([
         {
@@ -1476,12 +1493,13 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
       mediaLookup[media._id.toString()] = media;
     });
 
-    const tuneBytesLookup = {};
-    tuneBytesByMedia.forEach(item => {
-      if (item._id) {
-        tuneBytesLookup[item._id.toString()] = item.totalTuneBytes;
-      }
-    });
+    const tuneBytesLookup = tuneBytesByMedia instanceof Map ? tuneBytesByMedia : new Map();
+    const userTuneBytesLookup = new Map();
+    if (viewerIsOwner && Array.isArray(userTuneBytesByMedia)) {
+      userTuneBytesByMedia.forEach((item) => {
+        if (item?._id) userTuneBytesLookup.set(item._id.toString(), item.totalTuneBytes || 0);
+      });
+    }
 
     const supporterLookup = {};
     const supporterUserIds = [];
@@ -1639,7 +1657,11 @@ async function fetchTuneLibraryForUser(user, { authenticated = false, viewerUser
                 ? (viewerTotalLookup[aggregate.mediaId] || 0) > 0
                 : (aggregate.userBidTotal || 0) > 0)
               : false,
-            tuneBytesEarned: tuneBytesLookup[aggregate.mediaId] || 0,
+            ...libraryTuneByteFields(
+              tuneBytesFor(tuneBytesLookup, aggregate.mediaId),
+              tuneBytesFor(userTuneBytesLookup, aggregate.mediaId),
+              { includeUserEarned: viewerIsOwner },
+            ),
             supporterCount: supporterStat.supporterCount || bids.length,
             lastBidAt: aggregate.lastBidAt,
             firstBidAt: aggregate.firstBidAt,
@@ -4473,6 +4495,15 @@ router.get('/:userId/profile', async (req, res) => {
         ? { ...socialMediaFromDoc }
         : {};
 
+    let ownedMediaTuneBytes = 0;
+    if (userObj.creatorProfile?.verificationStatus === 'verified') {
+      try {
+        ownedMediaTuneBytes = await sumTuneBytesGeneratedByOwnedMedia(userObj._id);
+      } catch (ownedTuneBytesError) {
+        console.error('Error summing TuneBytes generated by owned media:', ownedTuneBytesError);
+      }
+    }
+
     const userResponse = {
       id: userObj.uuid, // Use UUID as primary ID for external API
       uuid: userObj.uuid,
@@ -4487,7 +4518,7 @@ router.get('/:userId/profile', async (req, res) => {
       globalUserAggregateRank: userAggregateRank,
       globalUserBidAvg: globalUserBidAvg,
       globalUserBids: globalUserBids,
-      tuneBytes: userObj.tuneBytes || 0,
+      tuneBytes: displayedProfileTuneBytes(userObj, ownedMediaTuneBytes),
       socialMedia: socialMediaData,
       creatorProfile: userObj.creatorProfile,
     };
