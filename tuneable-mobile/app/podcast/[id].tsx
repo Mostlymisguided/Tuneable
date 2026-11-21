@@ -5,7 +5,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -47,7 +46,7 @@ import {
 } from '@/src/lib/podcast';
 import { mediaId } from '@/src/lib/media';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
-import { shareStoryCard } from '@/src/lib/shareStoryCard';
+import { shareCaptionAndUrl, shareStoryCard } from '@/src/lib/shareStoryCard';
 import { useNotedCover } from '@/src/lib/coverMemory';
 import {
   buildTipStatChips,
@@ -375,10 +374,7 @@ export default function PodcastEpisodeProfileScreen() {
       });
     } catch {
       try {
-        await Share.share({
-          message: `${media.title || 'Episode'} — ${seriesName}\n${url}`,
-          url,
-        });
+        await shareCaptionAndUrl(`${media.title || 'Episode'} — ${seriesName}`, url);
       } catch {
         // dismissed
       }

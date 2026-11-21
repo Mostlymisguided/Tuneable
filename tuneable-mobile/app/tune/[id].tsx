@@ -7,7 +7,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -47,7 +46,7 @@ import {
 } from '@/src/lib/media';
 import { viewerHasTipped } from '@/src/lib/viewerTipped';
 import { useNotedCover } from '@/src/lib/coverMemory';
-import { shareStoryCard } from '@/src/lib/shareStoryCard';
+import { shareCaptionAndUrl, shareStoryCard } from '@/src/lib/shareStoryCard';
 import {
   buildTipStatChips,
   resolveTipStatInputs,
@@ -383,10 +382,7 @@ export default function TuneProfileScreen() {
       });
     } catch {
       try {
-        await Share.share({
-          message: `${media.title || 'Tune'} — ${artist}\n${url}`,
-          url,
-        });
+        await shareCaptionAndUrl(`${media.title || 'Tune'} — ${artist}`, url);
       } catch {
         // dismissed
       }

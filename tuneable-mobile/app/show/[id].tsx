@@ -5,7 +5,6 @@ import {
   Image,
   Pressable,
   RefreshControl,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -32,7 +31,7 @@ import { getApiErrorMessage } from '@/src/lib/apiError';
 import { formatPoundsFromPence } from '@/src/lib/format';
 import { getPlaceProfileHref } from '@/src/lib/location';
 import { getTagProfileHref } from '@/src/lib/tagNormalizer';
-import { shareStoryCard } from '@/src/lib/shareStoryCard';
+import { shareCaptionAndUrl, shareStoryCard } from '@/src/lib/shareStoryCard';
 import { useNotedCover } from '@/src/lib/coverMemory';
 import {
   episodeId,
@@ -331,10 +330,7 @@ export default function PodcastShowScreen() {
       });
     } catch {
       try {
-        await Share.share({
-          message: `${series.title || 'Podcast'}\n${url}`,
-          url,
-        });
+        await shareCaptionAndUrl(series.title || 'Podcast', url);
       } catch {
         // dismissed
       }

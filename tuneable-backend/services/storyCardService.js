@@ -321,7 +321,9 @@ async function buildMediaStoryCard(id, { format = 'story' } = {}) {
   const { copy } = await loadCardContext(media);
   const coverUrl = absoluteCoverUrl(getMediaCoverArt(media));
   const buffer = await renderPng(copy, coverUrl, cardFormat);
-  const frontendUrl = (process.env.FRONTEND_URL || 'https://tuneable.stream').replace(/\/$/, '');
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://tuneable.stream')
+    .replace(/\/$/, '')
+    .replace('://www.tuneable.stream', '://tuneable.stream');
   const sharePath = canonicalMediaPath(kind, media.slug || media.uuid || media._id);
   const shareUrl = `${frontendUrl}${sharePath}`;
 

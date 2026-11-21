@@ -5022,7 +5022,9 @@ router.get('/share/:id', async (req, res) => {
       return res.status(400).send('Invalid media ID');
     }
     
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173')
+      .replace(/\/$/, '')
+      .replace('://www.tuneable.stream', '://tuneable.stream');
     
     // Detect if this is Facebook's crawler (or other social media crawlers)
     const userAgent = req.headers['user-agent'] || '';
@@ -5289,7 +5291,9 @@ router.get('/share/:id', async (req, res) => {
   } catch (error) {
     console.error('❌ Error serving share page:', error);
     console.error('Error stack:', error.stack);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173')
+      .replace(/\/$/, '')
+      .replace('://www.tuneable.stream', '://tuneable.stream');
     
     // Detect if this is a crawler even in error case
     const userAgent = req.headers['user-agent'] || '';

@@ -1,4 +1,4 @@
-import { Share } from 'react-native';
+import { Platform, Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -20,6 +20,19 @@ export function buildStoryShareCaption(options: {
 }): string {
   const who = options.artist ? `${options.title} — ${options.artist}` : options.title;
   return `${who}\n${options.url}`;
+}
+
+/**
+ * iOS appends `url` to `message`. If the message already contains that URL,
+ * Messages, WhatsApp, and Mail show the link twice. Android ignores `url`.
+ */
+export async function shareCaptionAndUrl(message: string, url: string): Promise<void> {
+  const body = message.split(url).join('').replace(/\n{3,}/g, '\n\n').trim();
+  if (Platform.OS === 'ios') {
+    await Share.share(body ? { message: body, url } : { url });
+    return;
+  }
+  await Share.share({ message: body ? `${body}\n${url}` : url });
 }
 
 export async function shareStoryCard(options: {
@@ -54,8 +67,5 @@ export async function shareStoryCard(options: {
     return;
   }
 
-  await Share.share({
-    message: caption,
-    url: options.url,
-  });
+  await shareCaptionAndUrl(caption, options.url);
 }

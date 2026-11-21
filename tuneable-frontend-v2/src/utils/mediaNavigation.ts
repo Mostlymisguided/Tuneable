@@ -14,8 +14,24 @@ function formList(value?: string[] | string): string[] {
 }
 
 function mediaIdentifier(media: MediaPathFields): string {
-  const ident = media.slug || media.uuid || media.mediaUuid || media._id || media.mediaId || '';
-  return ident ? encodeURIComponent(String(ident)) : '';
+  let ident = String(media.slug || media.uuid || media.mediaUuid || media._id || media.mediaId || '').trim();
+  if (!ident) return '';
+  if (/^https?:\/\//i.test(ident)) {
+    try {
+      ident = new URL(ident).pathname;
+    } catch {
+      // Keep the raw value if it is not a parseable URL.
+    }
+  }
+  ident = ident.replace(/^\/+/, '').replace(/^(tune|podcasts|podcast|book)\//, '');
+  return encodeURIComponent(ident);
+}
+
+/** Prefix the current site once. A path that is already absolute is left alone. */
+export function toAbsoluteUrl(pathOrUrl: string, origin = window.location.origin): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  const path = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+  return `${origin.replace(/\/$/, '')}${path}`;
 }
 
 /** Pick slug/uuid/_id from mixed list payloads (library rows, queue items, history). */

@@ -82,7 +82,7 @@ import DeleteMediaSection from '../components/DeleteMediaSection';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
-import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { getMediaProfileUrl, toAbsoluteUrl } from '../utils/mediaNavigation';
 import { usePageMeta } from '../seo/usePageMeta';
 import { SITE_ORIGIN, clipText } from '../seo/pageMeta';
 import { stripHtml } from '../utils/stripHtml';
@@ -1689,7 +1689,7 @@ const PodcastEpisodeProfile: React.FC = () => {
   // Backend route /api/media/share/:id is for Facebook's crawler to get meta tags
   // Use _id instead of uuid for shorter URLs
   const shareUrl = media
-    ? `${window.location.origin}${getMediaProfileUrl(media)}`
+    ? toAbsoluteUrl(getMediaProfileUrl(media))
     : window.location.href;
   const creatorDisplay = media ? getCreatorDisplay(media) : null;
   const shareText = `Support your Favourite Creators on Tuneable! Check out "${media?.title || 'this episode'}"${creatorDisplay ? ` by ${creatorDisplay}` : ''} and show it some love.`;
@@ -1744,18 +1744,9 @@ const PodcastEpisodeProfile: React.FC = () => {
       const encodedUrl = encodeURIComponent(shareUrl);
       const encodedText = encodeURIComponent(shareText);
 
-      // For Facebook, use the backend share route so Facebook's crawler can get meta tags
-      // The backend route sets og:url to the frontend URL, so users will be redirected there
-      // For other platforms, use the frontend URL directly
-      // Use _id instead of uuid for shorter URLs
-      const facebookShareUrl = media?._id 
-        ? `${window.location.origin}/api/media/share/${media._id}`
-        : shareUrl;
-      const encodedFacebookUrl = encodeURIComponent(facebookShareUrl);
-      
       const shareUrls: Record<string, string> = {
         twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
-        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedFacebookUrl}`,
+        facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
         linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
         whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
       };
@@ -1783,32 +1774,25 @@ const PodcastEpisodeProfile: React.FC = () => {
         return;
       }
 
-      // Handle Facebook sharing (copy text + link to clipboard for better UX)
-      // Facebook's sharer.php doesn't support pre-filling text, so we copy to clipboard instead
       if (platform === 'facebook') {
         try {
-          const textToCopy = `${shareText}\n\n${facebookShareUrl}`;
-          await navigator.clipboard.writeText(textToCopy);
-          setCopySuccess(true);
-          toast.success('Message and link copied! Paste it into Facebook to share with the text included.');
-          setTimeout(() => setCopySuccess(false), 2000);
-          
-          // Also open Facebook share dialog as fallback (user can paste the text there)
           const shareWindow = window.open(
-            shareUrls[platform], 
-            '_blank', 
+            shareUrls[platform],
+            '_blank',
             'width=600,height=400,menubar=no,toolbar=no,resizable=yes,scrollbars=yes'
           );
-          
-          if (!shareWindow || shareWindow.closed || typeof shareWindow.closed === 'undefined') {
-            // Popup blocked - that's okay, we already copied to clipboard
-          } else {
-            console.log('Facebook share tracked:', { mediaId: media?._id, url: shareUrl });
-          }
+          const popupBlocked = !shareWindow || shareWindow.closed || typeof shareWindow.closed === 'undefined';
+          await navigator.clipboard.writeText(popupBlocked ? `${shareText}\n\n${shareUrl}` : shareText);
+          setCopySuccess(true);
+          toast.success(
+            popupBlocked
+              ? 'Popup blocked. Caption and link copied instead.'
+              : 'Caption copied. The Facebook window already includes the link.'
+          );
+          setTimeout(() => setCopySuccess(false), 2000);
           return;
         } catch (err) {
           console.error('Failed to copy:', err);
-          // Fall through to regular share dialog if clipboard fails
         }
       }
       

@@ -35,8 +35,50 @@ function triggerDownload(file: File) {
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
 }
 
+/** One copy of the link. Share sheets append a separate `url` field, so it must not also sit in the text. */
+export function shareTextWithUrl(text: string, url: string): string {
+  const trimmed = text.trim();
+  if (!url) return trimmed;
+  if (trimmed.includes(url)) return trimmed;
+  return `${trimmed}\n${url}`;
+}
+
+function sharingThisPage(url: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const here = new URL(window.location.href);
+    const target = new URL(url, window.location.href);
+    return here.origin === target.origin && here.pathname === target.pathname;
+  } catch {
+    return false;
+  }
+}
+
+export function webShareData(options: {
+  title: string;
+  text: string;
+  url: string;
+  files?: File[];
+}): ShareData {
+  const text = options.text.trim();
+  // The open tune page is already the link. Putting that URL in the text as well
+  // makes iOS, WhatsApp, and Messages print it a second time.
+  if (sharingThisPage(options.url)) {
+    const data: ShareData = { title: options.title, text };
+    if (options.files?.length) data.files = options.files;
+    else data.url = options.url;
+    return data;
+  }
+  const data: ShareData = {
+    title: options.title,
+    text: shareTextWithUrl(text, options.url),
+  };
+  if (options.files?.length) data.files = options.files;
+  return data;
+}
+
 async function copyShareCaption(text: string, url: string) {
-  const caption = `${text}\n\n${url}`;
+  const caption = shareTextWithUrl(text, url);
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(caption);
     return;
@@ -89,7 +131,7 @@ export async function shareStoryCard(options: ShareStoryOptions): Promise<'share
   if (platform === 'instagram') {
     if (canShareFiles(file) && navigator.share) {
       try {
-        await navigator.share({ files: [file], title, text: `${text}\n${url}` });
+        await navigator.share(webShareData({ files: [file], title, text, url }));
         return 'shared';
       } catch (err) {
         if (isAbortError(err)) return 'cancelled';
@@ -101,7 +143,7 @@ export async function shareStoryCard(options: ShareStoryOptions): Promise<'share
 
   if (canShareFiles(file) && navigator.share) {
     try {
-      await navigator.share({ files: [file], title, text: `${text}\n${url}` });
+      await navigator.share(webShareData({ files: [file], title, text, url }));
       return 'shared';
     } catch (err) {
       if (isAbortError(err)) return 'cancelled';
@@ -110,7 +152,7 @@ export async function shareStoryCard(options: ShareStoryOptions): Promise<'share
 
   if (typeof navigator.share === 'function') {
     try {
-      await navigator.share({ title, text, url });
+      await navigator.share(webShareData({ title, text, url }));
       triggerDownload(file);
       return 'shared';
     } catch (err) {
