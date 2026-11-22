@@ -97,7 +97,7 @@ import {
   openListenElsewhere,
 } from '../utils/listenElsewhere';
 import { requireAuthToPlay } from '../utils/playAuth';
-import { computeChampionTipContext, resolveTipStatInputs } from '../utils/tipStats';
+import { computeChampionTipContext } from '../utils/tipStats';
 import { copyAccessSentence, copyShareLabel, normalizeCopySharePercent, type CopyAccessStatus } from '../utils/copyShare';
 import { shareStoryCardWithToast, getStoryCardUrl } from '../utils/shareMediaCard';
 import ProductionStackEditor from '../components/ProductionStackEditor';
@@ -106,7 +106,7 @@ import AiToolsEditor from '../components/AiToolsEditor';
 import AiToolsDisplay from '../components/AiToolsDisplay';
 import AiAssistedBadge from '../components/AiAssistedBadge';
 import DeleteMediaSection from '../components/DeleteMediaSection';
-import QueueMediaCard, { normalizeQueueMediaData } from '../components/QueueMediaCard';
+import RelatedTunesRail from '../components/RelatedTunesRail';
 import TipHeartButton from '../components/TipHeartButton';
 import { viewerHasTipped } from '../utils/viewerTipped';
 import { EMPTY_PRODUCTION_STACK, hasProductionStack, type ProductionStack } from '../data/gear';
@@ -469,8 +469,6 @@ const TuneProfile: React.FC = () => {
   }>>([]);
   const [relatedMedia, setRelatedMedia] = useState<RecommendedMediaItem[]>([]);
   const [isLoadingRelatedPlaylists, setIsLoadingRelatedPlaylists] = useState(false);
-  const [recommendedItemToTip, setRecommendedItemToTip] = useState<RecommendedMediaItem | null>(null);
-  const [isPlacingRecommendedTip, setIsPlacingRecommendedTip] = useState(false);
   const [hasInitializedBidInput, setHasInitializedBidInput] = useState(false);
 
   // Report modal state
@@ -604,11 +602,6 @@ const TuneProfile: React.FC = () => {
         fallbackChampionUser: (media as any)?.globalMediaAggregateTopUser,
       }),
     [media, user]
-  );
-
-  const recommendedTipStats = useMemo(
-    () => resolveTipStatInputs(recommendedItemToTip, user),
-    [recommendedItemToTip, user]
   );
 
   // Check if user can edit this tune
@@ -1863,25 +1856,6 @@ const TuneProfile: React.FC = () => {
     ...playerPlayabilityFields(item as any),
   });
 
-  const recommendedToQueueShape = (item: RecommendedMediaItem) => ({
-    _id: item._id,
-    id: item.uuid || item._id,
-    uuid: item.uuid || item._id,
-    title: item.title,
-    artist: item.artist,
-    coverArt: item.coverArt || DEFAULT_COVER_ART,
-    duration: item.duration || 0,
-    bpm: item.bpm ?? null,
-    releaseDate: item.releaseDate ?? null,
-    releaseYear: item.releaseYear ?? null,
-    primaryLocation: item.primaryLocation ?? null,
-    tags: item.tags?.length ? item.tags : item.sharedTags || [],
-    bids: item.bids || [],
-    globalMediaAggregate: item.globalMediaAggregate || 0,
-    tuneBytesEarned: item.tuneBytesEarned,
-    sources: item.sources || {},
-  });
-
   const isRecommendedPlayable = (item: RecommendedMediaItem) => {
     const enriched = enrichMediaWithPlayability({
       sources: item.sources || {},
@@ -1935,59 +1909,6 @@ const TuneProfile: React.FC = () => {
 
   const handlePlayRelatedTunes = () => {
     startRecommendedQueue(relatedMedia);
-  };
-
-  const handleOpenRecommendedTip = (item: RecommendedMediaItem) => {
-    if (!user) {
-      toast.info('Please log in to support this tune');
-      const returnUrl = getMediaProfileUrl(media || { _id: mediaId });
-      navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
-      return;
-    }
-    setRecommendedItemToTip(item);
-  };
-
-  const handleConfirmRecommendedTip = async (
-    tags: string[],
-    amount: number,
-    _setProgress?: unknown,
-    moment?: TipMoment | null
-  ) => {
-    if (!user || !recommendedItemToTip) return;
-
-    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : (globalAverageTip);
-    if (tipAmount < minimumBid) {
-      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
-      return;
-    }
-
-    const canAffordRecommended = await ensureSpendableBalance(
-      (user as any)?.balance,
-      Math.round(tipAmount * 100),
-      refreshUser
-    );
-    if (!canAffordRecommended) {
-      toast.error('Insufficient balance. Please top up your wallet.');
-      navigate('/wallet');
-      return;
-    }
-
-    const tipMediaId = recommendedItemToTip._id || recommendedItemToTip.uuid;
-    if (!tipMediaId) return;
-
-    setIsPlacingRecommendedTip(true);
-    try {
-      const result = await mediaAPI.placeGlobalBid(tipMediaId, tipAmount, undefined, tags, moment);
-      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
-      toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${recommendedItemToTip.title}"!`);
-      setRecommendedItemToTip(null);
-      void loadRelatedPlaylists();
-    } catch (err: any) {
-      console.error('Error placing recommended tip:', err);
-      toast.error(err.response?.data?.error || 'Failed to place tip');
-    } finally {
-      setIsPlacingRecommendedTip(false);
-    }
   };
 
   const defaultTipAmount = useMemo(() => {
@@ -2447,30 +2368,6 @@ const TuneProfile: React.FC = () => {
       caption={copyAccessLine()}
       onSeek={isMediaPlayable(media) ? seekTune : undefined}
     />
-  );
-
-  const renderRecommendedQueueList = (items: RecommendedMediaItem[]) => (
-    <div className="space-y-3">
-      {items.map((item, index) => {
-        const queueShape = recommendedToQueueShape(item);
-        const mediaData = normalizeQueueMediaData(queueShape);
-
-        return (
-          <QueueMediaCard
-            key={`related-${item._id}`}
-            item={queueShape}
-            index={index}
-            mediaData={mediaData}
-            showActions={false}
-            isBidding={isPlacingRecommendedTip}
-            onActionClick={() => {}}
-            onPlay={() => startRecommendedQueue(items, item)}
-            onTip={() => handleOpenRecommendedTip(item)}
-            mediaHref={getMediaProfileUrl(item)}
-          />
-        );
-      })}
-    </div>
   );
 
   return (
@@ -2944,7 +2841,11 @@ const TuneProfile: React.FC = () => {
             {isLoadingRelatedPlaylists ? (
               <div className="text-gray-400 text-sm">Loading related tunes...</div>
             ) : (
-              renderRecommendedQueueList(relatedMedia)
+              <RelatedTunesRail
+                items={relatedMedia}
+                isPlayable={isRecommendedPlayable}
+                onPlay={(item) => startRecommendedQueue(relatedMedia, item)}
+              />
             )}
           </div>
         )}
@@ -4175,29 +4076,6 @@ const TuneProfile: React.FC = () => {
           }}
         />
       ) : null}
-
-      <BidConfirmationModal
-        isOpen={!!recommendedItemToTip}
-        onClose={() => setRecommendedItemToTip(null)}
-        onConfirm={handleConfirmRecommendedTip}
-        waveformPeaks={waveformPeaksOf(recommendedItemToTip?.waveformPeaks)}
-        durationSeconds={recommendedItemToTip?.duration}
-        bidAmount={globalAverageTip}
-        minTip={minimumBid}
-        avgTip={recommendedTipStats.avgTip}
-        championAggregate={recommendedTipStats.championAggregate}
-        viewerAggregate={recommendedTipStats.viewerAggregate}
-        viewerIsChampion={recommendedTipStats.viewerIsChampion}
-        viewerRank={recommendedTipStats.viewerRank}
-        mediaTitle={recommendedItemToTip?.title || 'Unknown'}
-        mediaArtist={recommendedItemToTip?.artist}
-        userBalance={penceToPoundsNumber((user as any)?.balance)}
-        isLoading={isPlacingRecommendedTip}
-        isNonPlayable={
-          recommendedItemToTip ? !isRecommendedPlayable(recommendedItemToTip) : false
-        }
-        existingTags={recommendedItemToTip?.tags}
-      />
 
       {/* Add Link Modal */}
       {showAddLinkModal && (
