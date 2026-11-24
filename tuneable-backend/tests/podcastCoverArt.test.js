@@ -3,6 +3,7 @@ const {
   extractRssItemImage,
   withSeriesCoverArt,
   getSeriesEpisodeSort,
+  compareSeriesEpisodes,
 } = require('../utils/podcastCoverArt');
 
 describe('normalizeCoverArtUrl', () => {
@@ -105,5 +106,15 @@ describe('getSeriesEpisodeSort', () => {
       duration: -1,
       globalMediaAggregate: -1,
     });
+  });
+});
+
+describe('compareSeriesEpisodes', () => {
+  it('orders most tipped first, then newer release date', () => {
+    const tipped = { _id: '1', globalMediaAggregate: 100, releaseDate: '2020-01-01' };
+    const plain = { _id: '2', globalMediaAggregate: 0, releaseDate: '2024-01-01' };
+    const olderPlain = { _id: '3', globalMediaAggregate: 0, releaseDate: '2019-01-01' };
+    const episodes = [olderPlain, plain, tipped].sort((a, b) => compareSeriesEpisodes(a, b, 'mostTipped'));
+    expect(episodes.map((ep) => ep._id)).toEqual(['1', '2', '3']);
   });
 });

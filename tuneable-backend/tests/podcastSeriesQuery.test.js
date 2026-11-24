@@ -2,6 +2,9 @@ const {
   MIN_SERIES_EPISODE_SEARCH_LENGTH,
   escapeRegex,
   normalizeSeriesEpisodeSearch,
+  normalizeEpisodeTitle,
+  dedupeIncomingEpisodes,
+  dedupeSeriesEpisodes,
   seriesEpisodeMatch,
   buildSeriesEpisodeMatch,
   readSeriesExternalIds,
@@ -77,6 +80,59 @@ describe('readSeriesExternalIds', () => {
       podcastIndexId: null,
       iTunesId: null,
     });
+  });
+});
+
+describe('normalizeEpisodeTitle', () => {
+  it('treats case, spacing, and simple entities as the same title', () => {
+    expect(normalizeEpisodeTitle('  Britney &amp; The Can-Can  ')).toBe(
+      normalizeEpisodeTitle('britney & the can-can')
+    );
+  });
+});
+
+describe('dedupeIncomingEpisodes', () => {
+  it('collapses the same title when source ids differ and keeps the first row', () => {
+    const merged = dedupeIncomingEpisodes([
+      { title: 'Britney Spears and The Can-Can', guid: 'rss-guid', source: 'rss' },
+      { title: 'Britney Spears and The Can-Can', guid: '4991', source: 'podcastindex' },
+      { title: 'A different episode', guid: 'other' },
+    ]);
+    expect(merged).toHaveLength(2);
+    expect(merged[0].source).toBe('rss');
+    expect(merged.map((ep) => ep.title)).toEqual([
+      'Britney Spears and The Can-Can',
+      'A different episode',
+    ]);
+  });
+
+  it('lets a later source replace the earlier row when asked', () => {
+    const merged = dedupeIncomingEpisodes([
+      { title: 'Ada', guid: 'rss-1', source: 'rss' },
+      { title: 'Ada', guid: 'pi-9', source: 'podcastindex' },
+    ], { preferLast: true });
+    expect(merged).toEqual([
+      { title: 'Ada', guid: 'pi-9', source: 'podcastindex' },
+    ]);
+  });
+});
+
+describe('dedupeSeriesEpisodes', () => {
+  it('keeps one row per title and prefers the copy with tips', () => {
+    const episodes = dedupeSeriesEpisodes([
+      { _id: 'a', title: 'Britney Spears and The Can-Can', globalMediaAggregate: 0, duration: 2518 },
+      { _id: 'b', title: 'Britney Spears and The Can-Can', globalMediaAggregate: 250, duration: 2518 },
+      { _id: 'c', title: 'The joy of the overture', globalMediaAggregate: 0 },
+    ]);
+    expect(episodes.map((ep) => ep._id)).toEqual(['b', 'c']);
+  });
+
+  it('does not collapse untitled episodes', () => {
+    const episodes = dedupeSeriesEpisodes([
+      { _id: 'a', title: '   ' },
+      { _id: 'b', title: '' },
+    ]);
+    expect(episodes.map((ep) => ep._id)).toEqual(['a', 'b']);
   });
 });
 

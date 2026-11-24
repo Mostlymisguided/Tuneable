@@ -21,4 +21,13 @@ describe('mergeCatalogueEpisodes', () => {
     expect(merged[0].source).toBe('rss');
     expect(merged.map((ep) => ep.title)).toEqual(['Ada', 'Ada live']);
   });
+
+  it('collapses the same episode when RSS and Podcast Index use different ids', () => {
+    const merged = mergeCatalogueEpisodes([
+      [{ title: 'Britney Spears and The Can-Can', guid: 'https://show.example/ep/1', source: 'rss' }],
+      [{ title: 'Britney Spears and The Can-Can', id: 88421, source: 'podcastindex' }],
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].source).toBe('rss');
+  });
 });

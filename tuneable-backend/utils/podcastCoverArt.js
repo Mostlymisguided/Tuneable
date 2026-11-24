@@ -59,9 +59,36 @@ function getSeriesEpisodeSort(sortBy) {
   }
 }
 
+function seriesSortValue(episode, key) {
+  if (key === 'releaseDate') {
+    if (!episode?.releaseDate) return null;
+    const time = new Date(episode.releaseDate).getTime();
+    return Number.isNaN(time) ? null : time;
+  }
+  if (key === '_id') return episode?._id ? String(episode._id) : null;
+  const value = episode?.[key];
+  if (value == null || value === '') return null;
+  return value;
+}
+
+function compareSeriesEpisodes(a, b, sortBy) {
+  const spec = getSeriesEpisodeSort(sortBy);
+  for (const [key, direction] of Object.entries(spec)) {
+    const av = seriesSortValue(a, key);
+    const bv = seriesSortValue(b, key);
+    if (av == null && bv == null) continue;
+    if (av == null) return -direction;
+    if (bv == null) return direction;
+    if (av < bv) return -direction;
+    if (av > bv) return direction;
+  }
+  return 0;
+}
+
 module.exports = {
   normalizeCoverArtUrl,
   extractRssItemImage,
   withSeriesCoverArt,
   getSeriesEpisodeSort,
+  compareSeriesEpisodes,
 };

@@ -20,7 +20,7 @@ const spotifyService = require('../services/spotifyService');
 const { parsePodcastUrl, isValidPodcastUrl } = require('../utils/podcastUrlParser');
 const { buildBidLocationSnapshot } = require('../utils/locationUtils');
 const {
-  getSeriesEpisodeSort,
+  compareSeriesEpisodes,
   withSeriesCoverArt,
 } = require('../utils/podcastCoverArt');
 const {
@@ -30,11 +30,20 @@ const {
 } = require('../utils/podcastRss');
 const {
   buildSeriesEpisodeMatch,
+  dedupeIncomingEpisodes,
+  dedupeSeriesEpisodes,
+  normalizeEpisodeTitle,
   seriesEpisodeMatch,
 } = require('../utils/podcastSeriesQuery');
 const {
   importMatchingSeriesCatalogueEpisodes,
 } = require('../services/seriesCatalogueSearchService');
+const {
+  removeUnplayableShells,
+  importRecentFeedEpisodes,
+  sourceValue,
+} = require('../services/podcastFeedImport');
+const { showImportBatchSize, feedBackfillOpen } = require('../utils/podcastFeedBatch');
 const {
   normalizeLocationScope,
   locationScopeIncludesOrigin,
@@ -2503,8 +2512,7 @@ async function fetchSeriesEpisodePage({
   q,
 }) {
   const { match } = buildSeriesEpisodeMatch(seriesId, q);
-  let query = Media.find(match)
-    .sort(getSeriesEpisodeSort(sortBy))
+  const docs = await Media.find(match)
     .populate('podcastSeries', 'title coverArt genres tags')
     .select(
       slim
@@ -2512,10 +2520,13 @@ async function fetchSeriesEpisodePage({
         : '-transcript -editHistory -ownershipHistory -relationships'
     )
     .lean();
-  if (applyLimit) {
-    query = query.skip(offset).limit(limit);
-  }
-  return query;
+  // Duplicate rows share a title when the same episode was imported from
+  // two catalogues (different guids). Collapse before paging so search
+  // results and the show list count each episode once.
+  const unique = dedupeSeriesEpisodes(docs)
+    .sort((a, b) => compareSeriesEpisodes(a, b, sortBy));
+  const episodes = applyLimit ? unique.slice(offset, offset + limit) : unique;
+  return { episodes, total: unique.length };
 }
 
 async function computeSeriesEpisodeStats(seriesId) {
@@ -2531,10 +2542,15 @@ async function computeSeriesEpisodeStats(seriesId) {
       episodeCount: { $sum: 1 },
       episodesWithTips: {
         $sum: { $cond: [{ $gt: [{ $ifNull: ['$globalMediaAggregate', 0] }, 0] }, 1, 0] }
-      }
+      },
+      titles: { $push: '$title' }
     } }
   ]);
-  const stats = statsResult[0] || { totalTips: 0, episodeCount: 0, episodesWithTips: 0 };
+  const stats = statsResult[0] || { totalTips: 0, episodeCount: 0, episodesWithTips: 0, titles: [] };
+  const uniqueTitles = new Set(
+    (stats.titles || []).map((title) => normalizeEpisodeTitle(title)).filter(Boolean)
+  );
+  stats.episodeCount = uniqueTitles.size || stats.episodeCount;
   const avgTip = stats.episodesWithTips > 0 ? stats.totalTips / stats.episodesWithTips : 0;
   const topEpisode = await Media.findOne(seriesEpisodeMatch(seriesId))
     .sort({ globalMediaAggregate: -1 })
@@ -2584,7 +2600,7 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
     const seriesId = resolved._id.toString();
     const { autoImport = 'true', refresh = 'false', loadMore = 'false', offset = '0' } = req.query;
     const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : 'mostTipped';
-    const { match: episodeMatch, query: searchQuery } = buildSeriesEpisodeMatch(
+    const { query: searchQuery } = buildSeriesEpisodeMatch(
       seriesId,
       req.query.q
     );
@@ -2609,7 +2625,13 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
 
     await Media.ensureSlug(series);
 
-    const existingEpisodeCount = await Media.countDocuments(seriesEpisodeMatch(seriesId));
+    let existingEpisodeCount = await Media.countDocuments(seriesEpisodeMatch(seriesId));
+    if (!searching && existingEpisodeCount > 0 && existingEpisodeCount <= 30) {
+      const removedShells = await removeUnplayableShells(seriesId, series.title);
+      if (removedShells > 0) {
+        existingEpisodeCount = await Media.countDocuments(seriesEpisodeMatch(seriesId));
+      }
+    }
 
     // Auto-import episodes from external source if series has external IDs
     let importedCount = 0;
@@ -2627,8 +2649,46 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
     );
     
     let taddyResult = null; // Declare outside if block for use in response
-    
-    if (needsImport && series.externalIds) {
+    let feedImportHandled = false;
+    let canImportMore = false;
+
+    if (needsImport) {
+      const batchSize = showImportBatchSize({
+        loadMore: loadMore === 'true',
+        requestedLimit,
+        applyLimit,
+      });
+      try {
+        const feedImport = await importRecentFeedEpisodes({
+          series,
+          addedBy: series.addedBy || new mongoose.Types.ObjectId(),
+          batchSize,
+          onProgress: (current, total) => {
+            importProgress.set(seriesId, {
+              current,
+              total,
+              status: 'importing',
+              startedAt: importProgress.get(seriesId)?.startedAt || new Date(),
+            });
+          },
+        });
+        feedImportHandled = feedImport.handled;
+        canImportMore = feedImport.canImportMore;
+        importedCount += feedImport.imported;
+        if (feedImport.handled) {
+          importProgress.set(seriesId, {
+            current: feedImport.imported,
+            total: Math.max(feedImport.imported, 1),
+            status: 'complete',
+            startedAt: importProgress.get(seriesId)?.startedAt || new Date(),
+          });
+        }
+      } catch (feedError) {
+        console.error('Recent feed import failed:', feedError.message);
+      }
+    }
+
+    if (needsImport && !feedImportHandled && series.externalIds) {
       // Handle both Map and plain object formats
       let taddyUuid, podcastIndexId, iTunesId;
       
@@ -2691,18 +2751,8 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
                 await series.save();
               }
               
-              // Merge episodes from all feeds (deduplicate by GUID/title)
-              const allEpisodes = new Map();
-              rssResults.forEach(result => {
-                result.episodes.forEach(ep => {
-                  const key = ep.guid || ep.title?.toLowerCase().trim();
-                  if (key && !allEpisodes.has(key)) {
-                    allEpisodes.set(key, ep);
-                  }
-                });
-              });
-              
-              rssEpisodes = Array.from(allEpisodes.values());
+              // Same episode can show up in more than one feed with a different guid.
+              rssEpisodes = dedupeIncomingEpisodes(rssResults.flatMap((result) => result.episodes || []));
               console.log(`📡 Merged ${rssEpisodes.length} unique episodes from ${rssResults.length} RSS feed(s)`);
             }
           } else if (rssFeeds.length > 0 && loadMore === 'true') {
@@ -2713,16 +2763,7 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
             
             if (rssResults.length > 0) {
               bestRssFeed = rssResults[0];
-              const allEpisodes = new Map();
-              rssResults.forEach(result => {
-                result.episodes.forEach(ep => {
-                  const key = ep.guid || ep.title?.toLowerCase().trim();
-                  if (key && !allEpisodes.has(key)) {
-                    allEpisodes.set(key, ep);
-                  }
-                });
-              });
-              rssEpisodes = Array.from(allEpisodes.values());
+              rssEpisodes = dedupeIncomingEpisodes(rssResults.flatMap((result) => result.episodes || []));
               console.log(`📡 Found ${rssEpisodes.length} episodes from RSS feeds`);
             }
           } else {
@@ -2812,27 +2853,11 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
             }
           }
           
-          // Merge all episodes (RSS + API) and deduplicate
-          const allEpisodesMap = new Map();
-          
-          // Add RSS episodes
-          rssEpisodes.forEach(ep => {
-            const key = ep.guid || ep.title?.toLowerCase().trim();
-            if (key && !allEpisodesMap.has(key)) {
-              allEpisodesMap.set(key, ep);
-            }
-          });
-          
-          // Add API episodes (they take precedence for historical episodes)
-          apiEpisodes.forEach(ep => {
-            const key = ep.guid || ep.title?.toLowerCase().trim();
-            if (key) {
-              // API episodes override RSS episodes (they're more comprehensive)
-              allEpisodesMap.set(key, ep);
-            }
-          });
-          
-          const mergedEpisodes = Array.from(allEpisodesMap.values());
+          // API copies replace the RSS row when the title or guid matches.
+          const mergedEpisodes = dedupeIncomingEpisodes(
+            [...rssEpisodes, ...apiEpisodes],
+            { preferLast: true }
+          );
           console.log(`📚 Merged ${mergedEpisodes.length} total episodes (${rssEpisodes.length} from RSS, ${apiEpisodes.length} from APIs)`);
           
           // Get existing episodes to check for duplicates
@@ -2843,7 +2868,9 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
           }).select('title externalIds').lean();
           
           // Filter out episodes already imported (check by title and GUID)
-          const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+          const existingTitles = new Set(
+            existingEpisodes.map((ep) => normalizeEpisodeTitle(ep.title)).filter(Boolean)
+          );
           const existingGuids = new Set();
           existingEpisodes.forEach(ep => {
             if (ep.externalIds && typeof ep.externalIds === 'object') {
@@ -2855,11 +2882,12 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
             }
           });
           
-          episodesToImport = mergedEpisodes.filter(ep => {
-            const titleMatch = ep.title && existingTitles.has(ep.title.toLowerCase().trim());
-            const guidMatch = ep.guid && existingGuids.has(ep.guid);
-            return !titleMatch && !guidMatch; // Only include if neither title nor GUID matches
-          });
+          episodesToImport = dedupeIncomingEpisodes(mergedEpisodes.filter(ep => {
+            const title = normalizeEpisodeTitle(ep.title);
+            const titleMatch = title && existingTitles.has(title);
+            const guidMatch = ep.guid && existingGuids.has(String(ep.guid));
+            return !titleMatch && !guidMatch;
+          }));
           
           console.log(`📚 ${episodesToImport.length} new episodes to import (${mergedEpisodes.length - episodesToImport.length} already exist)`);
           
@@ -3050,18 +3078,9 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
                 bestRssFeed = rssResults[0];
                 console.log(`📡 Using discovered ${bestRssFeed.source} RSS feed (${bestRssFeed.count} episodes)`);
                 
-                // Merge episodes from all discovered feeds
-                const allEpisodes = new Map();
-                rssResults.forEach(result => {
-                  result.episodes.forEach(ep => {
-                    const key = ep.guid || ep.title?.toLowerCase().trim();
-                    if (key && !allEpisodes.has(key)) {
-                      allEpisodes.set(key, ep);
-                    }
-                  });
-                });
-                
-                rssEpisodes = Array.from(allEpisodes.values());
+                rssEpisodes = dedupeIncomingEpisodes(
+                  rssResults.flatMap((result) => result.episodes || [])
+                );
                 
                 // Get existing episodes to check for duplicates
                 const existingEpisodes = await Media.find({
@@ -3070,7 +3089,9 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
                   contentForm: { $in: ['podcastepisode'] }
                 }).select('title externalIds').lean();
                 
-                const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+                const existingTitles = new Set(
+                  existingEpisodes.map((ep) => normalizeEpisodeTitle(ep.title)).filter(Boolean)
+                );
                 const existingGuids = new Set();
                 existingEpisodes.forEach(ep => {
                   if (ep.externalIds && typeof ep.externalIds === 'object') {
@@ -3080,24 +3101,18 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
                 });
                 
                 const rssEpisodesToImport = rssEpisodes.filter(rssEp => {
-                  const titleMatch = rssEp.title && existingTitles.has(rssEp.title.toLowerCase().trim());
-                  const guidMatch = rssEp.guid && existingGuids.has(rssEp.guid);
+                  const title = normalizeEpisodeTitle(rssEp.title);
+                  const titleMatch = title && existingTitles.has(title);
+                  const guidMatch = rssEp.guid && existingGuids.has(String(rssEp.guid));
                   return !titleMatch && !guidMatch;
                 });
                 
-                // Merge with existing episodesToImport instead of replacing
-                // Deduplicate by GUID/title
-                const existingImportKeys = new Set(episodesToImport.map(ep => 
-                  ep.guid || ep.title?.toLowerCase().trim()
-                ).filter(Boolean));
-                
-                const newRssEpisodes = rssEpisodesToImport.filter(ep => {
-                  const key = ep.guid || ep.title?.toLowerCase().trim();
-                  return key && !existingImportKeys.has(key);
-                });
-                
-                episodesToImport = [...episodesToImport, ...newRssEpisodes];
-                console.log(`📡 Added ${newRssEpisodes.length} new episodes from discovered RSS feed(s) (${episodesToImport.length} total episodes to import)`);
+                const beforeDiscovered = episodesToImport.length;
+                episodesToImport = dedupeIncomingEpisodes([
+                  ...episodesToImport,
+                  ...rssEpisodesToImport,
+                ]);
+                console.log(`📡 Added ${episodesToImport.length - beforeDiscovered} new episodes from discovered RSS feed(s) (${episodesToImport.length} total episodes to import)`);
                 
                 // Sort by date (newest first) to ensure consistent ordering
                 episodesToImport.sort((a, b) => {
@@ -3299,11 +3314,14 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
                 const existingEpisodes = await Media.find({
                   podcastSeries: seriesId
                 }).select('title').lean();
-                const existingTitles = new Set(existingEpisodes.map(ep => ep.title?.toLowerCase().trim()));
+                const existingTitles = new Set(
+                  existingEpisodes.map((ep) => normalizeEpisodeTitle(ep.title)).filter(Boolean)
+                );
                 
-                const rssEpisodesToImport = rssEpisodes.filter(rssEp => {
-                  return !existingTitles.has(rssEp.title?.toLowerCase().trim());
-                });
+                const rssEpisodesToImport = dedupeIncomingEpisodes(rssEpisodes.filter(rssEp => {
+                  const title = normalizeEpisodeTitle(rssEp.title);
+                  return !title || !existingTitles.has(title);
+                }));
                 
                 console.log(`📡 ${rssEpisodesToImport.length} new episodes from RSS (${rssEpisodes.length - rssEpisodesToImport.length} already exist)`);
                 
@@ -3628,7 +3646,7 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
     const seriesObj = series.toObject ? series.toObject() : series;
     const seriesCoverArt = seriesObj.coverArt || null;
 
-    const [episodes, stats, matchedCount] = await Promise.all([
+    const [page, stats] = await Promise.all([
       fetchSeriesEpisodePage({
         seriesId,
         sortBy,
@@ -3639,20 +3657,29 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
         q: searchQuery,
       }),
       computeSeriesEpisodeStats(seriesId),
-      applyLimit && searching ? Media.countDocuments(episodeMatch) : Promise.resolve(null),
     ]);
 
     const serializedEpisodes = await serializeSeriesEpisodes(
-      episodes,
+      page.episodes,
       seriesCoverArt,
       req.user?._id || null
     );
-    const resultCount = searching
-      ? (matchedCount ?? serializedEpisodes.length)
-      : stats.totalEpisodes;
-    const hasMore = applyLimit
-      ? episodeOffset + serializedEpisodes.length < resultCount
+    const resultCount = searching ? page.total : stats.totalEpisodes;
+    if (!feedImportHandled && !searching) {
+      canImportMore = feedBackfillOpen({
+        flag: sourceValue(series.sources, 'feedBackfill'),
+        episodeCount: stats.totalEpisodes,
+        hasFeed: getAllRSSFeeds(series).length > 0 || Boolean(
+          (series.externalIds instanceof Map
+            ? series.externalIds.get('iTunes')
+            : series.externalIds?.iTunes)
+        ),
+      });
+    }
+    const hasMoreInDb = applyLimit
+      ? episodeOffset + serializedEpisodes.length < page.total
       : false;
+    const hasMore = hasMoreInDb || (applyLimit && canImportMore && !searching);
 
     // Clean up progress after a delay (to allow final poll)
     setTimeout(() => {
@@ -3669,6 +3696,7 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
       offset: episodeOffset,
       limit: applyLimit ? requestedLimit : serializedEpisodes.length,
       hasMore,
+      canImportMore: Boolean(canImportMore) && !searching,
       importInfo: importedCount > 0 ? {
         imported: importedCount,
         errors: importErrors.length,

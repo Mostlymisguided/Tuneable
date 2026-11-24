@@ -8,6 +8,8 @@ const {
 } = require('../utils/podcastRss');
 const {
   MAX_SERIES_CATALOGUE_SEARCH_IMPORTS,
+  dedupeIncomingEpisodes,
+  normalizeEpisodeTitle,
   normalizeSeriesEpisodeSearch,
   readSeriesExternalIds,
   selectCatalogueSearchMatches,
@@ -20,25 +22,12 @@ const CATALOGUE_APPLE_LOOKUP_MAX = 200;
 const THIN_CATALOGUE_THRESHOLD = 50;
 const CATALOGUE_SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
 const catalogueSearchCache = new Map();
-
-function catalogueDedupeKey(episode) {
-  const guid = episode?.guid || episode?.episodeGuid || episode?.id || episode?.trackId;
-  if (guid) return `id:${String(guid).toLowerCase().trim()}`;
-  const title = episode?.title || episode?.trackName || episode?.name || '';
-  return `title:${title.toLowerCase().trim()}`;
-}
+const catalogueSearchInflight = new Map();
 
 function mergeCatalogueEpisodes(batches) {
-  const merged = new Map();
-  batches.flat().forEach((episode) => {
-    if (!episode) return;
-    const key = catalogueDedupeKey(episode);
-    if (!key || key === 'title:') return;
-    if (!merged.has(key)) {
-      merged.set(key, episode);
-    }
-  });
-  return Array.from(merged.values());
+  // Same episode often arrives from RSS and Podcast Index with different ids.
+  // Collapse those by title as well as guid before anything is imported.
+  return dedupeIncomingEpisodes(batches.flat());
 }
 
 function toCatalogueItem(source, episode) {
@@ -168,7 +157,8 @@ async function existingSeriesEpisodeKeys(seriesId) {
   const titles = new Set();
   const ids = new Set();
   existing.forEach((ep) => {
-    if (ep.title) titles.add(ep.title.toLowerCase().trim());
+    const title = normalizeEpisodeTitle(ep.title);
+    if (title) titles.add(title);
     const ext = ep.externalIds && typeof ep.externalIds === 'object' ? ep.externalIds : {};
     ['rssGuid', 'podcastIndex', 'iTunes', 'apple', 'taddy'].forEach((key) => {
       if (ext[key]) ids.add(String(ext[key]));
@@ -177,8 +167,16 @@ async function existingSeriesEpisodeKeys(seriesId) {
   return { titles, ids };
 }
 
+function rememberImportedEpisode(existing, episode) {
+  const title = normalizeEpisodeTitle(episode?.title || episode?.trackName || episode?.name);
+  if (title) existing.titles.add(title);
+  [episode?.guid, episode?.episodeGuid, episode?.id, episode?.trackId, episode?.podcastIndexId]
+    .filter(Boolean)
+    .forEach((id) => existing.ids.add(String(id)));
+}
+
 function isAlreadyImported(episode, existing) {
-  const title = (episode.title || '').toLowerCase().trim();
+  const title = normalizeEpisodeTitle(episode.title || episode.trackName || episode.name);
   if (title && existing.titles.has(title)) return true;
   const candidates = [
     episode.guid,
@@ -201,6 +199,9 @@ function importSourceFor(episode) {
 async function importEpisodeIntoExistingSeries(episode, series, addedBy) {
   const seriesData = buildSeriesData(series);
   const source = importSourceFor(episode);
+  const title = episode.title || episode.trackName || episode.name;
+  const alreadyInSeries = await podcastAdapter.findEpisodeInSeriesByTitle(series._id, title);
+  if (alreadyInSeries) return alreadyInSeries;
   const imported = await podcastAdapter.importEpisode(source, episode, addedBy, seriesData);
   if (!imported) return null;
 
@@ -248,7 +249,18 @@ async function importMatchingSeriesCatalogueEpisodes({
   if (cached && Date.now() - cached.at < CATALOGUE_SEARCH_CACHE_TTL_MS) {
     return { imported: 0, catalogHits: cached.catalogHits, cached: true };
   }
+  const inflight = catalogueSearchInflight.get(cacheKey);
+  if (inflight) return inflight;
 
+  const promise = importCatalogueMatches({ series, query: q, addedBy, maxImport, cacheKey })
+    .finally(() => {
+      catalogueSearchInflight.delete(cacheKey);
+    });
+  catalogueSearchInflight.set(cacheKey, promise);
+  return promise;
+}
+
+async function importCatalogueMatches({ series, query: q, addedBy, maxImport, cacheKey }) {
   const catalogue = await fetchSeriesCatalogueEpisodes(series, q);
   const matches = selectCatalogueSearchMatches(catalogue, q, Math.max(maxImport * 3, maxImport));
   if (!matches.length) {
@@ -261,9 +273,14 @@ async function importMatchingSeriesCatalogueEpisodes({
   let imported = 0;
 
   for (const episode of toImport) {
+    if (isAlreadyImported(episode, existing)) continue;
     try {
       const result = await importEpisodeIntoExistingSeries(episode, series, addedBy);
-      if (result) imported += 1;
+      if (result) {
+        imported += 1;
+        rememberImportedEpisode(existing, episode);
+        rememberImportedEpisode(existing, result);
+      }
     } catch (error) {
       console.error(`Show catalogue import failed for "${episode.title}":`, error.message);
     }
@@ -283,5 +300,4 @@ module.exports = {
   fetchSeriesCatalogueEpisodes,
   importMatchingSeriesCatalogueEpisodes,
   mergeCatalogueEpisodes,
-  catalogueDedupeKey,
 };

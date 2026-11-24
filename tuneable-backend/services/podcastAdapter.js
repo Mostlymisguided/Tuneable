@@ -5,6 +5,33 @@
 
 const Media = require('../models/Media');
 const { normalizeCoverArtUrl } = require('../utils/podcastCoverArt');
+const { normalizeEpisodeTitle } = require('../utils/podcastSeriesQuery');
+
+function directAudioUrl(mediaData) {
+  const sources = mediaData?.sources;
+  const url = sources instanceof Map ? sources.get('audio_direct') : sources?.audio_direct;
+  return typeof url === 'string' && /^https?:\/\//i.test(url.trim()) ? url.trim() : '';
+}
+
+function isEpisodeIdentityKey(platform) {
+  if (!platform) return false;
+  const lower = String(platform).toLowerCase();
+  // Show-level ids are shared by every episode and collapse a catalogue into one row.
+  if (lower.includes('series') || lower.includes('collection') || lower.includes('feed')) return false;
+  return true;
+}
+
+function applePlayableUrl(episode) {
+  const candidates = [episode?.episodeUrl, episode?.previewUrl, episode?.audioUrl, episode?.enclosureUrl];
+  for (const value of candidates) {
+    if (typeof value !== 'string') continue;
+    const url = value.trim();
+    if (!/^https?:\/\//i.test(url)) continue;
+    if (/podcasts\.apple\.com|itunes\.apple\.com/i.test(url)) continue;
+    return url;
+  }
+  return '';
+}
 
 function episodeShowTitle(episodeData, seriesData) {
   const candidates = [
@@ -52,6 +79,11 @@ class PodcastAdapter {
         break;
       default:
         throw new Error(`Unknown podcast source: ${source}`);
+    }
+
+    if (source.toLowerCase() !== 'spotify' && !directAudioUrl(mediaData)) {
+      console.warn(`Skipping ${source} episode with no audio URL: ${mediaData.title}`);
+      return null;
     }
     
     // Check for existing episode by external ID
@@ -116,9 +148,7 @@ class PodcastAdapter {
     // Series IDs (like podcastSeries_taddy) are the same for all episodes and will cause false matches
     if (externalIds instanceof Map) {
       for (const [platform, id] of externalIds) {
-        if (id && !platform.includes('Series') && !platform.includes('series')) {
-          // Only use episode-specific IDs (taddy, podcastIndex, iTunes, etc.)
-          // Skip series IDs (podcastSeries_taddy, etc.)
+        if (id && isEpisodeIdentityKey(platform)) {
           queries.push({
             [`externalIds.${platform}`]: id
           });
@@ -126,8 +156,7 @@ class PodcastAdapter {
       }
     } else if (typeof externalIds === 'object') {
       for (const [platform, id] of Object.entries(externalIds)) {
-        if (id && !platform.includes('Series') && !platform.includes('series')) {
-          // Only use episode-specific IDs
+        if (id && isEpisodeIdentityKey(platform)) {
           queries.push({
             [`externalIds.${platform}`]: id
           });
@@ -145,6 +174,22 @@ class PodcastAdapter {
         Array.from(existing.externalIds.entries()) : existing.externalIds);
     }
     return existing;
+  }
+
+  /**
+   * Find an episode already linked to this series with the same title.
+   * RSS, Apple, and Podcast Index often disagree on guids for one episode.
+   */
+  async findEpisodeInSeriesByTitle(seriesId, title) {
+    const normalized = normalizeEpisodeTitle(title);
+    const raw = String(title || '').trim();
+    if (!seriesId || !normalized) return null;
+    return Media.findOne({
+      podcastSeries: seriesId,
+      contentType: { $in: ['spoken'] },
+      contentForm: { $in: ['podcastepisode'] },
+      title: { $in: [...new Set([raw, normalized, String(title || '')])] },
+    }).collation({ locale: 'en', strength: 2 });
   }
   
   /**
@@ -324,10 +369,10 @@ class PodcastAdapter {
       creatorDisplay: episodeShowTitle(piEpisode, seriesData),
       
       // Episode metadata
-      episodeNumber: piEpisode.episode || null,
-      seasonNumber: piEpisode.season || null,
+      episodeNumber: piEpisode.episode || piEpisode.episodeNumber || null,
+      seasonNumber: piEpisode.season || piEpisode.seasonNumber || null,
       duration: piEpisode.duration || 0,
-      explicit: piEpisode.explicit === 1,
+      explicit: piEpisode.explicit === 1 || piEpisode.explicit === true,
       description: piEpisode.description || '',
       
       // Visual
@@ -341,26 +386,35 @@ class PodcastAdapter {
       tags: this.buildTags(primaryGenreName, genres, categories),
       language: piEpisode.feedLanguage || 'en',
       
-      // Sources
+      // Sources — accept raw Podcast Index items and the converted shape
       sources: new Map(
         [
-          ['audio_direct', piEpisode.enclosureUrl],
-          ['rss', piEpisode.feedUrl],
-          ['podcast_index', `https://podcastindex.org/episode/${piEpisode.id}`]
+          ['audio_direct', piEpisode.enclosureUrl || piEpisode.audioUrl],
+          ['rss', piEpisode.feedUrl || piEpisode.rssUrl],
+          ['podcast_index', (piEpisode.id || piEpisode.podcastIndexId)
+            ? `https://podcastindex.org/episode/${piEpisode.id || piEpisode.podcastIndexId}`
+            : null]
         ].filter(([_, url]) => url)
       ),
       
-      // External IDs
+      // External IDs — feedId is the show, not the episode
       externalIds: new Map(
         [
-          ['podcastIndex', piEpisode.id?.toString()],
-          ['feedId', piEpisode.feedId?.toString()],
+          ['podcastIndex', (piEpisode.id || piEpisode.podcastIndexId)?.toString()],
           ['rssGuid', piEpisode.guid]
         ].filter(([_, id]) => id)
       ),
       
       // System
-      releaseDate: piEpisode.datePublished ? new Date(piEpisode.datePublished * 1000) : new Date(),
+      releaseDate: (() => {
+        if (typeof piEpisode.datePublished === 'number') {
+          return new Date(piEpisode.datePublished * 1000);
+        }
+        if (piEpisode.publishedAt || piEpisode.datePublished) {
+          return new Date(piEpisode.publishedAt || piEpisode.datePublished);
+        }
+        return new Date();
+      })(),
       fileSize: piEpisode.enclosureLength || null
     };
   }
@@ -434,8 +488,13 @@ class PodcastAdapter {
     const primaryGenreName = appleEpisode.primaryGenreName || seriesData?.primaryGenreName || null;
     const categories = genres; // Apple uses genres as categories
     
+    const playableUrl = appleEpisode.kind === 'podcast' ? '' : applePlayableUrl(appleEpisode);
+    const episodeGuid = appleEpisode.episodeGuid
+      || (appleEpisode.guid && String(appleEpisode.guid) !== String(appleEpisode.collectionId || '')
+        ? appleEpisode.guid
+        : '');
     return {
-      title: appleEpisode.trackName || 'Untitled Episode',
+      title: appleEpisode.trackName || appleEpisode.title || 'Untitled Episode',
       contentType: ['spoken'],
       contentForm: ['podcastepisode'],
       mediaType: ['mp3'],
@@ -446,7 +505,9 @@ class PodcastAdapter {
       creatorDisplay: episodeShowTitle(appleEpisode, seriesData) || appleEpisode.artistName || null,
       
       // Episode metadata
-      duration: appleEpisode.trackTimeMillis ? Math.floor(appleEpisode.trackTimeMillis / 1000) : 0,
+      duration: appleEpisode.trackTimeMillis
+        ? Math.floor(Number(appleEpisode.trackTimeMillis) / 1000) || 0
+        : (Number(appleEpisode.duration) || 0),
       explicit: appleEpisode.contentAdvisoryRating === 'Explicit',
       description: appleEpisode.description || '',
       
@@ -463,22 +524,24 @@ class PodcastAdapter {
       // Sources
       sources: new Map(
         [
-          ['audio_direct', appleEpisode.episodeUrl],
-          ['rss', appleEpisode.feedUrl],
+          ['audio_direct', playableUrl],
+          ['rss', appleEpisode.feedUrl || appleEpisode.rssUrl],
           ['apple', appleEpisode.trackViewUrl]
         ].filter(([_, url]) => url)
       ),
       
-      // External IDs
+      // collectionId is the show. Using it as an episode id stores one row for the whole catalogue.
       externalIds: new Map(
         [
-          ['iTunes', appleEpisode.trackId?.toString()],
-          ['collectionId', appleEpisode.collectionId?.toString()]
+          ['iTunes', (appleEpisode.trackId || appleEpisode.appleId)?.toString()],
+          ['rssGuid', episodeGuid ? String(episodeGuid) : null]
         ].filter(([_, id]) => id)
       ),
       
       // System
-      releaseDate: appleEpisode.releaseDate ? new Date(appleEpisode.releaseDate) : new Date()
+      releaseDate: (appleEpisode.releaseDate || appleEpisode.publishedAt)
+        ? new Date(appleEpisode.releaseDate || appleEpisode.publishedAt)
+        : new Date()
     };
   }
 
@@ -672,9 +735,15 @@ class PodcastAdapter {
   async importEpisodeWithSeries(source, episodeData, seriesData, addedBy) {
     // Create or find the podcast series (pass source to store RSS feed with source-specific key)
     const series = await this.createOrFindSeries(seriesData, addedBy, source);
+    const title = episodeData.title || episodeData.trackName || episodeData.name;
+    const existingInSeries = await this.findEpisodeInSeriesByTitle(series._id, title);
+    if (existingInSeries) {
+      return { episode: existingInSeries, series };
+    }
     
     // Import the episode (pass seriesData for better tag population)
     const episode = await this.importEpisode(source, episodeData, addedBy, seriesData);
+    if (!episode) return { episode: null, series };
     
     // Link episode to series
     let dirty = false;
