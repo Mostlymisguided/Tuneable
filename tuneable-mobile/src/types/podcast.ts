@@ -39,6 +39,7 @@ export interface CatalogShow {
   language: string;
   rssUrl: string;
   sources: CatalogShowSource[];
+  releaseDate?: string;
   appleId?: string;
   iTunesId?: string;
   taddyUuid?: string;

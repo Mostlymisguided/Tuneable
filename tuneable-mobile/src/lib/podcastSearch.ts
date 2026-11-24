@@ -243,6 +243,14 @@ export function catalogShowSourceLabel(sources: CatalogShowSource[]): string {
   return sources.map((source) => CATALOG_SOURCE_LABEL[source]).join(' · ');
 }
 
+function catalogReleaseIso(raw: Record<string, unknown>): string | undefined {
+  const value = raw.releaseDate ?? raw.publishedAt;
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
 export function normalizeCatalogShow(
   raw: Record<string, unknown>,
   source: CatalogShowSource
@@ -265,6 +273,7 @@ export function normalizeCatalogShow(
     language: typeof raw.language === 'string' ? raw.language : 'en',
     rssUrl: typeof raw.rssUrl === 'string' ? raw.rssUrl : '',
     sources: [source],
+    releaseDate: catalogReleaseIso(raw),
     appleId: appleId != null ? String(appleId) : undefined,
     iTunesId: appleId != null ? String(appleId) : undefined,
     taddyUuid: raw.taddyUuid ? String(raw.taddyUuid) : undefined,
@@ -289,6 +298,7 @@ export function mergeCatalogShows(shows: CatalogShow[]): CatalogShow[] {
     existing.iTunesId = existing.iTunesId || show.iTunesId;
     existing.taddyUuid = existing.taddyUuid || show.taddyUuid;
     existing.podcastIndexId = existing.podcastIndexId || show.podcastIndexId;
+    existing.releaseDate = existing.releaseDate || show.releaseDate;
     if (!existing.categories.length) existing.categories = show.categories;
   }
   return Array.from(merged.values()).slice(0, 12);

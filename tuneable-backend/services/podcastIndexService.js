@@ -1,6 +1,13 @@
 const axios = require('axios');
 const crypto = require('crypto');
 
+function publishDateFromUnix(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const date = new Date(value * 1000);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 class PodcastIndexService {
   constructor() {
     this.baseUrl = 'https://api.podcastindex.org/api/1.0';
@@ -248,6 +255,7 @@ class PodcastIndexService {
       language: piPodcast.language || 'en',
       rssUrl: piPodcast.url || '',
       podcastIndexId: piPodcast.id,
+      releaseDate: publishDateFromUnix(piPodcast.newestItemPublishTime),
       lastUpdate: piPodcast.lastUpdateTime ? new Date(piPodcast.lastUpdateTime * 1000) : null
     };
   }

@@ -200,6 +200,7 @@ interface CatalogShow {
   language: string;
   rssUrl: string;
   sources: CatalogShowSource[];
+  releaseDate?: string;
   appleId?: string;
   iTunesId?: string;
   taddyUuid?: string;
@@ -214,6 +215,21 @@ const CATALOG_SOURCE_LABEL: Record<CatalogShowSource, string> = {
 
 function catalogSourceLabel(sources: CatalogShowSource[]): string {
   return sources.map((source) => CATALOG_SOURCE_LABEL[source]).join(' · ');
+}
+
+function catalogReleaseIso(raw: any): string | undefined {
+  const value = raw?.releaseDate ?? raw?.publishedAt ?? null;
+  if (value == null || value === '') return undefined;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
+function formatCatalogDate(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function normalizeCatalogShow(raw: any, source: CatalogShowSource): CatalogShow | null {
@@ -232,6 +248,7 @@ function normalizeCatalogShow(raw: any, source: CatalogShowSource): CatalogShow 
     language: typeof raw?.language === 'string' ? raw.language : 'en',
     rssUrl: typeof raw?.rssUrl === 'string' ? raw.rssUrl : '',
     sources: [source],
+    releaseDate: catalogReleaseIso(raw),
     appleId: appleId != null ? String(appleId) : undefined,
     iTunesId: appleId != null ? String(appleId) : undefined,
     taddyUuid: raw?.taddyUuid ? String(raw.taddyUuid) : undefined,
@@ -256,6 +273,7 @@ function mergeCatalogShows(shows: CatalogShow[]): CatalogShow[] {
     existing.iTunesId = existing.iTunesId || show.iTunesId;
     existing.taddyUuid = existing.taddyUuid || show.taddyUuid;
     existing.podcastIndexId = existing.podcastIndexId || show.podcastIndexId;
+    existing.releaseDate = existing.releaseDate || show.releaseDate;
     if (!existing.categories.length) existing.categories = show.categories;
   }
   return Array.from(merged.values()).slice(0, 12);
@@ -2155,7 +2173,9 @@ const Podcasts: React.FC = () => {
               These shows are from Apple, Podcast Index, and Taddy, including ones that are not in Tuneable yet.
             </p>
             <div className="space-y-2">
-              {catalogShows.map((show) => (
+              {catalogShows.map((show) => {
+                const releaseLabel = formatCatalogDate(show.releaseDate);
+                return (
                 <div
                   key={show.key}
                   className="flex items-center gap-3 rounded-xl bg-gray-900/50 border border-white/10 p-3"
@@ -2167,8 +2187,16 @@ const Podcasts: React.FC = () => {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-white font-medium truncate">{show.title}</p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {show.author || 'Unknown host'} · {catalogSourceLabel(show.sources)}
+                    <p className="text-xs text-gray-400 flex items-baseline gap-1 min-w-0">
+                      <span className="truncate min-w-0">{show.author || 'Unknown host'}</span>
+                      {releaseLabel ? (
+                        <>
+                          <span className="shrink-0 text-gray-600" aria-hidden>·</span>
+                          <span className="shrink-0 tabular-nums">{releaseLabel}</span>
+                        </>
+                      ) : null}
+                      <span className="shrink-0 text-gray-600" aria-hidden>·</span>
+                      <span className="shrink-0">{catalogSourceLabel(show.sources)}</span>
                     </p>
                   </div>
                   <button
@@ -2182,7 +2210,8 @@ const Podcasts: React.FC = () => {
                     {addingShowKey === show.key ? 'Adding…' : 'Add'}
                   </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

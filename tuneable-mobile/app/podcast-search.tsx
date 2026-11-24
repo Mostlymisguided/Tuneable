@@ -497,6 +497,7 @@ export default function PodcastSearchScreen() {
               </Text>
               {visibleShows.map((show) => {
                 const adding = addingShowKey === show.key;
+                const releaseLabel = formatEpisodeDate(show.releaseDate);
                 return (
                   <View key={show.key} style={styles.showRowCard}>
                     <Image
@@ -507,9 +508,21 @@ export default function PodcastSearchScreen() {
                       <Text style={styles.showName} numberOfLines={2}>
                         {show.title}
                       </Text>
-                      <Text style={styles.showAuthor} numberOfLines={1}>
-                        {show.author || 'Unknown host'} · {catalogShowSourceLabel(show.sources)}
-                      </Text>
+                      <View style={styles.showAuthorRow}>
+                        <Text style={styles.showAuthor} numberOfLines={1}>
+                          {show.author || 'Unknown host'}
+                        </Text>
+                        {releaseLabel ? (
+                          <>
+                            <Text style={styles.metaDot}>·</Text>
+                            <Text style={styles.dateLabel}>{releaseLabel}</Text>
+                          </>
+                        ) : null}
+                        <Text style={styles.metaDot}>·</Text>
+                        <Text style={styles.showSource} numberOfLines={1}>
+                          {catalogShowSourceLabel(show.sources)}
+                        </Text>
+                      </View>
                     </View>
                     <Pressable
                       style={[styles.addShowBtn, adding && styles.disabled]}
@@ -755,7 +768,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  showAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 0,
+  },
   showAuthor: {
+    flexShrink: 1,
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  showSource: {
+    flexShrink: 0,
     color: colors.textMuted,
     fontSize: 12,
   },
