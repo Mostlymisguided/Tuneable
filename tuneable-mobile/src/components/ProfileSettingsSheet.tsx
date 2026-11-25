@@ -6,13 +6,19 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
+import {
+  initialWindowMetrics,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LEGAL_URLS, LegalLinks } from '@/src/components/LegalLinks';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -63,6 +69,18 @@ export function ProfileSettingsSheet({
   const [busy, setBusy] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const afterCloseRef = useRef<(() => void) | null>(null);
+  const insets = useSafeAreaInsets();
+  // Modal is its own native root, so live insets are often 0 there. Fall back
+  // to the window metrics captured at launch, then the status-bar height.
+  const topInset = Math.max(
+    insets.top,
+    initialWindowMetrics?.insets.top ?? 0,
+    Constants.statusBarHeight ?? 0
+  );
+  const bottomInset = Math.max(
+    insets.bottom,
+    initialWindowMetrics?.insets.bottom ?? 0
+  );
 
   useEffect(() => {
     if (visible) setDismissing(false);
@@ -146,15 +164,34 @@ export function ProfileSettingsSheet({
       onRequestClose={onClose}
       onDismiss={() => afterCloseRef.current?.()}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={[
+            styles.sheet,
+            {
+              paddingTop: Math.max(topInset, 12),
+              paddingBottom: Math.max(28, bottomInset + 12),
+            },
+          ]}
+          onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text style={styles.title}>Settings</Text>
-            <Pressable onPress={onClose} hitSlop={10} disabled={disabled}>
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              hitSlop={8}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel="Close settings">
               <Ionicons name="close" size={24} color={colors.textMuted} />
             </Pressable>
           </View>
 
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled">
           <Pressable
             style={styles.row}
             onPress={() => runAfterSheetCloses(onWallet)}
@@ -249,6 +286,7 @@ export function ProfileSettingsSheet({
               <Text style={styles.deleteText}>Delete account</Text>
             )}
           </Pressable>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -262,14 +300,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   sheet: {
+    flex: 1,
     backgroundColor: colors.gradientStart,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
-    paddingBottom: 36,
-    paddingTop: 10,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 8,
   },
   handle: {
     alignSelf: 'center',
@@ -283,7 +326,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 4,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    marginRight: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     color: colors.text,
