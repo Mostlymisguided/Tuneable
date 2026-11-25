@@ -36,7 +36,6 @@ import { getCanonicalTag } from '../utils/tagNormalizer';
 import {
   ChartSortPanel,
   ChartSortTrigger,
-  CHART_PODCAST_SORT_HINT,
 } from '../components/ChartSortControl';
 import { toPodcastChartSort, type ChartSortKey } from '../utils/chartSort';
 import {
@@ -1943,7 +1942,6 @@ const Podcasts: React.FC = () => {
               sort={filters.sortBy}
               onChange={(next) => setFilters((f) => ({ ...f, sortBy: next }))}
               onHide={() => setShowSortPanel(false)}
-              hint={CHART_PODCAST_SORT_HINT}
             />
           )}
 

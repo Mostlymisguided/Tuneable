@@ -36,7 +36,6 @@ import {
   seriesTitle,
 } from '@/src/lib/podcast';
 import {
-  CHART_PODCAST_SORT_HINT,
   sortChartItems,
   toPodcastChartSort,
   type ChartSortKey,
@@ -261,7 +260,6 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
               onSortChange={setChartSort}
               showSortPanel={showSortPanel}
               onToggleSortPanel={() => setShowSortPanel((open) => !open)}
-              sortHint={CHART_PODCAST_SORT_HINT}
               onToggleTagPanel={() => setShowTagPanel((open) => !open)}
               onToggleTimePanel={() => setShowTimePanel((open) => !open)}
               onClearFilters={clearClientFilters}
