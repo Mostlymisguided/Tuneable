@@ -36,6 +36,7 @@ const {
   seriesEpisodeMatch,
 } = require('../utils/podcastSeriesQuery');
 const {
+  importExternalSeriesEpisodeMatches,
   importMatchingSeriesCatalogueEpisodes,
 } = require('../services/seriesCatalogueSearchService');
 const {
@@ -3629,17 +3630,39 @@ router.get('/series/:seriesId', optionalAuthMiddleware, async (req, res) => {
     } // Close if (needsImport && series.externalIds)
 
     if (searching && episodeOffset === 0) {
+      const addedBy = series.addedBy || new mongoose.Types.ObjectId();
       try {
         const catalogueImport = await importMatchingSeriesCatalogueEpisodes({
           series,
           query: searchQuery,
-          addedBy: series.addedBy || new mongoose.Types.ObjectId(),
+          addedBy,
         });
         if (catalogueImport.imported > 0) {
           importedCount += catalogueImport.imported;
         }
       } catch (catalogueError) {
         console.error('Show catalogue search failed:', catalogueError.message);
+      }
+
+      // Return submits this flag. Only leave the show catalogue when it has no matches.
+      if (req.query.external === 'true') {
+        try {
+          const storedMatches = await Media.countDocuments(
+            buildSeriesEpisodeMatch(seriesId, searchQuery).match
+          );
+          if (storedMatches === 0) {
+            const externalImport = await importExternalSeriesEpisodeMatches({
+              series,
+              query: searchQuery,
+              addedBy,
+            });
+            if (externalImport.imported > 0) {
+              importedCount += externalImport.imported;
+            }
+          }
+        } catch (externalError) {
+          console.error('External show search failed:', externalError.message);
+        }
       }
     }
 

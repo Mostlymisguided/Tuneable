@@ -90,6 +90,8 @@ export default function PodcastShowScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const episodeRequestSeq = useRef(0);
+  const externalSearchRef = useRef(false);
+  const [searchedExternally, setSearchedExternally] = useState(false);
   const [tagRankings, setTagRankings] = useState<MediaTagRanking[]>([]);
   const [locationRankings, setLocationRankings] = useState<MediaLocationRanking[]>(
     []
@@ -155,8 +157,11 @@ export default function PodcastShowScreen() {
   const loadEpisodes = useCallback(async () => {
     if (!id) return;
     const seq = ++episodeRequestSeq.current;
+    const widen = externalSearchRef.current;
+    externalSearchRef.current = false;
     setHasMore(false);
     setLoadingEpisodes(true);
+    setSearchedExternally(widen);
     try {
       const params = {
         autoImport: false,
@@ -164,6 +169,7 @@ export default function PodcastShowScreen() {
         offset: 0,
         sortBy,
         q: searchQuery || undefined,
+        external: widen && Boolean(searchQuery),
       };
       let data = await podcastsAPI.getSeries(id, params);
       // Only hit RSS/import when the catalog is empty, never while searching.
@@ -187,6 +193,17 @@ export default function PodcastShowScreen() {
       }
     }
   }, [id, sortBy, searchQuery]);
+
+  const submitEpisodeSearch = () => {
+    const trimmed = searchInput.trim();
+    if (trimmed.length < MIN_SEARCH_LENGTH) return;
+    externalSearchRef.current = true;
+    if (trimmed === searchQuery) {
+      void loadEpisodes();
+      return;
+    }
+    setSearchQuery(trimmed);
+  };
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -551,6 +568,7 @@ export default function PodcastShowScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="search"
+                  onSubmitEditing={submitEpisodeSearch}
                   clearButtonMode="while-editing"
                   inputAccessoryViewID={keyboard.nativeID}
                   onFocus={keyboard.onFocus}
@@ -581,7 +599,9 @@ export default function PodcastShowScreen() {
               {searchQuery && (loadingEpisodes || episodes.length > 0) ? (
                 <Text style={styles.searchMeta}>
                   {loadingEpisodes && episodes.length === 0
-                    ? 'Searching catalogue…'
+                    ? searchedExternally
+                      ? 'Searching Apple, Podcast Index, and Taddy…'
+                      : 'Searching catalogue…'
                     : `${episodes.length}${hasMore ? '+' : ''} matching episode${
                         episodes.length === 1 ? '' : 's'
                       }`}
@@ -619,7 +639,9 @@ export default function PodcastShowScreen() {
             !loadingEpisodes ? (
               <Text style={styles.empty}>
                 {searchQuery
-                  ? `No episodes in this show’s catalogue match “${searchQuery}”.`
+                  ? searchedExternally
+                    ? `No episodes found for “${searchQuery}” on Tuneable, Apple, Podcast Index, or Taddy.`
+                    : `No episodes in this show’s catalogue match “${searchQuery}”. Press return to search Apple, Podcast Index, and Taddy.`
                   : 'No episodes in this show yet.'}
               </Text>
             ) : null

@@ -44,10 +44,12 @@ export const podcastsAPI = {
       offset?: number;
       sortBy?: string;
       q?: string;
+      external?: boolean;
     }
   ): Promise<PodcastSeriesResponse> => {
     const autoImport = params?.autoImport === true;
     const q = params?.q?.trim();
+    const external = params?.external === true;
     const response = await api.get<PodcastSeriesResponse>(
       `/podcasts/series/${seriesId}`,
       {
@@ -57,8 +59,9 @@ export const podcastsAPI = {
           offset: params?.offset ?? 0,
           sortBy: params?.sortBy ?? 'mostTipped',
           ...(q ? { q } : {}),
+          ...(external ? { external: 'true' } : {}),
         },
-        timeout: autoImport || q ? 90000 : undefined,
+        timeout: autoImport || q || external ? 90000 : undefined,
       }
     );
     return response.data;

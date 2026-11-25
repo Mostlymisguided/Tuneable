@@ -130,6 +130,8 @@ const PodcastSeriesProfile: React.FC = () => {
   const episodesPerPage = 20;
   const appliedSearch = debouncedSearch.trim().length >= 2 ? debouncedSearch.trim() : '';
   const episodeFetchSeq = useRef(0);
+  const externalSearchRef = useRef(false);
+  const [searchedExternally, setSearchedExternally] = useState(false);
   
   // Tipping state
   const [showBidConfirmationModal, setShowBidConfirmationModal] = useState(false);
@@ -264,6 +266,8 @@ const PodcastSeriesProfile: React.FC = () => {
   const fetchEpisodes = async (refresh = false) => {
     if (!seriesId) return;
     const seq = ++episodeFetchSeq.current;
+    const widen = externalSearchRef.current;
+    externalSearchRef.current = false;
     
     setIsLoadingEpisodes(true);
     setLoadingMessage('Loading episodes...');
@@ -287,8 +291,18 @@ const PodcastSeriesProfile: React.FC = () => {
       if (appliedSearch) {
         params.append('q', appliedSearch);
       }
+      if (widen && appliedSearch) {
+        params.append('external', 'true');
+        setSearchedExternally(true);
+      } else if (appliedSearch) {
+        setSearchedExternally(false);
+      }
       
-      setLoadingMessage('Fetching episodes...');
+      setLoadingMessage(
+        widen && appliedSearch
+          ? 'Searching Apple, Podcast Index, and Taddy…'
+          : 'Fetching episodes...'
+      );
       setLoadingProgress(50);
       
       const url = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/podcasts/series/${seriesId}${params.toString() ? '?' + params.toString() : ''}`;
@@ -441,6 +455,17 @@ const PodcastSeriesProfile: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seriesId, appliedSearch]);
   
+  const submitEpisodeSearch = () => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) return;
+    externalSearchRef.current = true;
+    if (trimmed === appliedSearch) {
+      void fetchEpisodes();
+      return;
+    }
+    setDebouncedSearch(trimmed);
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchEpisodes(true);
@@ -1199,6 +1224,12 @@ const PodcastSeriesProfile: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      submitEpisodeSearch();
+                    }
+                  }}
                   placeholder="Search this show’s catalogue…"
                   aria-label="Search this show’s catalogue"
                   className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-9 py-2 border border-gray-600 focus:border-purple-500 focus:outline-none"
@@ -1266,14 +1297,22 @@ const PodcastSeriesProfile: React.FC = () => {
             <EntertainingLoader
               flavor="podcast"
               size="section"
-              headline="Searching this show’s catalogue…"
+              headline={
+                searchedExternally
+                  ? 'Searching Apple, Podcast Index, and Taddy…'
+                  : 'Searching this show’s catalogue…'
+              }
               detail={`Looking for “${appliedSearch}”`}
             />
           ) : episodes.length === 0 ? (
             appliedSearch ? (
             <div className="text-center py-12 bg-gray-800/50 rounded-lg">
               <Search className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No episodes in this show’s catalogue match “{appliedSearch}”</p>
+              <p className="text-gray-400">
+                {searchedExternally
+                  ? `No episodes found for “${appliedSearch}” on Tuneable, Apple, Podcast Index, or Taddy.`
+                  : `No episodes in this show’s catalogue match “${appliedSearch}”. Press return to search Apple, Podcast Index, and Taddy.`}
+              </p>
               <button
                 onClick={() => setSearchQuery('')}
                 className="mt-4 text-purple-400 hover:text-purple-300"

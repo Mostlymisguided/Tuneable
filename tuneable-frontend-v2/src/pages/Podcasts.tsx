@@ -2236,7 +2236,7 @@ const Podcasts: React.FC = () => {
             <div className="text-center py-16">
               <p className="text-gray-400">Nothing in this chart matches.</p>
               <p className="text-gray-500 text-sm mt-2">
-                Use Add Media above to search Apple, Podcast Index, and Taddy.
+                Press return to search Apple, Podcast Index, and Taddy.
               </p>
             </div>
           ) : (

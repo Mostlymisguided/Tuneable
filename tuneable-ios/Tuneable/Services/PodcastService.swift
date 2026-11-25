@@ -95,7 +95,7 @@ final class PodcastService {
         private enum CodingKeys: String, CodingKey { case series, episodes, stats }
     }
 
-    func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0, autoImport: Bool = true, q: String? = nil) async throws -> SeriesDetailResponse {
+    func getSeries(seriesId: String, limit: Int = 20, offset: Int = 0, autoImport: Bool = true, q: String? = nil, external: Bool = false) async throws -> SeriesDetailResponse {
         let trimmed = q?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let searching = trimmed.count >= 2
         var items: [URLQueryItem] = [
@@ -105,6 +105,9 @@ final class PodcastService {
         ]
         if searching {
             items.append(URLQueryItem(name: "q", value: trimmed))
+        }
+        if external && searching {
+            items.append(URLQueryItem(name: "external", value: "true"))
         }
         let res: SeriesDetailResponse = try await client.get("/podcasts/series/\(seriesId)", queryItems: items)
         return res

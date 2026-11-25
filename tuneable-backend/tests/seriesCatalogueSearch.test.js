@@ -1,5 +1,8 @@
 const { parseDuration } = require('../utils/podcastRss');
-const { mergeCatalogueEpisodes } = require('../services/seriesCatalogueSearchService');
+const {
+  externalEpisodeMatchesSeries,
+  mergeCatalogueEpisodes,
+} = require('../services/seriesCatalogueSearchService');
 
 describe('parseDuration', () => {
   it('parses clock and second formats', () => {
@@ -8,6 +11,40 @@ describe('parseDuration', () => {
     expect(parseDuration('90')).toBe(90);
     expect(parseDuration(15)).toBe(15);
     expect(parseDuration('')).toBe(0);
+  });
+});
+
+describe('externalEpisodeMatchesSeries', () => {
+  const ids = { iTunesId: '99', podcastIndexId: '42', taddyUuid: 'tdy', title: 'Add to Playlist' };
+
+  it('keeps episodes from this show and drops other shows when an id is known', () => {
+    expect(externalEpisodeMatchesSeries(
+      { source: 'apple', collectionId: 99, collectionName: 'Someone else' },
+      ids
+    )).toBe(true);
+    expect(externalEpisodeMatchesSeries(
+      { source: 'apple', collectionId: 5, collectionName: 'Add to Playlist' },
+      ids
+    )).toBe(false);
+    expect(externalEpisodeMatchesSeries(
+      { source: 'podcastindex', feedId: '42' },
+      ids
+    )).toBe(true);
+    expect(externalEpisodeMatchesSeries(
+      { source: 'taddy', podcastSeries: { uuid: 'other', name: 'Add to Playlist' } },
+      ids
+    )).toBe(false);
+  });
+
+  it('falls back to the show title when the series has no external id', () => {
+    expect(externalEpisodeMatchesSeries(
+      { source: 'apple', collectionName: 'Add to Playlist' },
+      { title: 'Add to Playlist' }
+    )).toBe(true);
+    expect(externalEpisodeMatchesSeries(
+      { source: 'apple', collectionName: 'Other Show' },
+      { title: 'Add to Playlist' }
+    )).toBe(false);
   });
 });
 

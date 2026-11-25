@@ -267,6 +267,11 @@ export function PodcastChartScreen({ onChartKindChange }: Props) {
               onClearFilters={clearClientFilters}
               hasActiveFilters={filtersActive}
               searchPlaceholder="Title, series, or tag…"
+              onSearchSubmit={() => {
+                const q = searchQuery.trim();
+                if (q.length < 2 || filteredEpisodes.length > 0) return;
+                router.push({ pathname: '/podcast-search', params: { q } });
+              }}
             />
 
             {searchQuery.trim() && filteredEpisodes.length > 0 ? (

@@ -52,6 +52,7 @@ type Props = {
   hasActiveFilters: boolean;
   searchPlaceholder?: string;
   searchHint?: string;
+  onSearchSubmit?: () => void;
   playableOnly?: boolean;
   onPlayableOnlyChange?: (next: boolean) => void;
   showPlayable?: boolean;
@@ -85,6 +86,7 @@ export function ChartFilterToolbar({
   hasActiveFilters,
   searchPlaceholder = 'Title, artist, or tag…',
   searchHint,
+  onSearchSubmit,
   playableOnly = false,
   onPlayableOnlyChange,
   showPlayable = false,
@@ -126,6 +128,7 @@ export function ChartFilterToolbar({
             clearButtonMode="while-editing"
             returnKeyType="search"
             blurOnSubmit
+            onSubmitEditing={onSearchSubmit}
             inputAccessoryViewID={keyboard.nativeID}
             onFocus={keyboard.onFocus}
             onBlur={keyboard.onBlur}

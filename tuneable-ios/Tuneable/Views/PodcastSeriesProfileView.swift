@@ -8,6 +8,7 @@ struct PodcastSeriesProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var searchText = ""
+    @State private var externalQuery = ""
 
     private var appliedSearch: String {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -50,7 +51,9 @@ struct PodcastSeriesProfileView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         if !appliedSearch.isEmpty && !isLoading && episodes.isEmpty {
-                            Text("No episodes in this show’s catalogue match “\(appliedSearch)”.")
+                            Text(externalQuery == appliedSearch
+                                 ? "No episodes found for “\(appliedSearch)” on Tuneable, Apple, Podcast Index, or Taddy."
+                                 : "No episodes in this show’s catalogue match “\(appliedSearch)”. Press return to search Apple, Podcast Index, and Taddy.")
                                 .font(.subheadline)
                                 .foregroundStyle(AppTheme.textSecondary)
                                 .padding(.horizontal)
@@ -81,11 +84,19 @@ struct PodcastSeriesProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .searchable(text: $searchText, prompt: "Search this show’s catalogue")
+        .onSubmit(of: .search) {
+            let q = appliedSearch
+            guard !q.isEmpty else { return }
+            externalQuery = q
+            Task { await load(external: true) }
+        }
         .refreshable { await load() }
         .task(id: appliedSearch) {
+            if externalQuery == appliedSearch { return }
             if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 guard !Task.isCancelled else { return }
+                if externalQuery == appliedSearch { return }
             }
             await load()
         }
@@ -145,14 +156,15 @@ struct PodcastSeriesProfileView: View {
         .padding(.horizontal)
     }
 
-    private func load() async {
+    private func load(external: Bool = false) async {
         isLoading = true
         errorMessage = nil
         do {
             let res = try await PodcastService.shared.getSeries(
                 seriesId: seriesId,
                 autoImport: appliedSearch.isEmpty,
-                q: appliedSearch.isEmpty ? nil : appliedSearch
+                q: appliedSearch.isEmpty ? nil : appliedSearch,
+                external: external
             )
             series = res.series
             episodes = res.episodes ?? []

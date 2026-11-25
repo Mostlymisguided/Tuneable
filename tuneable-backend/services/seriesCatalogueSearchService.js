@@ -1,5 +1,6 @@
 const podcastIndexService = require('./podcastIndexService');
 const applePodcastsService = require('./applePodcastsService');
+const taddyService = require('./taddyService');
 const podcastAdapter = require('./podcastAdapter');
 const Media = require('../models/Media');
 const {
@@ -192,8 +193,80 @@ function isAlreadyImported(episode, existing) {
 
 function importSourceFor(episode) {
   if (episode.source === 'apple') return 'apple';
+  if (episode.source === 'taddy') return 'taddy';
   if (episode.source === 'podcastindex') return 'podcastIndex';
   return 'rss';
+}
+
+function titlesMatch(left, right) {
+  const a = normalizeEpisodeTitle(left);
+  const b = normalizeEpisodeTitle(right);
+  return Boolean(a && b && a === b);
+}
+
+function externalEpisodeMatchesSeries(episode, ids) {
+  const iTunesId = ids?.iTunesId;
+  const podcastIndexId = ids?.podcastIndexId;
+  const taddyUuid = ids?.taddyUuid;
+  const title = ids?.title;
+  if (episode?.source === 'apple') {
+    if (iTunesId) return sameId(episode.collectionId, iTunesId);
+    return titlesMatch(episode.collectionName, title);
+  }
+  if (episode?.source === 'taddy') {
+    const seriesId = episode.podcastSeries?.uuid || episode.podcastSeriesUuid || episode.podcastId;
+    if (taddyUuid) return sameId(seriesId, taddyUuid);
+    return titlesMatch(episode.podcastSeries?.name || episode.podcastTitle, title);
+  }
+  if (episode?.source === 'podcastindex') {
+    if (podcastIndexId) return sameId(episode.feedId, podcastIndexId);
+    return titlesMatch(episode.feedTitle || episode.podcastTitle, title);
+  }
+  return false;
+}
+
+function taddySearchEpisode(episode) {
+  const published = episode.releaseDate || episode.publishedAt || episode.datePublished;
+  const datePublished = published instanceof Date ? published.toISOString() : published;
+  return {
+    ...episode,
+    name: episode.name || episode.title,
+    uuid: episode.uuid || episode.taddyUuid || episode.guid,
+    datePublished,
+    audioUrl: episode.audioUrl,
+    podcastSeries: episode.podcastSeries || {
+      uuid: episode.podcastSeriesUuid || episode.podcastId,
+      name: episode.podcastTitle,
+      authorName: episode.podcastAuthor,
+      author: episode.podcastAuthor,
+      imageUrl: episode.podcastImage,
+      rssUrl: episode.rssUrl,
+      language: episode.language,
+    },
+  };
+}
+
+async function fetchExternalSeriesEpisodes(series, query) {
+  const ids = readSeriesExternalIds(series);
+  const seriesIds = { ...ids, title: series?.title };
+  const [appleResult, taddyResult, indexResult] = await Promise.allSettled([
+    applePodcastsService.searchEpisodes(query, 50),
+    taddyService.searchEpisodes(query, 25, 1),
+    podcastIndexService.searchEpisodesByTitle(query, 50),
+  ]);
+
+  const appleEpisodes = appleResult.status === 'fulfilled' && appleResult.value?.success
+    ? appleResult.value.episodes.map((ep) => toCatalogueItem('apple', ep))
+    : [];
+  const taddyEpisodes = taddyResult.status === 'fulfilled' && taddyResult.value?.success
+    ? taddyResult.value.episodes.map((ep) => toCatalogueItem('taddy', taddySearchEpisode(ep)))
+    : [];
+  const indexEpisodes = indexResult.status === 'fulfilled' && indexResult.value?.success
+    ? indexResult.value.episodes.map((ep) => toCatalogueItem('podcastindex', ep))
+    : [];
+
+  return mergeCatalogueEpisodes([appleEpisodes, taddyEpisodes, indexEpisodes])
+    .filter((episode) => externalEpisodeMatchesSeries(episode, seriesIds));
 }
 
 async function importEpisodeIntoExistingSeries(episode, series, addedBy) {
@@ -295,9 +368,68 @@ async function importCatalogueMatches({ series, query: q, addedBy, maxImport, ca
   return { imported, catalogHits: matches.length };
 }
 
+async function importExternalSeriesEpisodeMatches({
+  series,
+  query,
+  addedBy,
+  maxImport = MAX_SERIES_CATALOGUE_SEARCH_IMPORTS,
+}) {
+  const q = normalizeSeriesEpisodeSearch(query);
+  if (!q || !series?._id) {
+    return { imported: 0, catalogHits: 0 };
+  }
+
+  const cacheKey = `${series._id}|${q.toLowerCase()}|external`;
+  const cached = catalogueSearchCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CATALOGUE_SEARCH_CACHE_TTL_MS) {
+    return { imported: 0, catalogHits: cached.catalogHits, cached: true };
+  }
+  const inflight = catalogueSearchInflight.get(cacheKey);
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    const catalogue = await fetchExternalSeriesEpisodes(series, q);
+    const matches = selectCatalogueSearchMatches(catalogue, q, Math.max(maxImport * 3, maxImport));
+    if (!matches.length) {
+      catalogueSearchCache.set(cacheKey, { at: Date.now(), catalogHits: 0 });
+      return { imported: 0, catalogHits: 0 };
+    }
+
+    const existing = await existingSeriesEpisodeKeys(series._id);
+    const toImport = matches.filter((ep) => !isAlreadyImported(ep, existing)).slice(0, maxImport);
+    let imported = 0;
+    for (const episode of toImport) {
+      if (isAlreadyImported(episode, existing)) continue;
+      try {
+        const result = await importEpisodeIntoExistingSeries(episode, series, addedBy);
+        if (result) {
+          imported += 1;
+          rememberImportedEpisode(existing, episode);
+          rememberImportedEpisode(existing, result);
+        }
+      } catch (error) {
+        console.error(`External show search import failed for "${episode.title}":`, error.message);
+      }
+    }
+
+    if (imported > 0) {
+      console.log(`🔎 Imported ${imported} external episode${imported === 1 ? '' : 's'} for series search "${q}"`);
+    }
+    catalogueSearchCache.set(cacheKey, { at: Date.now(), catalogHits: matches.length });
+    return { imported, catalogHits: matches.length };
+  })().finally(() => {
+    catalogueSearchInflight.delete(cacheKey);
+  });
+
+  catalogueSearchInflight.set(cacheKey, promise);
+  return promise;
+}
+
 module.exports = {
   CATALOGUE_RSS_MAX_EPISODES,
+  externalEpisodeMatchesSeries,
   fetchSeriesCatalogueEpisodes,
+  importExternalSeriesEpisodeMatches,
   importMatchingSeriesCatalogueEpisodes,
   mergeCatalogueEpisodes,
 };
