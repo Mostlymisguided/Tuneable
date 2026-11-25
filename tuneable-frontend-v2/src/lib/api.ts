@@ -1474,6 +1474,19 @@ export const artistCatalogAPI = {
     const response = await api.patch(`/artist-catalog/admin/${encodeURIComponent(id)}`, body);
     return response.data;
   },
+  uploadProfilePic: async (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('profilePic', file);
+    const response = await api.put(
+      `/artist-catalog/admin/${encodeURIComponent(id)}/profile-pic`,
+      formData,
+    );
+    return response.data as { profilePic: string };
+  },
+  removeProfilePic: async (id: string) => {
+    const response = await api.delete(`/artist-catalog/admin/${encodeURIComponent(id)}/profile-pic`);
+    return response.data as { profilePic: string };
+  },
   listClaims: async (status = 'pending') => {
     const response = await api.get('/artist-catalog/admin/claims', { params: { status } });
     return response.data;

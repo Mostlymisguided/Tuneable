@@ -700,7 +700,7 @@ async function getTagProfile(rawSlug, { page = 1, limit = 50, timePeriod = 'all-
   const isVirtualTag = typeof releaseYear === 'number' || typeof bpm === 'number';
   const contentScope = isVirtualTag ? 'music' : parseContentScope(type);
 
-  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags genres category uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared podcastTitle podcastSeries description createdAt uploadedAt';
+  const MEDIA_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags genres category uuid contentType contentForm duration waveformPeaks bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared podcastTitle podcastSeries description createdAt uploadedAt';
 
   const matched = contentScope === 'podcast'
     ? await findPodcastMediaForTag({ displayName, canonicalTag, selectFields: MEDIA_FIELDS })

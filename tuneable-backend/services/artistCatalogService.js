@@ -31,7 +31,7 @@ const {
 const CHART_MEDIA_SELECT = [
   '_id', 'uuid', 'slug', 'title', 'coverArt', 'creatorDisplay',
   'artist', 'featuring', 'contentForm', 'contentType',
-  'duration', 'bpm', 'releaseDate', 'releaseYear', 'primaryLocation',
+  'duration', 'waveformPeaks', 'bpm', 'releaseDate', 'releaseYear', 'primaryLocation',
   'tags', 'sources', 'globalMediaAggregate',
   'rightsStatus', 'rightsCleared', 'status',
 ].join(' ');
@@ -535,7 +535,12 @@ async function getPublicCatalog(slug, viewerId) {
 
   const { toClientMedia } = require('../utils/mediaPlayability');
   const { loadBidsByMediaId } = require('./relatedMediaService');
-  const bidsByMediaId = await loadBidsByMediaId(ranked.map((row) => row.item._id));
+  const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
+  const mediaIds = ranked.map((row) => row.item._id);
+  const [bidsByMediaId, tuneBytesByMedia] = await Promise.all([
+    loadBidsByMediaId(mediaIds),
+    sumConfirmedTuneBytesByMediaId(mediaIds),
+  ]);
   const playability = { authenticated: Boolean(viewerId) };
 
   const queue = ranked.map(({ item, roles }) => {
@@ -552,12 +557,16 @@ async function getPublicCatalog(slug, viewerId) {
       contentForm: client.contentForm,
       contentType: client.contentType,
       duration: client.duration || 0,
+      waveformPeaks: Array.isArray(item.waveformPeaks) && item.waveformPeaks.length
+        ? item.waveformPeaks
+        : undefined,
       bpm: client.bpm ?? null,
       releaseDate: client.releaseDate ?? null,
       releaseYear: client.releaseYear ?? null,
       primaryLocation: client.primaryLocation ?? null,
       tags: client.tags || [],
       globalMediaAggregate: client.globalMediaAggregate || 0,
+      tuneBytesEarned: tuneBytesFor(tuneBytesByMedia, item._id),
       rightsStatus: client.rightsStatus || 'pending',
       rightsCleared: client.rightsCleared === true,
       sources: client.sources || {},

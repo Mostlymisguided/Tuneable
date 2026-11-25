@@ -1,20 +1,35 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Crown, Globe, Instagram, MapPin, Minus, Music, Plus, Settings, Tag, Youtube } from 'lucide-react';
-import { artistCatalogAPI } from '../lib/api';
+import { Camera, Crown, Globe, Instagram, Loader2, MapPin, Minus, Music, Plus, Settings, Tag, Trash2, Youtube } from 'lucide-react';
+import { artistCatalogAPI, mediaAPI, partyAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../seo/usePageMeta';
 import { getUserProfileUrl } from '../utils/profileNavigation';
 import { isAdmin } from '../utils/permissionHelpers';
 import { refreshArtistCatalogIndex } from '../utils/artistCatalogIndex';
 import { toast } from '../utils/toast';
-import { DEFAULT_COVER_ART } from '../constants';
+import { DEFAULT_COVER_ART, hasCustomProfilePic } from '../constants';
+import { prepareProfileImage } from '../utils/profileImage';
 import { formatLocation, getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
 import { getTagProfilePath } from '../utils/tagNormalizer';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import UserAvatar from '../components/UserAvatar';
 import MediaChampions from '../components/MediaChampions';
-import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
+import PublicUserLibraryChart from '../components/PublicUserLibraryChart';
+import BidConfirmationModal from '../components/BidConfirmationModal';
+import type { LibraryItem } from '../components/TuneLibraryTable';
+import type { TippedQueueItem } from '../components/TippedMediaQueueList';
+import { getCreatorDisplay } from '../utils/creatorDisplay';
+import { getMediaProfileUrl } from '../utils/mediaNavigation';
+import { enrichMediaWithPlayability, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
+import { requireAuthToPlay } from '../utils/playAuth';
+import { useWebPlayerStore } from '../stores/webPlayerStore';
+import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
+import { useGlobalAverageTip } from '../lib/globalAverageTip';
+import { resolveTipStatInputs } from '../utils/tipStats';
+import { ensureSpendableBalance } from '../utils/spendableBalance';
+import { penceToPoundsNumber } from '../utils/currency';
+import { buildLoginUrl, getCurrentReturnPath } from '../utils/authHelpers';
 
 type ClaimedBy = {
   _id?: string;
@@ -127,6 +142,59 @@ function hasLocation(location: ResolvedLocation | null | undefined) {
   return !!(location?.display || location?.city || location?.country || location?.region);
 }
 
+function asList(value: string[] | string | undefined): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return value ? [value] : [];
+}
+
+function queueToLibraryItem(item: TippedQueueItem): LibraryItem {
+  const release = item.releaseDate ? new Date(item.releaseDate).toISOString() : '';
+  const aggregate = item.globalMediaAggregate || 0;
+  const bids = (item.bids || []).filter((bid) => bid.userId?.username);
+  return {
+    mediaId: item._id,
+    mediaUuid: item.uuid || item._id,
+    slug: item.slug,
+    title: item.title,
+    artist: getCreatorDisplay(item),
+    coverArt: item.coverArt || undefined,
+    duration: item.duration,
+    waveformPeaks: item.waveformPeaks,
+    bpm: typeof item.bpm === 'number' && item.bpm > 0 ? item.bpm : undefined,
+    releaseDate: release || null,
+    releaseYear: item.releaseYear ?? null,
+    primaryLocation: item.primaryLocation ?? null,
+    tags: item.tags || [],
+    contentForm: asList(item.contentForm),
+    sources: item.sources || {},
+    rightsStatus: item.rightsStatus,
+    rightsCleared: item.rightsCleared,
+    isPlayable: item.isPlayable,
+    hasHostedAudio: item.hasHostedAudio,
+    globalMediaAggregate: aggregate,
+    globalMediaAggregateAvg: bids.length ? aggregate / bids.length : 0,
+    globalUserMediaAggregate: aggregate,
+    bidCount: bids.length,
+    tuneBytesEarned: item.tuneBytesEarned || 0,
+    lastBidAt: release,
+    createdAt: release || null,
+    bids,
+    contentType: asList(item.contentType),
+  } as LibraryItem;
+}
+
+function isLibraryPlayable(item: LibraryItem) {
+  return isMediaPlayable(enrichMediaWithPlayability({
+    sources: item.sources || {},
+    contentForm: item.contentForm,
+    contentType: (item as LibraryItem & { contentType?: string[] }).contentType,
+    rightsStatus: item.rightsStatus,
+    rightsCleared: item.rightsCleared,
+    isPlayable: item.isPlayable,
+    hasHostedAudio: item.hasHostedAudio,
+  }));
+}
+
 function errorMessage(error: unknown, fallback: string) {
   const data = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
   return data || fallback;
@@ -200,15 +268,16 @@ function socialLinks(catalog: CatalogRecord): SocialLink[] {
 const ArtistCatalogPage: React.FC = () => {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateBalance, refreshUser } = useAuth();
   const admin = isAdmin(user);
+  const globalAverageTip = useGlobalAverageTip();
+  const { setCurrentMedia, setQueue, setGlobalPlayerActive, setCurrentPartyId, play } = useWebPlayerStore();
   const [page, setPage] = useState<CatalogPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [showClaim, setShowClaim] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showChampions, setShowChampions] = useState(false);
-  const [playableOnly, setPlayableOnly] = useState(false);
   const [proofText, setProofText] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -216,6 +285,31 @@ const ArtistCatalogPage: React.FC = () => {
   const [editMedia, setEditMedia] = useState<EditMedia[]>([]);
   const [editSelected, setEditSelected] = useState<Set<string>>(new Set());
   const [savingEdit, setSavingEdit] = useState(false);
+  const profilePicInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPic, setIsUploadingPic] = useState(false);
+  const [isRemovingPic, setIsRemovingPic] = useState(false);
+  const [minimumBid, setMinimumBid] = useState(0.01);
+  const [itemToTip, setItemToTip] = useState<LibraryItem | null>(null);
+  const [isPlacingTip, setIsPlacingTip] = useState(false);
+
+  const libraryItems = useMemo(
+    () => (page?.queue || []).map(queueToLibraryItem),
+    [page]
+  );
+  const tipStats = useMemo(() => resolveTipStatInputs(itemToTip, user), [itemToTip, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    partyAPI.getParties()
+      .then((response) => {
+        const globalParty = response.parties.find((party: { type?: string; minimumBid?: number }) => party.type === 'global');
+        if (!cancelled && globalParty?.minimumBid) setMinimumBid(globalParty.minimumBid);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadPage = useCallback(async () => {
     const data = await artistCatalogAPI.get(slug);
@@ -337,6 +431,141 @@ const ArtistCatalogPage: React.FC = () => {
       toast.error(errorMessage(error, 'Failed to update artist page'));
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const playCatalog = (item: LibraryItem, _index?: number, sourceList?: LibraryItem[]) => {
+    if (!requireAuthToPlay()) return;
+    const list = sourceList && sourceList.length ? sourceList : libraryItems;
+    const playable = list.filter(isLibraryPlayable);
+    if (!playable.length) {
+      toast.info(list[0]?.mediaId === item.mediaId ? 'No playable tracks yet.' : 'This track is not playable yet — opening its profile instead.');
+      if (list[0]?.mediaId !== item.mediaId) navigate(getMediaProfileUrl(item));
+      return;
+    }
+    let startIndex = playable.findIndex((row) => row.mediaId === item.mediaId);
+    if (startIndex < 0) {
+      if (list[0]?.mediaId === item.mediaId) {
+        startIndex = 0;
+      } else {
+        toast.info('This track is not playable yet — opening its profile instead.');
+        navigate(getMediaProfileUrl(item));
+        return;
+      }
+    }
+    usePodcastPlayerStore.getState().clear();
+    const queue = playable.map((row) => ({
+      id: row.mediaId,
+      _id: row.mediaId,
+      title: row.title,
+      artist: row.artist,
+      duration: row.duration || 0,
+      coverArt: row.coverArt || DEFAULT_COVER_ART,
+      sources: row.sources || {},
+      globalMediaAggregate: row.globalMediaAggregate || 0,
+      bids: [],
+      addedBy: null,
+      totalBidValue: row.globalMediaAggregate || 0,
+      ...playerPlayabilityFields(row),
+    }));
+    setQueue(queue as never);
+    setCurrentMedia(queue[startIndex] as never, startIndex);
+    play();
+    setGlobalPlayerActive(true);
+    setCurrentPartyId(null);
+    toast.success(`Now playing: ${queue[startIndex].title}`);
+  };
+
+  const openTip = (item: LibraryItem) => {
+    if (!user) {
+      toast.info('Please log in to support this tune');
+      navigate(buildLoginUrl(getCurrentReturnPath()));
+      return;
+    }
+    setItemToTip(item);
+  };
+
+  const confirmTip = async (
+    tags: string[],
+    amount: number,
+    _setProgress?: unknown,
+    moment?: { timestampSeconds: number; note?: string } | null
+  ) => {
+    if (!user || !itemToTip) return;
+    const tipAmount = Number.isFinite(amount) && amount > 0 ? amount : globalAverageTip;
+    if (tipAmount < minimumBid) {
+      toast.error(`Minimum tip is £${minimumBid.toFixed(2)}`);
+      return;
+    }
+    const canAfford = await ensureSpendableBalance(
+      (user as { balance?: number }).balance,
+      Math.round(tipAmount * 100),
+      refreshUser
+    );
+    if (!canAfford) {
+      toast.error('Insufficient balance. Please top up your wallet.');
+      navigate('/wallet');
+      return;
+    }
+    setIsPlacingTip(true);
+    try {
+      const result = await mediaAPI.placeGlobalBid(itemToTip.mediaUuid || itemToTip.mediaId, tipAmount, undefined, tags, moment);
+      if (typeof result.updatedBalance === 'number') updateBalance(result.updatedBalance);
+      toast.success(`Placed £${tipAmount.toFixed(2)} tip on "${itemToTip.title}"!`);
+      setItemToTip(null);
+      await loadPage();
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to place tip'));
+    } finally {
+      setIsPlacingTip(false);
+    }
+  };
+
+  const applyCatalogPic = (profilePic: string) => {
+    setEditForm((current) => ({ ...current, profilePic }));
+    setPage((current) => (
+      current ? { ...current, catalog: { ...current.catalog, profilePic } } : current
+    ));
+  };
+
+  const uploadCatalogPic = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const catalogId = page?.catalog?._id;
+    if (!file || !catalogId) return;
+    let prepared: File;
+    try {
+      prepared = await prepareProfileImage(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not use that image');
+      event.target.value = '';
+      return;
+    }
+    setIsUploadingPic(true);
+    try {
+      const response = await artistCatalogAPI.uploadProfilePic(catalogId, prepared);
+      applyCatalogPic(response.profilePic || '');
+      toast.success('Profile picture updated');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to upload profile picture'));
+    } finally {
+      setIsUploadingPic(false);
+      event.target.value = '';
+    }
+  };
+
+  const removeCatalogPic = async () => {
+    const catalogId = page?.catalog?._id;
+    if (!catalogId || !hasCustomProfilePic(editForm.profilePic)) return;
+    if (!window.confirm('Remove this picture? The initial will show instead.')) return;
+    setIsRemovingPic(true);
+    try {
+      const response = await artistCatalogAPI.removeProfilePic(catalogId);
+      applyCatalogPic(response.profilePic || '');
+      toast.success('Profile picture removed');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to remove profile picture'));
+    } finally {
+      setIsRemovingPic(false);
     }
   };
 
@@ -657,14 +886,67 @@ const ArtistCatalogPage: React.FC = () => {
                   className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
                 />
               </label>
-              <label className="block text-sm text-gray-300 md:col-span-2">
-                Image URL
+              <div className="md:col-span-2">
+                <label className="block text-white font-medium mb-3">Profile Picture</label>
+                <div className="flex items-center gap-4">
+                  <UserAvatar
+                    name={editForm.name || catalog.name}
+                    profilePic={editForm.profilePic}
+                    alt={`${editForm.name || catalog.name} profile`}
+                    className="w-20 h-20 object-cover shadow-lg"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => profilePicInputRef.current?.click()}
+                      disabled={isUploadingPic || isRemovingPic}
+                      className="px-4 py-2 bg-purple-600/40 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center space-x-2"
+                    >
+                      {isUploadingPic ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="h-4 w-4" />
+                          <span>{hasCustomProfilePic(editForm.profilePic) ? 'Change' : 'Upload'}</span>
+                        </>
+                      )}
+                    </button>
+                    {hasCustomProfilePic(editForm.profilePic) && (
+                      <button
+                        type="button"
+                        onClick={removeCatalogPic}
+                        disabled={isUploadingPic || isRemovingPic}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-white transition-colors flex items-center space-x-2"
+                      >
+                        {isRemovingPic ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Removing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4" />
+                            <span>Remove</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <input
-                  value={editForm.profilePic}
-                  onChange={(event) => setEditForm({ ...editForm, profilePic: event.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                  ref={profilePicInputRef}
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  onChange={uploadCatalogPic}
+                  className="hidden"
                 />
-              </label>
+                <p className="text-xs text-gray-400 mt-2">
+                  Large photos are resized automatically. Removing the picture shows the initial.
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -783,24 +1065,41 @@ const ArtistCatalogPage: React.FC = () => {
           </div>
         )}
 
-        <TippedMediaQueueList
-          items={queue}
-          playableOnly={playableOnly}
-          onPlayableOnlyChange={setPlayableOnly}
-          onTipPlaced={loadPage}
-          header={(
-            <div className="flex items-center">
-              <Music className="h-6 w-6 text-purple-400 mr-2" />
-              <h2 className="text-2xl font-semibold text-white">Catalog</h2>
-              <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
-                {queue.length}
-              </span>
-            </div>
-          )}
+        <div className="flex items-center mb-4">
+          <Music className="h-6 w-6 text-purple-400 mr-2" />
+          <h2 className="text-2xl font-semibold text-white">Catalog</h2>
+          <span className="ml-3 px-3 py-1 bg-purple-900 text-purple-200 text-sm rounded-full">
+            {queue.length}
+          </span>
+        </div>
+        <PublicUserLibraryChart
+          items={libraryItems}
+          username={catalog.name}
+          onPlay={playCatalog}
+          onTip={openTip}
+          rankBy="track"
+          emptyMessage="No tunes on this page yet."
         />
-        {queue.length === 0 && (
-          <p className="text-center text-gray-300 py-8">No tunes on this page yet.</p>
-        )}
+        <BidConfirmationModal
+          isOpen={!!itemToTip}
+          onClose={() => setItemToTip(null)}
+          onConfirm={confirmTip}
+          bidAmount={globalAverageTip}
+          minTip={minimumBid}
+          avgTip={tipStats.avgTip}
+          championAggregate={tipStats.championAggregate}
+          viewerAggregate={tipStats.viewerAggregate}
+          viewerIsChampion={tipStats.viewerIsChampion}
+          viewerRank={tipStats.viewerRank}
+          mediaTitle={itemToTip?.title || 'Unknown'}
+          mediaArtist={itemToTip?.artist}
+          userBalance={penceToPoundsNumber((user as { balance?: number } | null)?.balance)}
+          isLoading={isPlacingTip}
+          isNonPlayable={itemToTip ? !isLibraryPlayable(itemToTip) : false}
+          durationSeconds={itemToTip?.duration}
+          existingTags={itemToTip?.tags}
+          user={user}
+        />
       </div>
     </div>
   );

@@ -119,6 +119,8 @@ function libraryItemToQueueShape(item: LibraryItem) {
     artist: item.artist,
     coverArt: item.coverArt,
     duration: item.duration,
+    waveformPeaks: item.waveformPeaks,
+    tuneBytesEarned: item.tuneBytesEarned,
     bpm: item.bpm,
     releaseDate: item.releaseDate ?? null,
     releaseYear: item.releaseYear ?? null,

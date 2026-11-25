@@ -28,6 +28,7 @@ export interface LibraryItem {
   artist: string;
   coverArt?: string;
   duration?: number;
+  waveformPeaks?: number[];
   bpm?: number;
   releaseDate?: string | null;
   releaseYear?: number | null;

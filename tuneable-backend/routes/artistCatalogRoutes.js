@@ -3,10 +3,11 @@ const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const optionalAuthMiddleware = require('../middleware/optionalAuthMiddleware');
-const { createClaimUpload, getPublicUrl } = require('../utils/r2Upload');
+const { createClaimUpload, createProfilePictureUpload, processAndUploadImage, getPublicUrl } = require('../utils/r2Upload');
 const catalog = require('../services/artistCatalogService');
 
 const upload = createClaimUpload();
+const profilePicUpload = createProfilePictureUpload();
 
 function sendError(res, error, fallback) {
   if (error?.status) {
@@ -93,6 +94,40 @@ router.patch('/admin/:id', adminMiddleware, async (req, res) => {
     });
   } catch (error) {
     sendError(res, error, 'Failed to update artist page');
+  }
+});
+
+function uploadedProfilePicUrl(file) {
+  if (!file) return '';
+  if (file.key) return getPublicUrl(file.key);
+  if (file.location) return file.location;
+  if (file.filename) return getPublicUrl(`profile-pictures/${file.filename}`);
+  return '';
+}
+
+// @route   PUT /api/artist-catalog/admin/:id/profile-pic
+// @desc    Upload the picture shown on an artist page
+// @access  Admin
+router.put('/admin/:id/profile-pic', adminMiddleware, profilePicUpload.single('profilePic'), processAndUploadImage, async (req, res) => {
+  try {
+    const profilePic = uploadedProfilePicUrl(req.file);
+    if (!profilePic) return res.status(400).json({ error: 'No file uploaded' });
+    const updated = await catalog.updateCatalog(req.params.id, { profilePic }, req.user._id);
+    res.json({ message: 'Profile picture updated', profilePic: updated.profilePic || '' });
+  } catch (error) {
+    sendError(res, error, 'Failed to upload profile picture');
+  }
+});
+
+// @route   DELETE /api/artist-catalog/admin/:id/profile-pic
+// @desc    Clear the artist page picture so the initial shows
+// @access  Admin
+router.delete('/admin/:id/profile-pic', adminMiddleware, async (req, res) => {
+  try {
+    const updated = await catalog.updateCatalog(req.params.id, { profilePic: '' }, req.user._id);
+    res.json({ message: 'Profile picture removed', profilePic: updated.profilePic || '' });
+  } catch (error) {
+    sendError(res, error, 'Failed to remove profile picture');
   }
 });
 

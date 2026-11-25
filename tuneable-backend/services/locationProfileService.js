@@ -28,7 +28,7 @@ const VALID_TIME_PERIODS = new Set([
 ]);
 
 const MEDIA_FIELDS =
-  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared createdAt uploadedAt';
+  'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid contentType contentForm duration waveformPeaks bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared createdAt uploadedAt';
 
 /**
  * Normalize a Mapbox placeId from a URL/path segment.

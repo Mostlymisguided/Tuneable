@@ -200,6 +200,7 @@ const TippedMediaQueueList: React.FC<TippedMediaQueueListProps> = ({
     bids: item.bids || [],
     globalMediaAggregate: item.globalMediaAggregate || 0,
     tuneBytesEarned: item.tuneBytesEarned,
+    waveformPeaks: item.waveformPeaks,
     sources: item.sources || {},
   });
 

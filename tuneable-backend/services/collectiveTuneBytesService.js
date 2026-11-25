@@ -14,7 +14,7 @@ const { toClientMedia } = require('../utils/mediaPlayability');
 const { loadBidsByMediaId } = require('./relatedMediaService');
 const { sumConfirmedTuneBytesByMediaId, tuneBytesFor } = require('../utils/mediaTuneBytes');
 
-const CHART_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid slug contentType contentForm duration bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared';
+const CHART_FIELDS = 'title artist featuring creatorNames coverArt sources globalMediaAggregate tags uuid slug contentType contentForm duration waveformPeaks bpm releaseDate releaseYear primaryLocation rightsStatus rightsCleared';
 
 async function loadTuneByteInputs(collectives) {
   const windowsByCollective = new Map();
