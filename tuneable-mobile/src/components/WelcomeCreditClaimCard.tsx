@@ -14,9 +14,10 @@ const TERMS_URL = 'https://tuneable.stream/terms-of-service#welcome-credit';
 
 type Props = {
   compact?: boolean;
+  embedded?: boolean;
 };
 
-export function WelcomeCreditClaimCard({ compact = false }: Props) {
+export function WelcomeCreditClaimCard({ compact = false, embedded = false }: Props) {
   const { user, refreshUser, updateBalance } = useAuth();
   const offer = user?.welcomeCreditOffer;
   const [accepted, setAccepted] = useState(false);
@@ -65,7 +66,7 @@ export function WelcomeCreditClaimCard({ compact = false }: Props) {
   };
 
   return (
-    <View style={[styles.card, compact && styles.cardCompact]}>
+    <View style={[styles.card, compact && styles.cardCompact, embedded && styles.cardEmbedded]}>
       <View style={styles.iconWrap}>
         <Ionicons name="gift-outline" size={20} color={colors.accentLight} />
       </View>
@@ -133,6 +134,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
     padding: 12,
+  },
+  cardEmbedded: {
+    marginTop: 12,
+    marginBottom: 0,
   },
   iconWrap: {
     width: 36,

@@ -6,7 +6,6 @@ import { toast } from '../utils/toast';
 import { ArrowLeft, Wallet as WalletIcon, Loader } from 'lucide-react';
 import { penceToPounds } from '../utils/currency';
 import TopUpConfirmationModal from '../components/TopUpConfirmationModal';
-import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
 
 const Wallet: React.FC = () => {
   const navigate = useNavigate();
@@ -213,8 +212,6 @@ const Wallet: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <WelcomeCreditClaimCard />
 
       {/* Quick Top-Up Section */}
       <div className="card mb-6">

@@ -46,8 +46,9 @@ export interface User {
   emailVerified?: boolean;
   /** False for accounts that only sign in with Google/Facebook/Apple etc. */
   hasPassword?: boolean;
+  parentInviteCode?: string | null;
   welcomeCreditOffer?: {
-    status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+    status: 'eligible' | 'needs_invite' | 'needs_verification' | 'claimed' | 'unavailable';
     amountPence: number;
     remainingPence?: number;
     expiresAt?: string | null;

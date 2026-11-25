@@ -18,7 +18,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '@/src/auth/AuthContext';
 import { TipAmountPicker, MAX_TIP_POUNDS } from '@/src/components/TipAmountPicker';
-import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import {
   canRequestLocationPermission,
   getCurrentLocationStatus,
@@ -702,9 +701,6 @@ export function TipSheet({
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {liveBalancePence <= 0 || (error && error.startsWith('Insufficient')) ? (
-              <WelcomeCreditClaimCard compact />
-            ) : null}
 
             <Pressable
               style={[styles.confirm, submitting && styles.confirmDisabled]}

@@ -1,8 +1,9 @@
 /**
  * Welcome / beta credit helper.
  *
- * Credit is claimed by the user (not auto-granted on signup) so they can
- * accept promotional terms first. Grant is atomic to prevent double-claim.
+ * Credit is not offered on signup. The user has to attach a valid invite
+ * code first, then accept promotional terms and claim it. Grant is atomic
+ * to prevent double-claim.
  */
 
 const notificationService = require('../services/notificationService');
@@ -18,6 +19,7 @@ const WELCOME_CREDIT_TERMS_VERSION = 'welcome-credit-v1';
 
 const OFFER_STATUS = {
   ELIGIBLE: 'eligible',
+  NEEDS_INVITE: 'needs_invite',
   NEEDS_VERIFICATION: 'needs_verification',
   CLAIMED: 'claimed',
   UNAVAILABLE: 'unavailable',
@@ -47,6 +49,12 @@ function hasReceivedWelcomeCredit(user) {
   return Boolean(user.welcomeCreditGrantedAt) || (user.welcomeCreditRemainingPence || 0) > 0;
 }
 
+function hasAttachedInvite(user) {
+  if (!user) return false;
+  if (user.invitedByUserId) return true;
+  return typeof user.parentInviteCode === 'string' && user.parentInviteCode.trim().length > 0;
+}
+
 function getWelcomeCreditOffer(user) {
   const amountPence = WELCOME_CREDIT_PENCE;
   const remainingPence = Math.max(0, user?.welcomeCreditRemainingPence || 0);
@@ -64,6 +72,15 @@ function getWelcomeCreditOffer(user) {
   if (!isBetaModeEnabled()) {
     return {
       status: OFFER_STATUS.UNAVAILABLE,
+      amountPence,
+      remainingPence: 0,
+      expiresAt: null,
+    };
+  }
+
+  if (!hasAttachedInvite(user)) {
+    return {
+      status: OFFER_STATUS.NEEDS_INVITE,
       amountPence,
       remainingPence: 0,
       expiresAt: null,
@@ -178,6 +195,15 @@ async function claimWelcomeCredit(user, { acceptedPromoTerms } = {}) {
     };
   }
 
+  if (!hasAttachedInvite(user)) {
+    return {
+      ok: false,
+      status: 403,
+      code: 'NEEDS_INVITE',
+      message: 'Enter a valid invite code to claim welcome credit.',
+    };
+  }
+
   if (!hasVerifiedIdentity(user)) {
     return {
       ok: false,
@@ -257,6 +283,7 @@ module.exports = {
   isBetaModeEnabled,
   hasVerifiedIdentity,
   hasReceivedWelcomeCredit,
+  hasAttachedInvite,
   getWelcomeCreditOffer,
   withWelcomeCreditOffer,
   claimWelcomeCredit,

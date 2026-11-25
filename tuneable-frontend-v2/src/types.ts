@@ -36,7 +36,7 @@ export interface MapboxLocationFields {
 }
 
 export interface WelcomeCreditOffer {
-  status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+  status: 'eligible' | 'needs_invite' | 'needs_verification' | 'claimed' | 'unavailable';
   amountPence: number;
   remainingPence?: number;
   expiresAt?: string | null;
@@ -101,6 +101,7 @@ export interface User {
   globalUserBidAvg?: number;
   globalUserBids?: number;
   emailVerified?: boolean;
+  parentInviteCode?: string | null;
   welcomeCreditOffer?: WelcomeCreditOffer;
   // Social media (now top-level, available to all users)
   socialMedia?: {

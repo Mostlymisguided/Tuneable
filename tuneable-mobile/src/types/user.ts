@@ -21,6 +21,7 @@ export interface User {
   role: string[];
   isActive: boolean;
   emailVerified?: boolean;
+  parentInviteCode?: string | null;
   /** False for accounts that only sign in with Google/Facebook/Apple. */
   hasPassword?: boolean;
   createdAt?: string;
@@ -53,7 +54,7 @@ export interface User {
     notificationsPromptSeenAt?: string;
   };
   welcomeCreditOffer?: {
-    status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+    status: 'eligible' | 'needs_invite' | 'needs_verification' | 'claimed' | 'unavailable';
     amountPence: number;
     remainingPence?: number;
     expiresAt?: string | null;

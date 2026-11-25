@@ -14,7 +14,6 @@ import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { UserAvatar } from '@/src/components/UserAvatar';
 import { CoverRail, type CoverRailItem } from '@/src/components/CoverRail';
 import { DashboardPrompts } from '@/src/components/DashboardPrompts';
-import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LibraryImportCards } from '@/src/components/LibraryImportCards';
 import { RecentActivityFeed } from '@/src/components/RecentActivityFeed';
@@ -221,8 +220,6 @@ export default function HomeScreen() {
               ) : null}
             </Pressable>
           </View>
-
-          <WelcomeCreditClaimCard />
 
           <LibraryImportCards showUpload={canUpload} />
 

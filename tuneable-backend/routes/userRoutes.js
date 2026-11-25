@@ -1736,7 +1736,7 @@ async function buildPlaybackQueueResponse(user) {
 }
 
 // @route   POST /api/users/me/welcome-credit/claim
-// @desc    Claim promotional welcome credit after accepting promo terms
+// @desc    Claim promotional welcome credit after an invite code is attached and promo terms are accepted
 // @access  Private
 router.post('/me/welcome-credit/claim', authMiddleware, async (req, res) => {
   try {

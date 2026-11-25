@@ -54,8 +54,9 @@ interface User {
   globalUserBidAvg?: number;
   globalUserBids?: number;
   emailVerified?: boolean;
+  parentInviteCode?: string | null;
   welcomeCreditOffer?: {
-    status: 'eligible' | 'needs_verification' | 'claimed' | 'unavailable';
+    status: 'eligible' | 'needs_invite' | 'needs_verification' | 'claimed' | 'unavailable';
     amountPence: number;
     remainingPence?: number;
     expiresAt?: string | null;
@@ -1677,7 +1678,7 @@ export const userAPI = {
     return response.data;
   },
   
-  // Claim promotional welcome credit (after accepting promo terms)
+  // Claim promotional welcome credit after an invite code is on the account
   claimWelcomeCredit: async () => {
     const response = await api.post('/users/me/welcome-credit/claim', {
       acceptedPromoTerms: true,

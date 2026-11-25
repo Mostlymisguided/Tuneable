@@ -19,6 +19,7 @@ import {
   initialWindowMetrics,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { InviteCodeRedeem } from '@/src/components/InviteCodeRedeem';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { LEGAL_URLS, LegalLinks } from '@/src/components/LegalLinks';
 import { useAuth } from '@/src/auth/AuthContext';
@@ -191,7 +192,8 @@ export function ProfileSettingsSheet({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets>
           <Pressable
             style={styles.row}
             onPress={() => runAfterSheetCloses(onWallet)}
@@ -259,6 +261,8 @@ export function ProfileSettingsSheet({
             />
             <Text style={styles.rowText}>Data deletion info</Text>
           </Pressable>
+
+          <InviteCodeRedeem />
 
           <InviteShareCard
             inviteCode={inviteCode}

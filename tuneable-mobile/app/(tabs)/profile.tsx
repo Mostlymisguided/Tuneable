@@ -14,7 +14,6 @@ import { Screen } from '@/src/components/Screen';
 import { ProfileSettingsSheet } from '@/src/components/ProfileSettingsSheet';
 import { UserLibrarySection } from '@/src/components/UserLibrarySection';
 import { UserProfileHero } from '@/src/components/UserProfileHero';
-import { WelcomeCreditClaimCard } from '@/src/components/WelcomeCreditClaimCard';
 import { userAPI } from '@/src/api/user';
 import { useAuth } from '@/src/auth/AuthContext';
 import { usePlayerDockState } from '@/src/hooks/usePlayerDock';
@@ -149,7 +148,6 @@ export default function ProfileScreen() {
                 onSettingsPress={() => setSettingsOpen(true)}
               />
             ) : null}
-            <WelcomeCreditClaimCard />
             <View style={styles.addRow}>
               <Pressable
                 style={styles.addBtn}

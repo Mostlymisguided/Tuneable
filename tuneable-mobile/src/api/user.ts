@@ -271,6 +271,23 @@ export const userAPI = {
     return response.data;
   },
 
+  attachFoundingInvite: async (
+    code: string
+  ): Promise<{
+    message: string;
+    code: string;
+    inviterUsername?: string | null;
+    eligible: boolean;
+  }> => {
+    const response = await api.post<{
+      message: string;
+      code: string;
+      inviterUsername?: string | null;
+      eligible: boolean;
+    }>('/users/me/founding-invite', { code });
+    return response.data;
+  },
+
   claimWelcomeCredit: async (): Promise<{
     message?: string;
     alreadyClaimed?: boolean;

@@ -34,7 +34,7 @@ import HomeListenSection from '../components/HomeListenSection';
 import type { HomeListenQueueItem } from '../lib/api';
 import BringTipsUpControl from '../components/BringTipsUpControl';
 import BidConfirmationModal from '../components/BidConfirmationModal';
-import WelcomeCreditClaimCard from '../components/WelcomeCreditClaimCard';
+import InviteCodeRedeem from '../components/InviteCodeRedeem';
 import TipCtaLabel from '../components/TipCtaLabel';
 import { normalizeSources, isMediaPlayable, playerPlayabilityFields } from '../utils/mediaPlayability';
 import { requireAuthToPlay } from '../utils/playAuth';
@@ -973,8 +973,6 @@ Join here: ${inviteLink}`.trim();
               Add your favourite tunes and tip to influence the charts.
             </p>
       </div>
-
-      <WelcomeCreditClaimCard />
 
       <HomeListenSection
         refreshKey={queueRefresh}
@@ -2897,6 +2895,8 @@ Join here: ${inviteLink}`.trim();
             )}
           </div>
         </div>
+
+        <InviteCodeRedeem />
 
         <button
           onClick={() => setIsInviteCodesCollapsed(prev => !prev)}

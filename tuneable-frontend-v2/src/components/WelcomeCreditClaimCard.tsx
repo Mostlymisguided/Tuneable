@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { emailAPI, userAPI } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 
-type Variant = 'default' | 'compact';
+type Variant = 'default' | 'compact' | 'embedded';
 
 function offerPounds(amountPence?: number): string {
   return penceToPounds(amountPence || 1111);
@@ -24,7 +24,7 @@ const WelcomeCreditClaimCard: React.FC<{ variant?: Variant }> = ({ variant = 'de
   }
 
   const amountLabel = offerPounds(offer.amountPence);
-  const compact = variant === 'compact';
+  const compact = variant === 'compact' || variant === 'embedded';
 
   const handleClaim = async () => {
     if (!accepted || claiming) return;
@@ -70,7 +70,7 @@ const WelcomeCreditClaimCard: React.FC<{ variant?: Variant }> = ({ variant = 'de
   return (
     <div
       className={`rounded-lg border border-purple-500/40 bg-gray-900 ${
-        compact ? 'p-3 mb-4' : 'p-5 mb-6'
+        variant === 'embedded' ? 'p-4 mt-4' : compact ? 'p-3 mb-4' : 'p-5 mb-6'
       }`}
     >
       <div className="flex items-start gap-3">

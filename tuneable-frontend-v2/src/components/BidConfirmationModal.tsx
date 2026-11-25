@@ -13,7 +13,6 @@ import { appendTipChips, isKnownElement, normalizeTipChipForDisplay } from '../u
 import { tagsMatch } from '../utils/tagNormalizer';
 import TipStatChips from './TipStatChips';
 import { viewerChampionStatusLabel } from '../utils/tipStats';
-import WelcomeCreditClaimCard from './WelcomeCreditClaimCard';
 import { TipAmountWheel, useCoarsePointer } from './TipAmountWheel';
 import WaveformBars, { waveformPeaksOf, type TipMoment } from './WaveformBars';
 
@@ -438,9 +437,6 @@ const BidConfirmationModal: React.FC<BidConfirmationModalProps> = ({
               </p>
             </div>
           </div>
-        )}
-        {(hasInsufficientFunds || liveBalancePounds <= 0) && (
-          <WelcomeCreditClaimCard variant="compact" />
         )}
 
         {/* Chart influence: home + current location */}
