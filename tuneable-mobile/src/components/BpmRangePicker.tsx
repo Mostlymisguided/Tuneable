@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useLockParentScroll } from '@/src/components/parentScrollLock';
 import {
   BPM_FILTER_ALL,
   BPM_FILTER_MAX,
@@ -36,9 +37,32 @@ type WheelProps = {
 
 /**
  * Drag wheel, not a nested scroller. Chart filters sit inside a parent list,
- * and a vertical FlatList there loses the gesture to that list.
+ * and a vertical scroller there loses the gesture to that list. The list's
+ * native pan still follows the finger unless the list is locked for the drag.
  */
 function BpmWheel({ value, lo, hi, onChange, label }: WheelProps) {
+  const setParentScrollLocked = useLockParentScroll();
+  const setParentScrollLockedRef = useRef(setParentScrollLocked);
+  setParentScrollLockedRef.current = setParentScrollLocked;
+  const parentLocked = useRef(false);
+  const gestureRef = useRef({
+    lock() {},
+    unlock() {},
+  });
+
+  const lockParentScroll = () => {
+    if (parentLocked.current) return;
+    parentLocked.current = true;
+    setParentScrollLockedRef.current(true);
+  };
+  const unlockParentScroll = () => {
+    if (!parentLocked.current) return;
+    parentLocked.current = false;
+    setParentScrollLockedRef.current(false);
+  };
+  gestureRef.current.lock = lockParentScroll;
+  gestureRef.current.unlock = unlockParentScroll;
+
   const [offset, setOffset] = useState(0);
   const offsetRef = useRef(0);
   const grantOffset = useRef(0);
@@ -59,7 +83,12 @@ function BpmWheel({ value, lo, hi, onChange, label }: WheelProps) {
     frame.current = null;
   };
 
-  useEffect(() => stopAnim, []);
+  useEffect(() => {
+    return () => {
+      gestureRef.current.unlock();
+      stopAnim();
+    };
+  }, []);
 
   const commit = (next: number) => {
     offsetRef.current = 0;
@@ -101,10 +130,13 @@ function BpmWheel({ value, lo, hi, onChange, label }: WheelProps) {
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
       onPanResponderTerminationRequest: () => false,
       onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
+        gestureRef.current.lock();
         stopAnim();
         grantOffset.current = offsetRef.current;
       },
@@ -115,9 +147,11 @@ function BpmWheel({ value, lo, hi, onChange, label }: WheelProps) {
       },
       onPanResponderRelease: (_event, gesture) => {
         settle(grantOffset.current + gesture.dy, gesture.vy);
+        gestureRef.current.unlock();
       },
       onPanResponderTerminate: (_event, gesture) => {
         settle(grantOffset.current + gesture.dy, 0);
+        gestureRef.current.unlock();
       },
     })
   ).current;
@@ -156,6 +190,7 @@ function BpmWheel({ value, lo, hi, onChange, label }: WheelProps) {
 
   return (
     <View
+      collapsable={false}
       style={styles.wheel}
       accessibilityRole="adjustable"
       accessibilityLabel={label}

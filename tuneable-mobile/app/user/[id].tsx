@@ -10,6 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import {
+  ParentScrollLock,
+  useParentScrollLock,
+} from '@/src/components/parentScrollLock';
 import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { UserLibrarySection } from '@/src/components/UserLibrarySection';
@@ -45,6 +49,7 @@ export default function PublicUserProfileScreen() {
   const [blockBusy, setBlockBusy] = useState(false);
   const markBlocked = useBlockedUsersStore((s) => s.markBlocked);
   const markUnblocked = useBlockedUsersStore((s) => s.markUnblocked);
+  const scrollLock = useParentScrollLock<ScrollView>();
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -196,7 +201,15 @@ export default function PublicUserProfileScreen() {
           </Pressable>
         </View>
       ) : user ? (
+        <ParentScrollLock lock={scrollLock.setLocked}>
         <ScrollView
+          ref={scrollLock.scrollRef}
+          scrollEnabled={scrollLock.scrollEnabled}
+          canCancelContentTouches={scrollLock.scrollEnabled}
+          onScroll={scrollLock.onScroll}
+          onScrollEndDrag={scrollLock.onScroll}
+          onMomentumScrollEnd={scrollLock.onScroll}
+          scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           refreshControl={
@@ -254,6 +267,7 @@ export default function PublicUserProfileScreen() {
             onClose={() => setReportOpen(false)}
           />
         </ScrollView>
+        </ParentScrollLock>
       ) : null}
     </Screen>
   );

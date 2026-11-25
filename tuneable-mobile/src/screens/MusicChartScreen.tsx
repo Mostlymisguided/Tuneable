@@ -13,6 +13,10 @@ import { Screen } from '@/src/components/Screen';
 import { ArtworkLoader } from '@/src/components/ArtworkCube';
 import { AddMediaPrompt } from '@/src/components/AddMediaPrompt';
 import { ChartFilterToolbar } from '@/src/components/ChartFilterToolbar';
+import {
+  ParentScrollLock,
+  useParentScrollLock,
+} from '@/src/components/parentScrollLock';
 import { ChartTrackRow } from '@/src/components/ChartTrackRow';
 import { GlobalChartHero } from '@/src/components/GlobalChartHero';
 import { TipSheet } from '@/src/components/TipSheet';
@@ -90,6 +94,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
   const [tipTarget, setTipTarget] = useState<ChartMediaItem | null>(null);
   const setQueueAndPlay = useMusicPlayerStore((s) => s.setQueueAndPlay);
   const { playableOnly, setPlayableOnly } = usePlayableOnly('chart');
+  const scrollLock = useParentScrollLock<FlatList<ChartMediaItem>>();
 
   const filterState = useMemo(
     () => ({ selectedTagTerms, searchQuery, bpmFilterRange }),
@@ -247,9 +252,17 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
 
   return (
     <Screen>
+      <ParentScrollLock lock={scrollLock.setLocked}>
       <FlatList
+        ref={scrollLock.scrollRef}
         data={visibleMedia}
         keyExtractor={(item, index) => mediaId(item) || String(index)}
+        scrollEnabled={scrollLock.scrollEnabled}
+        canCancelContentTouches={scrollLock.scrollEnabled}
+        onScroll={scrollLock.onScroll}
+        onScrollEndDrag={scrollLock.onScroll}
+        onMomentumScrollEnd={scrollLock.onScroll}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={[
@@ -370,6 +383,7 @@ export function MusicChartScreen({ onChartKindChange }: Props) {
           />
         )}
       />
+      </ParentScrollLock>
 
       <TipSheet
         visible={Boolean(tipTarget)}

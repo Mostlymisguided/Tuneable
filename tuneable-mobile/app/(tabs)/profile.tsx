@@ -10,6 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
+import {
+  ParentScrollLock,
+  useParentScrollLock,
+} from '@/src/components/parentScrollLock';
 import { Screen } from '@/src/components/Screen';
 import { ProfileSettingsSheet } from '@/src/components/ProfileSettingsSheet';
 import { UserLibrarySection } from '@/src/components/UserLibrarySection';
@@ -116,12 +120,21 @@ export default function ProfileScreen() {
   const onLogout = () => {
     void logout();
   };
+  const scrollLock = useParentScrollLock<FlatList<{ key: string }>>();
 
   return (
     <Screen>
+      <ParentScrollLock lock={scrollLock.setLocked}>
       <FlatList
+        ref={scrollLock.scrollRef}
         data={[{ key: 'library' }]}
         keyExtractor={(item) => item.key}
+        scrollEnabled={scrollLock.scrollEnabled}
+        canCancelContentTouches={scrollLock.scrollEnabled}
+        onScroll={scrollLock.onScroll}
+        onScrollEndDrag={scrollLock.onScroll}
+        onMomentumScrollEnd={scrollLock.onScroll}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={[
@@ -172,6 +185,7 @@ export default function ProfileScreen() {
           />
         )}
       />
+      </ParentScrollLock>
 
       <Modal
         visible={addMediaOpen}
