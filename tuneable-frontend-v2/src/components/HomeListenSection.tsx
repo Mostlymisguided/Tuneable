@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ListMusic, Loader2, Play, Plus, X } from 'lucide-react';
 import TipHeartButton from './TipHeartButton';
 import { partyAPI, userAPI, type HomeListenQueueItem } from '../lib/api';
+import RecentActivityFeed from './RecentActivityFeed';
 import { useWebPlayerStore } from '../stores/webPlayerStore';
 import { usePodcastPlayerStore } from '../stores/podcastPlayerStore';
 import { toast } from '../utils/toast';
@@ -204,7 +205,9 @@ const HomeListenSection: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col">
-      <div className="card mb-8 order-2">
+      <RecentActivityFeed refreshKey={refreshKey} />
+
+      <div className="card mb-8 order-3">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-semibold text-white">Rising this week</h2>
           <Link to="/party/global" className="text-sm text-purple-300 hover:text-white">

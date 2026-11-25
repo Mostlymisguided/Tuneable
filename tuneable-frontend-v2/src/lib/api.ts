@@ -2180,8 +2180,15 @@ export const userAPI = {
     sourceType?: 'user_queue' | 'library' | 'party' | 'search' | 'profile' | 'direct' | 'unknown';
     page?: number;
     limit?: number;
+    countedAsPlay?: boolean;
   }) => {
-    const response = await api.get('/users/me/listening-history', { params });
+    const { countedAsPlay, ...rest } = params || {};
+    const response = await api.get('/users/me/listening-history', {
+      params: {
+        ...rest,
+        ...(countedAsPlay ? { countedAsPlay: 'true' } : {}),
+      },
+    });
     return response.data;
   },
 
@@ -2532,6 +2539,20 @@ export const userAPI = {
     }
 
     throw new Error('Import job timed out — please try again with fewer tracks');
+  },
+
+  getTuneBytesHistory: async (userId: string, params?: { limit?: number; offset?: number }) => {
+    const response = await api.get(`/users/${encodeURIComponent(userId)}/tunebytes/history`, {
+      params: { limit: params?.limit ?? 30, offset: params?.offset ?? 0 },
+    });
+    return response.data;
+  },
+
+  getChampionPodiumEvents: async (params?: { limit?: number; offset?: number }) => {
+    const response = await api.get('/users/me/champion-podium', {
+      params: { limit: params?.limit ?? 30, offset: params?.offset ?? 0 },
+    });
+    return response.data;
   },
 
   // Get user's tip history (all individual bids/tips)
