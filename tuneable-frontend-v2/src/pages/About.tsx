@@ -35,32 +35,32 @@ const pillars: {
   {
     title: 'Tip what you love',
     items: [
-      { icon: Heart, label: 'Pay creators', panel: 'bg-pink-100 text-pink-600' },
-      { icon: Globe, label: 'Influence charts', panel: 'bg-purple-100 text-purple-600' },
+      { icon: Heart, label: 'Pay creators', panel: 'bg-pink-500/20 text-pink-300' },
+      { icon: Globe, label: 'Influence charts', panel: 'bg-purple-500/20 text-purple-300' },
     ],
     note: 'From £0.01 upwards',
   },
   {
     title: 'Be a champion',
     items: [
-      { icon: Crown, label: 'Get recognition', panel: 'bg-amber-100 text-amber-600' },
-      { icon: MapPin, label: 'Local or global', panel: 'bg-indigo-100 text-indigo-600' },
+      { icon: Crown, label: 'Get recognition', panel: 'bg-amber-500/20 text-amber-300' },
+      { icon: MapPin, label: 'Local or global', panel: 'bg-indigo-500/20 text-indigo-300' },
     ],
     note: 'Represent your favourites',
   },
   {
     title: 'Own your taste',
     items: [
-      { icon: Music, label: 'Music', panel: 'bg-purple-100 text-purple-600' },
-      { icon: Headphones, label: 'Podcasts', panel: 'bg-pink-100 text-pink-600' },
-      { icon: BookOpen, label: 'Books', panel: 'bg-indigo-100 text-indigo-600' },
+      { icon: Music, label: 'Music', panel: 'bg-purple-500/20 text-purple-300' },
+      { icon: Headphones, label: 'Podcasts', panel: 'bg-pink-500/20 text-pink-300' },
+      { icon: BookOpen, label: 'Books', panel: 'bg-indigo-500/20 text-indigo-300' },
     ],
     note: (
       <>
         Download what you pay for
         <a
           href="#download-offline"
-          className="text-purple-600 hover:text-purple-800"
+          className="text-purple-300 hover:text-purple-100"
           aria-label="See how creators set downloads"
         >
           *
@@ -134,39 +134,39 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      <section className="bg-white py-16">
+      <section className="py-16">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 lg:grid-cols-3 lg:px-8">
           {pillars.map((pillar) => (
             <div
               key={pillar.title}
-              className="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+              className="flex flex-col rounded-2xl border border-white/10 bg-gray-900/50 p-6 shadow-sm backdrop-blur-sm"
             >
-              <h2 className="text-center text-2xl font-bold text-gray-900">{pillar.title}</h2>
+              <h2 className="text-center text-2xl font-bold text-white">{pillar.title}</h2>
               <div
                 className={`mt-6 grid gap-3 ${
                   pillar.items.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
                 }`}
               >
                 {pillar.items.map(({ icon: Icon, label, panel }) => (
-                  <div key={label} className="overflow-hidden rounded-2xl border border-gray-200">
+                  <div key={label} className="overflow-hidden rounded-2xl border border-white/10">
                     <div className={`flex h-24 items-center justify-center sm:h-28 ${panel}`}>
                       <Icon className="h-8 w-8 sm:h-10 sm:w-10" />
                     </div>
-                    <p className="px-2 py-3 text-center text-sm font-semibold text-gray-900">
+                    <p className="px-2 py-3 text-center text-sm font-semibold text-gray-100">
                       {label}
                     </p>
                   </div>
                 ))}
               </div>
               {pillar.note ? (
-                <p className="mt-4 text-center text-sm text-gray-500">{pillar.note}</p>
+                <p className="mt-4 text-center text-sm text-gray-400">{pillar.note}</p>
               ) : null}
             </div>
           ))}
         </div>
         <p
           id="download-offline"
-          className="mx-auto mt-8 max-w-2xl scroll-mt-24 px-4 text-center text-base leading-relaxed text-gray-600"
+          className="mx-auto mt-8 max-w-2xl scroll-mt-24 px-4 text-center text-base leading-relaxed text-gray-300"
         >
           *Creators can choose the level at which a user can download and keep offline
         </p>
@@ -225,20 +225,20 @@ const About: React.FC = () => {
         </div>
       </section>
 
-      <section id="tunebytes" className="scroll-mt-24 bg-white py-16">
+      <section id="tunebytes" className="scroll-mt-24 py-16">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10 text-center">
-            <h2 className="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">TuneBytes</h2>
-            <p className="text-lg text-gray-600 md:text-xl">
+            <h2 className="mb-4 text-3xl font-bold text-white md:text-4xl">TuneBytes</h2>
+            <p className="text-lg text-gray-300 md:text-xl">
               Tip media before it grows. Earlier tips earn more.
             </p>
           </div>
-          <div className="rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-6 text-center sm:p-8">
-            <h3 className="text-xl font-bold text-gray-900 md:text-2xl">
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-purple-950/80 to-indigo-950/80 p-6 text-center backdrop-blur-sm sm:p-8">
+            <h3 className="text-xl font-bold text-white md:text-2xl">
               Spend them with that creator
               <a
                 href="#tunebytes-spend"
-                className="text-purple-600 hover:text-purple-800"
+                className="text-purple-300 hover:text-purple-100"
                 aria-label="See when you can spend TuneBytes"
               >
                 *
@@ -251,34 +251,34 @@ const About: React.FC = () => {
                 { icon: Ticket, label: 'Gigs' },
                 { icon: Sparkles, label: 'Perks' },
               ].map(({ icon: Icon, label }) => (
-                <div key={label} className="rounded-xl bg-white px-3 py-4 shadow-sm">
-                  <Icon className="mx-auto mb-2 h-7 w-7 text-purple-600" />
-                  <p className="text-sm font-semibold text-gray-900">{label}</p>
+                <div key={label} className="rounded-xl border border-white/10 bg-gray-900/60 px-3 py-4">
+                  <Icon className="mx-auto mb-2 h-7 w-7 text-purple-300" />
+                  <p className="text-sm font-semibold text-white">{label}</p>
                 </div>
               ))}
             </div>
-            <p className="mx-auto mt-6 max-w-xl text-gray-600">
+            <p className="mx-auto mt-6 max-w-xl text-gray-300">
               Creators choose how much of their {ARTIST_TIP_SHARE_TODAY_PERCENT}% — from none of it up to all of it — goes into a perk fund. That pool buys the perks. Until the perks launch, the full {ARTIST_TIP_SHARE_TODAY_PERCENT}% stays payable. Fans spend
               the TuneBytes they earned.
             </p>
-            <p id="tunebytes-spend" className="mx-auto mt-4 max-w-xl scroll-mt-24 text-sm text-gray-500">
+            <p id="tunebytes-spend" className="mx-auto mt-4 max-w-xl scroll-mt-24 text-sm text-gray-400">
               * You can earn TuneBytes today and spend them when we launch V1.1
             </p>
           </div>
         </div>
       </section>
 
-      <section className="bg-gray-50 py-16">
+      <section className="py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="mb-8 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">Legal Mission</h2>
-            <p className="mt-3 text-balance text-gray-600">
+            <h2 className="text-3xl font-bold text-white md:text-4xl">Legal Mission</h2>
+            <p className="mt-3 text-balance text-gray-300">
               Tuneable is a{' '}
               <a
                 href="https://find-and-update.company-information.service.gov.uk/company/16736489"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-purple-600 underline hover:text-purple-800"
+                className="font-medium text-purple-300 underline hover:text-purple-100"
               >
                 CIC
               </a>
@@ -289,10 +289,10 @@ const About: React.FC = () => {
             {objects.map(({ icon: Icon, title }) => (
               <li
                 key={title}
-                className="flex items-center gap-4 rounded-xl bg-white px-4 py-4 shadow-sm"
+                className="flex items-center gap-4 rounded-xl border border-white/10 bg-gray-900/50 px-4 py-4 backdrop-blur-sm"
               >
-                <Icon className="h-5 w-5 shrink-0 text-purple-600" />
-                <span className="font-medium text-gray-900">{title}</span>
+                <Icon className="h-5 w-5 shrink-0 text-purple-300" />
+                <span className="font-medium text-gray-100">{title}</span>
               </li>
             ))}
           </ul>
