@@ -194,11 +194,18 @@ class ApplePodcastsService {
       });
 
       const response = await axios.get(`${this.baseUrl}/lookup?${params}`);
+      // The first lookup row is the show itself (kind: "podcast"), not an episode.
+      const episodes = (response.data.results || []).filter((item) =>
+        item &&
+        (item.kind === 'podcast-episode' || item.wrapperType === 'podcastEpisode') &&
+        item.trackName &&
+        (item.episodeUrl || item.previewUrl)
+      );
       
       return {
         success: true,
-        episodes: response.data.results || [],
-        count: response.data.resultCount || 0
+        episodes,
+        count: episodes.length
       };
     } catch (error) {
       console.error('Apple Podcasts get episodes error:', error.response?.data || error.message);

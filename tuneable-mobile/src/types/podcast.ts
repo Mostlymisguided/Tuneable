@@ -138,6 +138,8 @@ export interface PodcastSeriesResponse {
   offset?: number;
   limit?: number;
   hasMore?: boolean;
+  canImportMore?: boolean;
+  importInfo?: { imported?: number; errors?: number } | null;
 }
 
 export interface CreateOrFindSeriesResponse {

@@ -57,6 +57,8 @@ import {
 
 const ABOUT_PREVIEW_CHARS = 180;
 const EPISODE_PAGE_SIZE = 25;
+const INITIAL_IMPORT_BATCH = 5;
+const MORE_IMPORT_BATCH = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 const MIN_SEARCH_LENGTH = 2;
 
@@ -88,7 +90,10 @@ export default function PodcastShowScreen() {
   const keyboard = useHideKeyboardAccessory();
   const [searchQuery, setSearchQuery] = useState('');
   const [hasMore, setHasMore] = useState(false);
+  const [canImportMore, setCanImportMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const listScrolled = useRef(false);
+  const loadingMoreLock = useRef(false);
   const episodeRequestSeq = useRef(0);
   const externalSearchRef = useRef(false);
   const [searchedExternally, setSearchedExternally] = useState(false);
@@ -159,6 +164,7 @@ export default function PodcastShowScreen() {
     const seq = ++episodeRequestSeq.current;
     const widen = externalSearchRef.current;
     externalSearchRef.current = false;
+    listScrolled.current = false;
     setHasMore(false);
     setLoadingEpisodes(true);
     setSearchedExternally(widen);
@@ -175,14 +181,17 @@ export default function PodcastShowScreen() {
       // Only hit RSS/import when the catalog is empty, never while searching.
       if ((data.episodes?.length ?? 0) === 0 && !searchQuery) {
         data = await podcastsAPI.getSeries(id, {
-          ...params,
           autoImport: true,
+          limit: INITIAL_IMPORT_BATCH,
+          offset: 0,
+          sortBy,
         });
       }
       if (seq !== episodeRequestSeq.current) return;
       if (data.series) setSeries(data.series);
       if (data.stats) setStats(data.stats);
       setEpisodes(data.episodes ?? []);
+      setCanImportMore(Boolean(data.canImportMore) && !searchQuery);
       setHasMore(Boolean(data.hasMore));
     } catch (err) {
       if (seq !== episodeRequestSeq.current) return;
@@ -218,10 +227,53 @@ export default function PodcastShowScreen() {
   );
 
   const loadMoreEpisodes = useCallback(async () => {
-    if (!id || loadingMore || loadingEpisodes || !hasMore) return;
+    if (!id || loadingMoreLock.current || loadingMore || loadingEpisodes || (!hasMore && !canImportMore)) return;
     const seq = episodeRequestSeq.current;
+    loadingMoreLock.current = true;
     setLoadingMore(true);
     try {
+      if (canImportMore && !searchQuery) {
+        const imported = await podcastsAPI.getSeries(id, {
+          loadMore: true,
+          limit: MORE_IMPORT_BATCH,
+          offset: 0,
+          sortBy,
+        });
+        if (seq !== episodeRequestSeq.current) return;
+        const added = imported.importInfo?.imported ?? 0;
+        setCanImportMore(Boolean(imported.canImportMore));
+        if (added > 0) {
+          const data = await podcastsAPI.getSeries(id, {
+            autoImport: false,
+            limit: episodes.length + added,
+            offset: 0,
+            sortBy,
+          });
+          if (seq !== episodeRequestSeq.current) return;
+          setEpisodes(data.episodes ?? []);
+          setHasMore(Boolean(data.hasMore));
+          setCanImportMore(Boolean(data.canImportMore));
+          if (data.stats) setStats(data.stats);
+        } else {
+          const stored = imported.stats?.totalEpisodes ?? episodes.length;
+          if (stored > episodes.length) {
+            const data = await podcastsAPI.getSeries(id, {
+              autoImport: false,
+              limit: episodes.length + MORE_IMPORT_BATCH,
+              offset: 0,
+              sortBy,
+            });
+            if (seq !== episodeRequestSeq.current) return;
+            setEpisodes(data.episodes ?? []);
+            setHasMore(Boolean(data.hasMore));
+            setCanImportMore(Boolean(data.canImportMore));
+          } else {
+            setHasMore(false);
+          }
+        }
+        return;
+      }
+
       const data = await podcastsAPI.getSeries(id, {
         autoImport: false,
         limit: EPISODE_PAGE_SIZE,
@@ -236,10 +288,12 @@ export default function PodcastShowScreen() {
         return [...prev, ...incoming.filter((ep) => !seen.has(episodeId(ep)))];
       });
       setHasMore(Boolean(data.hasMore));
+      setCanImportMore(Boolean(data.canImportMore) && !searchQuery);
       if (data.stats) setStats(data.stats);
     } catch {
       if (seq === episodeRequestSeq.current) setHasMore(false);
     } finally {
+      loadingMoreLock.current = false;
       setLoadingMore(false);
     }
   }, [
@@ -247,6 +301,7 @@ export default function PodcastShowScreen() {
     loadingMore,
     loadingEpisodes,
     hasMore,
+    canImportMore,
     episodes.length,
     sortBy,
     searchQuery,
@@ -646,17 +701,32 @@ export default function PodcastShowScreen() {
               </Text>
             ) : null
           }
+          onScrollBeginDrag={() => {
+            listScrolled.current = true;
+          }}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
-            if (!loadingEpisodes) void loadMoreEpisodes();
+            if (!listScrolled.current || loadingEpisodes) return;
+            void loadMoreEpisodes();
           }}
           ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator
-                color={colors.accentLight}
-                style={{ marginVertical: 16 }}
-              />
-            ) : null
+            <View style={styles.footer}>
+              {loadingMore ? (
+                <ActivityIndicator
+                  color={colors.accentLight}
+                  style={{ marginVertical: 16 }}
+                />
+              ) : null}
+              {!searchQuery && canImportMore && !loadingMore ? (
+                <Pressable
+                  style={styles.moreBtn}
+                  onPress={() => void loadMoreEpisodes()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add more episodes">
+                  <Text style={styles.moreBtnText}>Add more episodes</Text>
+                </Pressable>
+              ) : null}
+            </View>
           }
           renderItem={({ item, index }) => (
             <PodcastEpisodeRow
@@ -915,6 +985,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 16,
     marginBottom: 24,
+  },
+  footer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  moreBtn: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    backgroundColor: 'rgba(168, 85, 247, 0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.55)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  moreBtnText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
   },
   centered: {
     paddingHorizontal: 24,

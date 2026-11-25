@@ -2,6 +2,26 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const { extractRssItemImage } = require('./podcastCoverArt');
 
+function rssText(value) {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'object') {
+    return rssText(value._ ?? value['#text'] ?? value.text ?? '');
+  }
+  return '';
+}
+
+function rssEnclosureUrl(item) {
+  const enclosure = item?.enclosure || {};
+  const direct = rssText(enclosure.url || enclosure.href);
+  if (/^https?:\/\//i.test(direct)) return direct;
+  const media = item?.['media:content'];
+  const node = Array.isArray(media) ? media[0] : media;
+  const mediaUrl = rssText(node?.url || node?.href);
+  return /^https?:\/\//i.test(mediaUrl) ? mediaUrl : '';
+}
+
 function parseDuration(durationStr) {
   if (!durationStr) return 0;
   if (typeof durationStr === 'number') return durationStr;
@@ -85,6 +105,7 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
 
     const episodes = items.slice(0, maxEpisodes).map((item) => {
       const enclosure = item.enclosure || {};
+      const audioUrl = rssEnclosureUrl(item);
       const episodeImage = extractRssItemImage(item);
       const itunes = {
         episode: item['itunes:episode'],
@@ -103,17 +124,17 @@ async function parseRSSFeed(rssUrl, maxEpisodes = 50) {
       }
 
       return {
-        title: item.title || 'Untitled Episode',
+        title: rssText(item.title) || rssText(item['itunes:title']) || 'Untitled Episode',
         description: item.description || item['content:encoded'] || '',
         content: item['content:encoded'] || item.description || '',
-        contentSnippet: item.description || '',
-        author: item['itunes:author'] || item.author || channel['itunes:author'] || channel.managingEditor || '',
+        contentSnippet: rssText(item.description) || '',
+        author: rssText(item['itunes:author'] || item.author || channel['itunes:author'] || channel.managingEditor || ''),
         pubDate,
-        guid: item.guid?._ || item.guid || item.link || '',
-        link: item.link || '',
+        guid: rssText(item.guid) || rssText(item.link) || '',
+        link: rssText(item.link) || '',
         enclosure: {
-          url: enclosure.url || enclosure.$?.url || '',
-          type: enclosure.type || enclosure.$?.type || 'audio/mpeg',
+          url: audioUrl,
+          type: rssText(enclosure.type) || 'audio/mpeg',
           length: enclosure.length || enclosure.$?.length || null,
         },
         image: episodeImage ? { url: episodeImage } : null,

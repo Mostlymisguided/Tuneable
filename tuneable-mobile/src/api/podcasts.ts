@@ -40,6 +40,7 @@ export const podcastsAPI = {
     seriesId: string,
     params?: {
       autoImport?: boolean;
+      loadMore?: boolean;
       limit?: number;
       offset?: number;
       sortBy?: string;
@@ -48,20 +49,22 @@ export const podcastsAPI = {
     }
   ): Promise<PodcastSeriesResponse> => {
     const autoImport = params?.autoImport === true;
+    const loadMore = params?.loadMore === true;
     const q = params?.q?.trim();
     const external = params?.external === true;
     const response = await api.get<PodcastSeriesResponse>(
       `/podcasts/series/${seriesId}`,
       {
         params: {
-          autoImport: autoImport ? 'true' : 'false',
+          autoImport: autoImport || loadMore ? 'true' : 'false',
+          ...(loadMore ? { loadMore: 'true' } : {}),
           limit: params?.limit ?? 12,
           offset: params?.offset ?? 0,
           sortBy: params?.sortBy ?? 'mostTipped',
           ...(q ? { q } : {}),
           ...(external ? { external: 'true' } : {}),
         },
-        timeout: autoImport || q || external ? 90000 : undefined,
+        timeout: autoImport || loadMore || q || external ? 90000 : undefined,
       }
     );
     return response.data;
