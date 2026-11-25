@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { rightsAPI } from '../lib/api';
 import ArtistsAdmin from './ArtistsAdmin';
+import ArtistCatalogAdmin from './ArtistCatalogAdmin';
 import type { RightsContactCandidate } from '../lib/api';
 import { penceToPounds } from '../utils/currency';
 import { DEFAULT_COVER_ART } from '../constants';
@@ -29,7 +30,7 @@ import {
   type RightsStatus,
 } from '../utils/rightsStatus';
 
-type QueueId = 'artists' | 'all' | 'limbo' | 'follow_ups' | 'open' | 'inbound' | 'stalled';
+type QueueId = 'artists' | 'catalog' | 'all' | 'limbo' | 'follow_ups' | 'open' | 'inbound' | 'stalled';
 
 interface RightsAdminProps {
   onAttentionCountChange?: (count: number) => void;
@@ -37,6 +38,7 @@ interface RightsAdminProps {
 
 const QUEUE_LABELS: { id: QueueId; label: string }[] = [
   { id: 'artists', label: 'Artists' },
+  { id: 'catalog', label: 'Artist pages' },
   { id: 'all', label: 'All' },
   { id: 'limbo', label: 'Limbo' },
   { id: 'follow_ups', label: 'Follow-ups' },
@@ -577,7 +579,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   }, [onAttentionCountChange]);
 
   const loadList = useCallback(async () => {
-    if (!catalogueStatus && queue === 'artists') {
+    if (!catalogueStatus && (queue === 'artists' || queue === 'catalog')) {
       setLoading(false);
       return;
     }
@@ -1063,7 +1065,7 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
   };
 
   const countFor = (id: QueueId): number | null => {
-    if (id === 'artists') return null;
+    if (id === 'artists' || id === 'catalog') return null;
     if (id === 'all') return counts.all;
     if (id === 'limbo') return counts.limbo;
     if (id === 'follow_ups') return counts.followUps;
@@ -1249,6 +1251,8 @@ const RightsAdmin: React.FC<RightsAdminProps> = ({ onAttentionCountChange }) => 
 
       {!catalogueStatus && queue === 'artists' ? (
         <ArtistsAdmin />
+      ) : !catalogueStatus && queue === 'catalog' ? (
+        <ArtistCatalogAdmin />
       ) : (
       <>
       <div className="relative w-full max-w-md">

@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import { getCreatorDisplay } from '../utils/creatorDisplay';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import {
+  catalogPathForName,
+  getArtistCatalogIndex,
+  subscribeArtistCatalogIndex,
+} from '../utils/artistCatalogIndex';
 
 interface Artist {
   name: string;
@@ -35,6 +40,25 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
   className = '',
   showFeaturing = true
 }) => {
+  const catalogIndex = useSyncExternalStore(
+    subscribeArtistCatalogIndex,
+    getArtistCatalogIndex,
+    getArtistCatalogIndex
+  );
+
+  const hrefFor = (person: Artist): string | null => {
+    const catalogPath = catalogPathForName(person.name || '', catalogIndex);
+    if (catalogPath) return catalogPath;
+
+    const populated = typeof person.userId === 'object' && person.userId
+      ? person.userId
+      : null;
+    if (populated) return getUserProfileUrl(populated);
+
+    const userId = typeof person.userId === 'string' ? person.userId : null;
+    return userId ? getUserProfileUrl(userId) : null;
+  };
+
   // Get artist array (handle both array and string formats)
   // Prefer 'artists' array if available (backend sends this with userIds)
   // Otherwise use 'artist' field
@@ -55,38 +79,16 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
       )
     : [];
 
-  // If we have artist array with userIds, render with links
-  if (artistArray.length > 0) {
-    // Check if any artist has a userId (handle both ObjectId strings and populated objects)
-    const hasAnyUserId = artistArray.some(a => {
-      const userId = a.userId;
-      return userId !== null && userId !== undefined && 
-             (typeof userId === 'string' || typeof userId === 'object');
-    }) || (showFeaturing && featuringArray.some(f => {
-      const userId = f.userId;
-      return userId !== null && userId !== undefined && 
-             (typeof userId === 'string' || typeof userId === 'object');
-    }));
-    
-    if (hasAnyUserId) {
+  const hasLink = artistArray.some((artist) => hrefFor(artist))
+    || (showFeaturing && featuringArray.some((artist) => hrefFor(artist)));
+
+  // If we have artist array with a profile or catalog page, render with links
+  if (artistArray.length > 0 && hasLink) {
       // Render with clickable links
       return (
         <span className={className}>
           {artistArray.map((artist, idx) => {
-            const userId = typeof artist.userId === 'object' && artist.userId?._id
-              ? artist.userId._id
-              : typeof artist.userId === 'string'
-              ? artist.userId
-              : null;
-            
-            const populated = typeof artist.userId === 'object' && artist.userId
-              ? artist.userId
-              : null;
-            const linkPath = populated
-              ? getUserProfileUrl(populated)
-              : userId
-                ? getUserProfileUrl(userId)
-                : null;
+            const linkPath = hrefFor(artist);
             
             const relation = (artist as any)?.relationToNext;
             const relationText = relation && relation !== ','
@@ -118,20 +120,7 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
             <>
               <span> ft. </span>
               {featuringArray.map((feat, idx) => {
-                const userId = typeof feat.userId === 'object' && feat.userId?._id
-                  ? feat.userId._id
-                  : typeof feat.userId === 'string'
-                  ? feat.userId
-                  : null;
-                
-                const populated = typeof feat.userId === 'object' && feat.userId
-                  ? feat.userId
-                  : null;
-                const linkPath = populated
-                  ? getUserProfileUrl(populated)
-                  : userId
-                    ? getUserProfileUrl(userId)
-                    : null;
+                const linkPath = hrefFor(feat);
                 
                 return (
                   <React.Fragment key={idx}>
@@ -154,7 +143,6 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
           )}
         </span>
       );
-    }
   }
 
   // Fallback: use creatorDisplay or getCreatorDisplay helper
@@ -163,25 +151,10 @@ const ClickableArtistDisplay: React.FC<ClickableArtistDisplayProps> = ({
   // Try to parse creatorDisplay and match back to artist array for userIds
   // This is a simple approach - for complex cases, we'd need more sophisticated parsing
   if (displayText && artistArray.length > 0) {
-    // Check if first artist has userId
-    const firstArtist = artistArray[0];
-    const userId = typeof firstArtist.userId === 'object' && firstArtist.userId?._id
-      ? firstArtist.userId._id
-      : typeof firstArtist.userId === 'string'
-      ? firstArtist.userId
-      : null;
-    
-    const populated = typeof firstArtist.userId === 'object' && firstArtist.userId
-      ? firstArtist.userId
-      : null;
-    const linkPath = populated
-      ? getUserProfileUrl(populated)
-      : userId
-        ? getUserProfileUrl(userId)
-        : null;
+    const linkPath = hrefFor(artistArray[0]);
     
     if (linkPath) {
-      // If first artist has userId, make the whole display clickable
+      // If first artist has a page, make the whole display clickable
       // (Future: could parse and make individual artists clickable)
       return (
         <Link

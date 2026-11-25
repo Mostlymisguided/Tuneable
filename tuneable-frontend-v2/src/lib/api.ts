@@ -1445,6 +1445,58 @@ export const artistAPI = {
   },
 };
 
+export const artistCatalogAPI = {
+  getIndex: async () => {
+    const response = await api.get('/artist-catalog/index');
+    return response.data as {
+      artists: Array<{ slug: string; name: string; aliases?: string[] }>;
+    };
+  },
+  get: async (slug: string) => {
+    const response = await api.get(`/artist-catalog/${encodeURIComponent(slug)}`);
+    return response.data;
+  },
+  submitClaim: async (slug: string, formData: FormData) => {
+    const response = await api.post(`/artist-catalog/${encodeURIComponent(slug)}/claim`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  suggest: async (q: string) => {
+    const response = await api.get('/artist-catalog/admin/suggest', { params: { q } });
+    return response.data as {
+      suggestions: Array<{ name: string; count: number; catalog: { slug: string; name: string } | null }>;
+    };
+  },
+  preview: async (names: string[]) => {
+    const response = await api.post('/artist-catalog/admin/preview', { names });
+    return response.data;
+  },
+  list: async () => {
+    const response = await api.get('/artist-catalog/admin');
+    return response.data;
+  },
+  create: async (body: Record<string, unknown>) => {
+    const response = await api.post('/artist-catalog/admin', body);
+    return response.data;
+  },
+  update: async (id: string, body: Record<string, unknown>) => {
+    const response = await api.patch(`/artist-catalog/admin/${encodeURIComponent(id)}`, body);
+    return response.data;
+  },
+  listClaims: async (status = 'pending') => {
+    const response = await api.get('/artist-catalog/admin/claims', { params: { status } });
+    return response.data;
+  },
+  reviewClaim: async (
+    claimId: string,
+    body: { status: 'approved' | 'rejected'; reviewNotes?: string; clearRights?: boolean }
+  ) => {
+    const response = await api.patch(`/artist-catalog/admin/claims/${encodeURIComponent(claimId)}`, body);
+    return response.data as { message?: string; warnings?: string[]; clearedCount?: number; escrowPence?: number };
+  },
+};
+
 // Top Tunes API
 export const topTunesAPI = {
   getTopTunes: async (sortBy: string = 'globalMediaAggregate', limit: number = 10, timePeriod: string = 'all-time', search?: string, tags?: string[]) => {

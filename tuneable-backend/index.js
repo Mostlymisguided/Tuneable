@@ -447,6 +447,7 @@ app.use('/api/labels', labelRoutes); // Label routes
 app.use('/api/gear', gearRoutes); // Production gear catalog
 app.use('/api/tags', maskBlockedUsers, tagRoutes); // Tag profile pages
 app.use('/api/artists', maskBlockedUsers, artistRoutes); // Artist champions
+app.use('/api/artist-catalog', require('./routes/artistCatalogRoutes')); // Unclaimed artist pages
 app.use('/api/collectives', collectiveRoutes); // Collective routes
 app.use('/api/notifications', notificationRoutes); // Notification routes
 app.use('/api/conversations', require('./routes/conversationRoutes')); // Tuneable Conversations

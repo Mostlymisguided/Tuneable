@@ -43,6 +43,7 @@ import BookProfile from './pages/BookProfile';
 import TuneProfile from './pages/TuneProfile';
 import GearProfile from './pages/GearProfile';
 import TagProfile from './pages/TagProfile';
+import ArtistCatalogPage from './pages/ArtistCatalog';
 import LocationProfile from './pages/LocationProfile';
 import Places from './pages/Places';
 import PodcastEpisodeProfile from './pages/PodcastEpisodeProfile';
@@ -58,6 +59,7 @@ import RequestInvite from './pages/RequestInvite';
 import LoadingSpinner from './components/LoadingSpinner';
 import Onboarding from './pages/Onboarding';
 import { needsOnboarding } from './utils/authHelpers';
+import { refreshArtistCatalogIndex } from './utils/artistCatalogIndex';
 import Notifications from './pages/Notifications';
 import { AuthDeepLinkListener } from './capacitor/authDeepLink';
 import { getApiOrigin } from './utils/platform';
@@ -222,6 +224,10 @@ const PlayAuthRedirectBinder = () => {
 };
 
 const AppContent = () => {
+  useEffect(() => {
+    refreshArtistCatalogIndex();
+  }, []);
+
   return (
     <Router>
       <SeoManager />
@@ -300,6 +306,10 @@ const AppContent = () => {
             <Route
               path="/tag/:slug"
               element={<TagProfile />}
+            />
+            <Route
+              path="/artist/:slug"
+              element={<ArtistCatalogPage />}
             />
             <Route
               path="/place/:placeId"
