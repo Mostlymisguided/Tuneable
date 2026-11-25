@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { uuidv7 } = require('uuidv7');
+const { mapboxLocationFields } = require('./mapboxLocationFields');
 
 /**
  * Public catalog page for a credited artist who may not have a Tuneable account.
@@ -23,6 +24,7 @@ const artistCatalogSchema = new mongoose.Schema({
   genres: [{ type: String, trim: true, maxlength: 40 }],
   profilePic: { type: String, default: '' },
   website: { type: String, default: '' },
+  location: mapboxLocationFields(),
   socialMedia: {
     instagram: { type: String, default: '' },
     spotify: { type: String, default: '' },

@@ -11,6 +11,7 @@ const ArtistCatalog = require('../models/ArtistCatalog');
 const ArtistCatalogClaim = require('../models/ArtistCatalogClaim');
 const RightsCase = require('../models/RightsCase');
 const { isPlaceholderCreatorLabel } = require('../utils/creatorHelpers');
+const { applyResolvedLocation } = require('../utils/locationUtils');
 const { isRightsPendingClaimable } = require('../utils/mediaPlayability');
 const { TERMINAL_STATUSES } = require('../utils/rightsCaseHelpers');
 const {
@@ -134,6 +135,111 @@ function presentMedia(media, roles) {
   };
 }
 
+const PUBLIC_LOCATION_FIELDS = [
+  'city', 'region', 'country', 'countryCode', 'coordinates',
+  'placeId', 'featureType', 'ancestorIds', 'ancestors',
+  'label', 'namePreferred', 'display', 'placeFormatted', 'fullAddress', 'postcode',
+];
+
+function presentLocation(location) {
+  if (!location) return null;
+  const source = location.toObject?.() || location;
+  if (!source.placeId && !source.city && !source.country && !source.display && !source.region) return null;
+  const out = {};
+  PUBLIC_LOCATION_FIELDS.forEach((key) => {
+    if (source[key] != null && source[key] !== '') out[key] = source[key];
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function assignCatalogLocation(catalog, input) {
+  if (!input) {
+    catalog.set('location', undefined);
+    return;
+  }
+  catalog.set('location', applyResolvedLocation(input, catalog.location || null) || undefined);
+}
+
+const BADGE_LIMIT = 3;
+
+function mediaForSingleTag(item, tag) {
+  return {
+    _id: item._id,
+    tags: [tag],
+    genres: [],
+    category: null,
+    podcastSeries: null,
+    contentForm: item.contentForm,
+    contentType: item.contentType,
+    globalMediaAggregate: item.globalMediaAggregate || 0,
+  };
+}
+
+async function bestTagBadges(media) {
+  const { getMediaTagRankings, collectRankingTags } = require('./mediaTagRankingsService');
+  const bestByTag = new Map();
+  for (const item of media) {
+    const aggregate = item.globalMediaAggregate || 0;
+    for (const tag of collectRankingTags(item)) {
+      const key = String(tag).trim().toLowerCase();
+      const current = bestByTag.get(key);
+      if (!current || aggregate > current.aggregate) {
+        bestByTag.set(key, { tag, item, aggregate });
+      }
+    }
+  }
+  const jobs = [...bestByTag.values()]
+    .sort((a, b) => b.aggregate - a.aggregate)
+    .slice(0, 8);
+  const rows = await Promise.all(jobs.map(async ({ tag, item }) => {
+    const rankings = await getMediaTagRankings(mediaForSingleTag(item, tag), { limit: 1 });
+    return rankings[0] || null;
+  }));
+  return rows
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank || b.aggregate - a.aggregate)
+    .slice(0, BADGE_LIMIT)
+    .map((row) => ({ tag: row.tag, rank: row.rank }));
+}
+
+async function bestLocationBadges(media) {
+  const { getMediaLocationRankings } = require('./locationProfileService');
+  const located = media
+    .filter((item) => item.primaryLocation?.placeId)
+    .sort((a, b) => (b.globalMediaAggregate || 0) - (a.globalMediaAggregate || 0))
+    .slice(0, 8);
+  const batches = await Promise.all(located.map((item) => getMediaLocationRankings(item, {
+    limit: 3,
+    minTotal: 2,
+  })));
+  const best = new Map();
+  batches.flat().forEach((row) => {
+    const current = best.get(row.placeId);
+    if (!current || row.rank < current.rank) best.set(row.placeId, row);
+  });
+  return [...best.values()]
+    .sort((a, b) => a.rank - b.rank || (b.aggregate || 0) - (a.aggregate || 0))
+    .slice(0, BADGE_LIMIT)
+    .map((row) => ({
+      placeId: row.placeId,
+      name: row.name,
+      rank: row.rank,
+    }));
+}
+
+async function catalogChartBadges(media) {
+  try {
+    const [tagRankings, locationRankings] = await Promise.all([
+      bestTagBadges(media),
+      bestLocationBadges(media),
+    ]);
+    return { tagRankings, locationRankings };
+  } catch (error) {
+    console.error('Artist catalog rankings failed:', error);
+    return { tagRankings: [], locationRankings: [] };
+  }
+}
+
 function presentCatalog(catalog, extras = {}) {
   return {
     _id: catalog._id,
@@ -145,6 +251,7 @@ function presentCatalog(catalog, extras = {}) {
     genres: catalog.genres || [],
     profilePic: catalog.profilePic || '',
     website: catalog.website || '',
+    location: presentLocation(catalog.location),
     socialMedia: catalog.socialMedia || {},
     status: catalog.status,
     mediaCount: Array.isArray(catalog.mediaIds) ? catalog.mediaIds.length : 0,
@@ -332,6 +439,7 @@ async function createCatalog(input, actorId) {
       genres: cleanGenres(input.genres),
       profilePic: input.profilePic ? cleanUrl(input.profilePic) : '',
       website: input.website ? cleanUrl(input.website) : '',
+      location: input.location ? (applyResolvedLocation(input.location, null) || undefined) : undefined,
       socialMedia: applySocial({}, input.socialMedia),
       mediaIds,
       status: 'unclaimed',
@@ -366,6 +474,7 @@ async function updateCatalog(catalogId, input, actorId) {
   if (input.genres != null) catalog.genres = cleanGenres(input.genres);
   if (input.profilePic != null) catalog.profilePic = input.profilePic ? cleanUrl(input.profilePic) : '';
   if (input.website != null) catalog.website = input.website ? cleanUrl(input.website) : '';
+  if (input.location !== undefined) assignCatalogLocation(catalog, input.location);
   if (input.socialMedia != null) catalog.socialMedia = applySocial(catalog.socialMedia, input.socialMedia);
   if (input.mediaIds != null) catalog.mediaIds = await loadAttachedMedia(input.mediaIds);
 
@@ -473,10 +582,14 @@ async function getPublicCatalog(slug, viewerId) {
       .lean();
   }
 
+  const rankings = await catalogChartBadges(media);
+
   return {
     catalog: presentCatalog(catalog, { claimedBy: publicUser(catalog.claimedBy) }),
     queue,
     sections,
+    tagRankings: rankings.tagRankings,
+    locationRankings: rankings.locationRankings,
     viewerClaim: viewerClaim
       ? {
         status: viewerClaim.status,

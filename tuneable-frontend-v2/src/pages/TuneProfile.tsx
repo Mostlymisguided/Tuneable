@@ -2345,7 +2345,12 @@ const TuneProfile: React.FC = () => {
     )
   );
 
-  const copyAccessLine = () => (copyAccess ? copyAccessSentence(copyAccess) : null);
+  const copyAccessLine = () => {
+    if (!copyAccess) return null;
+    const publicShareLine = copyAccess.mode !== 'closed' && copyAccess.mode !== 'pence' && !copyAccess.unlocked;
+    if (publicShareLine) return null;
+    return copyAccessSentence(copyAccess);
+  };
 
   const seekTune = (seconds: number) => {
     const state = useWebPlayerStore.getState();

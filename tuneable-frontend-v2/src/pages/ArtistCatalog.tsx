@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Crown, Globe, Instagram, Minus, Music, Plus, Youtube } from 'lucide-react';
+import { Crown, Globe, Instagram, MapPin, Minus, Music, Plus, Settings, Tag, Youtube } from 'lucide-react';
 import { artistCatalogAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../seo/usePageMeta';
 import { getUserProfileUrl } from '../utils/profileNavigation';
+import { isAdmin } from '../utils/permissionHelpers';
+import { refreshArtistCatalogIndex } from '../utils/artistCatalogIndex';
 import { toast } from '../utils/toast';
+import { DEFAULT_COVER_ART } from '../constants';
+import { formatLocation, getPlaceProfilePath, type ResolvedLocation } from '../utils/locationHelpers';
+import { getTagProfilePath } from '../utils/tagNormalizer';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 import UserAvatar from '../components/UserAvatar';
 import MediaChampions from '../components/MediaChampions';
 import TippedMediaQueueList, { type TippedQueueItem } from '../components/TippedMediaQueueList';
@@ -18,26 +24,37 @@ type ClaimedBy = {
   artistName?: string | null;
 };
 
+type CatalogSocial = {
+  instagram?: string;
+  spotify?: string;
+  youtube?: string;
+  soundcloud?: string;
+  twitter?: string;
+};
+
+type CatalogRecord = {
+  _id: string;
+  slug: string;
+  name: string;
+  aliases: string[];
+  bio: string;
+  genres: string[];
+  profilePic: string;
+  website: string;
+  location?: ResolvedLocation | null;
+  socialMedia?: CatalogSocial;
+  status: 'unclaimed' | 'claimed';
+  claimedBy: ClaimedBy | null;
+};
+
+type TagRanking = { tag: string; rank: number };
+type LocationRanking = { placeId: string; name: string; rank: number };
+
 type CatalogPage = {
-  catalog: {
-    slug: string;
-    name: string;
-    aliases: string[];
-    bio: string;
-    genres: string[];
-    profilePic: string;
-    website: string;
-    socialMedia?: {
-      instagram?: string;
-      spotify?: string;
-      youtube?: string;
-      soundcloud?: string;
-      twitter?: string;
-    };
-    status: 'unclaimed' | 'claimed';
-    claimedBy: ClaimedBy | null;
-  };
+  catalog: CatalogRecord;
   queue?: TippedQueueItem[];
+  tagRankings?: TagRanking[];
+  locationRankings?: LocationRanking[];
   viewerClaim: { status: string; reviewNotes?: string; submittedAt?: string } | null;
 };
 
@@ -47,6 +64,68 @@ type SocialLink = {
   icon: React.ComponentType<{ className?: string }>;
   color: string;
 };
+
+type EditForm = {
+  name: string;
+  aliases: string;
+  bio: string;
+  genres: string;
+  website: string;
+  profilePic: string;
+  instagram: string;
+  spotify: string;
+  youtube: string;
+  soundcloud: string;
+  location: ResolvedLocation | null;
+};
+
+type EditMedia = {
+  _id: string;
+  title: string;
+  coverArt?: string | null;
+  roles?: string[];
+  rightsStatus?: string;
+  defaultSelected?: boolean;
+};
+
+const emptyEditForm: EditForm = {
+  name: '',
+  aliases: '',
+  bio: '',
+  genres: '',
+  website: '',
+  profilePic: '',
+  instagram: '',
+  spotify: '',
+  youtube: '',
+  soundcloud: '',
+  location: null,
+};
+
+function splitList(value: string) {
+  return value.split(',').map((part) => part.trim()).filter(Boolean);
+}
+
+function editFormFromCatalog(catalog: CatalogRecord): EditForm {
+  const social = catalog.socialMedia || {};
+  return {
+    name: catalog.name || '',
+    aliases: (catalog.aliases || []).join(', '),
+    bio: catalog.bio || '',
+    genres: (catalog.genres || []).join(', '),
+    website: catalog.website || '',
+    profilePic: catalog.profilePic || '',
+    instagram: social.instagram || '',
+    spotify: social.spotify || '',
+    youtube: social.youtube || '',
+    soundcloud: social.soundcloud || '',
+    location: catalog.location || null,
+  };
+}
+
+function hasLocation(location: ResolvedLocation | null | undefined) {
+  return !!(location?.display || location?.city || location?.country || location?.region);
+}
 
 function errorMessage(error: unknown, fallback: string) {
   const data = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
@@ -67,7 +146,7 @@ const SoundCloudIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-function socialLinks(catalog: CatalogPage['catalog']): SocialLink[] {
+function socialLinks(catalog: CatalogRecord): SocialLink[] {
   const social = catalog.socialMedia || {};
   const links: SocialLink[] = [];
   const website = externalHref(catalog.website);
@@ -122,15 +201,21 @@ const ArtistCatalogPage: React.FC = () => {
   const { slug = '' } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const admin = isAdmin(user);
   const [page, setPage] = useState<CatalogPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [showClaim, setShowClaim] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [showChampions, setShowChampions] = useState(false);
   const [playableOnly, setPlayableOnly] = useState(false);
   const [proofText, setProofText] = useState('');
   const [proofFiles, setProofFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm>(emptyEditForm);
+  const [editMedia, setEditMedia] = useState<EditMedia[]>([]);
+  const [editSelected, setEditSelected] = useState<Set<string>>(new Set());
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const loadPage = useCallback(async () => {
     const data = await artistCatalogAPI.get(slug);
@@ -166,6 +251,94 @@ const ArtistCatalogPage: React.FC = () => {
     path: `/artist/${catalog.slug}`,
     image: catalog.profilePic || undefined,
   } : null);
+
+  const openEdit = () => {
+    if (!page?.catalog) return;
+    const rows: EditMedia[] = (page.queue || []).map((item) => ({
+      _id: String(item._id),
+      title: item.title,
+      coverArt: item.coverArt,
+      roles: (item as TippedQueueItem & { roles?: string[] }).roles,
+      rightsStatus: item.rightsStatus,
+    }));
+    setEditForm(editFormFromCatalog(page.catalog));
+    setEditMedia(rows);
+    setEditSelected(new Set(rows.map((row) => row._id)));
+    setShowClaim(false);
+    setShowEdit(true);
+  };
+
+  const findTunes = async () => {
+    const names = [editForm.name, ...splitList(editForm.aliases)];
+    if (!names.length) {
+      toast.error('Enter an artist name');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const preview = await artistCatalogAPI.preview(names);
+      const rows: EditMedia[] = (preview.media || []).map((row: EditMedia) => ({
+        ...row,
+        _id: String(row._id),
+      }));
+      const known = new Set(editMedia.map((row) => row._id));
+      setEditMedia((current) => {
+        const byId = new Map(current.map((row) => [row._id, row]));
+        rows.forEach((row) => byId.set(row._id, { ...byId.get(row._id), ...row }));
+        return [...byId.values()];
+      });
+      setEditSelected((current) => {
+        const next = new Set(current);
+        rows.forEach((row) => {
+          if (!known.has(row._id) && row.defaultSelected) next.add(row._id);
+        });
+        return next;
+      });
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to find tunes'));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!page?.catalog?._id) return;
+    if (!editForm.name.trim()) {
+      toast.error('Artist name is required');
+      return;
+    }
+    if (!editSelected.size) {
+      toast.error('Choose at least one tune');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await artistCatalogAPI.update(page.catalog._id, {
+        name: editForm.name.trim(),
+        aliases: splitList(editForm.aliases),
+        bio: editForm.bio.trim(),
+        genres: splitList(editForm.genres),
+        website: editForm.website.trim(),
+        profilePic: editForm.profilePic.trim(),
+        socialMedia: {
+          instagram: editForm.instagram.trim(),
+          spotify: editForm.spotify.trim(),
+          youtube: editForm.youtube.trim(),
+        soundcloud: editForm.soundcloud.trim(),
+      },
+      location: editForm.location,
+      mediaIds: [...editSelected],
+      });
+      toast.success('Artist page updated');
+      setShowEdit(false);
+      await refreshArtistCatalogIndex(true);
+      await loadPage();
+    } catch (error) {
+      toast.error(errorMessage(error, 'Failed to update artist page'));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const submitClaim = async () => {
     if (!user) {
@@ -236,15 +409,27 @@ const ArtistCatalogPage: React.FC = () => {
             Back
           </button>
 
-          {unclaimed && (
+          {(admin || unclaimed) && (
             <div className="inline rounded-full items-center absolute right-0 top-0 md:right-3 mb-4 flex space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowClaim((open) => !open)}
-                className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all text-sm md:text-base"
-              >
-                {claimPending ? 'Claim pending' : 'Claim'}
-              </button>
+              {admin && (
+                <button
+                  type="button"
+                  onClick={() => (showEdit ? setShowEdit(false) : openEdit())}
+                  className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all flex items-center space-x-2 text-sm md:text-base"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>{showEdit ? 'Close' : 'Edit'}</span>
+                </button>
+              )}
+              {unclaimed && (
+                <button
+                  type="button"
+                  onClick={() => setShowClaim((open) => !open)}
+                  className="px-3 md:px-4 py-2 bg-purple-600/40 hover:bg-purple-500 text-white font-semibold rounded-lg shadow-lg transition-all text-sm md:text-base"
+                >
+                  {claimPending ? 'Claim pending' : 'Claim'}
+                </button>
+              )}
             </div>
           )}
 
@@ -264,14 +449,59 @@ const ArtistCatalogPage: React.FC = () => {
               {catalog.aliases.length > 0 && (
                 <p className="text-xl text-gray-300 mb-2">{catalog.aliases.join(', ')}</p>
               )}
-              {catalog.status === 'claimed' && catalog.claimedBy ? (
+              {catalog.status === 'claimed' && catalog.claimedBy && (
                 <p className="text-gray-300 mb-3">
                   <Link to={getUserProfileUrl(catalog.claimedBy)} className="text-purple-200 hover:text-white">
                     @{catalog.claimedBy.username}
                   </Link>
                 </p>
-              ) : (
-                <p className="text-gray-300 mb-3">Hasn't joined Tuneable yet.</p>
+              )}
+              {hasLocation(catalog.location) && (
+                <div className="inline-flex items-center space-x-2 px-3 py-1.5 mb-3 bg-purple-900/30 border border-purple-500/30 rounded-full text-gray-300 text-sm w-fit">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>{formatLocation(catalog.location)}</span>
+                </div>
+              )}
+              {((page.tagRankings?.length || 0) > 0 || (page.locationRankings?.length || 0) > 0) && (
+                <div className="flex flex-col gap-1.5 mb-3">
+                  {(page.tagRankings?.length || 0) > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {page.tagRankings!.map((ranking) => (
+                        <Link
+                          key={ranking.tag}
+                          to={getTagProfilePath(ranking.tag)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-colors no-underline"
+                        >
+                          <Tag className="h-3 w-3 text-purple-400" />
+                          #{ranking.rank} {ranking.tag}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  {(page.locationRankings?.length || 0) > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {page.locationRankings!.map((ranking) => {
+                        const placePath = getPlaceProfilePath(ranking.placeId);
+                        const chipClass = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-200 text-xs font-medium hover:bg-sky-500/25 hover:border-sky-400/50 transition-colors no-underline';
+                        const chipBody = (
+                          <>
+                            <MapPin className="h-3 w-3 text-sky-400" />
+                            #{ranking.rank} {ranking.name}
+                          </>
+                        );
+                        return placePath ? (
+                          <Link key={ranking.placeId} to={placePath} className={chipClass}>
+                            {chipBody}
+                          </Link>
+                        ) : (
+                          <span key={ranking.placeId} className={chipClass}>
+                            {chipBody}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
               {catalog.bio && (
                 <p className="text-gray-200 whitespace-pre-wrap mb-3 max-w-2xl">{catalog.bio}</p>
@@ -340,6 +570,165 @@ const ArtistCatalogPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {admin && showEdit && (
+          <div className="card p-4 md:p-6 mb-6 space-y-4">
+            <h2 className="text-lg font-semibold text-white">Edit page</h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block text-sm text-gray-300">
+                Name
+                <input
+                  value={editForm.name}
+                  onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
+                Aliases, comma separated
+                <input
+                  value={editForm.aliases}
+                  onChange={(event) => setEditForm({ ...editForm, aliases: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300 md:col-span-2">
+                Bio
+                <textarea
+                  value={editForm.bio}
+                  onChange={(event) => setEditForm({ ...editForm, bio: event.target.value })}
+                  rows={4}
+                  maxLength={500}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
+                Genres
+                <input
+                  value={editForm.genres}
+                  onChange={(event) => setEditForm({ ...editForm, genres: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <div className="md:col-span-2">
+                <LocationAutocomplete
+                  label="Location"
+                  value={editForm.location}
+                  onChange={(location) => setEditForm({ ...editForm, location })}
+                  placeholder="Search for a city or town"
+                />
+              </div>
+              <label className="block text-sm text-gray-300">
+                Website
+                <input
+                  value={editForm.website}
+                  onChange={(event) => setEditForm({ ...editForm, website: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
+                Instagram
+                <input
+                  value={editForm.instagram}
+                  onChange={(event) => setEditForm({ ...editForm, instagram: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
+                YouTube
+                <input
+                  value={editForm.youtube}
+                  onChange={(event) => setEditForm({ ...editForm, youtube: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
+                SoundCloud
+                <input
+                  value={editForm.soundcloud}
+                  onChange={(event) => setEditForm({ ...editForm, soundcloud: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300">
+                Spotify
+                <input
+                  value={editForm.spotify}
+                  onChange={(event) => setEditForm({ ...editForm, spotify: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+              <label className="block text-sm text-gray-300 md:col-span-2">
+                Image URL
+                <input
+                  value={editForm.profilePic}
+                  onChange={(event) => setEditForm({ ...editForm, profilePic: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                />
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-gray-400">
+                  {editSelected.size} tune{editSelected.size === 1 ? '' : 's'} on this page
+                </p>
+                <button
+                  type="button"
+                  onClick={findTunes}
+                  disabled={savingEdit}
+                  className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-60"
+                >
+                  Find matching tunes
+                </button>
+              </div>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {editMedia.map((item) => (
+                  <label key={item._id} className="flex items-center gap-3 rounded-lg bg-gray-900 p-2">
+                    <input
+                      type="checkbox"
+                      checked={editSelected.has(item._id)}
+                      onChange={(event) => {
+                        setEditSelected((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(item._id);
+                          else next.delete(item._id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <img src={item.coverArt || DEFAULT_COVER_ART} alt="" className="h-10 w-10 rounded object-cover" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm text-white">{item.title}</span>
+                      {(item.roles?.length || item.rightsStatus) && (
+                        <span className="block text-xs text-gray-500">
+                          {[...(item.roles || []), item.rightsStatus].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-60"
+              >
+                {savingEdit ? 'Saving…' : 'Save page'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEdit(false)}
+                className="rounded-lg px-4 py-2 text-sm text-gray-300 hover:text-white"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {unclaimed && showClaim && (
           <div className="card p-4 md:p-6 mb-6 space-y-3">

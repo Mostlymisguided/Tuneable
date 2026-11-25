@@ -5,6 +5,8 @@ import { toast } from '../utils/toast';
 import { penceToPounds } from '../utils/currency';
 import { refreshArtistCatalogIndex } from '../utils/artistCatalogIndex';
 import { DEFAULT_COVER_ART } from '../constants';
+import LocationAutocomplete from './LocationAutocomplete';
+import type { ResolvedLocation } from '../utils/locationHelpers';
 
 type Suggestion = { name: string; count: number; catalog: { slug: string; name: string } | null };
 
@@ -28,6 +30,7 @@ type Published = {
   genres: string[];
   website: string;
   profilePic: string;
+  location?: ResolvedLocation | null;
   socialMedia?: { instagram?: string };
   status: 'unclaimed' | 'claimed';
   mediaIds: string[];
@@ -58,6 +61,7 @@ const emptyForm = {
   website: '',
   instagram: '',
   profilePic: '',
+  location: null as ResolvedLocation | null,
 };
 
 const ArtistCatalogAdmin: React.FC = () => {
@@ -153,6 +157,7 @@ const ArtistCatalogAdmin: React.FC = () => {
         genres: form.genres.split(',').map((part) => part.trim()).filter(Boolean),
         website: form.website.trim(),
         profilePic: form.profilePic.trim(),
+        location: form.location,
         socialMedia: { instagram: form.instagram.trim() },
         mediaIds: [...selected],
       };
@@ -188,6 +193,7 @@ const ArtistCatalogAdmin: React.FC = () => {
       website: page.website || '',
       instagram: page.socialMedia?.instagram || '',
       profilePic: page.profilePic || '',
+      location: page.location || null,
     });
     const preserve = new Set(page.mediaIds || []);
     setSelected(preserve);
@@ -320,6 +326,14 @@ const ArtistCatalogAdmin: React.FC = () => {
               className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
             />
           </label>
+          <div className="md:col-span-2">
+            <LocationAutocomplete
+              label="Location"
+              value={form.location}
+              onChange={(location) => setForm({ ...form, location })}
+              placeholder="Search for a city or town"
+            />
+          </div>
         </div>
 
         {media.length > 0 && (
