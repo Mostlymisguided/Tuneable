@@ -523,11 +523,11 @@ const ArtistCatalogPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowChampions((open) => !open)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black/20 hover:bg-black/30 border border-amber-500/20 transition-colors"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/25 hover:bg-black/40 border border-amber-400/25 transition-colors"
                 >
-                  <Crown className="h-4 w-4 text-amber-400" />
+                  <Crown className="h-4 w-4 text-amber-300" />
                   <span className="text-sm font-semibold text-white">
-                    {showChampions ? 'Hide artist Champions' : `Champions of ${catalog.name}`}
+                    {showChampions ? 'Hide Champions' : 'Champions'}
                   </span>
                   {showChampions ? (
                     <Minus className="h-4 w-4 text-gray-400" />
@@ -536,7 +536,7 @@ const ArtistCatalogPage: React.FC = () => {
                   )}
                 </button>
                 {showChampions && (
-                  <div className="mt-3 card bg-black/20 rounded-lg p-3 md:p-4">
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3.5 md:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                     <MediaChampions
                       artistUserId={catalog.claimedBy?.uuid || catalog.claimedBy?._id}
                       artistName={catalog.name}

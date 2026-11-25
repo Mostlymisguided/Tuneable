@@ -17,6 +17,7 @@ const {
   selectFallbackScopes,
   withLocation,
 } = require('../utils/championBadges');
+const { mergeBestLocationPlaces } = require('../utils/championPlaces');
 
 /** Minimum distinct tippers in-scope before crowning Champions. Solo supporters still count. */
 const MIN_TIPPERS_FOR_CHAMPION = 1;
@@ -397,6 +398,38 @@ async function getLocationChampions(rawPlaceId, options = {}) {
   );
 }
 
+const BEST_PLACE_MEDIA_SAMPLE = 6;
+const BEST_PLACE_LIMIT = 4;
+
+/**
+ * Places where this creator's music charts best. Used as Champion scope pills
+ * so the list is filtered by the creator's strongest locations, not the viewer's home.
+ */
+async function loadCreatorBestPlaces(mediaDocs) {
+  const located = (Array.isArray(mediaDocs) ? mediaDocs : [])
+    .filter((item) => item?.primaryLocation?.placeId)
+    .sort((a, b) => (b.globalMediaAggregate || 0) - (a.globalMediaAggregate || 0))
+    .slice(0, BEST_PLACE_MEDIA_SAMPLE);
+
+  if (!located.length) return [];
+
+  try {
+    const { getMediaLocationRankings } = require('./locationProfileService');
+    const batches = await Promise.all(
+      located.map((item) =>
+        getMediaLocationRankings(item, { limit: 3, minTotal: 2 }).catch((error) => {
+          console.error('Location rank for champion places failed:', error);
+          return [];
+        })
+      )
+    );
+    return mergeBestLocationPlaces(batches.flat(), BEST_PLACE_LIMIT);
+  } catch (error) {
+    console.error('Creator best places failed:', error);
+    return [];
+  }
+}
+
 /**
  * Aggregate tip champions across an artist's catalog.
  * Prefer verified userId; fall back to case-insensitive artist.name match.
@@ -447,19 +480,34 @@ async function getArtistChampions({ userId, name } = {}, options = {}) {
       rankings: [],
       podiumSize: CHAMPION_PODIUM_SIZE,
       minTippersForChampion: MIN_TIPPERS_FOR_CHAMPION,
+      bestPlaces: [],
     };
   }
 
-  return aggregateChampionsForMatch(
-    { mediaId: { $in: mediaIds } },
-    {
-      ...options,
-      meta: {
-        entityType: 'artist',
-        artist: { userId: artistUserId, name: artistLabel },
-      },
-    }
-  );
+  const locatedMedia = await Media.find({
+    _id: { $in: mediaIds },
+    'primaryLocation.placeId': { $exists: true, $nin: [null, ''] },
+  })
+    .select('_id primaryLocation globalMediaAggregate contentForm')
+    .sort({ globalMediaAggregate: -1 })
+    .limit(BEST_PLACE_MEDIA_SAMPLE)
+    .lean();
+
+  const [champions, bestPlaces] = await Promise.all([
+    aggregateChampionsForMatch(
+      { mediaId: { $in: mediaIds } },
+      {
+        ...options,
+        meta: {
+          entityType: 'artist',
+          artist: { userId: artistUserId, name: artistLabel },
+        },
+      }
+    ),
+    loadCreatorBestPlaces(locatedMedia),
+  ]);
+
+  return { ...champions, bestPlaces };
 }
 
 async function getScopedUserTagChampionTitles(userObjectId, userIdStr, options = {}) {

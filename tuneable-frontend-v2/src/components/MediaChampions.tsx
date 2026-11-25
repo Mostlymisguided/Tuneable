@@ -48,6 +48,13 @@ export interface MediaChampionsResponse {
   rankings: MediaChampionRanking[];
   podiumSize?: number;
   minTippersForChampion: number;
+  /** Places where this creator charts best. Artist champions only. */
+  bestPlaces?: Array<{
+    placeId: string;
+    label: string;
+    rank?: number | null;
+    placetype?: string | null;
+  }>;
 }
 
 interface MediaChampionsProps {
@@ -81,30 +88,42 @@ const MEDAL_STYLES: Record<
   ChampionMedal,
   {
     border: string;
+    surface: string;
     crownWrap: string;
     crown: string;
     amount: string;
   }
 > = {
   gold: {
-    border: 'border-amber-400/50',
-    crownWrap: 'bg-amber-400/15 border-amber-400/30 text-amber-200',
+    border: 'border-amber-300/40',
+    surface: 'bg-gradient-to-r from-amber-400/10 to-transparent',
+    crownWrap: 'bg-amber-400/15 border-amber-300/40 text-amber-200',
     crown: 'text-amber-200',
-    amount: 'text-amber-300',
+    amount: 'text-amber-200',
   },
   silver: {
-    border: 'border-slate-300/40',
-    crownWrap: 'bg-slate-300/10 border-slate-300/25 text-slate-200',
+    border: 'border-slate-300/30',
+    surface: 'bg-gradient-to-r from-slate-300/10 to-transparent',
+    crownWrap: 'bg-slate-300/10 border-slate-300/30 text-slate-200',
     crown: 'text-slate-200',
     amount: 'text-slate-200',
   },
   bronze: {
-    border: 'border-orange-400/40',
-    crownWrap: 'bg-orange-400/15 border-orange-400/30 text-orange-200',
+    border: 'border-orange-400/35',
+    surface: 'bg-gradient-to-r from-orange-400/10 to-transparent',
+    crownWrap: 'bg-orange-400/15 border-orange-400/35 text-orange-200',
     crown: 'text-orange-200',
-    amount: 'text-orange-300',
+    amount: 'text-orange-200',
   },
 };
+
+function scopePillClass(selected: boolean) {
+  return `inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${
+    selected
+      ? 'bg-purple-600 text-white border-purple-300/50'
+      : 'bg-white/[0.04] text-gray-200 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+  }`;
+}
 
 function medalForRank(rank: number, isChampion: boolean, medal?: ChampionMedal | null): ChampionMedal | null {
   if (medal) return medal;
@@ -122,8 +141,6 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   seedLocation = null,
   compact = false,
   variant = 'default',
-  entityLabel,
-  mediaTitle,
 }) => {
   const { user } = useAuth();
   const [selectedLocation, setSelectedLocation] = useState<ResolvedLocation | null>(seedLocation);
@@ -162,18 +179,6 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   const scopeLabel = selectedLocation?.placeId
     ? formatLocation(selectedLocation)
     : 'Earth';
-
-  const subjectLabel = useMemo(() => {
-    if (entityLabel) return entityLabel;
-    if (mediaTitle) return mediaTitle;
-    if (data?.tag?.name) return `#${data.tag.name}`;
-    if (data?.place?.name) return data.place.name;
-    if (data?.artist?.name) return data.artist.name;
-    if (tagSlug) return `#${tagSlug.replace(/-/g, ' ')}`;
-    if (originPlaceId) return originPlaceId;
-    if (artistName) return artistName;
-    return null;
-  }, [entityLabel, mediaTitle, data, tagSlug, originPlaceId, artistName]);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,6 +236,13 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   const profilePath = (ranking: MediaChampionRanking) => {
     return ranking.user ? getUserProfileUrl(ranking.user) : undefined;
   };
+
+  const creatorScoped = Boolean(artistUserId || artistName);
+  const scopePills = creatorScoped ? (data?.bestPlaces || []) : homeScopePicks;
+  const customScope = Boolean(
+    selectedLocation?.placeId
+    && !scopePills.some((pick) => pick.placeId === selectedLocation.placeId)
+  );
 
   const podiumChampions = useMemo(() => {
     if (!data) return [];
@@ -312,76 +324,67 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
             : 'contents'
         }
       >
-      {/* Scope header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-white">
-            <Crown className={`text-amber-400 flex-shrink-0 ${compact || isStrip ? 'h-4 w-4' : 'h-5 w-5'}`} />
-            <h3 className={`font-bold ${compact || isStrip ? 'text-base md:text-lg' : 'text-lg md:text-xl'}`}>
-              Champions of{' '}
-              {subjectLabel ? (
-                <span className="text-amber-300">{subjectLabel}</span>
-              ) : (
-                <span className="text-amber-300">{scopeLabel}</span>
-              )}
-              {subjectLabel && (
-                <span className="text-gray-400 font-normal text-sm md:text-base">
-                  {' '}
-                  · {scopeLabel}
-                </span>
-              )}
-            </h3>
-          </div>
-          <p className={`text-gray-400 mt-1 ${compact || isStrip ? 'text-[11px]' : 'text-xs md:text-sm'}`}>
-            #1 · #2 · #3 Champions by tip total from tippers based here. Social status only — not ownership rights.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowLocationSearch((v) => !v)}
-          className="inline-flex items-center gap-1.5 self-start text-xs sm:text-sm text-purple-300 hover:text-white transition-colors"
-        >
-          <MapPin className="h-3.5 w-3.5" />
-          {showLocationSearch ? 'Hide search' : 'Search place'}
-        </button>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/15 border border-amber-300/30 flex-shrink-0">
+          <Crown className="h-3.5 w-3.5 text-amber-200" />
+        </span>
+        <h3 className={`font-semibold tracking-tight text-white truncate ${compact || isStrip ? 'text-base' : 'text-lg'}`}>
+          Champions
+        </h3>
       </div>
 
-      {/* Scope chips */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => {
             setSelectedLocation(null);
             setShowLocationSearch(false);
           }}
-          className={`rounded-full px-3 py-1 text-xs transition-colors ${
-            !selectedLocation?.placeId
-              ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
-              : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-          }`}
+          className={scopePillClass(!selectedLocation?.placeId)}
         >
           Earth
         </button>
-        {homeScopePicks.map((pick) => {
+        {scopePills.map((pick) => {
           const selected = selectedLocation?.placeId === pick.placeId;
           return (
             <button
               key={pick.placeId}
               type="button"
               onClick={() =>
-                setSelectedLocation(selected ? null : championPickToResolvedLocation(pick))
+                setSelectedLocation(
+                  selected
+                    ? null
+                    : championPickToResolvedLocation({
+                        placeId: pick.placeId,
+                        label: pick.label,
+                        placetype: pick.placetype || undefined,
+                      })
+                )
               }
-              className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                selected
-                  ? 'bg-purple-600 text-white ring-1 ring-purple-400/50'
-                  : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
-              }`}
-              title={pick.placetype ? `${pick.placetype}` : undefined}
+              className={scopePillClass(selected)}
+              title={pick.rank ? `Best rank #${pick.rank}` : pick.placetype || undefined}
             >
               {pick.label}
             </button>
           );
         })}
+        {customScope && (
+          <button
+            type="button"
+            onClick={() => setSelectedLocation(null)}
+            className={scopePillClass(true)}
+          >
+            {scopeLabel}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setShowLocationSearch((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-purple-200 hover:text-white border border-transparent hover:border-white/10 hover:bg-white/[0.04] transition-colors whitespace-nowrap ml-auto"
+        >
+          <MapPin className="h-3.5 w-3.5" />
+          {showLocationSearch ? 'Hide search' : 'Search place'}
+        </button>
       </div>
 
       {showLocationSearch && (
@@ -393,8 +396,8 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
           }}
           placeholder="Search country, city, or neighborhood…"
           variant="dark"
-          label="Champion scope"
-          description="Titles use the tipper’s home location hierarchy."
+          label="Place"
+          description="Show champions whose home is in this place."
         />
       )}
 
@@ -410,13 +413,10 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
       )}
 
       {!loading && !error && data && data.rankings.length === 0 && (
-        <div className="text-center py-6 px-4 rounded-lg bg-black/20 border border-dashed border-gray-700">
-          <MapPin className="h-6 w-6 text-gray-500 mx-auto mb-2" />
+        <div className="text-center py-6 px-4 rounded-xl bg-white/[0.03] border border-dashed border-white/10">
+          <MapPin className="h-5 w-5 text-gray-500 mx-auto mb-2" />
           <p className="text-sm text-gray-300">
-            No champions yet in <span className="text-white font-medium">{scopeLabel}</span>.
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Be the first tipper based here to claim a Champion spot.
+            No champions in <span className="text-white font-medium">{scopeLabel}</span> yet.
           </p>
         </div>
       )}
@@ -438,8 +438,8 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
               const tipLabel = `${ranking.bidCount} ${ranking.bidCount === 1 ? 'tip' : 'tips'}`;
               const key = String(ranking.user._id || ranking.user.uuid || ranking.rank);
               const revealed = revealedIds.has(key);
-              const chipClassName = `flex items-center gap-1.5 md:gap-2 w-full px-1.5 py-1.5 md:px-2 md:py-2 rounded-lg bg-black/25 hover:bg-purple-500/40 border transition-colors ${
-                styles ? styles.border : 'border-white/5'
+              const chipClassName = `flex items-center gap-2 w-full px-2 py-1.5 rounded-xl border transition-colors hover:brightness-110 ${
+                styles ? `${styles.border} ${styles.surface}` : 'border-white/10 bg-white/[0.03]'
               }`;
               const nameClass = 'flex-1 min-w-0 text-xs md:text-sm text-white truncate hover:underline';
               return (
@@ -505,13 +505,6 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
               );
             })}
           </div>
-
-          {data && data.tipperCount > 0 && (
-            <p className="text-[11px] text-gray-500 text-center pt-0.5">
-              {data.tipperCount} tipper{data.tipperCount === 1 ? '' : 's'} ·{' '}
-              {penceToPounds(data.totalAmount)} in this scope
-            </p>
-          )}
         </div>
       )}
       </div>

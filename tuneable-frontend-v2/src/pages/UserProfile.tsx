@@ -2422,13 +2422,11 @@ const UserProfile: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowArtistChampions(!showArtistChampions)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black/20 hover:bg-black/30 border border-amber-500/20 transition-colors"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/25 hover:bg-black/40 border border-amber-400/25 transition-colors"
                   >
-                    <Crown className="h-4 w-4 text-amber-400" />
+                    <Crown className="h-4 w-4 text-amber-300" />
                     <span className="text-sm font-semibold text-white">
-                      {showArtistChampions
-                        ? 'Hide artist Champions'
-                        : `Champions of ${user.creatorProfile?.artistName || user.username}`}
+                      {showArtistChampions ? 'Hide Champions' : 'Champions'}
                     </span>
                     {showArtistChampions ? (
                       <Minus className="h-4 w-4 text-gray-400" />
@@ -2437,7 +2435,7 @@ const UserProfile: React.FC = () => {
                     )}
                   </button>
                   {showArtistChampions && (
-                    <div className="mt-3 card bg-black/20 rounded-lg p-3 md:p-4">
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3.5 md:p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <MediaChampions
                         artistUserId={user.uuid || user._id}
                         entityLabel={user.creatorProfile?.artistName || user.username}
