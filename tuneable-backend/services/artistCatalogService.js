@@ -27,6 +27,14 @@ const {
   ownerUserId,
 } = require('../utils/artistCatalog');
 
+const CHART_MEDIA_SELECT = [
+  '_id', 'uuid', 'slug', 'title', 'coverArt', 'creatorDisplay',
+  'artist', 'featuring', 'contentForm', 'contentType',
+  'duration', 'bpm', 'releaseDate', 'releaseYear', 'primaryLocation',
+  'tags', 'sources', 'globalMediaAggregate',
+  'rightsStatus', 'rightsCleared', 'status',
+].join(' ');
+
 const MEDIA_CARD_SELECT = [
   '_id', 'uuid', 'slug', 'title', 'coverArt', 'creatorDisplay',
   'artist', 'featuring', 'producer', 'songwriter', 'composer',
@@ -406,16 +414,56 @@ async function getPublicCatalog(slug, viewerId) {
   const media = await Media.find({
     _id: { $in: catalog.mediaIds || [] },
     status: 'active',
-  }).select(MEDIA_CARD_SELECT).lean();
+  }).select(CHART_MEDIA_SELECT).lean();
 
   const keys = new Set(catalog.nameKeys || []);
+  const ranked = media
+    .map((item) => ({ item, roles: matchedRoles(item, keys) }))
+    .sort((a, b) => (
+      (b.item.globalMediaAggregate || 0) - (a.item.globalMediaAggregate || 0)
+      || String(a.item.title || '').localeCompare(String(b.item.title || ''))
+    ));
+
+  const { toClientMedia } = require('../utils/mediaPlayability');
+  const { loadBidsByMediaId } = require('./relatedMediaService');
+  const bidsByMediaId = await loadBidsByMediaId(ranked.map((row) => row.item._id));
+  const playability = { authenticated: Boolean(viewerId) };
+
+  const queue = ranked.map(({ item, roles }) => {
+    const client = toClientMedia(item, {}, playability);
+    return {
+      _id: client._id,
+      uuid: client.uuid,
+      slug: client.slug || null,
+      title: client.title,
+      coverArt: client.coverArt || null,
+      creatorDisplay: client.creatorDisplay || null,
+      artist: client.artist || [],
+      featuring: client.featuring || [],
+      contentForm: client.contentForm,
+      contentType: client.contentType,
+      duration: client.duration || 0,
+      bpm: client.bpm ?? null,
+      releaseDate: client.releaseDate ?? null,
+      releaseYear: client.releaseYear ?? null,
+      primaryLocation: client.primaryLocation ?? null,
+      tags: client.tags || [],
+      globalMediaAggregate: client.globalMediaAggregate || 0,
+      rightsStatus: client.rightsStatus || 'pending',
+      rightsCleared: client.rightsCleared === true,
+      sources: client.sources || {},
+      isPlayable: client.isPlayable,
+      hasHostedAudio: client.hasHostedAudio,
+      bids: bidsByMediaId.get(String(item._id)) || [],
+      roles,
+      section: sectionForRoles(roles),
+    };
+  });
+
   const sections = { artist: [], appears: [], credits: [] };
-  media
-    .map((item) => presentMedia(item, matchedRoles(item, keys)))
-    .sort((a, b) => (b.globalMediaAggregate || 0) - (a.globalMediaAggregate || 0) || a.title.localeCompare(b.title))
-    .forEach((item) => {
-      sections[item.section].push(item);
-    });
+  queue.forEach((item) => {
+    sections[item.section].push(item);
+  });
 
   let viewerClaim = null;
   if (viewerId) {
@@ -427,6 +475,7 @@ async function getPublicCatalog(slug, viewerId) {
 
   return {
     catalog: presentCatalog(catalog, { claimedBy: publicUser(catalog.claimedBy) }),
+    queue,
     sections,
     viewerClaim: viewerClaim
       ? {
