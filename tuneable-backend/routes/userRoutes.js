@@ -1861,6 +1861,79 @@ router.get('/me/blocked', authMiddleware, async (req, res) => {
 });
 
 /**
+ * Strip sign-in identity from an account. Tips, wallet ledger rows, and artist
+ * escrow stay on the record so money already owed can still be paid.
+ */
+function applyAccountDeletion(user, username) {
+  user.appleId = undefined;
+  user.googleId = undefined;
+  user.facebookId = undefined;
+  user.soundcloudId = undefined;
+  user.instagramId = undefined;
+  user.spotifyId = undefined;
+  user.googleAccessToken = undefined;
+  user.googleRefreshToken = undefined;
+  user.facebookAccessToken = undefined;
+  user.soundcloudAccessToken = undefined;
+  user.soundcloudRefreshToken = undefined;
+  user.soundcloudUsername = undefined;
+  user.instagramAccessToken = undefined;
+  user.instagramUsername = undefined;
+  user.spotifyAccessToken = undefined;
+  user.spotifyRefreshToken = undefined;
+
+  // Production unique indexes on email / personalInviteCode are not sparse,
+  // so unsetting them collides with other users that lack a value.
+  user.email = `${username}_${user._id}@deleted.tuneable.invalid`;
+  user.password = undefined;
+  user.cellPhone = undefined;
+  user.givenName = '';
+  user.familyName = '';
+  user.profilePic =
+    'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
+  user.username = username;
+  user.personalInviteCode = `DELETED_${user._id}`;
+  if (Array.isArray(user.personalInviteCodes)) {
+    user.personalInviteCodes.forEach((ic) => {
+      ic.isActive = false;
+    });
+  }
+
+  user.set('socialMedia', undefined);
+  user.set('homeLocation', undefined);
+  user.set('secondaryLocation', undefined);
+  if (user.preferences) {
+    user.preferences.favoriteTags = [];
+  }
+  if (user.creatorProfile) {
+    user.creatorProfile.artistName = undefined;
+    user.creatorProfile.bio = '';
+    user.creatorProfile.website = undefined;
+    user.creatorProfile.management = undefined;
+    user.markModified('creatorProfile');
+  }
+
+  user.pushDevices = [];
+  user.role = ['user'];
+  user.isActive = false;
+  user.deletedAt = new Date();
+  user.balance = 0;
+  user.welcomeCreditRemainingPence = 0;
+  user.emailVerified = false;
+  user.emailVerificationToken = undefined;
+  user.passwordResetToken = undefined;
+  user.unsubscribeToken = undefined;
+  user.oauthVerified = {
+    apple: false,
+    google: false,
+    facebook: false,
+    instagram: false,
+    soundcloud: false,
+    spotify: false,
+  };
+}
+
+/**
  * @route   DELETE /api/users/me
  * @desc    Permanently deactivate and anonymize the authenticated account (App Store / GDPR)
  * @access  Private
@@ -1874,59 +1947,7 @@ router.delete('/me', authMiddleware, async (req, res) => {
     }
 
     const idSuffix = String(user._id).slice(-8);
-    const anonymizedUsername = `deleted_${idSuffix}`;
-
-    // Clear unique OAuth / contact identifiers so they can be reused
-    user.appleId = undefined;
-    user.googleId = undefined;
-    user.facebookId = undefined;
-    user.soundcloudId = undefined;
-    user.instagramId = undefined;
-    user.spotifyId = undefined;
-    user.googleAccessToken = undefined;
-    user.googleRefreshToken = undefined;
-    user.facebookAccessToken = undefined;
-    user.soundcloudAccessToken = undefined;
-    user.soundcloudRefreshToken = undefined;
-    user.instagramAccessToken = undefined;
-    user.spotifyAccessToken = undefined;
-    user.spotifyRefreshToken = undefined;
-
-    // Production unique indexes on email / personalInviteCode are not sparse,
-    // so unsetting them collides with other users that lack a value.
-    user.email = `${anonymizedUsername}_${user._id}@deleted.tuneable.invalid`;
-    user.password = undefined;
-    user.cellPhone = undefined;
-    user.givenName = '';
-    user.familyName = '';
-    user.profilePic =
-      'https://uploads.tuneable.stream/profile-pictures/default-profile.png';
-    user.username = anonymizedUsername;
-    // Never 5 chars, so findByInviteCode can't resolve it
-    user.personalInviteCode = `DELETED_${user._id}`;
-    if (Array.isArray(user.personalInviteCodes)) {
-      user.personalInviteCodes.forEach((ic) => {
-        ic.isActive = false;
-      });
-    }
-
-    user.pushDevices = [];
-    user.isActive = false;
-    user.deletedAt = new Date();
-    user.balance = 0;
-    user.welcomeCreditRemainingPence = 0;
-    user.emailVerified = false;
-    user.emailVerificationToken = undefined;
-    user.passwordResetToken = undefined;
-    user.unsubscribeToken = undefined;
-    user.oauthVerified = {
-      apple: false,
-      google: false,
-      facebook: false,
-      instagram: false,
-      soundcloud: false,
-      spotify: false,
-    };
+    applyAccountDeletion(user, `deleted_${idSuffix}`);
 
     await revokeAllAuthSessions(user._id);
     await user.save();
@@ -1942,12 +1963,8 @@ router.delete('/me', authMiddleware, async (req, res) => {
       try {
         const user = await User.findById(req.user._id);
         if (user) {
-          user.username = `deleted_${Date.now().toString(36)}`;
-          user.email = `${user.username}_${user._id}@deleted.tuneable.invalid`;
-          user.personalInviteCode = `DELETED_${user._id}`;
-          user.pushDevices = [];
-          user.isActive = false;
-          user.deletedAt = new Date();
+          applyAccountDeletion(user, `deleted_${Date.now().toString(36)}`);
+          await revokeAllAuthSessions(user._id);
           await user.save();
           return res.json({ message: 'Account deleted successfully' });
         }

@@ -50,7 +50,7 @@ const EXACT: Record<string, PageMeta> = {
   },
   '/join-us': {
     title: 'Join Tuneable',
-    description: 'Buy shares in Tuneable and help steer a chart that pays artists.',
+    description: 'Community funding is paused. Register interest. This does not buy shares in Tuneable.',
     path: '/join-us',
   },
   '/privacy-policy': {

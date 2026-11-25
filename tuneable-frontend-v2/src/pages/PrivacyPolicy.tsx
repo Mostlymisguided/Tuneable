@@ -183,8 +183,10 @@ const PrivacyPolicy: React.FC = () => {
                   <li><strong>Expo / push delivery:</strong> Device push tokens so we can send notifications you have opted into</li>
                   <li><strong>OAuth Providers:</strong> Facebook, Google, SoundCloud, Instagram for authentication (see their respective privacy policies)</li>
                   <li><strong>Catalogue sources:</strong> Public catalogue metadata you choose to import on the website (for example a public YouTube playlist) for library matching</li>
-                  <li><strong>Hosting Providers:</strong> Cloud infrastructure and data storage services</li>
-                  <li><strong>Analytics Services:</strong> Platform usage analytics (in anonymized form where possible)</li>
+                  <li><strong>Render:</strong> Hosts the Tuneable API</li>
+                  <li><strong>MongoDB:</strong> Stores account and platform data</li>
+                  <li><strong>Cloudflare:</strong> Hosts the website (Pages) and uploaded files (R2)</li>
+                  <li><strong>Resend:</strong> Sends account and notification email</li>
                 </ul>
                 <p className="mb-2">
                   All service providers are contractually obligated to protect your information and use it only for the purposes we specify.
@@ -258,8 +260,11 @@ const PrivacyPolicy: React.FC = () => {
                 <h3 className="text-xl font-medium text-gray-900">5.3 Right to Erasure ("Right to be Forgotten")</h3>
                 <p className="mb-2">
                   You can delete your account in the Tuneable iOS or Android app (Profile → Settings → Delete account),
-                  or request deletion by emailing <strong>hi@tuneable.stream</strong>. We will delete or anonymize your
-                  personal data within 30 days, except where we are required to retain it for:
+                  or on the website (your profile → Settings → Security → Delete account),
+                  or request deletion by emailing <strong>hi@tuneable.stream</strong>. Deletion in the app or on the
+                  website takes effect immediately: we remove your sign-in details and public profile. Tips, party
+                  activity, and payment records stay attached to an anonymized account. We also keep data where we
+                  are required to retain it for:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li>Legal or regulatory compliance (e.g., financial records, tax information)</li>
@@ -365,7 +370,8 @@ const PrivacyPolicy: React.FC = () => {
 
                 <h3 className="text-xl font-medium text-gray-900">7.2 Account Deletion</h3>
                 <p className="mb-2">
-                  When you delete your account, we will delete your personal information within 30 days, except where we are required 
+                  When you delete your account, we remove your sign-in details and public profile immediately. Tips,
+                  party activity, and payment records remain on an anonymized account. We also retain information where we are required
                   to retain it for:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
@@ -431,8 +437,7 @@ const PrivacyPolicy: React.FC = () => {
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                   <li><strong>Stripe:</strong> Payment processing may involve data transfer to the United States (protected by Stripe's 
                   compliance with international data protection standards)</li>
-                  <li><strong>Cloud Infrastructure:</strong> Our hosting providers may store data in various locations (protected by 
-                  appropriate safeguards)</li>
+                  <li><strong>Render, MongoDB, Cloudflare, and Resend:</strong> These providers may process data outside the UK, including in the United States, under their own transfer safeguards</li>
                   <li><strong>OAuth Providers:</strong> Authentication services may process data in their respective jurisdictions</li>
                 </ul>
                 <p className="mb-2">

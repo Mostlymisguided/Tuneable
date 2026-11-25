@@ -122,7 +122,7 @@ export function ProfileSettingsSheet({
           onPress: () => {
             Alert.alert(
               'Confirm deletion',
-              'Are you sure? Your profile, wallet balance, and personal data will be removed.',
+              'Your name, email, and sign-in details are removed. Unspent wallet balance is cleared and is not refunded. Tips and payment records stay in anonymized form.',
               [
                 { text: 'Cancel', style: 'cancel' },
                 {

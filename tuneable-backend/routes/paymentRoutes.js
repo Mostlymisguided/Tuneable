@@ -138,54 +138,12 @@ router.post('/create-checkout-session', authMiddleware, async (req, res) => {
   }
 });
 
-// Create Stripe Checkout Session for Share Purchase (LIVE MODE)
-router.post('/create-share-checkout-session', authMiddleware, async (req, res) => {
-  try {
-    const { amount, currency = 'gbp', packageId, shares } = req.body;
-    const userId = req.user.uuid;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
-
-    if (!stripeLive) {
-      return res.status(500).json({ error: 'Live Stripe key not configured. Share purchases require live mode.' });
-    }
-
-    const session = await stripeLive.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: currency,
-            product_data: {
-              name: 'Tuneable Share Purchase',
-              description: shares 
-                ? `Purchase ${shares} share${shares > 1 ? 's' : ''} in Tuneable`
-                : `Purchase shares in Tuneable`,
-            },
-            unit_amount: Math.round(amount * 100),
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join-us?success=true&amount=${amount}&packageId=${packageId || 'custom'}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/join-us?canceled=true`,
-      metadata: {
-        userId: userId,
-        amount: amount.toString(),
-        type: 'share_purchase',
-        packageId: packageId || 'custom',
-        shares: shares ? shares.toString() : ''
-      },
-    });
-
-    res.json({ sessionId: session.id, url: session.url });
-  } catch (error) {
-    console.error('Stripe Share Purchase Error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
+// Share checkout is closed. A public card payment described as shares is not an allotment,
+// and it is not a lawful way to offer shares. Interest is collected at /join-us.
+router.post('/create-share-checkout-session', authMiddleware, (_req, res) => {
+  res.status(410).json({
+    error: 'Share purchases are closed. Register interest at /join-us. Sending that form does not buy shares.',
+  });
 });
 
 async function retrieveCheckoutSessionForConfirm(sessionId) {

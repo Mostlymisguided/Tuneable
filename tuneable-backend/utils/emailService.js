@@ -1325,6 +1325,51 @@ async function sendCollectiveInviteEmail({ to, recipientName, inviterName, colle
   }
 }
 
+async function sendFundingInterestEmail({ name, email, note }) {
+  const he = require('he');
+  const esc = (value) => he.encode(String(value || ''));
+  const inbox = process.env.FUNDING_INTEREST_EMAIL || 'hi@tuneable.stream';
+  const recipients = [...new Set([inbox, ADMIN_EMAIL].filter(Boolean))];
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: recipients,
+    replyTo: email,
+    subject: `Community funding interest from ${name}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #9333ea;">Someone asked to hear about community funding</h2>
+        <p>This is not a share purchase and no money was taken.</p>
+        <p><strong>Name:</strong> ${esc(name)}</p>
+        <p><strong>Email:</strong> ${esc(email)}</p>
+        <p><strong>Note:</strong></p>
+        <p>${esc(note || 'No note').replace(/\r?\n/g, '<br>')}</p>
+      </div>
+    `,
+  });
+  if (error) {
+    console.error('Error sending funding interest email:', error);
+    return false;
+  }
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'We received your note about Tuneable',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <p>Hi ${esc(name)},</p>
+          <p>Thanks for asking to hear about community funding for Tuneable. This email does not buy shares, and it does not give you any stake in the company.</p>
+          <p>If a funding round opens, we will write to this address.</p>
+        </div>
+      `,
+    });
+  } catch (confirmErr) {
+    console.error('Funding interest saved to the team, confirmation email failed:', confirmErr.message);
+  }
+  return true;
+}
+
 module.exports = {
   sendCreatorApplicationNotification,
   sendClaimNotification,
@@ -1347,4 +1392,5 @@ module.exports = {
   sendPayoutRejectedNotification,
   sendRightsOutreachEmail,
   sendCollectiveInviteEmail,
+  sendFundingInterestEmail,
 };

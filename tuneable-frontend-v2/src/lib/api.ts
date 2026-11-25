@@ -419,17 +419,6 @@ export const paymentAPI = {
     return response.data;
   },
   
-  // Create checkout session for share purchases (uses live Stripe mode)
-  createShareCheckoutSession: async (amount: number, currency: string = 'gbp', packageId?: string, shares?: number) => {
-    const response = await api.post('/payments/create-share-checkout-session', {
-      amount,
-      currency,
-      packageId,
-      shares,
-    });
-    return response.data;
-  },
-  
   createPaymentIntent: async (amount: number, currency: string = 'gbp') => {
     const response = await api.post('/payments/create-payment-intent', {
       amount,
@@ -1646,6 +1635,11 @@ export interface HomeListenQueueItem {
 }
 
 export const userAPI = {
+  deleteAccount: async () => {
+    const response = await api.delete('/users/me');
+    return response.data;
+  },
+
   getProfile: async (userId: string) => {
     const response = await api.get(`/users/${encodeURIComponent(userId)}/profile`);
     return response.data;
@@ -3205,6 +3199,16 @@ export const emailAPI = {
 
   sendInvite: async (emails: string[]) => {
     const response = await api.post('/email/invite', { emails });
+    return response.data;
+  },
+
+  registerFundingInterest: async (payload: {
+    name: string;
+    email: string;
+    note?: string;
+    acknowledged: boolean;
+  }) => {
+    const response = await api.post('/email/funding-interest', payload);
     return response.data;
   },
 };

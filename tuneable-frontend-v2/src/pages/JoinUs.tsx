@@ -1,391 +1,155 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, TrendingUp, MessageCircle, Music, Sparkles, Shield, Zap, ArrowRight, Check, Plus, Minus } from 'lucide-react';
-import { paymentAPI } from '../lib/api';
+import { MessageCircle, Music, Users, ArrowRight, Mail } from 'lucide-react';
 import { toast } from '../utils/toast';
-import { useAuth } from '../contexts/AuthContext';
+import { emailAPI } from '../lib/api';
 import { HOW_MONEY_WORKS_PATH } from '../constants';
 
 const JoinUs: React.FC = () => {
-  const { user } = useAuth();
-  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [customShares, setCustomShares] = useState(1);
-  const sharePrice = 10; // £10 per share
+  const [sent, setSent] = useState(false);
 
-  // Share packages - you can customize these
-  const sharePackages = [
-    {
-      id: 'leg-up',
-      name: 'Leg Up',
-      shares: 1,
-      price: 10,
-      description: '1 share',
-      features: [
-        '1 share in Tuneable',
-        'Discord access',
-        'Quarterly updates',
-        'Early feature access',
-        'Help Steer The Direction Of Tuneable',
-      ]
-    },
-    {
-      id: 'starter',
-      name: 'Supporter',
-      shares: 10,
-      price: 100,
-      description: '10 shares',
-      features: [
-        '10 shares in Tuneable',
-        'Discord access',
-        'Quarterly updates',
-        'Early feature access',
-        'Help Steer The Direction Of Tuneable',
-      ]
-    },
-    {
-      id: 'supporter',
-      name: 'Investor',
-      shares: 50,
-      price: 500,
-      description: '50 shares',
-      features: [
-        '50 shares in Tuneable',
-        'Discord access',
-        'Quarterly updates',
-        'Early feature access',
-        'Help Steer The Direction Of Tuneable',
-      ]
-    }
-  ];
-
-  const handlePurchase = async (packageId: string, amount: number) => {
-    if (!user) {
-      toast.error('Please log in to purchase shares');
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!acknowledged) {
+      toast.error('Confirm that this form does not buy shares');
       return;
     }
-
-    setSelectedPackage(packageId);
     setIsLoading(true);
     try {
-      // Use the dedicated share purchase endpoint (live Stripe mode)
-      const pkg = sharePackages.find(p => p.id === packageId);
-      const shares = pkg ? pkg.shares : customShares;
-      
-      const response = await paymentAPI.createShareCheckoutSession(
-        amount, 
-        'gbp', 
-        packageId, 
-        shares
-      );
-      
-      if (response.url) {
-        // Store package info in sessionStorage for after payment
-        sessionStorage.setItem('pendingSharePurchase', JSON.stringify({
-          packageId,
-          amount,
-          shares,
-          timestamp: Date.now()
-        }));
-        
-        // Redirect to Stripe Checkout
-        window.location.href = response.url;
-      } else {
-        throw new Error('No checkout URL received');
-      }
+      await emailAPI.registerFundingInterest({ name, email, note, acknowledged });
+      setSent(true);
     } catch (error: any) {
-      console.error('Payment error:', error);
-      toast.error(error.response?.data?.error || 'Failed to create payment session');
+      toast.error(error.response?.data?.error || 'Could not send that. Email hi@tuneable.stream instead.');
+    } finally {
       setIsLoading(false);
-      setSelectedPackage(null);
     }
-  };
-
-  const handleCustomPurchase = () => {
-    const amount = customShares * sharePrice;
-    if (customShares < 1) {
-      toast.error('Please select at least 1 share');
-      return;
-    }
-    if (!user) {
-      toast.error('Please log in to purchase shares');
-      return;
-    }
-    handlePurchase('custom', amount);
-  };
-
-  const handleSharesChange = (delta: number) => {
-    const newShares = Math.max(1, Math.min(100, customShares + delta));
-    setCustomShares(newShares);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-indigo-800">
-      {/* Hero Section */}
       <section className="text-white relative overflow-hidden pt-24 pb-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            {/* Badge */}
-            <div className="flex justify-center mb-8">
-              <div className="bg-gradient-to-r from-purple-700 to-pink-700 px-6 py-3 rounded-full flex items-center space-x-2 shadow-lg">
-                <TrendingUp className="h-5 w-5 text-yellow-400" />
-                <span className="text-white text-xl font-semibold">Join Our Journey</span>
-              </div>
-            </div>
-            
-            {/* Main Title */}
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              <span className="text-white">Own a Piece of</span>
-              <br />
-              <span className="text-pink-400">Tuneable</span>
-            </h1>
-            
-            {/* Description */}
-            <p className="text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed mb-8">
-              Invest in the future of music discovery. Join us in building a platform that empowers artists and connects music lovers worldwide.
-            </p>
-            <p className="text-base md:text-lg text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-              Tuneable is a Community Interest Company. Shares help fund the mission — they are not a path to billionaire extraction.
-              If Tuneable ever reaches a £1 billion valuation, we commit to becoming a DAO owned and steered by artists and users.
-              {' '}
-              <Link to={HOW_MONEY_WORKS_PATH} className="underline hover:text-white">
-                How we split money
-              </Link>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Share Packages Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Investment Packages
-            </h2>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Choose the package that fits your investment goals
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            {sharePackages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-gray-700 transition-all hover:border-purple-500 hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] hover:scale-105"
-              >
-                <h3 className="text-3xl font-bold text-white mb-2">{pkg.name}</h3>
-                <p className="text-gray-400 mb-6">{pkg.description}</p>
-                
-                <div className="mb-6">
-                  <div className="text-5xl font-bold text-white mb-2">
-                    £{pkg.price.toLocaleString()}
-                  </div>
-                </div>
-
-                <ul className="space-y-3 mb-8">
-                  {pkg.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start">
-                      <Check className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-300">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => handlePurchase(pkg.id, pkg.price)}
-                  disabled={isLoading}
-                  className="w-full py-4 rounded-lg font-semibold text-lg transition-all bg-gray-800 text-white hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 hover:shadow-lg border border-gray-600 hover:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading && selectedPackage === pkg.id ? 'Processing...' : 'Purchase Shares'}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* Custom Amount */}
-          <div className="bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border-2 border-gray-700 max-w-2xl mx-auto">
-            <h3 className="text-2xl font-bold text-white mb-4 text-center">Custom Investment</h3>
-            <p className="text-gray-400 text-center mb-6">
-              Choose the number of shares you'd like to purchase (maximum 100 shares)
-            </p>
-            <div className="space-y-6">
-              <div className="flex items-center justify-center gap-4">
-                <button
-                  onClick={() => handleSharesChange(-1)}
-                  disabled={customShares <= 1 || isLoading}
-                  className="p-3 bg-gray-800 border border-gray-600 rounded-lg text-white hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Decrease shares"
-                >
-                  <Minus className="h-5 w-5" />
-                </button>
-                
-                <div className="text-center min-w-[200px]">
-                  <div className="text-4xl font-bold text-white mb-2">
-                    {customShares}
-                  </div>
-                  <div className="text-gray-400 text-sm">
-                    {customShares === 1 ? 'share' : 'shares'}
-                  </div>
-                  <div className="text-2xl font-semibold text-purple-400 mt-2">
-                    £{(customShares * sharePrice).toLocaleString()}
-                  </div>
-                  {customShares >= 100 && (
-                    <div className="text-xs text-yellow-400 mt-1">
-                      Maximum reached
-                    </div>
-                  )}
-                </div>
-                
-                <button
-                  onClick={() => handleSharesChange(1)}
-                  disabled={customShares >= 100 || isLoading}
-                  className="p-3 bg-gray-800 border border-gray-600 rounded-lg text-white hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Increase shares"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              </div>
-              
-              <div className="flex justify-center">
-                <button
-                  onClick={handleCustomPurchase}
-                  disabled={isLoading}
-                  className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? 'Processing...' : `Purchase ${customShares} ${customShares === 1 ? 'Share' : 'Shares'}`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Why Invest in Tuneable?
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
-              <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                <TrendingUp className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Growth Potential</h3>
-              <p className="text-gray-300">
-                Be part of a platform that's revolutionizing how music is discovered and artists are supported.
-              </p>
-            </div>
-
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
-              <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                <Music className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Support Artists</h3>
-              <p className="text-gray-300">
-                Your investment funds a CIC built so artists keep more of every tip over time — 80% today, 90% at scale — not a vehicle for private fortune.
-              </p>
-            </div>
-
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
-              <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                <Users className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Join the Community</h3>
-              <p className="text-gray-300">
-                Connect with other investors and music enthusiasts in our exclusive Discord community.
-              </p>
-            </div>
-
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
-              <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                <Zap className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Early Access</h3>
-              <p className="text-gray-300">
-                Get first access to new features and help shape the future of Tuneable.
-              </p>
-            </div>
-
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
-              <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                <Shield className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Transparent</h3>
-              <p className="text-gray-300">
-                Regular updates on our progress, financials, and roadmap. You'll always know where we're headed.
-              </p>
-            </div>
-
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
-              <div className="bg-purple-600/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                <Sparkles className="h-8 w-8 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">Community-owned future</h3>
-              <p className="text-gray-300">
-                At a £1 billion valuation we commit to full community governance: a DAO for artists and users, consistent with our CIC purpose.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 backdrop-blur-sm rounded-2xl p-12 border-2 border-purple-500/50 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-              Ready to Join Us?
-            </h2>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Connect with our community, become a creator, or invest in our future. Choose your path.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href="https://discord.gg/hwGMZV89up"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg"
-              >
-                <MessageCircle className="h-5 w-5 mr-2" />
-                Join Discord
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </a>
-              
-              <Link
-                to="/register"
-                className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
-              >
-                <Users className="h-5 w-5 mr-2" />
-                Join as a User
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Link>
-              
-              <Link
-                to="/creator/register"
-                className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold text-lg hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
-              >
-                <Music className="h-5 w-5 mr-2" />
-                Become a Creator
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer Note */}
-      <section className="py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <p className="text-gray-400 text-sm">
-            * Investment involves risk. Please review all terms and conditions before investing. 
-            Share ownership and terms are subject to our investment agreement.
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+            Community funding is paused
+          </h1>
+          <p className="text-xl text-gray-200 leading-relaxed mb-6">
+            Tuneable is a Community Interest Company. We are not taking payments for shares while we
+            sort the legal structure of any future round.
           </p>
+          <p className="text-base text-indigo-100 leading-relaxed">
+            Registering interest does not buy shares, and it does not give you any stake in Tuneable.
+            {' '}
+            <Link to={HOW_MONEY_WORKS_PATH} className="underline hover:text-white">
+              How tips are split
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      <section className="pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-xl mx-auto bg-gray-900/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-700">
+          {sent ? (
+            <div className="text-center">
+              <Mail className="h-10 w-10 text-purple-300 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white mb-3">We have your note</h2>
+              <p className="text-gray-300">
+                If a funding round opens, we will email {email}. Nothing has been purchased.
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <h2 className="text-2xl font-bold text-white">Hear about a future round</h2>
+              <div>
+                <label htmlFor="funding-name" className="block text-sm text-gray-300 mb-1">Name</label>
+                <input
+                  id="funding-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={80}
+                  required
+                  className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
+                />
+              </div>
+              <div>
+                <label htmlFor="funding-email" className="block text-sm text-gray-300 mb-1">Email</label>
+                <input
+                  id="funding-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
+                />
+              </div>
+              <div>
+                <label htmlFor="funding-note" className="block text-sm text-gray-300 mb-1">Note (optional)</label>
+                <textarea
+                  id="funding-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  maxLength={1000}
+                  rows={4}
+                  className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
+                />
+              </div>
+              <label className="flex items-start gap-3 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={acknowledged}
+                  onChange={(e) => setAcknowledged(e.target.checked)}
+                  className="mt-1"
+                  required
+                />
+                <span>I understand this form does not buy shares or any other stake in Tuneable.</span>
+              </label>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 rounded-lg font-semibold bg-gradient-to-r from-purple-600 to-pink-600 text-white disabled:opacity-50"
+              >
+                {isLoading ? 'Sending…' : 'Register interest'}
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
+
+      <section className="py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl font-bold text-white mb-6">Use Tuneable today</h2>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="https://discord.gg/hwGMZV89up"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold"
+            >
+              <MessageCircle className="h-5 w-5 mr-2" />
+              Join Discord
+              <ArrowRight className="h-5 w-5 ml-2" />
+            </a>
+            <Link
+              to="/register"
+              className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold"
+            >
+              <Users className="h-5 w-5 mr-2" />
+              Join as a listener
+              <ArrowRight className="h-5 w-5 ml-2" />
+            </Link>
+            <Link
+              to="/creator/register"
+              className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold"
+            >
+              <Music className="h-5 w-5 mr-2" />
+              Become a creator
+              <ArrowRight className="h-5 w-5 ml-2" />
+            </Link>
+          </div>
         </div>
       </section>
     </div>
@@ -393,4 +157,3 @@ const JoinUs: React.FC = () => {
 };
 
 export default JoinUs;
-

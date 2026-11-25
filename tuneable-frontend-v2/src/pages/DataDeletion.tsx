@@ -22,15 +22,16 @@ const DataDeletion: React.FC = () => {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">How to Delete Your Account and Data</h2>
               <p className="text-gray-700 mb-6">
-                You have the right to delete your account and all associated data at any time. Here's how to do it:
+                You can delete your account at any time. Here is what that does:
               </p>
 
               <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
                 <div className="flex">
                   <div className="ml-3">
                     <p className="text-sm text-blue-700">
-                      <strong>Important:</strong> Account deletion is permanent and cannot be undone. 
-                      All your data, including music preferences, party history, and account balance, will be permanently removed.
+                      <strong>Important:</strong> Account deletion is permanent and cannot be undone.
+                      Your sign-in details and profile are removed. Tips and payment records stay in anonymized form.
+                      Unspent wallet balance is cleared and is not refunded.
                     </p>
                   </div>
                 </div>
@@ -38,17 +39,24 @@ const DataDeletion: React.FC = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Method 1: Delete Account Through App</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Method 1: Delete the account yourself</h2>
               <div className="space-y-4">
+                <p className="text-gray-700">In the iOS or Android app:</p>
                 <ol className="list-decimal pl-6 space-y-3 text-gray-700">
-                  <li>Log in to your Tuneable account in the mobile app</li>
+                  <li>Log in to your Tuneable account</li>
                   <li>Open your Profile tab</li>
                   <li>Tap the settings gear, then choose <strong>Delete account</strong></li>
                   <li>Confirm deletion twice when prompted</li>
-                  <li>Your account is deactivated immediately and personal data is anonymized</li>
+                </ol>
+                <p className="text-gray-700">On the website:</p>
+                <ol className="list-decimal pl-6 space-y-3 text-gray-700">
+                  <li>Log in and open your profile</li>
+                  <li>Open Settings, then the Security tab</li>
+                  <li>Choose <strong>Delete account</strong>, then <strong>Delete forever</strong></li>
                 </ol>
                 <p className="text-gray-700">
-                  On the website, you can also request deletion via email (Method 2) until in-web deletion is available.
+                  The account is deactivated immediately. Your name, email, phone, password, profile photo,
+                  location, and connected logins are removed.
                 </p>
               </div>
             </section>
@@ -70,7 +78,7 @@ const DataDeletion: React.FC = () => {
                       <li>Any additional verification information if requested</li>
                     </ul>
                   </li>
-                  <li>We will process your request within 7 business days</li>
+                  <li>We will process your request within 30 days</li>
                 </ol>
               </div>
             </section>
@@ -99,16 +107,13 @@ const DataDeletion: React.FC = () => {
             <section className="mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">What Data Will Be Deleted</h2>
               <div className="space-y-4">
-                <p className="text-gray-700">When you delete your account, the following data will be permanently removed:</p>
+                <p className="text-gray-700">When you delete your account, we remove:</p>
                 <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                  <li>Account information (username, email, profile details)</li>
-                  <li>Music preferences and listening history</li>
-                  <li>Party participation history and song bids</li>
-                  <li>Payment history and account balance</li>
-                  <li>Social connections and friend lists</li>
-                  <li>Profile pictures and uploaded content</li>
-                  <li>Location data and preferences</li>
-                  <li>All personal settings and configurations</li>
+                  <li>Your name, username, email, phone number, and password</li>
+                  <li>Your profile photo and connected logins (Apple, Google, Facebook, Instagram, SoundCloud, Spotify)</li>
+                  <li>Saved location, social links, and creator bio</li>
+                  <li>Push notification tokens</li>
+                  <li>Unspent wallet balance. This is cleared and is not refunded. Spend it or, if you are a creator, request a payout before you delete the account</li>
                 </ul>
               </div>
             </section>
@@ -117,16 +122,17 @@ const DataDeletion: React.FC = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Data That May Be Retained</h2>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  Some data may be retained for legal or regulatory purposes:
+                  Some records stay, attached to an anonymized account rather than your name:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                  <li>Transaction records required for tax or accounting purposes</li>
-                  <li>Data required to comply with legal obligations</li>
-                  <li>Anonymized usage data for service improvement</li>
-                  <li>Data necessary to prevent fraud or abuse</li>
+                  <li>Tips you placed, and which parties or tunes they relate to</li>
+                  <li>Wallet and payout records required for accounting and tax</li>
+                  <li>Creator earnings already owed, so they can still be paid</li>
+                  <li>Comments or other content you posted, which may remain visible without your profile</li>
+                  <li>Records we need to keep for fraud prevention or a legal claim</li>
                 </ul>
                 <p className="text-gray-700 mt-4">
-                  Any retained data will be anonymized and used only for the purposes stated above.
+                  Backups of the live database are overwritten on the host&apos;s normal backup cycle. We do not run a separate 90-day purge of those backups.
                 </p>
               </div>
             </section>
@@ -135,10 +141,9 @@ const DataDeletion: React.FC = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Timeline for Deletion</h2>
               <div className="space-y-4">
                 <ul className="list-disc pl-6 space-y-2 text-gray-700">
-                  <li><strong>Immediate:</strong> Account access is disabled</li>
-                  <li><strong>Within 24 hours:</strong> Personal data is removed from active systems</li>
-                  <li><strong>Within 30 days:</strong> Data is removed from backup systems</li>
-                  <li><strong>Within 90 days:</strong> All data is permanently deleted (except legally required data)</li>
+                  <li><strong>Immediate:</strong> If you delete the account in the app or on the website, sign-in stops and the profile fields above are removed then</li>
+                  <li><strong>Email requests:</strong> We process these within 30 days</li>
+                  <li><strong>Kept records:</strong> Tips, payment records, and unpaid creator earnings stay as described above</li>
                 </ul>
               </div>
             </section>

@@ -109,6 +109,7 @@ import LabelLinkModal from '../components/LabelLinkModal';
 import CollectiveLinkModal from '../components/CollectiveLinkModal';
 import ReportModal from '../components/ReportModal';
 import PasswordSecuritySection from '../components/PasswordSecuritySection';
+import DeleteAccountSection from '../components/DeleteAccountSection';
 import BlockedUsersSection from '../components/BlockedUsersSection';
 import { useBlockedUsersStore } from '../stores/blockedUsersStore';
 import MediaChampions from '../components/MediaChampions';
@@ -4245,10 +4246,11 @@ const UserProfile: React.FC = () => {
               </div>
             )}
 
-            {activeSettingsTab === 'security' && (
+            {isOwnProfile && activeSettingsTab === 'security' && (
               <>
                 <PasswordSecuritySection />
                 <BlockedUsersSection />
+                <DeleteAccountSection />
               </>
             )}
 

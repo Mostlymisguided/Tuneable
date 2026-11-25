@@ -9,7 +9,8 @@ const {
   sendWelcomeEmail,
   sendOwnershipNotification,
   sendClaimStatusNotification,
-  sendInviteEmail
+  sendInviteEmail,
+  sendFundingInterestEmail
 } = require('../utils/emailService');
 
 const rateLimit = require('../middleware/rateLimit');
@@ -29,6 +30,20 @@ const resetRequestEmailLimit = rateLimit({
   message: 'A reset link was sent recently. Please check your inbox (and spam folder) before trying again.',
 });
 const resetConfirmLimit = rateLimit({ name: 'reset-confirm', windowMs: FIFTEEN_MINUTES, max: 10 });
+const fundingInterestIpLimit = rateLimit({
+  name: 'funding-interest-ip',
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many requests. Email hi@tuneable.stream if you still want to register interest.',
+});
+const fundingInterestEmailLimit = rateLimit({
+  name: 'funding-interest-email',
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  perIp: false,
+  key: (req) => String(req.body?.email || '').trim(),
+  message: 'We already have a recent note from this email address.',
+});
 
 // @route   POST /api/email/verify/send
 // @desc    Send email verification
@@ -464,6 +479,42 @@ router.get('/unsubscribe', async (req, res) => {
         </body>
       </html>
     `);
+  }
+});
+
+// @route   POST /api/email/funding-interest
+// @desc    Register interest in a future community funding round. Does not sell shares.
+// @access  Public
+router.post('/funding-interest', fundingInterestIpLimit, fundingInterestEmailLimit, [
+  body('name').trim().isLength({ min: 1, max: 80 }).withMessage('Name is required'),
+  body('email').isEmail().withMessage('A valid email is required'),
+  body('note').optional({ values: 'falsy' }).isLength({ max: 1000 }).withMessage('Note is too long'),
+  body('acknowledged').custom((value) => value === true).withMessage('Confirm this does not buy shares'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: errors.array()[0].msg });
+    }
+
+    const name = String(req.body.name).trim();
+    const email = String(req.body.email).trim();
+    const note = String(req.body.note || '').trim();
+    const sent = await sendFundingInterestEmail({ name, email, note });
+    if (!sent) {
+      return res.status(503).json({
+        error: 'We could not send that just now. Email hi@tuneable.stream and we will record it.',
+      });
+    }
+
+    res.json({
+      message: 'Thanks. We will email you if community funding opens. This does not buy shares.',
+    });
+  } catch (error) {
+    console.error('Error recording funding interest:', error);
+    res.status(503).json({
+      error: 'We could not send that just now. Email hi@tuneable.stream and we will record it.',
+    });
   }
 });
 

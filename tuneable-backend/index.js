@@ -5,9 +5,10 @@ const { initializeSocketIO } = require('./utils/socketIO'); // Import Socket.IO 
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env';
 require('dotenv').config({ path: envFile });
 require('./config/jwtSecret').assertJwtSecretConfigured();
+require('./config/sessionSecret').assertSessionSecretConfigured();
 
 console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('MONGO_URI:', process.env.MONGO_URI);
+console.log('MONGO_URI:', process.env.MONGO_URI ? 'set' : 'missing');
 
 const cors = require('cors');
 const path = require('path');
@@ -218,11 +219,8 @@ app.set('trust proxy', 1);
 // MemoryStore is process-local. saveUninitialized:false so health checks / anonymous
 // API traffic do not accumulate sessions until RSS exceeds the Render cap.
 const sessionStore = new session.MemoryStore();
-if (!process.env.SESSION_SECRET) {
-  console.warn('⚠️  SESSION_SECRET is not set; OAuth session cookies are signed with a public default. Set it to a long random string.');
-}
 const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET || 'your-session-secret-key',
+  secret: require('./config/sessionSecret').getSessionSecret(),
   resave: false,
   saveUninitialized: false,
   store: sessionStore,
@@ -398,7 +396,12 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), asy
         });
       }
     } else if (session.metadata && session.metadata.type === 'share_purchase') {
-      console.log(`✅ Share purchase successful: User ${session.metadata.userId}`);
+      // Checkout is closed. Acknowledge old events so Stripe stops retrying.
+      // This does not allot shares or update a register.
+      console.error(
+        `Share purchase webhook received for user ${session.metadata.userId} session ${session.id}. ` +
+        'No shares were allotted. Reconcile the Stripe payment manually.'
+      );
     } else {
       console.log(`⚠️ Unhandled checkout session type: ${session.metadata?.type || 'no metadata'}`);
     }
