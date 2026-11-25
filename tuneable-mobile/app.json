@@ -96,7 +96,17 @@
           "cameraPermission": "Tuneable uses your camera so you can take a profile picture.",
           "microphonePermission": false
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "extraProguardRules": "-keepattributes SourceFile,LineNumberTable\n-renamesourcefileattribute SourceFile"
+          }
+        }
+      ],
+      "./plugins/withR8Optimize"
     ],
     "experiments": {
       "typedRoutes": true

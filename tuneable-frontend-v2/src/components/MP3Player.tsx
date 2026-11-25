@@ -13,17 +13,6 @@ import { penceToPoundsNumber, poundsToPence } from '../utils/currency';
 import { ensureSpendableBalance } from '../utils/spendableBalance';
 import { computeChampionTipContext, averageTipPounds } from '../utils/tipStats';
 import { toast } from '../utils/toast';
-import {
-  isNativeAudioPlatform,
-  loadNativeTrack,
-  playNativeAudio,
-  pauseNativeAudio,
-  destroyNativeAudio,
-  setNativeAudioEndedCallback,
-  getNativeCurrentTime,
-  getNativeDuration,
-  seekNativeAudio,
-} from '../services/nativeAudioPlayer';
 import { claimMediaSession, clearMediaSession, updateMediaSession } from '../utils/mediaSession';
 
 interface PlayerMedia {
@@ -186,65 +175,6 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     try {
       const fullUrl = resolveUploadAudioUrl(audioUrl);
 
-      if (isNativeAudioPlatform()) {
-        setIsPlayerReady(false);
-        setIsLoading(true);
-        const pending = useWebPlayerStore.getState().pendingSeek;
-        const pendingKey = String(media._id || media.id || '');
-        if (!pending || pending.mediaKey !== pendingKey) {
-          setCurrentTime(0);
-        }
-        setDuration(0);
-
-        const artistName = typeof media.artist === 'string'
-          ? media.artist
-          : (media as any).artist?.[0]?.name || 'Unknown Artist';
-
-        setNativeAudioEndedCallback(() => {
-          if (cancelled) return;
-          markCompleted();
-          if (currentPartyId && media?._id && isHost) {
-            partyAPI.completeMedia(currentPartyId, media._id)
-              .then(() => next())
-              .catch(() => next());
-          } else {
-            next();
-          }
-        });
-
-        const mediaKey = media._id || media.id;
-        loadNativeTrack(fullUrl, {
-          title: media.title,
-          artist: artistName,
-          artwork: media.coverArt,
-        })
-          .then(async (loaded) => {
-            if (cancelled || !loaded) return;
-            const current = useWebPlayerStore.getState().currentMedia;
-            const currentKey = current?._id || current?.id;
-            if (!mediaKey || mediaKey !== currentKey) return;
-            const dur = await getNativeDuration().catch(() => 0);
-            if (cancelled) return;
-            setDuration(dur || media.duration || 0);
-            setIsPlayerReady(true);
-            setIsLoading(false);
-          })
-          .catch((error) => {
-            if (cancelled) return;
-            console.error('MP3Player: Native audio init failed:', error);
-            setIsLoading(false);
-            const current = useWebPlayerStore.getState().currentMedia;
-            const currentKey = current?._id || current?.id;
-            if (mediaKey && mediaKey === currentKey) {
-              useWebPlayerStore.getState().next();
-            }
-          });
-
-        return () => {
-          cancelled = true;
-        };
-      }
-
       console.log('MP3Player: Setting audio source to:', fullUrl);
       console.log('MP3Player: Original URL was:', audioUrl);
       
@@ -349,11 +279,6 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (isNativeAudioPlatform()) {
-        setNativeAudioEndedCallback(null);
-        destroyNativeAudio().catch(() => {});
-        return;
-      }
       if (audioRef.current) {
         audioRef.current.onerror = null;
         audioRef.current.onended = null;
@@ -364,34 +289,9 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     };
   }, []);
 
-  // Native time polling
-  useEffect(() => {
-    if (!isNativeAudioPlatform() || !isPlayerReady) return;
-    const interval = setInterval(async () => {
-      try {
-        const t = await getNativeCurrentTime();
-        setCurrentTime(t);
-      } catch {
-        // Player not active
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [isPlayerReady]);
-
   // Handle play/pause
   useEffect(() => {
     if (!isPlayerReady) return;
-
-    if (isNativeAudioPlatform()) {
-      const action = isPlaying ? playNativeAudio : pauseNativeAudio;
-      action().catch((error) => {
-        console.error('MP3Player: Native play/pause error:', error);
-        if (useWebPlayerStore.getState().isPlaying) {
-          useWebPlayerStore.getState().pause();
-        }
-      });
-      return;
-    }
 
     if (!audioRef.current) return;
 
@@ -458,18 +358,14 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
   // Handle seeking
   const handleSeek = (newTime: number) => {
     const limit = duration || audioRef.current?.duration || durationRef.current || 0;
-    if (!limit && !isNativeAudioPlatform()) return;
+    if (!limit) return;
     
     isSeekingRef.current = true;
-    const clampedTime = limit ? Math.max(0, Math.min(newTime, limit)) : Math.max(0, newTime);
+    const clampedTime = Math.max(0, Math.min(newTime, limit));
     setCurrentTime(clampedTime);
     
     try {
-      if (isNativeAudioPlatform()) {
-        seekNativeAudio(clampedTime).catch((error) => {
-          console.error('MP3Player: Native seek error:', error);
-        });
-      } else if (audioRef.current) {
+      if (audioRef.current) {
         audioRef.current.currentTime = clampedTime;
       }
     } catch (error) {
@@ -491,7 +387,7 @@ const MP3Player: React.FC<MP3PlayerProps> = ({ media }) => {
     const key = String(media._id || media.id || '');
     if (pending.mediaKey !== key) return;
     const limit = audioRef.current?.duration || duration || media.duration || 0;
-    if (!limit && !isNativeAudioPlatform()) return;
+    if (!limit) return;
     handleSeek(pending.time);
     useWebPlayerStore.getState().clearPendingSeek();
   }, [pendingSeekNonce, isPlayerReady, duration, media?.id, media?._id]);

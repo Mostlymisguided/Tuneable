@@ -151,11 +151,6 @@ const allowedOrigins = [
   'http://127.0.0.1:5173', 
   'http://127.0.0.1:5174', 
   'http://127.0.0.1:5175',
-  // Capacitor native shell (WebView origin)
-  'capacitor://localhost',
-  'http://localhost',
-  'https://localhost',
-  'ionic://localhost',
   // Production - tuneable.stream (primary)
   'https://tuneable.stream',
   'https://www.tuneable.stream',

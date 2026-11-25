@@ -1,14 +1,5 @@
-import { Capacitor } from '@capacitor/core';
-
-/** Custom URL scheme — must match appId `stream.tuneable.app` and native project config. */
-export const NATIVE_AUTH_SCHEME = 'stream.tuneable.app';
-
 const DEFAULT_DEV_API = 'http://localhost:8000/api';
 const DEFAULT_PROD_API = 'https://tuneable.stream/api';
-
-export function isNativeApp(): boolean {
-  return Capacitor.isNativePlatform();
-}
 
 /** API base including `/api` suffix, e.g. `https://tuneable.stream/api` */
 export function getApiBaseUrl(): string {
@@ -25,9 +16,6 @@ export function getApiOrigin(): string {
 
 /** OAuth return URL passed to backend `redirect` query param */
 export function getOAuthCallbackRedirect(): string {
-  if (isNativeApp()) {
-    return `${NATIVE_AUTH_SCHEME}://auth/callback?oauth_success=true`;
-  }
   return `${window.location.origin}/auth/callback?oauth_success=true`;
 }
 

@@ -61,7 +61,6 @@ import Onboarding from './pages/Onboarding';
 import { needsOnboarding } from './utils/authHelpers';
 import { refreshArtistCatalogIndex } from './utils/artistCatalogIndex';
 import Notifications from './pages/Notifications';
-import { AuthDeepLinkListener } from './capacitor/authDeepLink';
 import { getApiOrigin } from './utils/platform';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -231,7 +230,6 @@ const AppContent = () => {
   return (
     <Router>
       <SeoManager />
-      <AuthDeepLinkListener />
       <PlayAuthRedirectBinder />
       <div className="flex min-h-screen flex-col">
         <Navbar />

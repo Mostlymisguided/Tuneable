@@ -13,7 +13,6 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
-import { Browser } from '@capacitor/browser';
 import { authAPI } from '../lib/api';
 import {
   PASSWORD_HINT,
@@ -22,7 +21,7 @@ import {
   passwordLengthError,
   submitWithPasswordWarnings,
 } from '../utils/passwordPolicy';
-import { buildOAuthStartUrl, isNativeApp } from '../utils/platform';
+import { buildOAuthStartUrl } from '../utils/platform';
 import {
   isAppleWebSignInConfigured,
   signInWithAppleWeb,
@@ -279,11 +278,7 @@ const AuthPage: React.FC = () => {
       invitePlaceId: formData.invitePlaceId || undefined,
     });
 
-    if (isNativeApp()) {
-      await Browser.open({ url: oauthUrl });
-    } else {
-      window.location.href = oauthUrl;
-    }
+    window.location.href = oauthUrl;
   };
 
   const handleAppleAuth = async () => {
@@ -296,11 +291,6 @@ const AuthPage: React.FC = () => {
       toast.error(
         'Apple Sign In is not configured yet. Set VITE_APPLE_CLIENT_ID to your Apple Services ID.'
       );
-      return;
-    }
-
-    if (isNativeApp()) {
-      toast.info('Use Sign in with Apple in the Tuneable iOS app.');
       return;
     }
 
