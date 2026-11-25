@@ -117,6 +117,13 @@ const MEDAL_STYLES: Record<
   },
 };
 
+type ScopePill = {
+  placeId: string;
+  label: string;
+  placetype?: string | null;
+  rank?: number | null;
+};
+
 function scopePillClass(selected: boolean) {
   return `inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${
     selected
@@ -238,7 +245,7 @@ const MediaChampions: React.FC<MediaChampionsProps> = ({
   };
 
   const creatorScoped = Boolean(artistUserId || artistName);
-  const scopePills = creatorScoped ? (data?.bestPlaces || []) : homeScopePicks;
+  const scopePills: ScopePill[] = creatorScoped ? (data?.bestPlaces || []) : homeScopePicks;
   const customScope = Boolean(
     selectedLocation?.placeId
     && !scopePills.some((pick) => pick.placeId === selectedLocation.placeId)
